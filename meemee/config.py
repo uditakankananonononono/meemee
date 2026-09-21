@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_json: bool = True
     readiness_min_free_bytes: int = 100_000_000
+    default_daily_jobs: int = 100
     oidc_role_claim: str = "roles"
     oidc_client_id: str | None = None
     oidc_client_secret: str | None = None

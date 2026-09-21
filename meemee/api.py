@@ -23,6 +23,7 @@ from .observability import (
     metrics_response,
 )
 from .oidc import OIDCConfig, OIDCValidator
+from .quotas import QuotaExceeded, QuotaStore
 from .rate_limit import RateLimitMiddleware, SQLiteRateLimiter
 from .runtime import build_agent
 from .streaming import job_event_stream
@@ -38,6 +39,7 @@ app.add_middleware(RateLimitMiddleware, limiter=SQLiteRateLimiter(settings.data_
 agent = build_agent(settings)
 jobs = JobStore(settings.data_dir / "jobs.sqlite3")
 idempotency = IdempotencyStore(settings.data_dir / "idempotency.sqlite3")
+quotas = QuotaStore(settings.data_dir / "quotas.sqlite3", settings.default_daily_jobs)
 tokens = TokenStore(settings.data_dir / "auth.sqlite3")
 audit = AuditLog(settings.data_dir / "audit.sqlite3")
 oidc = None
@@ -134,8 +136,12 @@ def create_job(
         run_at = datetime.fromisoformat(request.run_at.replace("Z", "+00:00")) if request.run_at else None
     except ValueError as exc:
         raise HTTPException(422, "run_at must be ISO 8601") from exc
+    try:
+        quota = quotas.consume_job(principal.id)
+    except QuotaExceeded as exc:
+        raise HTTPException(429, str(exc), headers={"Retry-After":"86400"}) from exc
     ident = jobs.enqueue(request.goal, run_at)
-    response = {"id": ident}
+    response = {"id": ident, "quota": quota}
     if idempotency_key:
         idempotency.put(principal.id, "/v1/jobs", idempotency_key, payload, 200, response)
     audit.append(principal.id, "job.create", ident, "success", {"scheduled": bool(run_at)})
@@ -242,3 +248,19 @@ def stream_job_events(request: Request, job_id: str, after: int = 0):
         media_type="text/event-stream",
         headers={"Cache-Control":"no-cache, no-transform", "X-Accel-Buffering":"no"},
     )
+
+
+@app.get("/v1/quota")
+def quota_status(principal=jobs_write_dependency):
+    return quotas.status(principal.id)
+
+
+class QuotaRequest(BaseModel):
+    daily_jobs: int = Field(ge=1, le=1_000_000)
+
+
+@app.put("/v1/quota/{principal_id}", dependencies=[Depends(auth.dependency("admin"))])
+def set_quota(principal_id: str, request: QuotaRequest):
+    quotas.set_limit(principal_id, request.daily_jobs)
+    audit.append("api", "quota.update", principal_id, "success", {"daily_jobs": request.daily_jobs})
+    return quotas.status(principal_id)
