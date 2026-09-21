@@ -9,6 +9,7 @@ from .llm import Model
 from .memory import MemoryStore
 from .planner import TaskPlanner
 from .policy import PolicyEngine
+from .tool_audit import redact
 from .tools.base import ToolRegistry
 from .types import Risk, RunReport
 
@@ -70,7 +71,7 @@ class Agent:
                     result = {"ok": False, "error": f"approval denied for {tool.risk.value} tool"}
                 else:
                     result = (await self.tools.execute(call.name, call.arguments)).model_dump()
-            event = {"tool": call.name, "arguments": call.arguments, "result": result}
+            event = {"tool": call.name, "arguments": redact(call.arguments), "result": redact(result)}
             events.append(event)
             self.memory.add(run_id, "tool", json.dumps(event, default=str))
             messages.append({"role": "tool", "content": json.dumps(event, default=str)})
