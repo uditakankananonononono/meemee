@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     api_token: str | None = None
     shell_allowlist: str = "python3,pytest,ruff,git,ls,find,cat,wc"
     worker_poll_seconds: float = 1.0
+    vault_key: str | None = None
+    browser_headless: bool = True
 
     @property
     def database_path(self) -> Path:

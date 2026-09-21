@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working v1, not a claim to be finished general intelligence.
 
-## Verified in v0.2.0 (15)
+## Verified in v0.3.0 (19)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -19,17 +19,22 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 13. Durable scheduled job queue with atomic multi-process claims, retry limits, and result/error records.
 14. Long-running worker command and job create/status API.
 15. Optional constant-time bearer-token authentication for run and job endpoints.
+16. Concurrent sub-agent delegation with isolated agent instances, bounded concurrency, and ordered result provenance.
+17. AES-256-GCM encrypted local secrets vault with per-record nonces and no secret-value listing.
+18. Playwright Chromium navigation with title/text/status/screenshot capture, public-address enforcement, and workspace-safe screenshot paths.
+19. Kubernetes API/worker deployments, persistent data claim, probes, resource limits, and restricted container security contexts.
 
-## Thin (4)
+## Thin (5)
 
 - Plans are deterministic sentence decomposition, not a persisted editable plan state machine.
 - Memory uses lexical FTS5, without embeddings or semantic reranking.
 - Immediate API runs remain in-process; queued jobs support multiple workers but there is no event streaming or cancellation yet.
 - API authentication is a single operator bearer token, not OIDC, users, roles, or scoped permissions.
+- Browser navigation is real but limited to page reads and screenshots; interaction primitives and persistent profiles are not built yet.
 
 ## Missing, not claimed
 
-Browser control, remote Git push/PR operations, multi-agent delegation, a secrets vault, permissions UI, OIDC/user-role authentication, rate limiting, semantic memory, event streaming, job cancellation, and Kubernetes deployment.
+Browser interaction/forms and persistent profiles, remote Git push/PR operations, permissions UI, OIDC/users/roles, rate limiting, semantic memory, event streaming, and job cancellation.
 
 ## Install
 
@@ -85,3 +90,5 @@ A model statement is never treated as proof that work happened. Tool returns are
 ## Advanced operation
 
 Set `MEEMEE_API_TOKEN` in production-facing environments. Run one or more durable workers with `meemee worker`. Schedule work through `POST /v1/jobs` with an ISO 8601 `run_at`; workers atomically claim due jobs. Shell and local Git mutations are side effects and still require agent-run approval. Commands are direct argv calls, never `shell=True`, and only configured executables can run. Git commits name explicit paths and never push.
+
+Browser setup: `pip install -e .[browser]` then `playwright install chromium`. Vault setup: run `meemee vault-key`, store the output as `MEEMEE_VAULT_KEY` outside the repo, and add secrets with `meemee vault-put NAME`. Kubernetes expects a separately managed `meemee-secrets` Secret; no plaintext secret manifest is committed.

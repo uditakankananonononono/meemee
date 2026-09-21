@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import getpass
 import json
 
 import typer
@@ -9,6 +10,7 @@ import uvicorn
 from .config import Settings
 from .runtime import build_agent
 from .tools.github import GitHubRepoSearch, GitHubSearchArgs
+from .vault import SecretVault
 from .worker import work_forever
 
 app = typer.Typer(no_args_is_help=True, help="Meemee local-first agent runtime")
@@ -47,3 +49,29 @@ def serve(host: str = "127.0.0.1", port: int = 8787) -> None:
 def worker() -> None:
     """Run a durable queued-job worker."""
     asyncio.run(work_forever())
+
+
+@app.command("vault-key")
+def vault_key() -> None:
+    """Generate a new vault key. Store it outside the repository."""
+    typer.echo(SecretVault.generate_key())
+
+
+@app.command("vault-put")
+def vault_put(name: str) -> None:
+    """Store a secret read without terminal echo."""
+    settings = Settings()
+    if not settings.vault_key:
+        raise typer.BadParameter("MEEMEE_VAULT_KEY is required")
+    SecretVault(settings.data_dir / "vault.sqlite3", settings.vault_key).put(name, getpass.getpass("Secret: "))
+    typer.echo(f"stored {name}")
+
+
+@app.command("vault-list")
+def vault_list() -> None:
+    """List secret names without disclosing values."""
+    settings = Settings()
+    if not settings.vault_key:
+        raise typer.BadParameter("MEEMEE_VAULT_KEY is required")
+    for name in SecretVault(settings.data_dir / "vault.sqlite3", settings.vault_key).names():
+        typer.echo(name)
