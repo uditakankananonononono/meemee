@@ -14,8 +14,40 @@ class HealthStatus(BaseModel):
     version: str
 
 
-class ReadinessStatus(BaseModel):
+class ReadinessComponent(BaseModel):
+    """One component of the server's readiness report (server v0.20+).
+
+    Known components: memory, jobs, tokens (databases), disk, model. Extra
+    detail fields (free_bytes, status, error, ...) are preserved.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    ok: bool
+
+
+class ReadinessReport(BaseModel):
+    """GET /ready response. The server returns this body with 200 when ready
+    and with 503 when not - both are parsed; check ``is_ready``/``failing``.
+
+    On pre-v0.20 servers the body is only {"status": "ready"} and components
+    is empty.
+    """
+
     status: str
+    components: dict[str, ReadinessComponent] = Field(default_factory=dict)
+
+    @property
+    def is_ready(self) -> bool:
+        return self.status == "ready"
+
+    def failing(self) -> list[str]:
+        """Names of components whose check failed."""
+        return [name for name, component in self.components.items() if not component.ok]
+
+
+#: Backwards-compatible alias from SDK 0.1.x.
+ReadinessStatus = ReadinessReport
 
 
 class RunReport(BaseModel):
@@ -79,8 +111,20 @@ class Job(BaseModel):
         return json.loads(self.result)
 
 
+class QuotaStatus(BaseModel):
+    """Per-principal daily job quota (server v0.20+). ``day`` is the UTC date."""
+
+    day: str
+    used: int
+    limit: int
+    remaining: int
+
+
 class CreatedJob(BaseModel):
     id: str
+    #: Quota snapshot after this create consumed one job (server v0.20+);
+    #: None when talking to an older server.
+    quota: QuotaStatus | None = None
 
 
 class JobCancelResult(BaseModel):
@@ -103,8 +147,9 @@ class JobEvent(BaseModel):
 
 
 #: Event kinds after which no further events can meaningfully advance the job.
-#: The server closes the SSE stream itself after done/failed; a cancelled job
-#: keeps the stream open (heartbeats only), so the SDK closes it client-side.
+#: Server v0.21.1+ closes the SSE stream after any of them; earlier servers
+#: only closed after done/failed, so the SDK closes client-side to stay correct
+#: against every version.
 TERMINAL_EVENT_KINDS: frozenset[str] = frozenset({"done", "failed", "cancelled"})
 
 
