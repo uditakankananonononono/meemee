@@ -8,6 +8,7 @@ from threading import Event
 from .llm import Model
 from .memory import MemoryStore
 from .planner import TaskPlanner
+from .policy import PolicyEngine
 from .tools.base import ToolRegistry
 from .types import Risk, RunReport
 
@@ -21,12 +22,13 @@ Do not repeat a failed call unchanged. Stop when done or when blocked and name t
 
 
 class Agent:
-    def __init__(self, model: Model, tools: ToolRegistry, memory: MemoryStore, max_steps: int = 12):
+    def __init__(self, model: Model, tools: ToolRegistry, memory: MemoryStore, max_steps: int = 12, policy: PolicyEngine | None = None):
         self.model = model
         self.tools = tools
         self.memory = memory
         self.max_steps = max_steps
         self.planner = TaskPlanner()
+        self.policy = policy or PolicyEngine()
 
     async def run(self, goal: str, approve: Approval | None = None, cancel: Event | None = None) -> RunReport:
         run_id = uuid.uuid4().hex
@@ -61,7 +63,10 @@ class Agent:
             except KeyError as exc:
                 result = {"ok": False, "error": str(exc)}
             else:
-                if tool.risk != Risk.READ and (approve is None or not approve(call.name, call.arguments, tool.risk)):
+                policy = self.policy.evaluate(call.name, call.arguments, tool.risk)
+                if not policy.allowed:
+                    result = {"ok": False, "error": f"policy denied: {policy.reason}"}
+                elif policy.require_approval and (approve is None or not approve(call.name, call.arguments, tool.risk)):
                     result = {"ok": False, "error": f"approval denied for {tool.risk.value} tool"}
                 else:
                     result = (await self.tools.execute(call.name, call.arguments)).model_dump()

@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     max_steps: int = 12
     request_timeout: float = 60.0
     model_max_attempts: int = 3
+    policy_file: Path | None = None
     api_token: str | None = None
     shell_allowlist: str = "python3,pytest,ruff,git,ls,find,cat,wc"
     worker_poll_seconds: float = 1.0

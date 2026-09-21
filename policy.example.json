@@ -1,0 +1,8 @@
+{
+  "deny_tools": [],
+  "allow_tools": [],
+  "deny_paths": [".env", "**/.env", "**/*secret*"],
+  "deny_hosts": ["*.internal.example.com"],
+  "max_argument_bytes": 1000000,
+  "auto_approve_risks": ["read"]
+}
