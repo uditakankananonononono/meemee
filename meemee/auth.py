@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import secrets
 import sqlite3
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,7 +26,9 @@ class TokenStore:
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
-        with self.db:
+        self.lock = threading.RLock()
+        self.db.execute("PRAGMA busy_timeout=5000")
+        with self.lock, self.db:
             self.db.executescript("""
                 PRAGMA journal_mode=WAL;
                 CREATE TABLE IF NOT EXISTS api_tokens (
@@ -44,7 +47,7 @@ class TokenStore:
             raise ValueError("token name and at least one scope are required")
         ident, token = secrets.token_hex(12), f"mee_{secrets.token_urlsafe(32)}"
         now = datetime.now(timezone.utc).isoformat()
-        with self.db:
+        with self.lock, self.db:
             self.db.execute(
                 "INSERT INTO api_tokens(id,name,digest,scopes,created_at,expires_at) VALUES(?,?,?,?,?,?)",
                 (ident, name, self.digest(token), " ".join(sorted(scopes)), now, expires_at),
@@ -53,18 +56,18 @@ class TokenStore:
 
     def authenticate(self, token: str) -> Principal | None:
         digest, now = self.digest(token), datetime.now(timezone.utc).isoformat()
-        row = self.db.execute(
-            "SELECT * FROM api_tokens WHERE digest=? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>?)",
-            (digest, now),
-        ).fetchone()
-        if row is None or not hmac.compare_digest(row["digest"], digest):
-            return None
-        with self.db:
+        with self.lock, self.db:
+            row = self.db.execute(
+                "SELECT * FROM api_tokens WHERE digest=? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>?)",
+                (digest, now),
+            ).fetchone()
+            if row is None or not hmac.compare_digest(row["digest"], digest):
+                return None
             self.db.execute("UPDATE api_tokens SET last_used_at=? WHERE id=?", (now, row["id"]))
-        return Principal(row["id"], row["name"], frozenset(row["scopes"].split()))
+            return Principal(row["id"], row["name"], frozenset(row["scopes"].split()))
 
     def revoke(self, ident: str) -> bool:
-        with self.db:
+        with self.lock, self.db:
             return bool(self.db.execute(
                 "UPDATE api_tokens SET revoked_at=? WHERE id=? AND revoked_at IS NULL",
                 (datetime.now(timezone.utc).isoformat(), ident),

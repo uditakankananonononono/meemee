@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working v1, not a claim to be finished general intelligence.
 
-## Verified in v0.25.0 (47)
+## Verified in v0.25.1 (47)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -127,3 +127,6 @@ Cancellation contract: cancelling an already-cancelled job is idempotent and ret
 
 
 Combined-tree verification for v0.22.0: 79 core tests passed; 107 SDK tests passed including 11 against a real booted server; PostgreSQL contract tests passed (3), while 2 live PostgreSQL integration tests require `MEEMEE_TEST_DATABASE_URL` and were skipped in this environment. The operator console mount is covered by a core HTTP integration test and its worker-provided headless browser suite. Readiness reports model health but, by default, does not fail the API solely because an optional/local model process is offline; set `MEEMEE_READINESS_REQUIRE_MODEL=true` where model availability is required for traffic.
+
+
+Concurrency contract: all shared SQLite connections are serialized at the store boundary. Token create/authenticate/revoke and audit append/verify/list use reentrant locks plus a five-second SQLite busy timeout. Load regression tests execute 2,000 parallel authentications and 1,000 parallel audit appends with concurrent verification.

@@ -16,6 +16,7 @@ class AuditLog:
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
+        self.db.execute("PRAGMA busy_timeout=5000")
         self.lock = threading.RLock()
         with self.db:
             self.db.executescript("""
@@ -47,14 +48,16 @@ class AuditLog:
             return int(cursor.lastrowid)
 
     def verify(self) -> tuple[bool, int | None]:
-        previous = "0" * 64
-        for row in self.db.execute("SELECT * FROM audit_log ORDER BY sequence"):
-            digest = self.hash(previous, row["occurred_at"], row["actor_id"], row["action"], row["resource"], row["outcome"], row["metadata"])
-            if row["previous_hash"] != previous or row["entry_hash"] != digest:
-                return False, row["sequence"]
-            previous = row["entry_hash"]
-        return True, None
+        with self.lock:
+            previous = "0" * 64
+            for row in self.db.execute("SELECT * FROM audit_log ORDER BY sequence"):
+                digest = self.hash(previous, row["occurred_at"], row["actor_id"], row["action"], row["resource"], row["outcome"], row["metadata"])
+                if row["previous_hash"] != previous or row["entry_hash"] != digest:
+                    return False, row["sequence"]
+                previous = row["entry_hash"]
+            return True, None
 
     def list(self, after: int = 0, limit: int = 100) -> list[dict[str, Any]]:
-        rows = self.db.execute("SELECT * FROM audit_log WHERE sequence>? ORDER BY sequence LIMIT ?", (after, min(limit, 500))).fetchall()
+        with self.lock:
+            rows = self.db.execute("SELECT * FROM audit_log WHERE sequence>? ORDER BY sequence LIMIT ?", (after, min(limit, 500))).fetchall()
         return [{**dict(row), "metadata": json.loads(row["metadata"])} for row in rows]
