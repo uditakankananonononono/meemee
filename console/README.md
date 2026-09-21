@@ -3,27 +3,42 @@
 A real, static, dependency-free operator console for the Meemee API, served by
 the API itself as an additive `console/` directory. No build step, no
 framework, no CDN: plain HTML/CSS/ES-module JavaScript that talks only to the
-documented v0.16.0 HTTP surface.
+documented v0.21.1 HTTP surface (with graceful degradation against pre-v0.19
+servers for readiness and quota endpoints).
 
 ## What it does
 
-- **Status** - `/health`, `/ready`, session capability probes, and an admin-only
+- **Status** - `/health`, `/ready` (optional 30s auto-refresh), session
+  capability probes, a live rate-limit budget readout from the
+  `RateLimit-Limit/Remaining/Reset` headers the API attaches to every measured
+  response (health/readiness are exempt by design), and an admin-only
   `/metrics` viewer (Prometheus text parsed into a table).
 - **Runs** - `POST /v1/runs` with an explicit `approve_writes` opt-in, full
   run-report rendering (final answer, steps used, per-tool arguments, results,
   errors, elapsed ms), browser-local history.
-- **Jobs** - `POST /v1/jobs` (immediate or scheduled `run_at`), per-job status
-  polling, append-only event log, **live resume-safe SSE progress** from
-  `GET /v1/jobs/{id}/stream` (fetch-based, because `EventSource` cannot send
-  an `Authorization` header), and `DELETE /v1/jobs/{id}` cancellation with the
-  documented 404/409 handling.
+- **Jobs** - `POST /v1/jobs` (immediate or scheduled `run_at`) with a
+  per-submission **`Idempotency-Key`** (v0.20+): retries replay the original
+  response instead of double-enqueueing, conflicts (409) rotate the key and
+  say so. The daily-quota block from the create response is surfaced
+  immediately, and quota-exceeded 429s are distinguished from rate-limit 429s.
+  Per-job status polling, append-only event log, **live resume-safe SSE
+  progress** from `GET /v1/jobs/{id}/stream` (fetch-based, because
+  `EventSource` cannot send an `Authorization` header), and
+  `DELETE /v1/jobs/{id}` cancellation with the documented 404/409 handling.
+- **Quotas** (v0.20+) - `GET /v1/quota` own-principal usage (needs
+  jobs:write, labelled when absent) and admin `PUT /v1/quota/{principal}`
+  overrides with the audited `quota.update` note.
 - **Tokens** - `POST /v1/tokens` with scope checkboxes and optional expiry,
   the one-time secret reveal with copy, and `DELETE /v1/tokens/{id}` revoke.
 - **Audit chain** - cursor-paged `GET /v1/audit`, the server-side verification
   outcome surfaced exactly as the API reports it, plus an **independent
   in-browser recomputation** of the whole SHA-256 chain (genesis `0`*64,
   `\x1f`-joined fields, canonical `json.dumps(sort_keys, separators)` metadata)
-  using WebCrypto. Filters and JSON export.
+  using WebCrypto. A successful verification pins the chain head in this
+  browser; later loads are checked against that anchor, so a chain that was
+  rolled back, replaced, or rewritten below the verified head is flagged in
+  red instead of silently accepted. Action/actor summary strip, filters,
+  per-entry verified markers, JSON export.
 - **Session** - OIDC interactive login (`GET /auth/login`), logout
   (`POST /auth/logout`), or a pasted bearer token (bootstrap, `mee_…` scoped,
   or OIDC access token) kept in sessionStorage by default.
@@ -74,9 +89,9 @@ matters instead of faking data:
 - **No per-entry verification endpoint** - the server verifies the chain as a
   whole on every `/v1/audit` call; the console adds its own full
   recomputation in the browser as a second opinion.
-- **SSE cancel quirk** - the server stream only terminates on `done`/`failed`;
-  after a `cancelled` event the console closes the stream client-side and
-  refreshes the job record.
+- **SSE terminal coverage** - v0.21+ servers terminate the stream on
+  `done`/`failed`/`cancelled`; the console additionally closes client-side on
+  any terminal event, which also keeps older servers honest.
 - **Client verification numerics** - the canonical encoder matches CPython for
   strings, booleans, null, integers and nested lists/objects. A
   non-integral float inside audit metadata would encode differently

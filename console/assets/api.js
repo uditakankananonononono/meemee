@@ -3,6 +3,23 @@
 // meemee_session cookie set by the interactive OIDC flow (same-origin).
 import { bearerToken, settings } from "./store.js";
 
+// Rate-limit budget observed on the most recent API response. The server
+// attaches RateLimit-Limit/Remaining/Reset to every non-exempt response
+// (RateLimitMiddleware); the console surfaces them live in the status view.
+export const rateLimit = {
+  current: null,
+  listeners: new Set(),
+  onChange(fn) { this.listeners.add(fn); fn(this.current); return () => this.listeners.delete(fn); },
+  update(headers) {
+    const limit = Number(headers.get("ratelimit-limit"));
+    const remaining = Number(headers.get("ratelimit-remaining"));
+    const reset = Number(headers.get("ratelimit-reset"));
+    if (!Number.isFinite(limit) || !Number.isFinite(reset)) return;
+    this.current = { limit, remaining, reset, observedAt: Date.now() };
+    for (const fn of this.listeners) fn(this.current);
+  },
+};
+
 export class ApiError extends Error {
   constructor(status, detail, { retryAfter = null, requestId = null } = {}) {
     super(detail || `HTTP ${status}`);
@@ -43,6 +60,7 @@ async function request(path, { method = "GET", body, headers = {}, signal } = {}
     throw new ApiError(0, `network error: ${error.message}`);
   }
   const requestId = response.headers.get("x-request-id");
+  rateLimit.update(response.headers);
   if (response.status === 429) {
     const retry = Number(response.headers.get("retry-after")) || null;
     throw new ApiError(429, "rate limited by the API", { retryAfter: retry, requestId });
@@ -72,14 +90,48 @@ async function request(path, { method = "GET", body, headers = {}, signal } = {}
 // --- Unauthenticated probes -------------------------------------------------
 export const getHealth = (opts) => request("/health", opts);
 export const getReady = (opts) => request("/ready", opts);
+// v0.19+ readiness returns a structured component report and answers 503
+// (with the same body) when any component fails. This variant resolves the
+// body in both cases so the console can render per-component diagnosis.
+export async function readiness(opts = {}) {
+  const token = bearerToken.get();
+  const headers = { accept: "application/json" };
+  if (token) headers.authorization = `Bearer ${token}`;
+  let response;
+  try {
+    response = await fetch(apiUrl("/ready"), { headers, credentials: "same-origin", signal: opts.signal });
+  } catch (error) {
+    if (error.name === "AbortError") throw error;
+    throw new ApiError(0, `network error: ${error.message}`);
+  }
+  rateLimit.update(response.headers);
+  const body = await response.json().catch(() => null);
+  if (response.ok) return { ok: true, body };
+  if (response.status === 503 && body) return { ok: false, body };
+  throw new ApiError(response.status, (body && body.detail) || `HTTP ${response.status}`);
+}
 
 // --- Runs (scope: runs:write) ------------------------------------------------
 export const createRun = (goal, approveWrites, opts) =>
   request("/v1/runs", { method: "POST", body: { goal, approve_writes: approveWrites }, ...opts });
 
 // --- Jobs (scopes: jobs:read / jobs:write) -----------------------------------
-export const createJob = (goal, runAt, opts) =>
-  request("/v1/jobs", { method: "POST", body: runAt ? { goal, run_at: runAt } : { goal }, ...opts });
+export const createJob = (goal, runAt, opts) => {
+  const { idempotencyKey, ...rest } = opts || {};
+  const headers = idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {};
+  return request("/v1/jobs", {
+    method: "POST",
+    body: runAt ? { goal, run_at: runAt } : { goal },
+    headers,
+    ...rest,
+  });
+};
+// --- Quotas (v0.20+): own status needs jobs:write, overrides need admin -----
+export const getQuota = (opts) => request("/v1/quota", opts);
+export const setQuota = (principalId, dailyJobs, opts) =>
+  request(`/v1/quota/${encodeURIComponent(principalId)}`, {
+    method: "PUT", body: { daily_jobs: dailyJobs }, ...opts,
+  });
 export const getJob = (id, opts) => request(`/v1/jobs/${encodeURIComponent(id)}`, opts);
 export const cancelJob = (id, opts) =>
   request(`/v1/jobs/${encodeURIComponent(id)}`, { method: "DELETE", ...opts });

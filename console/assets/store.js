@@ -82,6 +82,17 @@ export const tokenRegistry = {
   },
 };
 
+// Last audit-chain head this browser independently verified. Comparing a
+// future chain against this anchor detects rollback or rewriting between
+// visits - the tamper-evidence property, carried across sessions.
+const ANCHOR_KEY = "meemee.console.auditAnchor";
+
+export const auditAnchor = {
+  get() { return readJson(LS, ANCHOR_KEY, null); },
+  set(anchor) { writeJson(LS, ANCHOR_KEY, anchor); },
+  clear() { try { LS.removeItem(ANCHOR_KEY); } catch { /* ignore */ } },
+};
+
 export const runHistory = {
   all() { return readJson(LS, RUNS_KEY, []); },
   remember(report) {
