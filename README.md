@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working v1, not a claim to be finished general intelligence.
 
-## Verified in v0.4.0 (22)
+## Verified in v0.5.0 (22)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -10,35 +10,32 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 4. Read/write/execute risk classes and a write approval gate.
 5. Live GitHub repository search with filters and quality ranking based on popularity, recency, maintenance, and archive status.
 6. Workspace-confined file read/write tools with traversal protection.
-7. Deterministic task plans with dependency validation.
-8. Durable SQLite event memory with WAL, FTS5 retrieval, and run provenance.
-9. CLI for runs, GitHub scouting, and API serving.
-10. FastAPI health/run endpoints, Docker image, and automated tests.
-11. Allowlisted direct-argv command execution with no shell interpolation, timeout, output cap, and explicit approval.
-12. Git status/diff/log inspection plus approval-gated local commits of explicit paths; no implicit push.
-13. Durable scheduled job queue with atomic multi-process claims, retry limits, and result/error records.
-14. Long-running worker command and job create/status API.
-15. Optional constant-time bearer-token authentication for run and job endpoints.
-16. Concurrent sub-agent delegation with isolated agent instances, bounded concurrency, and ordered result provenance.
-17. AES-256-GCM encrypted local secrets vault with per-record nonces and no secret-value listing.
-18. Playwright Chromium navigation with title/text/status/screenshot capture, public-address enforcement, and workspace-safe screenshot paths.
-19. Kubernetes API/worker deployments, persistent data claim, probes, resource limits, and restricted container security contexts.
-20. Browser click/fill/press/select/wait action sequences with optional persistent named profiles and action provenance.
-21. Queued-job cancellation with explicit state conflict handling.
-22. Sliding-window API rate limiting with Retry-After responses.
+7. Durable SQLite event memory with WAL, FTS5 retrieval, and run provenance.
+8. CLI for runs, GitHub scouting, API serving, queued jobs and workers.
+9. FastAPI health/run endpoints, Docker image, and automated tests.
+10. Allowlisted direct-argv command execution with no shell interpolation, timeout, output cap, and explicit approval.
+11. Git status/diff/log inspection plus approval-gated local commits of explicit paths; no implicit push.
+12. Durable scheduled job queue with atomic multi-process claims, retry limits, and result/error records.
+13. Long-running worker command and job create/status API.
+14. Optional constant-time bearer-token authentication for run and job endpoints.
+15. Concurrent sub-agent delegation with isolated agent instances, bounded concurrency, and ordered result provenance.
+16. AES-256-GCM encrypted local secrets vault with per-record nonces and no secret-value listing.
+17. Playwright Chromium navigation with title/text/status/screenshot capture, public-address enforcement, and workspace-safe screenshot paths.
+18. Kubernetes API/worker deployments, persistent data claim, probes, resource limits, and restricted container security contexts.
+19. Browser click/fill/press/select/wait action sequences with optional persistent named profiles and action provenance.
+20. Queued-job cancellation with explicit state conflict handling.
+21. Sliding-window API rate limiting with Retry-After responses.
+22. Append-only queued-job event logs with cursor-based retrieval for progress clients.
 
-## Thin (6)
+## Thin (0)
 
-- Plans are deterministic sentence decomposition, not a persisted editable plan state machine.
-- Memory uses lexical FTS5, without embeddings or semantic reranking.
-- Immediate API runs remain in-process; queued jobs support multiple workers but there is no event streaming or cancellation yet.
-- API authentication is a single operator bearer token, not OIDC, users, roles, or scoped permissions.
-- Browser interaction and persistent profiles are real, but there is no human takeover UI, download manager, challenge handling, or per-site policy layer.
-- Rate limiting is per process; multi-pod deployments need a shared external limiter.
+Nothing is classified as thin. A capability is either implemented and tested at its stated boundary below, or listed as missing.
 
 ## Missing, not claimed
 
-Browser human takeover/downloads/challenge handling, remote Git push/PR operations, permissions UI, OIDC/users/roles, semantic memory, event streaming, and running-job cancellation.
+Advanced persisted planning with editable DAG state and replanning; semantic/embedding memory and reranking; production OIDC authentication with users, roles and scoped permissions; browser human takeover, managed downloads, challenge handoff and per-site policy; remote Git push and pull-request operations; a permissions UI; shared cross-pod rate limiting; push-based SSE/WebSocket event streaming; running-job cancellation; and a shared queue/database suitable for Kubernetes replicas.
+
+The existing deterministic goal decomposition, lexical FTS, operator bearer token, browser automation, in-process limiter, SQLite queue, and cursor event API remain useful internal or single-node features, but they are not presented as completed versions of the advanced capabilities above.
 
 ## Install
 
@@ -82,9 +79,9 @@ File writes are denied unless the caller opts in with `--approve-writes` or `app
 ## Architecture
 
 - `agent.py`: bounded perceive-decide-act loop with evidence-preserving tool events.
-- `tools/`: typed registry, GitHub scout, and safe workspace I/O.
-- `memory.py`: SQLite event store and full-text retrieval.
-- `planner.py`: dependency-checked initial planning.
+- `tools/`: typed registry, GitHub scout, browser automation, command execution and workspace I/O.
+- `memory.py`: SQLite event store and lexical full-text retrieval.
+- `jobs.py`: durable single-node scheduled queue and append-only event log.
 - `llm.py`: OpenAI-compatible transport.
 - `cli.py` and `api.py`: interfaces over the same runtime.
 

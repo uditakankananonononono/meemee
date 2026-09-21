@@ -66,3 +66,10 @@ def cancel_job(job_id: str):
     if job is None:
         raise HTTPException(status_code=404, detail="job not found")
     raise HTTPException(status_code=409, detail=f"cannot cancel job in {job['status']} state")
+
+
+@app.get("/v1/jobs/{job_id}/events", dependencies=[Depends(require_api_token)])
+def get_job_events(job_id: str, after: int = 0):
+    if jobs.get(job_id) is None:
+        raise HTTPException(status_code=404, detail="job not found")
+    return {"events": jobs.events(job_id, after)}

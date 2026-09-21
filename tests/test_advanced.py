@@ -51,3 +51,13 @@ def test_cancel_queued_job(tmp_path: Path):
     assert store.cancel(ident)
     assert store.get(ident)["error"] == "cancelled"
     assert not store.cancel(ident)
+
+
+def test_job_event_stream(tmp_path: Path):
+    store = JobStore(tmp_path / "jobs.db")
+    ident = store.enqueue("work")
+    store.claim()
+    store.finish(ident, {"final": "ok"})
+    assert [event["kind"] for event in store.events(ident)] == ["queued", "running", "done"]
+    first = store.events(ident)[0]["sequence"]
+    assert [event["kind"] for event in store.events(ident, first)] == ["running", "done"]
