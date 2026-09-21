@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     log_json: bool = True
     readiness_min_free_bytes: int = 100_000_000
     default_daily_jobs: int = 100
+    retention_jobs_days: int = 30
+    retention_memory_days: int = 90
+    retention_audit_days: int = 365
     oidc_role_claim: str = "roles"
     oidc_client_id: str | None = None
     oidc_client_secret: str | None = None

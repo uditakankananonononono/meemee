@@ -91,3 +91,7 @@ Use `GET /v1/jobs/{id}/stream` with `Accept: text/event-stream` and a token carr
 ## Idempotent job submission
 
 Send a unique `Idempotency-Key` header when creating a job. Retries by the same principal with the same key and identical body return the original job ID instead of creating duplicates. Reusing the key with a changed body returns HTTP 409. Keys are scoped to principal and route and retained for 24 hours. Use a UUID generated once per logical submission, not once per HTTP retry.
+
+## Data retention
+
+Run `meemee retention-run` from cron after backups. Defaults retain terminal jobs/events 30 days and memories 90 days; active jobs are never removed. Expired idempotency and rate-window records are cleaned. The tamper-evident audit chain is retained intact because deleting its prefix without externally signed anchors would break verification; archive/export with signed anchors is still missing. Always review legal and contractual retention duties before changing windows.

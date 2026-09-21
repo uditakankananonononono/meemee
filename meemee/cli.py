@@ -11,6 +11,7 @@ import uvicorn
 from .backup import BackupManager
 from .config import Settings
 from .migrations import CORE_MIGRATIONS, Migrator
+from .retention import RetentionManager
 from .runtime import build_agent
 from .tools.github import GitHubRepoSearch, GitHubSearchArgs
 from .vault import SecretVault
@@ -98,3 +99,15 @@ def backup(destination: Path) -> None:
 def backup_verify(directory: Path) -> None:
     """Verify backup checksums and SQLite integrity."""
     typer.echo(json.dumps(BackupManager.verify(directory), indent=2))
+
+
+@app.command("retention-run")
+def retention_run() -> None:
+    """Apply configured retention windows and print deletion counts."""
+    settings = Settings()
+    report = RetentionManager(settings.data_dir).run(
+        jobs_days=settings.retention_jobs_days,
+        memory_days=settings.retention_memory_days,
+        audit_days=settings.retention_audit_days,
+    )
+    typer.echo(json.dumps(report.__dict__, indent=2))
