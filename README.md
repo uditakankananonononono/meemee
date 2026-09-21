@@ -1,6 +1,6 @@
 # Meemee
 
-Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working v1, not a claim to be finished general intelligence.
+Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ## Verified in v0.25.2 (47)
 
@@ -47,7 +47,7 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 41. Configurable data-retention execution for terminal jobs/events, memories, expired idempotency and old rate windows, with active-job protection and deletion reporting; tamper-evident audit is deliberately retained intact.
 42. Production Python client SDK with sync/async clients, typed models, retries, idempotency and resumable SSE, tested against a live booted server.
 43. Static operator web console for health, jobs, SSE progress, audit verification and token/quota operations, served at `/console/`.
-44. PostgreSQL persistence package for shared multi-node jobs, events, plans, tokens, audit, idempotency, quota and rate limits, with migrations and integration tests.
+44. Additive PostgreSQL persistence package for memory, jobs, plans, tokens, audit and migrations, with pooled connections, leased/fenced job claims, checksummed migrations, contract tests and optional live-server integration tests. Core runtime selection is not wired yet.
 45. Secret-safe tool provenance: recursive redaction by sensitive field name, stable SHA-256 fingerprints for correlation, and bounded large-text recording with size/hash/preview metadata.
 46. Inbound credential scrubbing before planning, model prompts, run reports or memory persistence, covering common GitHub/OpenAI/Bearer formats and named secret assignments with correlation-safe markers.
 47. Bounded graceful API shutdown: stop accepting new immediate runs, wait for active runs, report grace timeout, then close pooled model transport resources.
@@ -58,7 +58,7 @@ Nothing is classified as thin. A capability is either implemented and tested at 
 
 ## Missing, not claimed
 
-Automated model-driven replanning policies; semantic/embedding memory and reranking; end-user account administration UI (interactive OIDC login/session/logout, bearer auth and scoped API tokens are implemented); browser human takeover, managed downloads, challenge handoff and per-site policy; remote Git push and pull-request operations; a permissions UI; cross-host/cross-pod rate limiting (single-host multi-process limiting is implemented); WebSocket streaming (resume-safe SSE is implemented); forced mid-tool cancellation (cooperative between-step cancellation is implemented); and a shared queue/database suitable for Kubernetes replicas.
+Automated model-driven replanning policies; semantic/embedding memory and reranking; core runtime selection for the additive PostgreSQL stores and an automated SQLite-to-PostgreSQL data-copy CLI; end-user account administration UI (interactive OIDC login/session/logout, bearer auth and scoped API tokens are implemented); browser human takeover, managed downloads, challenge handoff and per-site policy; remote Git push and pull-request operations; a permissions UI; cross-host/cross-pod rate limiting (single-host multi-process limiting is implemented); WebSocket streaming (resume-safe SSE is implemented); forced mid-tool cancellation (cooperative between-step cancellation is implemented); and a core-wired shared database/queue suitable for Kubernetes replicas (the additive PostgreSQL package exists, but the runtime still uses SQLite).
 
 The existing deterministic goal decomposition, lexical FTS, scoped/revocable API token system, browser automation, single-host shared limiter, SQLite queue, and cursor event API and SSE stream remain useful internal or single-node features, but they are not presented as completed versions of the advanced capabilities above.
 
@@ -126,7 +126,7 @@ Browser setup: `pip install -e .[browser]` then `playwright install chromium`. V
 Cancellation contract: cancelling an already-cancelled job is idempotent and returns its terminal cancelled state without appending another event. SSE streams emit that durable cancelled event and then close.
 
 
-Combined-tree verification for v0.22.0: 79 core tests passed; 107 SDK tests passed including 11 against a real booted server; PostgreSQL contract tests passed (3), while 2 live PostgreSQL integration tests require `MEEMEE_TEST_DATABASE_URL` and were skipped in this environment. The operator console mount is covered by a core HTTP integration test and its worker-provided headless browser suite. Readiness reports model health but, by default, does not fail the API solely because an optional/local model process is offline; set `MEEMEE_READINESS_REQUIRE_MODEL=true` where model availability is required for traffic.
+Current verification is tracked in [STATUS.md](STATUS.md). The operator console is mounted at `/console/`. Readiness reports model health but, by default, does not fail the API solely because an optional/local model process is offline; set `MEEMEE_READINESS_REQUIRE_MODEL=true` where model availability must gate traffic.
 
 
 Concurrency contract: all shared SQLite connections are serialized at the store boundary. Token create/authenticate/revoke and audit append/verify/list use reentrant locks plus a five-second SQLite busy timeout. Load regression tests execute 2,000 parallel authentications and 1,000 parallel audit appends with concurrent verification.
