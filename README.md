@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working v1, not a claim to be finished general intelligence.
 
-## Verified in v0.5.0 (22)
+## Verified in v0.6.0 (23)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -26,6 +26,7 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 20. Queued-job cancellation with explicit state conflict handling.
 21. Sliding-window API rate limiting with Retry-After responses.
 22. Append-only queued-job event logs with cursor-based retrieval for progress clients.
+23. Versioned persistent plan DAGs with cycle validation, arbitrary dependency order, status transitions, full history, change reasons, and optimistic concurrency control.
 
 ## Thin (0)
 
@@ -33,7 +34,7 @@ Nothing is classified as thin. A capability is either implemented and tested at 
 
 ## Missing, not claimed
 
-Advanced persisted planning with editable DAG state and replanning; semantic/embedding memory and reranking; production OIDC authentication with users, roles and scoped permissions; browser human takeover, managed downloads, challenge handoff and per-site policy; remote Git push and pull-request operations; a permissions UI; shared cross-pod rate limiting; push-based SSE/WebSocket event streaming; running-job cancellation; and a shared queue/database suitable for Kubernetes replicas.
+Automated model-driven replanning policies; semantic/embedding memory and reranking; production OIDC authentication with users, roles and scoped permissions; browser human takeover, managed downloads, challenge handoff and per-site policy; remote Git push and pull-request operations; a permissions UI; shared cross-pod rate limiting; push-based SSE/WebSocket event streaming; running-job cancellation; and a shared queue/database suitable for Kubernetes replicas.
 
 The existing deterministic goal decomposition, lexical FTS, operator bearer token, browser automation, in-process limiter, SQLite queue, and cursor event API remain useful internal or single-node features, but they are not presented as completed versions of the advanced capabilities above.
 
@@ -81,6 +82,7 @@ File writes are denied unless the caller opts in with `--approve-writes` or `app
 - `agent.py`: bounded perceive-decide-act loop with evidence-preserving tool events.
 - `tools/`: typed registry, GitHub scout, browser automation, command execution and workspace I/O.
 - `memory.py`: SQLite event store and lexical full-text retrieval.
+- `plan_store.py`: durable versioned DAG plans and edit history.
 - `jobs.py`: durable single-node scheduled queue and append-only event log.
 - `llm.py`: OpenAI-compatible transport.
 - `cli.py` and `api.py`: interfaces over the same runtime.

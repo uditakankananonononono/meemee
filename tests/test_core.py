@@ -21,9 +21,9 @@ def test_planner_dependencies():
     assert plan.steps[2].depends_on == ["step-2"]
 
 
-def test_plan_rejects_forward_dependency():
+def test_plan_rejects_unknown_dependency():
     with pytest.raises(ValueError):
-        Plan(goal="x", steps=[PlanStep(id="1", description="x", depends_on=["2"])])
+        Plan(goal="x", steps=[PlanStep(id="1", description="x", depends_on=["missing"])])
 
 
 def test_decision_requires_one_action():
