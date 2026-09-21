@@ -67,11 +67,6 @@ class ConflictError(ApiError):
     """HTTP 409 - state conflict, e.g. cancelling a job that is already finished."""
 
 
-class IdempotencyConflictError(ConflictError):
-    """HTTP 409 - an Idempotency-Key was reused with a different request body
-    (server v0.20+). Pick a fresh key; do not retry the request as-is."""
-
-
 class ValidationError(ApiError):
     """HTTP 422 - request body failed validation, or a parameter was not ISO 8601."""
 

@@ -1,7 +1,7 @@
 # meemee-client
 
 Typed Python SDK for the [Meemee](../README.md) agent platform API. Targets the
-server **v0.16.0 - v0.21.x** HTTP contract: scoped API tokens and OIDC bearer auth,
+server **v0.16.0** HTTP contract: scoped API tokens and OIDC bearer auth,
 synchronous runs, durable queued jobs, resume-safe SSE progress, fixed-window
 rate limiting, and the tamper-evident audit chain.
 
@@ -62,14 +62,9 @@ itself at `/auth/login`; it is not part of this SDK.
 
 ## Jobs and SSE progress
 
-- `jobs.create(goal, run_at=None, idempotency_key=None)` - enqueue; `run_at`
-  accepts a `datetime` or ISO 8601 string. Workers claim due jobs and retry
-  failures up to the server's per-job `max_attempts` (3). On server v0.20+ the
-  response carries the daily quota snapshot (`created.quota`) and an
-  `idempotency_key` (1-200 chars) deduplicates the create for 24 hours: a
-  replay returns the original job without consuming quota, a key reused with a
-  different body raises `IdempotencyConflictError`, and a keyed create is the
-  one POST the SDK auto-retries on transient failures.
+- `jobs.create(goal, run_at=None)` - enqueue; `run_at` accepts a `datetime` or
+  ISO 8601 string. Workers claim due jobs and retry failures up to the server's
+  per-job `max_attempts` (3).
 - `jobs.get(job_id)` - full state. `job.result` is the server's JSON string;
   `job.result_data` decodes it. `job.is_terminal` is True for
   done/failed/cancelled.
@@ -88,19 +83,6 @@ itself at `/auth/login`; it is not part of this SDK.
 - `jobs.wait(job_id, timeout=None, poll_interval=2.0)` - simple blocking poll
   to a terminal state; raises `WaitTimeoutError` on deadline.
 
-## Readiness and quotas (server v0.20+)
-
-- `client.ready()` returns a `ReadinessReport`: `status` plus per-component
-  results (`memory`, `jobs`, `tokens`, `disk`, `model`). The server answers
-  200 when ready and 503 with the same body when not - both are parsed, so
-  check `report.is_ready` and `report.failing()` instead of catching.
-- `client.quota.get()` - the caller's daily job quota (`QuotaStatus`: day,
-  used, limit, remaining). Requires the `jobs:write` scope server-side.
-- `client.quota.set(principal_id, daily_jobs)` - admin override, 1-1000000,
-  recorded in the audit chain as `quota.update`. An exhausted quota fails job
-  creation with `RateLimitError` (`retry_after=86400`); the SDK never retries
-  it, because waiting cannot help.
-
 ## Errors, retries, rate limits
 
 All HTTP errors raise typed subclasses of `ApiError`:
@@ -111,7 +93,7 @@ All HTTP errors raise typed subclasses of `ApiError`:
 | 401 | `AuthenticationError` | `www_authenticate` |
 | 403 | `PermissionDeniedError` | `missing_scope` |
 | 404 | `NotFoundError` | |
-| 409 | `ConflictError` (`IdempotencyConflictError` when a key is reused with a different body) | |
+| 409 | `ConflictError` | |
 | 422 | `ValidationError` | `issues` (FastAPI issue list when present) |
 | 429 | `RateLimitError` | `retry_after` |
 | 5xx | `ServerError` | |
@@ -121,12 +103,10 @@ the 500 body), and the raw `detail`. Transport failures raise `NetworkError`;
 SSE failures raise `StreamError`.
 
 Retries follow the server's own transport semantics: bounded attempts (3),
-jittered exponential backoff, `Retry-After` honoured on 429/503 up to a cap
-(120s - a longer directed wait, like the daily-quota 86400s, fails immediately
-instead of sleeping), and transient statuses only (408/429/5xx). Only
-idempotent methods (`GET`, `HEAD`, `DELETE`) plus `jobs.create` calls that
-carry an `idempotency_key` are retried automatically - any other retried POST
-could execute the goal twice. Tune with
+jittered exponential backoff, `Retry-After` honoured on 429/503, and transient
+statuses only (408/429/5xx). Because the server has no idempotency keys, only
+idempotent methods (`GET`, `HEAD`, `DELETE`) are retried automatically - a
+retried `POST /v1/runs` or `/v1/jobs` could execute the goal twice. Tune with
 `MeemeeClient(..., retry=RetryPolicy(...))`.
 
 Rate-limit headers on every response are exposed as `client.last_response_info`
@@ -135,9 +115,9 @@ are limiter-exempt server-side.
 
 ## Verified, Thin, Missing
 
-**Verified (126 tests: mocked-transport coverage of the full contract plus
-live integration tests that boot the real v0.21.1 server package and exercise
-it end to end):**
+**Verified (107 tests: 96 against a mocked transport implementing the server
+v0.16.0 contract, plus 11 live integration tests that boot the real server
+package and exercise it end to end):**
 
 1. Auth header attachment, 401/403 mapping including `WWW-Authenticate` and
    `missing_scope` extraction (mocked + live).
@@ -163,19 +143,10 @@ it end to end):**
    POST never auto-retried, permanent errors fail fast, network-error retries.
 10. Rate-limit and request-id metadata capture from the real limiter (live).
 11. `wait()` polling to terminal states with timeout.
-12. v0.20 quotas: create-time quota snapshot, own-status get, admin set with
-    bounds, quota-exhausted 429 (`Retry-After: 86400`) never retried (mocked +
-    live).
-13. v0.20 idempotent job creation: header pass-through, keyed POST auto-retry
-    on transient failures, 24h replay without extra quota, key-conflict 409 as
-    `IdempotencyConflictError` (mocked + live).
-14. v0.20 readiness report: component parsing on 200 and 503, `failing()`
-    names, legacy bare-body compatibility (mocked + live).
 
 The live suite lives in `tests/test_live_integration.py`; it boots uvicorn
 against the `meemee` package next to `sdk/` and skips cleanly when that
-package or its dependencies are absent. Version-specific live checks (quotas,
-idempotency, readiness components) skip against pre-v0.20 servers.
+package or its dependencies are absent.
 
 **Thin:** nothing. Every SDK behaviour above is implemented and tested at its
 stated boundary.
@@ -184,11 +155,9 @@ stated boundary.
 
 - An async (`asyncio`) client - the SDK is synchronous only.
 - A live test of `POST /v1/runs` - a real run needs a reachable model
-  endpoint; runs are covered in the mocked suite only. `/v1/runs` also has no
-  idempotency-key support server-side, so run creation is never auto-retried.
+  endpoint; runs are covered in the mocked suite only.
 - WebSocket streaming - the server offers resume-safe SSE only.
+- Idempotency keys for safe POST retries - the server does not support them.
 - Interactive OIDC browser login - owned by the server's `/auth/login`.
 - Token introspection/listing and job listing endpoints - the server does not
   expose them (token admin is create/revoke; jobs are addressed by id).
-- Retention, the web console, and Postgres persistence (v0.21.x) have no
-  client-facing HTTP surface, so there is nothing for this SDK to cover.

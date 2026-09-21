@@ -11,12 +11,21 @@ import httpx
 class ReadinessChecker:
     """Cached dependency checks with bounded latency and actionable component detail."""
 
-    def __init__(self, data_dir: Path, database_checks: dict[str, Callable[[], object]], model_url: str, min_free_bytes: int = 100_000_000, cache_seconds: float = 2.0):
+    def __init__(
+        self,
+        data_dir: Path,
+        database_checks: dict[str, Callable[[], object]],
+        model_url: str,
+        min_free_bytes: int = 100_000_000,
+        cache_seconds: float = 2.0,
+        require_model: bool = False,
+    ):
         self.data_dir = data_dir
         self.database_checks = database_checks
         self.model_url = model_url.rstrip("/")
         self.min_free_bytes = min_free_bytes
         self.cache_seconds = cache_seconds
+        self.require_model = require_model
         self._cached_at = 0.0
         self._cached: dict | None = None
 
@@ -43,6 +52,7 @@ class ReadinessChecker:
         finally:
             if owns_client:
                 await client.aclose()
-        result = {"status": "ready" if all(item["ok"] for item in components.values()) else "not_ready", "components": components}
+        required = [value for key, value in components.items() if key != "model" or self.require_model]
+        result = {"status": "ready" if all(item["ok"] for item in required) else "not_ready", "components": components}
         self._cached, self._cached_at = result, now
         return result

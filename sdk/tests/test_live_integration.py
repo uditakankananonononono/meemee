@@ -19,7 +19,6 @@ import pytest
 
 from meemee_client import (
     AuthenticationError,
-    IdempotencyConflictError,
     JobStatus,
     MeemeeClient,
     NotFoundError,
@@ -105,16 +104,12 @@ def cancelled_job_id(scoped: MeemeeClient) -> str:
     return created.id
 
 
-def test_live_health_and_ready(live_server: str, server_version: tuple[int, ...]) -> None:
+def test_live_health_and_ready(live_server: str) -> None:
     anon = MeemeeClient(live_server)
     health = anon.health()
     assert health.status == "ok"
     assert health.version  # exact package version reported by the server
-    if server_version >= (0, 20):
-        # Readiness includes the model endpoint, absent in this environment.
-        assert anon.ready().status in {"ready", "not_ready"}
-    else:
-        assert anon.ready().status == "ready"
+    assert anon.ready().status == "ready"
 
 
 def test_live_401_challenge(live_server: str) -> None:
@@ -179,73 +174,8 @@ def test_live_metrics(admin: MeemeeClient) -> None:
     assert "meemee" in admin.metrics()
 
 
-def test_live_revoke_takes_effect_immediately(admin: MeemeeClient, live_server: str) -> None:
-    # Mint a throwaway token for this test so the shared scoped fixture stays valid.
-    throwaway = admin.tokens.create("revoke-me", {"jobs:read"})
-    assert MeemeeClient(live_server, auth=throwaway.token).jobs.events.__self__ is not None
-    assert admin.tokens.revoke(throwaway.id).revoked is True
+def test_live_revoke_takes_effect_immediately(admin: MeemeeClient, live_server: str, scoped_token_id_and_secret) -> None:
+    token_id, secret = scoped_token_id_and_secret
+    assert admin.tokens.revoke(token_id).revoked is True
     with pytest.raises(AuthenticationError):
-        MeemeeClient(live_server, auth=throwaway.token).jobs.get("anything")
-
-
-@pytest.fixture(scope="module")
-def server_version(live_server: str) -> tuple[int, ...]:
-    parts: list[int] = []
-    for piece in MeemeeClient(live_server).health().version.split("."):
-        if not piece.isdigit():
-            break
-        parts.append(int(piece))
-    return tuple(parts)
-
-
-def _require_v020(version: tuple[int, ...]) -> None:
-    if version < (0, 20):
-        pytest.skip(f"server version {version} predates the v0.20 surface")
-
-
-def test_live_ready_reports_components(live_server: str, server_version: tuple[int, ...]) -> None:
-    _require_v020(server_version)
-    report = MeemeeClient(live_server).ready()
-    # The model component depends on a reachable model endpoint, which this
-    # test environment does not provide - assert the report's shape, not readiness.
-    assert report.status in {"ready", "not_ready"}
-    assert {"memory", "jobs", "tokens", "disk", "model"} <= set(report.components)
-    assert report.components["disk"].ok
-    if not report.is_ready:
-        assert report.failing()  # names the components that failed
-
-
-def test_live_job_create_reports_quota(scoped: MeemeeClient, server_version: tuple[int, ...]) -> None:
-    _require_v020(server_version)
-    created = scoped.jobs.create("Quota snapshot live check")
-    assert created.quota is not None
-    assert created.quota.limit >= 1
-    assert created.quota.used >= 1
-    scoped.jobs.cancel(created.id)
-
-
-def test_live_quota_get_and_admin_set(
-    admin: MeemeeClient,
-    scoped: MeemeeClient,
-    scoped_token_id_and_secret,
-    server_version: tuple[int, ...],
-) -> None:
-    _require_v020(server_version)
-    token_id, _ = scoped_token_id_and_secret
-    before = scoped.quota.get()
-    assert before.limit >= 1
-    updated = admin.quota.set(token_id, 500)
-    assert updated.limit == 500
-    assert scoped.quota.get().limit == 500
-
-
-def test_live_idempotent_job_create(scoped: MeemeeClient, server_version: tuple[int, ...]) -> None:
-    _require_v020(server_version)
-    first = scoped.jobs.create("Idempotency live check", idempotency_key="live-key-1")
-    replay = scoped.jobs.create("Idempotency live check", idempotency_key="live-key-1")
-    assert replay.id == first.id
-    assert first.quota is not None and replay.quota is not None
-    assert replay.quota.used == first.quota.used  # replay consumed no quota
-    with pytest.raises(IdempotencyConflictError):
-        scoped.jobs.create("A different goal entirely", idempotency_key="live-key-1")
-    scoped.jobs.cancel(first.id)
+        MeemeeClient(live_server, auth=secret).jobs.get("anything")

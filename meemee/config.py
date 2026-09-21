@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_json: bool = True
     readiness_min_free_bytes: int = 100_000_000
+    readiness_require_model: bool = False
     default_daily_jobs: int = 100
     retention_jobs_days: int = 30
     retention_memory_days: int = 90

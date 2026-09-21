@@ -26,7 +26,6 @@ from .errors import (
     AuthenticationError,
     BadRequestError,
     ConflictError,
-    IdempotencyConflictError,
     MeemeeError,
     NetworkError,
     NotFoundError,
@@ -47,9 +46,8 @@ from .models import (
     JobCancelResult,
     JobEvent,
     KNOWN_SCOPES,
-    QuotaStatus,
     RateLimitInfo,
-    ReadinessReport,
+    ReadinessStatus,
     ResponseInfo,
     RevokedToken,
     RunReport,
@@ -140,7 +138,6 @@ class MeemeeClient:
         self.jobs = JobsResource(self)
         self.tokens = TokensResource(self)
         self.audit = AuditResource(self)
-        self.quota = QuotaResource(self)
 
     # ------------------------------------------------------------------ basics
 
@@ -157,17 +154,9 @@ class MeemeeClient:
         """GET /health - unauthenticated liveness with the exact server version."""
         return HealthStatus.model_validate(self._request_json("GET", "/health"))
 
-    def ready(self) -> ReadinessReport:
-        """GET /ready - component-level readiness.
-
-        Server v0.20+ returns the same JSON body with 200 (status "ready") and
-        503 (status "not_ready"), detailing memory/jobs/tokens databases, disk
-        and the model endpoint; both are parsed, so check ``is_ready`` and
-        ``failing()``. Older servers return a bare {"status": "ready"} and a
-        plain 503 raises ServerError instead.
-        """
-        response = self._request("GET", "/ready", ok_statuses=frozenset({503}))
-        return ReadinessReport.model_validate(response.json())
+    def ready(self) -> ReadinessStatus:
+        """GET /ready - database-backed readiness; raises ServerError on 503."""
+        return ReadinessStatus.model_validate(self._request_json("GET", "/ready"))
 
     def metrics(self) -> str:
         """GET /metrics - Prometheus exposition text (admin scope)."""
@@ -193,8 +182,6 @@ class MeemeeClient:
         json_body: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
         timeout: httpx.Timeout | float | None = None,
-        retry_override: bool = False,
-        ok_statuses: frozenset[int] | None = None,
     ) -> httpx.Response:
         policy = self._retry
         attempt = 0
@@ -208,7 +195,7 @@ class MeemeeClient:
                 )
             except httpx.TransportError as exc:
                 error = NetworkError(f"{method} {path} failed before a response: {exc}")
-                if policy.can_retry(method, attempt) or (retry_override and attempt < policy.max_attempts):
+                if policy.can_retry(method, attempt):
                     self._sleeper(policy.delay(attempt))
                     continue
                 raise error from exc
@@ -219,15 +206,12 @@ class MeemeeClient:
             if (
                 response.status_code >= 400
                 and policy.is_retryable_status(response.status_code)
-                and (policy.can_retry(method, attempt) or (retry_override and attempt < policy.max_attempts))
+                and policy.can_retry(method, attempt)
             ):
                 retry_after = _parse_retry_after(response.headers.get("Retry-After"))
-                if policy.allows_wait(retry_after):
-                    self._sleeper(policy.delay(attempt, retry_after))
-                    continue
+                self._sleeper(policy.delay(attempt, retry_after))
+                continue
             if response.status_code >= 400:
-                if ok_statuses and response.status_code in ok_statuses:
-                    return response
                 raise _map_error(response)
             return response
 
@@ -322,8 +306,6 @@ def _map_error(response: httpx.Response) -> ApiError:
     if status == 404:
         return NotFoundError(message, status_code=status, request_id=rid, detail=detail)
     if status == 409:
-        if isinstance(detail, str) and detail.startswith("idempotency key"):
-            return IdempotencyConflictError(message, status_code=status, request_id=rid, detail=detail)
         return ConflictError(message, status_code=status, request_id=rid, detail=detail)
     if status == 422:
         issues = detail if isinstance(detail, list) else None
@@ -376,41 +358,18 @@ class JobsResource:
     def __init__(self, client: MeemeeClient) -> None:
         self._client = client
 
-    def create(
-        self,
-        goal: str,
-        *,
-        run_at: datetime | str | None = None,
-        idempotency_key: str | None = None,
-    ) -> CreatedJob:
+    def create(self, goal: str, *, run_at: datetime | str | None = None) -> CreatedJob:
         """POST /v1/jobs - enqueue a goal, optionally scheduled for a future run_at.
 
         Workers claim due jobs atomically and retry failures up to the job's
-        max_attempts (server default 3). The response includes the daily quota
-        snapshot after this create (server v0.20+; None on older servers).
-
-        Pass ``idempotency_key`` (1-200 chars, server v0.20+) to make the
-        create safely retryable: the server deduplicates by key for 24 hours,
-        a replay returns the original response without consuming quota again,
-        and the SDK then auto-retries the POST on transient failures - the one
-        exception is a quota-exhausted 429 (Retry-After: 86400), which raises
-        RateLimitError immediately because waiting cannot help. Reusing a key
-        with a different body raises IdempotencyConflictError.
+        max_attempts (server default 3). Not auto-retried; see RunsResource.create.
         """
         _validate_goal(goal)
         body: dict[str, Any] = {"goal": goal}
         scheduled = _iso_or_none(run_at, "run_at")
         if scheduled is not None:
             body["run_at"] = scheduled
-        headers: dict[str, str] | None = None
-        if idempotency_key is not None:
-            if not (1 <= len(idempotency_key) <= 200):
-                raise ValueError("idempotency_key must be 1-200 characters (server limit)")
-            headers = {"Idempotency-Key": idempotency_key}
-        payload = self._client._request_json(
-            "POST", "/v1/jobs", json_body=body, headers=headers,
-            retry_override=idempotency_key is not None,
-        )
+        payload = self._client._request_json("POST", "/v1/jobs", json_body=body)
         return CreatedJob.model_validate(payload)
 
     def get(self, job_id: str) -> Job:
@@ -464,11 +423,9 @@ class JobsResource:
         Yields JobEvents in order. On a dropped connection the stream resumes
         with a Last-Event-ID header, so no event is delivered twice and none is
         skipped. Returns when the job reaches a terminal event (done, failed or
-        cancelled). Server v0.21.1+ closes the stream after any terminal event;
-        on older servers a cancelled job's stream stayed open (heartbeats
-        only), so the SDK also closes client-side on the terminal event -
-        correct against every server version. Heartbeat comments are surfaced
-        through ``on_heartbeat`` instead of the event stream.
+        cancelled); the server itself closes the stream only after done/failed,
+        so the cancelled case is closed client-side. Heartbeat comments are
+        surfaced through ``on_heartbeat`` instead of the event stream.
 
         Raises NotFoundError for an unknown job, StreamError for a server error
         frame or a malformed event, and NetworkError when the reconnect budget
@@ -604,35 +561,6 @@ class TokensResource:
         raises NotFoundError when the id is unknown or already revoked)."""
         payload = self._client._request_json("DELETE", f"/v1/tokens/{token_id}")
         return RevokedToken.model_validate(payload)
-
-
-class QuotaResource:
-    """Per-principal daily job quotas (server v0.20+)."""
-
-    def __init__(self, client: MeemeeClient) -> None:
-        self._client = client
-
-    def get(self) -> QuotaStatus:
-        """GET /v1/quota - the caller's own daily quota for the current UTC day.
-
-        Note: the server requires the jobs:write scope for this endpoint -
-        a jobs:read-only token gets PermissionDeniedError.
-        """
-        payload = self._client._request_json("GET", "/v1/quota")
-        return QuotaStatus.model_validate(payload)
-
-    def set(self, principal_id: str, daily_jobs: int) -> QuotaStatus:
-        """PUT /v1/quota/{principal_id} - set a principal's daily job quota (admin).
-
-        daily_jobs must be 1-1000000. The change is recorded in the audit
-        chain as quota.update. Returns the principal's resulting status.
-        """
-        if not isinstance(daily_jobs, int) or not (1 <= daily_jobs <= 1_000_000):
-            raise ValueError("daily_jobs must be an integer in 1-1000000 (server bounds)")
-        payload = self._client._request_json(
-            "PUT", f"/v1/quota/{principal_id}", json_body={"daily_jobs": daily_jobs}
-        )
-        return QuotaStatus.model_validate(payload)
 
 
 class AuditResource:

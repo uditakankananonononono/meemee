@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working v1, not a claim to be finished general intelligence.
 
-## Verified in v0.21.1 (41)
+## Verified in v0.22.0 (44)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -45,6 +45,9 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 39. Bounded-latency cached readiness checks across memory/jobs/auth databases, model endpoint and free disk, with per-component diagnosis, safe errors and proper HTTP 503 failure signaling.
 40. Atomic per-principal daily job quotas with configurable defaults, admin overrides, UTC resets, status endpoint, rollback on excess, audit events and quota details returned at job creation.
 41. Configurable data-retention execution for terminal jobs/events, memories, expired idempotency and old rate windows, with active-job protection and deletion reporting; tamper-evident audit is deliberately retained intact.
+42. Production Python client SDK with sync/async clients, typed models, retries, idempotency and resumable SSE, tested against a live booted server.
+43. Static operator web console for health, jobs, SSE progress, audit verification and token/quota operations, served at `/console/`.
+44. PostgreSQL persistence package for shared multi-node jobs, events, plans, tokens, audit, idempotency, quota and rate limits, with migrations and integration tests.
 
 ## Thin (0)
 
@@ -118,3 +121,6 @@ Browser setup: `pip install -e .[browser]` then `playwright install chromium`. V
 
 
 Cancellation contract: cancelling an already-cancelled job is idempotent and returns its terminal cancelled state without appending another event. SSE streams emit that durable cancelled event and then close.
+
+
+Combined-tree verification for v0.22.0: 79 core tests passed; 107 SDK tests passed including 11 against a real booted server; PostgreSQL contract tests passed (3), while 2 live PostgreSQL integration tests require `MEEMEE_TEST_DATABASE_URL` and were skipped in this environment. The operator console mount is covered by a core HTTP integration test and its worker-provided headless browser suite. Readiness reports model health but, by default, does not fail the API solely because an optional/local model process is offline; set `MEEMEE_READINESS_REQUIRE_MODEL=true` where model availability is required for traffic.

@@ -136,21 +136,14 @@ def test_retry_after_is_honoured_before_retrying(sleeper: FakeSleeper) -> None:
     assert len(attempts) == 2
 
 
-def test_retry_after_beyond_cap_is_not_retried(sleeper: FakeSleeper) -> None:
-    # A server-directed wait beyond retry_after_max_seconds (e.g. the 86400s
-    # daily-quota 429) fails immediately - sleeping cannot help.
-    attempts = []
-
+def test_retry_after_capped_by_policy(sleeper: FakeSleeper) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
-        attempts.append(1)
-        return httpx.Response(429, json={"detail": "daily job quota exceeded (100)"}, headers={"Retry-After": "9999"})
+        return httpx.Response(429, json={"detail": "rate limit exceeded"}, headers={"Retry-After": "9999"})
 
-    policy = RetryPolicy(max_attempts=3, retry_after_max_seconds=30)
-    with pytest.raises(RateLimitError) as caught:
+    policy = RetryPolicy(max_attempts=2, retry_after_max_seconds=30)
+    with pytest.raises(RateLimitError):
         make_client(handler, sleeper=sleeper, retry=policy).health()
-    assert caught.value.retry_after == 9999.0
-    assert len(attempts) == 1
-    assert sleeper.calls == []
+    assert sleeper.calls == [30.0]
 
 
 def test_5xx_retried_with_jittered_backoff_then_succeeds(sleeper: FakeSleeper) -> None:

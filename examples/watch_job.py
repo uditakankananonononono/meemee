@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import os
 import sys
-import uuid
 
 from meemee_client import JobEvent, MeemeeClient, MeemeeError, StreamError
 
@@ -25,12 +24,8 @@ def main() -> int:
     goal = sys.argv[1] if len(sys.argv) > 1 else "Summarise today's arXiv cs.AI highlights"
 
     with MeemeeClient(base_url, auth=token) as client:
-        # An idempotency key makes the create safe to retry (server v0.20+):
-        # a replay returns the same job instead of enqueueing a duplicate.
-        created = client.jobs.create(goal, idempotency_key=f"watch-{uuid.uuid4().hex[:16]}")
+        created = client.jobs.create(goal)
         print(f"enqueued job {created.id}; following progress...")
-        if created.quota is not None:
-            print(f"daily quota: {created.quota.used}/{created.quota.limit} used")
 
         # stream_events resumes automatically with Last-Event-ID when the
         # connection drops, and returns when the job reaches done/failed/cancelled.

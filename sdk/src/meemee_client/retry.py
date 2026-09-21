@@ -33,14 +33,8 @@ class RetryPolicy:
     retry_methods: frozenset[str] = field(default=frozenset({"GET", "HEAD", "DELETE"}))
     #: Honour the server's Retry-After header on 429 (and 503) responses.
     respect_retry_after: bool = True
-    #: Longest server-directed wait that is still honoured. A Retry-After
-    #: beyond this (e.g. the 86400s of an exhausted daily job quota) makes the
-    #: request fail immediately instead of sleeping - waiting cannot help.
+    #: Cap on server-directed waits so a hostile Retry-After cannot stall the process.
     retry_after_max_seconds: float = 120.0
-
-    def allows_wait(self, retry_after: float | None) -> bool:
-        """Whether a server-directed wait is short enough to honour."""
-        return retry_after is None or retry_after <= self.retry_after_max_seconds
 
     def can_retry(self, method: str, attempt: int) -> bool:
         return method.upper() in self.retry_methods and attempt < self.max_attempts
@@ -55,7 +49,7 @@ class RetryPolicy:
         full jitter over the exponential window, matching the server's model transport.
         """
         if retry_after is not None and self.respect_retry_after:
-            return max(0.0, float(retry_after))
+            return max(0.0, min(float(retry_after), self.retry_after_max_seconds))
         window = min(
             self.backoff_base_seconds * (self.backoff_multiplier ** (attempt - 1)),
             self.backoff_max_seconds,
