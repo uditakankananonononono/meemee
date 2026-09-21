@@ -28,6 +28,7 @@ from .oidc import OIDCConfig, OIDCValidator
 from .quotas import QuotaExceeded, QuotaStore
 from .rate_limit import RateLimitMiddleware, SQLiteRateLimiter
 from .runtime import build_agent
+from .shutdown import RunGate
 from .streaming import job_event_stream
 from .web_login import WebLogin, WebLoginConfig
 
@@ -40,6 +41,7 @@ mount_console(app)
 app.add_middleware(MetricsMiddleware)
 app.add_middleware(RateLimitMiddleware, limiter=SQLiteRateLimiter(settings.data_dir / "rate-limits.sqlite3", settings.rate_limit_requests, settings.rate_limit_window_seconds))
 agent = build_agent(settings)
+run_gate = RunGate()
 jobs = JobStore(settings.data_dir / "jobs.sqlite3")
 idempotency = IdempotencyStore(settings.data_dir / "idempotency.sqlite3")
 quotas = QuotaStore(settings.data_dir / "quotas.sqlite3", settings.default_daily_jobs)
@@ -111,6 +113,9 @@ async def ready():
 
 @app.post("/v1/runs", dependencies=[Depends(auth.dependency("runs:write"))])
 async def create_run(request: RunRequest):
+    if not run_gate.accepting:
+        raise HTTPException(503, "server is draining", headers={"Retry-After":"30"})
+    await run_gate.enter()
     try:
         report = await agent.run(request.goal, approve=lambda *_: request.approve_writes)
         audit.append("api", "run.create", report.run_id, "success", {"steps": report.steps_used})
@@ -119,6 +124,8 @@ async def create_run(request: RunRequest):
     except (OSError, ValueError, RuntimeError) as exc:
         AGENT_RUNS.labels("failed").inc()
         raise HTTPException(status_code=502, detail=f"agent run failed: {exc}") from exc
+    finally:
+        await run_gate.leave()
 
 
 @app.post("/v1/jobs")
@@ -267,3 +274,13 @@ def set_quota(principal_id: str, request: QuotaRequest):
     quotas.set_limit(principal_id, request.daily_jobs)
     audit.append("api", "quota.update", principal_id, "success", {"daily_jobs": request.daily_jobs})
     return quotas.status(principal_id)
+
+
+@app.on_event("shutdown")
+async def graceful_shutdown():
+    drained = await run_gate.drain(settings.shutdown_grace_seconds)
+    if not drained:
+        log.warning("shutdown grace period elapsed", extra={"active_runs": run_gate.active})
+    close = getattr(agent.model, "aclose", None)
+    if close is not None:
+        await close()

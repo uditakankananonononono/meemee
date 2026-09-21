@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     retention_jobs_days: int = 30
     retention_memory_days: int = 90
     retention_audit_days: int = 365
+    shutdown_grace_seconds: float = 30.0
     oidc_role_claim: str = "roles"
     oidc_client_id: str | None = None
     oidc_client_secret: str | None = None
