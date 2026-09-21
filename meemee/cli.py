@@ -9,6 +9,7 @@ import uvicorn
 from .config import Settings
 from .runtime import build_agent
 from .tools.github import GitHubRepoSearch, GitHubSearchArgs
+from .worker import work_forever
 
 app = typer.Typer(no_args_is_help=True, help="Meemee local-first agent runtime")
 
@@ -40,3 +41,9 @@ def scout(query: str, language: str | None = None, min_stars: int = 0, limit: in
 def serve(host: str = "127.0.0.1", port: int = 8787) -> None:
     """Start the HTTP API."""
     uvicorn.run("meemee.api:app", host=host, port=port)
+
+
+@app.command()
+def worker() -> None:
+    """Run a durable queued-job worker."""
+    asyncio.run(work_forever())

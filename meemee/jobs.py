@@ -1,0 +1,63 @@
+from __future__ import annotations
+
+import json
+import sqlite3
+import threading
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+
+class JobStore:
+    """Durable SQLite queue. Atomic claims allow several worker processes."""
+
+    def __init__(self, path: Path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self.db = sqlite3.connect(path, check_same_thread=False, isolation_level=None)
+        self.db.row_factory = sqlite3.Row
+        self.lock = threading.RLock()
+        self.db.executescript("""
+            PRAGMA journal_mode=WAL;
+            CREATE TABLE IF NOT EXISTS jobs (
+                id TEXT PRIMARY KEY, goal TEXT NOT NULL, run_at TEXT NOT NULL,
+                status TEXT NOT NULL CHECK(status IN ('queued','running','done','failed')),
+                attempts INTEGER NOT NULL DEFAULT 0, max_attempts INTEGER NOT NULL DEFAULT 3,
+                result TEXT, error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS jobs_due ON jobs(status, run_at);
+        """)
+
+    def enqueue(self, goal: str, run_at: datetime | None = None, max_attempts: int = 3) -> str:
+        ident = uuid.uuid4().hex
+        now = datetime.now(timezone.utc).isoformat()
+        due = (run_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
+        with self.lock, self.db:
+            self.db.execute("INSERT INTO jobs(id,goal,run_at,status,max_attempts,created_at,updated_at) VALUES(?,?,?,'queued',?,?,?)", (ident, goal, due, max_attempts, now, now))
+        return ident
+
+    def claim(self) -> dict[str, Any] | None:
+        now = datetime.now(timezone.utc).isoformat()
+        with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            row = self.db.execute("SELECT * FROM jobs WHERE status='queued' AND run_at<=? ORDER BY run_at,id LIMIT 1", (now,)).fetchone()
+            if row is None:
+                self.db.execute("COMMIT"); return None
+            changed = self.db.execute("UPDATE jobs SET status='running', attempts=attempts+1, updated_at=? WHERE id=? AND status='queued'", (now, row["id"])).rowcount
+            self.db.execute("COMMIT")
+        return dict(row) if changed else None
+
+    def finish(self, ident: str, result: dict[str, Any]) -> None:
+        now = datetime.now(timezone.utc).isoformat()
+        with self.lock, self.db:
+            self.db.execute("UPDATE jobs SET status='done', result=?, updated_at=? WHERE id=? AND status='running'", (json.dumps(result), now, ident))
+
+    def fail(self, ident: str, error: str) -> None:
+        now = datetime.now(timezone.utc).isoformat()
+        with self.lock, self.db:
+            self.db.execute("UPDATE jobs SET status=CASE WHEN attempts<max_attempts THEN 'queued' ELSE 'failed' END, error=?, updated_at=? WHERE id=? AND status='running'", (error, now, ident))
+
+    def get(self, ident: str) -> dict[str, Any] | None:
+        with self.lock:
+            row = self.db.execute("SELECT * FROM jobs WHERE id=?", (ident,)).fetchone()
+        return dict(row) if row else None

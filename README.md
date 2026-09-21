@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working v1, not a claim to be finished general intelligence.
 
-## Verified in v0.1.0 (10)
+## Verified in v0.2.0 (15)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -14,16 +14,22 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 8. Durable SQLite event memory with WAL, FTS5 retrieval, and run provenance.
 9. CLI for runs, GitHub scouting, and API serving.
 10. FastAPI health/run endpoints, Docker image, and automated tests.
+11. Allowlisted direct-argv command execution with no shell interpolation, timeout, output cap, and explicit approval.
+12. Git status/diff/log inspection plus approval-gated local commits of explicit paths; no implicit push.
+13. Durable scheduled job queue with atomic multi-process claims, retry limits, and result/error records.
+14. Long-running worker command and job create/status API.
+15. Optional constant-time bearer-token authentication for run and job endpoints.
 
-## Thin (3)
+## Thin (4)
 
 - Plans are deterministic sentence decomposition, not a persisted editable plan state machine.
 - Memory uses lexical FTS5, without embeddings or semantic reranking.
-- API runs are in-process, without a durable queue, worker pool, authentication, or event streaming.
+- Immediate API runs remain in-process; queued jobs support multiple workers but there is no event streaming or cancellation yet.
+- API authentication is a single operator bearer token, not OIDC, users, roles, or scoped permissions.
 
 ## Missing, not claimed
 
-Browser control, shell execution, Git writes, multi-agent delegation, scheduled work, a secrets vault, permissions UI, production authentication, rate limiting, distributed workers, and Kubernetes deployment.
+Browser control, remote Git push/PR operations, multi-agent delegation, a secrets vault, permissions UI, OIDC/user-role authentication, rate limiting, semantic memory, event streaming, job cancellation, and Kubernetes deployment.
 
 ## Install
 
@@ -74,3 +80,8 @@ File writes are denied unless the caller opts in with `--approve-writes` or `app
 - `cli.py` and `api.py`: interfaces over the same runtime.
 
 A model statement is never treated as proof that work happened. Tool returns are stored separately, side effects require approval, and paths stay inside the configured workspace.
+
+
+## Advanced operation
+
+Set `MEEMEE_API_TOKEN` in production-facing environments. Run one or more durable workers with `meemee worker`. Schedule work through `POST /v1/jobs` with an ISO 8601 `run_at`; workers atomically claim due jobs. Shell and local Git mutations are side effects and still require agent-run approval. Commands are direct argv calls, never `shell=True`, and only configured executables can run. Git commits name explicit paths and never push.

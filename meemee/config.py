@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     workspace: Path = Field(default_factory=Path.cwd)
     max_steps: int = 12
     request_timeout: float = 60.0
+    api_token: str | None = None
+    shell_allowlist: str = "python3,pytest,ruff,git,ls,find,cat,wc"
+    worker_poll_seconds: float = 1.0
 
     @property
     def database_path(self) -> Path:
