@@ -72,8 +72,8 @@ class TokenStore:
 
 
 class Authenticator:
-    def __init__(self, store: TokenStore, bootstrap_token: str | None = None):
-        self.store, self.bootstrap = store, bootstrap_token
+    def __init__(self, store: TokenStore, bootstrap_token: str | None = None, oidc_validator=None):
+        self.store, self.bootstrap, self.oidc = store, bootstrap_token, oidc_validator
 
     def dependency(self, required: str):
         def check(request: Request, authorization: str | None = Header(default=None)) -> Principal:
@@ -84,6 +84,8 @@ class Authenticator:
                     principal = Principal("bootstrap", "bootstrap", frozenset({"admin", "runs:write", "jobs:read", "jobs:write"}))
                 else:
                     principal = self.store.authenticate(supplied)
+                    if principal is None and self.oidc is not None:
+                        principal = self.oidc.authenticate(supplied)
             if principal is None:
                 raise HTTPException(status_code=401, detail="missing or invalid bearer token", headers={"WWW-Authenticate": "Bearer"})
             if required not in principal.scopes and "admin" not in principal.scopes:

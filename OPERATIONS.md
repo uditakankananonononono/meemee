@@ -53,3 +53,15 @@ Schema creation is idempotent. There is not yet a formal migration framework, so
 - Leaked vault key: rotate the key by exporting and re-encrypting secrets on an offline trusted host; treat all stored values as exposed.
 - Stuck queued work: inspect `/v1/jobs/{id}` and `/events`, cancel queued work, then check worker/model logs.
 - Repeated browser challenge: stop automation for that site. Meemee does not claim challenge bypass.
+
+## OIDC identity provider
+
+For workforce or customer access, configure all three together:
+
+```bash
+MEEMEE_OIDC_ISSUER=https://login.example.com/
+MEEMEE_OIDC_AUDIENCE=meemee-api
+MEEMEE_OIDC_JWKS_URL=https://login.example.com/.well-known/jwks.json
+```
+
+The issuer and JWKS URL must be HTTPS on the same host. Meemee verifies the signature, algorithm, issuer, audience, expiry, issued-at time and subject. Configure roles with `MEEMEE_OIDC_ROLE_SCOPES`; unknown roles receive no rights. Rotate signing keys at the identity provider; JWKS keys are cached for five minutes. Keep a break-glass bootstrap token offline. Meemee accepts access tokens as bearer tokens; it does not implement an interactive browser login screen yet.

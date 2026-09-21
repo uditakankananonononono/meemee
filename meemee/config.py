@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     browser_headless: bool = True
     rate_limit_requests: int = 60
     rate_limit_window_seconds: int = 60
+    oidc_issuer: str | None = None
+    oidc_audience: str | None = None
+    oidc_jwks_url: str | None = None
+    oidc_role_claim: str = "roles"
+    oidc_role_scopes: str = "admin=admin;operator=runs:write,jobs:read,jobs:write;viewer=jobs:read"
 
     @property
     def database_path(self) -> Path:

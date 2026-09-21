@@ -13,6 +13,7 @@ from . import __version__
 from .auth import Authenticator, TokenStore
 from .config import Settings
 from .jobs import JobStore
+from .oidc import OIDCConfig, OIDCValidator
 from .rate_limit import RateLimitMiddleware
 from .runtime import build_agent
 
@@ -24,7 +25,15 @@ app.add_middleware(RateLimitMiddleware, requests=settings.rate_limit_requests, w
 agent = build_agent(settings)
 jobs = JobStore(settings.data_dir / "jobs.sqlite3")
 tokens = TokenStore(settings.data_dir / "auth.sqlite3")
-auth = Authenticator(tokens, settings.api_token)
+oidc = None
+if any((settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url)):
+    if not all((settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url)):
+        raise RuntimeError("OIDC requires issuer, audience and JWKS URL together")
+    oidc = OIDCValidator(OIDCConfig(
+        settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url,
+        settings.oidc_role_claim, settings.oidc_role_scopes,
+    ))
+auth = Authenticator(tokens, settings.api_token, oidc)
 
 
 @app.middleware("http")

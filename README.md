@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working v1, not a claim to be finished general intelligence.
 
-## Verified in v0.7.0 (25)
+## Verified in v0.8.0 (26)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -29,6 +29,7 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 23. Versioned persistent plan DAGs with cycle validation, arbitrary dependency order, status transitions, full history, change reasons, and optimistic concurrency control.
 24. Persistent revocable API tokens with SHA-256 digest storage, expiry, last-used audit, one-time reveal and endpoint scopes.
 25. Production API request IDs, safe 500 responses, security headers, readiness checks, exact package version reporting, and validated scheduling input.
+26. Federated OIDC bearer authentication with signed JWKS validation, strict issuer/audience/expiry requirements, safe algorithm allowlist, configurable role-to-scope mapping, and direct OAuth scope support.
 
 ## Thin (0)
 
@@ -36,7 +37,7 @@ Nothing is classified as thin. A capability is either implemented and tested at 
 
 ## Missing, not claimed
 
-Automated model-driven replanning policies; semantic/embedding memory and reranking; federated OIDC login and interactive end-user accounts (scoped commercial API tokens are implemented); browser human takeover, managed downloads, challenge handoff and per-site policy; remote Git push and pull-request operations; a permissions UI; shared cross-pod rate limiting; push-based SSE/WebSocket event streaming; running-job cancellation; and a shared queue/database suitable for Kubernetes replicas.
+Automated model-driven replanning policies; semantic/embedding memory and reranking; interactive browser login/session UI and account administration (OIDC bearer authentication and scoped API tokens are implemented); browser human takeover, managed downloads, challenge handoff and per-site policy; remote Git push and pull-request operations; a permissions UI; shared cross-pod rate limiting; push-based SSE/WebSocket event streaming; running-job cancellation; and a shared queue/database suitable for Kubernetes replicas.
 
 The existing deterministic goal decomposition, lexical FTS, scoped/revocable API token system, browser automation, in-process limiter, SQLite queue, and cursor event API remain useful internal or single-node features, but they are not presented as completed versions of the advanced capabilities above.
 
