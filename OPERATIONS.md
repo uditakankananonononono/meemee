@@ -79,3 +79,7 @@ Before an upgrade, run `meemee backup /secure/backups/meemee-YYYYMMDD` and `meem
 ## Interactive login
 
 Configure the authorization endpoint, token endpoint, client ID/secret, exact HTTPS redirect URI and a random `MEEMEE_SESSION_KEY` of at least 32 characters. Register the same redirect URI at the identity provider. The flow uses Authorization Code with PKCE S256, signed 10-minute state, nonce, CSRF state comparison, and an 8-hour Secure/HttpOnly/SameSite=Lax session cookie. Keep the application behind HTTPS. Rotate the session key to invalidate all sessions. The home page provides sign-in status and logout; full account administration remains external at the identity provider.
+
+## Rate limits
+
+The limiter uses a dedicated SQLite/WAL database and atomic transactions, so all API processes on the supported single host share one limit. Authenticated callers are isolated by a non-reversible prefix of the bearer-token digest; unauthenticated callers use the directly connected client IP. Do not trust forwarded headers in Meemee itself: terminate TLS at a controlled proxy and enforce edge limits there too. Health/readiness checks are exempt. Responses include `RateLimit-Limit`, `RateLimit-Remaining`, and `RateLimit-Reset`; blocked requests also include `Retry-After`. Cross-host deployments still require a future distributed limiter.

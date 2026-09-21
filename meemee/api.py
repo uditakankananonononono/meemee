@@ -22,7 +22,7 @@ from .observability import (
     metrics_response,
 )
 from .oidc import OIDCConfig, OIDCValidator
-from .rate_limit import RateLimitMiddleware
+from .rate_limit import RateLimitMiddleware, SQLiteRateLimiter
 from .runtime import build_agent
 from .web_login import WebLogin, WebLoginConfig
 
@@ -32,7 +32,7 @@ configure_logging(settings.log_level, settings.log_json)
 log = logging.getLogger("meemee.api")
 app = FastAPI(title="Meemee", version=__version__)
 app.add_middleware(MetricsMiddleware)
-app.add_middleware(RateLimitMiddleware, requests=settings.rate_limit_requests, window_seconds=settings.rate_limit_window_seconds)
+app.add_middleware(RateLimitMiddleware, limiter=SQLiteRateLimiter(settings.data_dir / "rate-limits.sqlite3", settings.rate_limit_requests, settings.rate_limit_window_seconds))
 agent = build_agent(settings)
 jobs = JobStore(settings.data_dir / "jobs.sqlite3")
 tokens = TokenStore(settings.data_dir / "auth.sqlite3")
