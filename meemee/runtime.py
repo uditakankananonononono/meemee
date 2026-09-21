@@ -29,6 +29,6 @@ def build_agent(settings: Settings | None = None, include_delegation: bool = Tru
     if include_delegation:
         registry.register(DelegateTasks(lambda: AgentTeam(lambda: build_agent(settings, False))))
     model = OpenAICompatibleModel(
-        settings.model_base_url, settings.model_name, settings.model_api_key, settings.request_timeout
+        settings.model_base_url, settings.model_name, settings.model_api_key, settings.request_timeout, settings.model_max_attempts
     )
     return Agent(model, registry, MemoryStore(settings.database_path), settings.max_steps)

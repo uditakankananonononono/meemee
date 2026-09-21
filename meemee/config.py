@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     workspace: Path = Field(default_factory=Path.cwd)
     max_steps: int = 12
     request_timeout: float = 60.0
+    model_max_attempts: int = 3
     api_token: str | None = None
     shell_allowlist: str = "python3,pytest,ruff,git,ls,find,cat,wc"
     worker_poll_seconds: float = 1.0
