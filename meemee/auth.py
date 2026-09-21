@@ -72,8 +72,8 @@ class TokenStore:
 
 
 class Authenticator:
-    def __init__(self, store: TokenStore, bootstrap_token: str | None = None, oidc_validator=None):
-        self.store, self.bootstrap, self.oidc = store, bootstrap_token, oidc_validator
+    def __init__(self, store: TokenStore, bootstrap_token: str | None = None, oidc_validator=None, session_auth=None):
+        self.store, self.bootstrap, self.oidc, self.session_auth = store, bootstrap_token, oidc_validator, session_auth
 
     def dependency(self, required: str):
         def check(request: Request, authorization: str | None = Header(default=None)) -> Principal:
@@ -86,6 +86,8 @@ class Authenticator:
                     principal = self.store.authenticate(supplied)
                     if principal is None and self.oidc is not None:
                         principal = self.oidc.authenticate(supplied)
+            if principal is None and self.session_auth is not None:
+                principal = self.session_auth(request.cookies.get("meemee_session", ""))
             if principal is None:
                 raise HTTPException(status_code=401, detail="missing or invalid bearer token", headers={"WWW-Authenticate": "Bearer"})
             if required not in principal.scopes and "admin" not in principal.scopes:

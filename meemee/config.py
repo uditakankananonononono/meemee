@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_json: bool = True
     oidc_role_claim: str = "roles"
+    oidc_client_id: str | None = None
+    oidc_client_secret: str | None = None
+    oidc_authorization_endpoint: str | None = None
+    oidc_token_endpoint: str | None = None
+    oidc_redirect_uri: str | None = None
+    session_key: str | None = None
     oidc_role_scopes: str = "admin=admin;operator=runs:write,jobs:read,jobs:write;viewer=jobs:read"
 
     @property

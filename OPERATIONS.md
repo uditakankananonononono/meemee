@@ -75,3 +75,7 @@ Before an upgrade, run `meemee backup /secure/backups/meemee-YYYYMMDD` and `meem
 ## Observability
 
 `GET /metrics` is Prometheus format and requires an admin bearer token. Scrape it through a protected internal route; do not expose it publicly. Metrics include request count by route/status, latency histograms, in-flight requests, agent outcomes and jobs created. Set `MEEMEE_LOG_JSON=true` for structured UTC JSON logs and `MEEMEE_LOG_LEVEL` to `INFO`, `WARNING` or `ERROR`. Ship stdout to your log platform and alert on sustained 5xx responses, p95 latency, failed agent runs, worker absence and disk pressure. Request responses carry `X-Request-ID`; preserve it at the proxy and use it to correlate logs.
+
+## Interactive login
+
+Configure the authorization endpoint, token endpoint, client ID/secret, exact HTTPS redirect URI and a random `MEEMEE_SESSION_KEY` of at least 32 characters. Register the same redirect URI at the identity provider. The flow uses Authorization Code with PKCE S256, signed 10-minute state, nonce, CSRF state comparison, and an 8-hour Secure/HttpOnly/SameSite=Lax session cookie. Keep the application behind HTTPS. Rotate the session key to invalidate all sessions. The home page provides sign-in status and logout; full account administration remains external at the identity provider.

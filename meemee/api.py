@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
 from . import __version__
@@ -24,6 +24,7 @@ from .observability import (
 from .oidc import OIDCConfig, OIDCValidator
 from .rate_limit import RateLimitMiddleware
 from .runtime import build_agent
+from .web_login import WebLogin, WebLoginConfig
 
 settings = Settings()
 settings.data_dir.mkdir(parents=True, exist_ok=True)
@@ -44,7 +45,13 @@ if any((settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url)):
         settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url,
         settings.oidc_role_claim, settings.oidc_role_scopes,
     ))
-auth = Authenticator(tokens, settings.api_token, oidc)
+web_login = None
+web_values = (settings.oidc_client_id, settings.oidc_client_secret, settings.oidc_authorization_endpoint, settings.oidc_token_endpoint, settings.oidc_redirect_uri, settings.session_key)
+if any(web_values):
+    if oidc is None or not all(web_values):
+        raise RuntimeError("interactive login requires complete OIDC and web-login configuration")
+    web_login = WebLogin(WebLoginConfig(*web_values), oidc)
+auth = Authenticator(tokens, settings.api_token, oidc, web_login.authenticate_session if web_login else None)
 
 
 @app.middleware("http")
@@ -172,3 +179,30 @@ def list_audit(after: int = 0, limit: int = 100):
 @app.get("/metrics", dependencies=[Depends(auth.dependency("admin"))], include_in_schema=False)
 def prometheus_metrics():
     return metrics_response()
+
+
+@app.get("/", include_in_schema=False)
+def web_home(request: Request):
+    principal = web_login.authenticate_session(request.cookies.get("meemee_session", "")) if web_login else None
+    return WebLogin.home(principal)
+
+
+@app.get("/auth/login", include_in_schema=False)
+def web_login_start():
+    if web_login is None:
+        raise HTTPException(404, "interactive login is not configured")
+    return web_login.start()
+
+
+@app.get("/auth/callback", include_in_schema=False)
+async def web_login_callback(request: Request, code: str, state: str):
+    if web_login is None:
+        raise HTTPException(404, "interactive login is not configured")
+    return await web_login.callback(request, code, state)
+
+
+@app.post("/auth/logout", include_in_schema=False)
+def web_logout():
+    response = RedirectResponse("/", 303)
+    response.delete_cookie("meemee_session", path="/")
+    return response
