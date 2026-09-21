@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Meemee Console</title>
+<link rel="stylesheet" href="./assets/app.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-name">Meemee</span>
+    <span class="brand-sub">operator console</span>
+  </div>
+  <nav id="nav-links" class="nav"></nav>
+  <div class="session">
+    <span id="session-chip" class="chip-row"></span>
+    <button id="session-button" class="button button-quiet" type="button">Session</button>
+  </div>
+</header>
+<div class="api-base">API: <code id="api-base-label"></code></div>
+<main id="view" class="view"></main>
+<footer class="footer">
+  Static, dependency-free console over the documented Meemee HTTP API.
+  Anything the API cannot do is labelled <span class="missing-tag">Missing</span> where it appears.
+</footer>
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<script type="module" src="./assets/app.js"></script>
+</body>
+</html>
