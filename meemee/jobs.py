@@ -21,7 +21,7 @@ class JobStore:
             PRAGMA journal_mode=WAL;
             CREATE TABLE IF NOT EXISTS jobs (
                 id TEXT PRIMARY KEY, goal TEXT NOT NULL, run_at TEXT NOT NULL,
-                status TEXT NOT NULL CHECK(status IN ('queued','running','done','failed')),
+                status TEXT NOT NULL CHECK(status IN ('queued','running','done','failed','cancel_requested','cancelled')),
                 attempts INTEGER NOT NULL DEFAULT 0, max_attempts INTEGER NOT NULL DEFAULT 3,
                 result TEXT, error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
             );
@@ -98,6 +98,31 @@ class JobStore:
             )
         job = self.get(ident)
         self.event(ident, "retry" if job and job["status"] == "queued" else "failed", {"error": error})
+
+
+    def request_cancel(self, ident: str) -> str | None:
+        now = datetime.now(timezone.utc).isoformat()
+        with self.lock, self.db:
+            row = self.db.execute("SELECT status FROM jobs WHERE id=?", (ident,)).fetchone()
+            if row is None:
+                return None
+            if row["status"] == "queued":
+                target = "cancelled"
+            elif row["status"] == "running":
+                target = "cancel_requested"
+            else:
+                return row["status"]
+            self.db.execute("UPDATE jobs SET status=?, error='cancelled', updated_at=? WHERE id=?", (target, now, ident))
+        self.event(ident, target, {})
+        return target
+
+    def cancel_running(self, ident: str) -> bool:
+        now = datetime.now(timezone.utc).isoformat()
+        with self.lock, self.db:
+            changed = self.db.execute("UPDATE jobs SET status='cancelled', error='cancelled', updated_at=? WHERE id=? AND status='cancel_requested'", (now, ident)).rowcount
+        if changed:
+            self.event(ident, "cancelled", {})
+        return bool(changed)
 
     def cancel(self, ident: str) -> bool:
         now = datetime.now(timezone.utc).isoformat()

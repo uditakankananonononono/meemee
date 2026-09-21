@@ -135,13 +135,13 @@ def get_job(job_id: str):
 
 @app.delete("/v1/jobs/{job_id}", dependencies=[Depends(auth.dependency("jobs:write"))])
 def cancel_job(job_id: str):
-    if jobs.cancel(job_id):
-        audit.append("api", "job.cancel", job_id, "success")
-        return {"id": job_id, "cancelled": True}
-    job = jobs.get(job_id)
-    if job is None:
+    status = jobs.request_cancel(job_id)
+    if status is None:
         raise HTTPException(404, "job not found")
-    raise HTTPException(409, f"cannot cancel job in {job['status']} state")
+    if status in {"cancelled", "cancel_requested"}:
+        audit.append("api", "job.cancel", job_id, "success", {"status": status})
+        return {"id": job_id, "status": status}
+    raise HTTPException(409, f"cannot cancel job in {status} state")
 
 
 @app.get("/v1/jobs/{job_id}/events", dependencies=[Depends(auth.dependency("jobs:read"))])

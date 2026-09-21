@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import uuid
 from collections.abc import Callable
+from threading import Event
 
 from .llm import Model
 from .memory import MemoryStore
@@ -27,7 +28,7 @@ class Agent:
         self.max_steps = max_steps
         self.planner = TaskPlanner()
 
-    async def run(self, goal: str, approve: Approval | None = None) -> RunReport:
+    async def run(self, goal: str, approve: Approval | None = None, cancel: Event | None = None) -> RunReport:
         run_id = uuid.uuid4().hex
         plan = self.planner.plan(goal)
         prior = self.memory.search(goal, limit=5)
@@ -43,6 +44,10 @@ class Agent:
         self.memory.add(run_id, "goal", goal, {"plan": plan.model_dump()})
         events: list[dict] = []
         for step_number in range(1, self.max_steps + 1):
+            if cancel is not None and cancel.is_set():
+                final = "Cancelled before the next agent step."
+                self.memory.add(run_id, "cancelled", final)
+                return RunReport(run_id=run_id, goal=goal, final=final, steps_used=step_number - 1, tool_results=events)
             decision = await self.model.decide(messages)
             messages.append({"role": "assistant", "content": decision.model_dump_json()})
             if decision.final is not None:
