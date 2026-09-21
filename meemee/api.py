@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from . import __version__
+from .audit import AuditLog
 from .auth import Authenticator, TokenStore
 from .config import Settings
 from .jobs import JobStore
@@ -25,6 +26,7 @@ app.add_middleware(RateLimitMiddleware, requests=settings.rate_limit_requests, w
 agent = build_agent(settings)
 jobs = JobStore(settings.data_dir / "jobs.sqlite3")
 tokens = TokenStore(settings.data_dir / "auth.sqlite3")
+audit = AuditLog(settings.data_dir / "audit.sqlite3")
 oidc = None
 if any((settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url)):
     if not all((settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url)):
@@ -85,7 +87,9 @@ def ready():
 @app.post("/v1/runs", dependencies=[Depends(auth.dependency("runs:write"))])
 async def create_run(request: RunRequest):
     try:
-        return await agent.run(request.goal, approve=lambda *_: request.approve_writes)
+        report = await agent.run(request.goal, approve=lambda *_: request.approve_writes)
+        audit.append("api", "run.create", report.run_id, "success", {"steps": report.steps_used})
+        return report
     except (OSError, ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=502, detail=f"agent run failed: {exc}") from exc
 
@@ -96,7 +100,9 @@ def create_job(request: JobRequest):
         run_at = datetime.fromisoformat(request.run_at.replace("Z", "+00:00")) if request.run_at else None
     except ValueError as exc:
         raise HTTPException(422, "run_at must be ISO 8601") from exc
-    return {"id": jobs.enqueue(request.goal, run_at)}
+    ident = jobs.enqueue(request.goal, run_at)
+    audit.append("api", "job.create", ident, "success", {"scheduled": bool(run_at)})
+    return {"id": ident}
 
 
 @app.get("/v1/jobs/{job_id}", dependencies=[Depends(auth.dependency("jobs:read"))])
@@ -110,6 +116,7 @@ def get_job(job_id: str):
 @app.delete("/v1/jobs/{job_id}", dependencies=[Depends(auth.dependency("jobs:write"))])
 def cancel_job(job_id: str):
     if jobs.cancel(job_id):
+        audit.append("api", "job.cancel", job_id, "success")
         return {"id": job_id, "cancelled": True}
     job = jobs.get(job_id)
     if job is None:
@@ -130,6 +137,7 @@ def create_token(request: TokenRequest):
     if not request.scopes <= allowed:
         raise HTTPException(422, f"unknown scopes: {sorted(request.scopes - allowed)}")
     ident, token = tokens.create(request.name, request.scopes, request.expires_at)
+    audit.append("api", "token.create", ident, "success", {"name": request.name, "scopes": sorted(request.scopes)})
     return {"id": ident, "token": token, "warning": "shown once; store it securely"}
 
 
@@ -137,4 +145,13 @@ def create_token(request: TokenRequest):
 def revoke_token(token_id: str):
     if not tokens.revoke(token_id):
         raise HTTPException(404, "active token not found")
+    audit.append("api", "token.revoke", token_id, "success")
     return {"id": token_id, "revoked": True}
+
+
+@app.get("/v1/audit", dependencies=[Depends(auth.dependency("admin"))])
+def list_audit(after: int = 0, limit: int = 100):
+    valid, broken_at = audit.verify()
+    if not valid:
+        raise HTTPException(500, f"audit chain verification failed at {broken_at}")
+    return {"verified": True, "entries": audit.list(after, limit)}
