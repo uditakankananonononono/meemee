@@ -1,15 +1,15 @@
 # Meemee status
 
-**Current core version:** 0.25.2  
-**Ledger:** 47 verified, 0 thin  
+**Current core version:** 0.26.0  
+**Ledger:** 48 verified, 0 thin  
 **Supported production shape:** one host, one or more API/worker processes, SQLite/WAL on local persistent storage  
-**Last core verification:** 92 passed, Ruff clean
+**Last core verification:** 96 passed, Ruff clean, Ruff clean
 
 ## What is production-usable now
 
 The authoritative detailed list is the 47-item "Verified" section in [README.md](README.md). The main product surfaces are:
 
-- Bounded agent loop, typed tools, approvals, deterministic policy, secret scrubbing and safe provenance.
+- Bounded agent loop, typed tools, per-run and persistent exact-tool approvals, deterministic policy, secret scrubbing and safe provenance.
 - Local and scheduled jobs, atomic claims, retries, cooperative cancellation, resumable SSE and idempotent submission.
 - SQLite/WAL persistence, backups, checksummed migrations, retention, quotas and shared single-host rate limits.
 - Scoped/revocable API tokens, OIDC bearer validation, interactive OIDC login and tamper-evident audit.

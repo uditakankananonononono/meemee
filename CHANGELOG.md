@@ -2,6 +2,11 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.26.0
+
+- Added per-run exact-tool approvals and persistent per-principal grants with expiry/revocation.
+- Added admin approval APIs and audit events.
+
 ## 0.25.2
 
 - Moved graceful shutdown to FastAPI lifespan context.

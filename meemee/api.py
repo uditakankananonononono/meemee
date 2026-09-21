@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from console.mount import mount_console
 
 from . import __version__
+from .approvals import ApprovalStore
 from .audit import AuditLog
 from .auth import Authenticator, TokenStore
 from .config import Settings
@@ -60,6 +61,7 @@ idempotency = IdempotencyStore(settings.data_dir / "idempotency.sqlite3")
 quotas = QuotaStore(settings.data_dir / "quotas.sqlite3", settings.default_daily_jobs)
 tokens = TokenStore(settings.data_dir / "auth.sqlite3")
 audit = AuditLog(settings.data_dir / "audit.sqlite3")
+approvals = ApprovalStore(settings.data_dir / "approvals.sqlite3")
 oidc = None
 if any((settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url)):
     if not all((settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url)):
@@ -78,6 +80,7 @@ auth = Authenticator(tokens, settings.api_token, oidc, web_login.authenticate_se
 readiness = ReadinessChecker(settings.data_dir, {"memory": lambda: agent.memory.connection.execute("SELECT 1").fetchone(), "jobs": lambda: jobs.db.execute("SELECT 1").fetchone(), "tokens": lambda: tokens.db.execute("SELECT 1").fetchone()}, settings.model_base_url, settings.readiness_min_free_bytes, require_model=settings.readiness_require_model)
 jobs_write_auth = auth.dependency("jobs:write")
 jobs_write_dependency = Depends(jobs_write_auth)
+runs_write_dependency = Depends(auth.dependency("runs:write"))
 
 
 @app.middleware("http")
@@ -98,6 +101,7 @@ async def request_context(request: Request, call_next):
 class RunRequest(BaseModel):
     goal: str = Field(min_length=2, max_length=20_000)
     approve_writes: bool = False
+    approved_tools: set[str] = Field(default_factory=set, max_length=100)
 
 
 class JobRequest(BaseModel):
@@ -124,13 +128,20 @@ async def ready():
     return result
 
 
-@app.post("/v1/runs", dependencies=[Depends(auth.dependency("runs:write"))])
-async def create_run(request: RunRequest):
+@app.post("/v1/runs")
+async def create_run(request: RunRequest, principal=runs_write_dependency):
     if not run_gate.accepting:
         raise HTTPException(503, "server is draining", headers={"Retry-After":"30"})
     await run_gate.enter()
     try:
-        report = await agent.run(request.goal, approve=lambda *_: request.approve_writes)
+        report = await agent.run(
+            request.goal,
+            approve=lambda name, _arguments, _risk: (
+                request.approve_writes
+                or name in request.approved_tools
+                or approvals.allows(principal.id, name)
+            ),
+        )
         audit.append("api", "run.create", report.run_id, "success", {"steps": report.steps_used})
         AGENT_RUNS.labels("success").inc()
         return report
@@ -288,3 +299,30 @@ def set_quota(principal_id: str, request: QuotaRequest):
     audit.append("api", "quota.update", principal_id, "success", {"daily_jobs": request.daily_jobs})
     return quotas.status(principal_id)
 
+
+
+class ToolApprovalRequest(BaseModel):
+    tool: str = Field(min_length=1, max_length=200)
+    expires_at: str | None = None
+
+
+@app.put("/v1/approvals/{principal_id}", dependencies=[Depends(auth.dependency("admin"))])
+def grant_tool_approval(principal_id: str, request: ToolApprovalRequest):
+    if request.tool not in {schema["name"] for schema in agent.tools.schemas()}:
+        raise HTTPException(422, "unknown tool")
+    approvals.grant(principal_id, request.tool, "api-admin", request.expires_at)
+    audit.append("api-admin", "approval.grant", principal_id, "success", {"tool": request.tool, "expires_at": request.expires_at})
+    return {"principal": principal_id, "tool": request.tool, "granted": True}
+
+
+@app.delete("/v1/approvals/{principal_id}/{tool_name}", dependencies=[Depends(auth.dependency("admin"))])
+def revoke_tool_approval(principal_id: str, tool_name: str):
+    if not approvals.revoke(principal_id, tool_name):
+        raise HTTPException(404, "active approval not found")
+    audit.append("api-admin", "approval.revoke", principal_id, "success", {"tool": tool_name})
+    return {"principal": principal_id, "tool": tool_name, "revoked": True}
+
+
+@app.get("/v1/approvals/{principal_id}", dependencies=[Depends(auth.dependency("admin"))])
+def list_tool_approvals(principal_id: str):
+    return {"approvals": approvals.list(principal_id)}
