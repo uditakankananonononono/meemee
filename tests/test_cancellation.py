@@ -36,3 +36,11 @@ def test_queued_job_cancel_is_terminal(tmp_path: Path):
     ident = jobs.enqueue("work")
     assert jobs.request_cancel(ident) == "cancelled"
     assert jobs.claim() is None
+
+
+def test_repeated_cancel_is_idempotent_state(tmp_path: Path):
+    jobs = JobStore(tmp_path / "jobs.db")
+    ident = jobs.enqueue("work")
+    assert jobs.request_cancel(ident) == "cancelled"
+    assert jobs.request_cancel(ident) == "cancelled"
+    assert [e["kind"] for e in jobs.events(ident)].count("cancelled") == 1

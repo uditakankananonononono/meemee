@@ -29,7 +29,7 @@ async def job_event_stream(
         if job is None:
             yield 'event: error\ndata: {"detail":"job not found"}\n\n'
             return
-        if job["status"] in {"done", "failed"} and not jobs.events(job_id, cursor):
+        if job["status"] in {"done", "failed", "cancelled"} and not jobs.events(job_id, cursor):
             return
         await asyncio.sleep(poll_seconds)
         since_heartbeat += poll_seconds

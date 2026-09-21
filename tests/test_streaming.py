@@ -27,3 +27,12 @@ async def test_stream_resumes_after_cursor(tmp_path: Path):
     chunks = [chunk async for chunk in job_event_stream(jobs, ident, after=first, poll_seconds=0)]
     assert "event: queued" not in "".join(chunks)
     assert "event: running" in "".join(chunks)
+
+
+@pytest.mark.asyncio
+async def test_stream_stops_after_cancelled(tmp_path: Path):
+    jobs = JobStore(tmp_path / "jobs.db")
+    ident = jobs.enqueue("work")
+    jobs.request_cancel(ident)
+    chunks = [chunk async for chunk in job_event_stream(jobs, ident, poll_seconds=0)]
+    assert "event: cancelled" in "".join(chunks)
