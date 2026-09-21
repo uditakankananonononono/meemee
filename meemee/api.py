@@ -5,7 +5,7 @@ import sqlite3
 import uuid
 from datetime import datetime
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -13,6 +13,7 @@ from . import __version__
 from .audit import AuditLog
 from .auth import Authenticator, TokenStore
 from .config import Settings
+from .idempotency import IdempotencyConflict, IdempotencyStore
 from .jobs import JobStore
 from .observability import (
     AGENT_RUNS,
@@ -36,6 +37,7 @@ app.add_middleware(MetricsMiddleware)
 app.add_middleware(RateLimitMiddleware, limiter=SQLiteRateLimiter(settings.data_dir / "rate-limits.sqlite3", settings.rate_limit_requests, settings.rate_limit_window_seconds))
 agent = build_agent(settings)
 jobs = JobStore(settings.data_dir / "jobs.sqlite3")
+idempotency = IdempotencyStore(settings.data_dir / "idempotency.sqlite3")
 tokens = TokenStore(settings.data_dir / "auth.sqlite3")
 audit = AuditLog(settings.data_dir / "audit.sqlite3")
 oidc = None
@@ -53,6 +55,8 @@ if any(web_values):
         raise RuntimeError("interactive login requires complete OIDC and web-login configuration")
     web_login = WebLogin(WebLoginConfig(*web_values), oidc)
 auth = Authenticator(tokens, settings.api_token, oidc, web_login.authenticate_session if web_login else None)
+jobs_write_auth = auth.dependency("jobs:write")
+jobs_write_dependency = Depends(jobs_write_auth)
 
 
 @app.middleware("http")
@@ -113,16 +117,31 @@ async def create_run(request: RunRequest):
         raise HTTPException(status_code=502, detail=f"agent run failed: {exc}") from exc
 
 
-@app.post("/v1/jobs", dependencies=[Depends(auth.dependency("jobs:write"))])
-def create_job(request: JobRequest):
+@app.post("/v1/jobs")
+def create_job(
+    request: JobRequest,
+    principal=jobs_write_dependency,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+):
+    payload = request.model_dump()
+    if idempotency_key:
+        try:
+            cached = idempotency.get(principal.id, "/v1/jobs", idempotency_key, payload)
+        except IdempotencyConflict as exc:
+            raise HTTPException(409, str(exc)) from exc
+        if cached is not None:
+            return cached[1]
     try:
         run_at = datetime.fromisoformat(request.run_at.replace("Z", "+00:00")) if request.run_at else None
     except ValueError as exc:
         raise HTTPException(422, "run_at must be ISO 8601") from exc
     ident = jobs.enqueue(request.goal, run_at)
-    audit.append("api", "job.create", ident, "success", {"scheduled": bool(run_at)})
+    response = {"id": ident}
+    if idempotency_key:
+        idempotency.put(principal.id, "/v1/jobs", idempotency_key, payload, 200, response)
+    audit.append(principal.id, "job.create", ident, "success", {"scheduled": bool(run_at)})
     JOBS_CREATED.inc()
-    return {"id": ident}
+    return response
 
 
 @app.get("/v1/jobs/{job_id}", dependencies=[Depends(auth.dependency("jobs:read"))])

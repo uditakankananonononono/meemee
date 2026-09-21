@@ -87,3 +87,7 @@ The limiter uses a dedicated SQLite/WAL database and atomic transactions, so all
 ## Live job progress
 
 Use `GET /v1/jobs/{id}/stream` with `Accept: text/event-stream` and a token carrying `jobs:read`. Each event has a durable numeric ID. Reconnect with the `Last-Event-ID` header to replay only later events; the server closes after a terminal done/failed event. Heartbeat comments keep idle connections alive. Disable response buffering for this route at the reverse proxy; Meemee also sends `X-Accel-Buffering: no` and `Cache-Control: no-cache, no-transform`.
+
+## Idempotent job submission
+
+Send a unique `Idempotency-Key` header when creating a job. Retries by the same principal with the same key and identical body return the original job ID instead of creating duplicates. Reusing the key with a changed body returns HTTP 409. Keys are scoped to principal and route and retained for 24 hours. Use a UUID generated once per logical submission, not once per HTTP retry.
