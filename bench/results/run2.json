@@ -1,0 +1,249 @@
+{
+  "meta": {
+    "harness": "bench/loadtest.py",
+    "source_tree_head": "4090dd38",
+    "started_at": "2026-09-21T15:11:28.534+00:00",
+    "machine": {
+      "platform": "Linux-6.1.158+-x86_64-with-glibc2.35",
+      "python": "3.10.12",
+      "cpu_count": 2,
+      "mem_total_mb": 1983,
+      "httpx": "0.28.1",
+      "uvicorn": "0.53.0"
+    },
+    "duration_s": 34.6,
+    "finished_at": "2026-09-21T15:12:03.136+00:00"
+  },
+  "scenarios": {
+    "job_create_throughput": {
+      "params": {
+        "total_jobs": 600,
+        "concurrency": 24
+      },
+      "wall_s": 16.989,
+      "throughput_jobs_per_s": 35.2,
+      "status_counts": {
+        "200": 598,
+        "500": 2
+      },
+      "latency": {
+        "count": 600,
+        "min_ms": 200.67,
+        "mean_ms": 667.32,
+        "p50_ms": 680.97,
+        "p95_ms": 935.77,
+        "p99_ms": 1024.1,
+        "max_ms": 1124.39
+      },
+      "non_200_samples": [
+        "{\"detail\":\"internal server error\",\"request_id\":\"c96147c535944e1b89c9f533998ae6b3\"}",
+        "{\"detail\":\"internal server error\",\"request_id\":\"e0b393c2bfa14a9bad349bd342953f9f\"}"
+      ],
+      "checks": {
+        "all_created": false,
+        "no_server_errors": false,
+        "quota_accounting_consistent": true
+      },
+      "notes": "jobs remain queued (no worker); principal 83a3bb7369a489e3e1646d53"
+    },
+    "sse_fanout": {
+      "params": {
+        "subscribers": 20,
+        "job_id": "efbb6e3bf13d40f6bda20cec306f604f"
+      },
+      "subscribers_connected": 20,
+      "subscribers_received_terminal": 20,
+      "subscriber_http_statuses": {
+        "200": 20
+      },
+      "cancel_http_status": 200,
+      "event_kind_totals": {
+        "queued": 20,
+        "cancelled": 20
+      },
+      "terminal_latency_after_cancel": {
+        "count": 20,
+        "min_ms": 43.51,
+        "mean_ms": 364.76,
+        "p50_ms": 399.51,
+        "p95_ms": 441.21,
+        "p99_ms": 484.21,
+        "max_ms": 484.21
+      },
+      "fanout_gap_ms": 440.7,
+      "errors": [],
+      "checks": {
+        "all_connected": true,
+        "all_received_terminal": true,
+        "no_errors": true
+      }
+    },
+    "concurrent_principals": {
+      "params": {
+        "principals": 8,
+        "jobs_each": 40
+      },
+      "wall_s": 9.287,
+      "throughput_jobs_per_s": 34.0,
+      "status_counts": {
+        "200": 316,
+        "500": 4
+      },
+      "per_principal_quota_used": {
+        "2bbd681c3bfaf50861dac362": 39,
+        "2e677d704b191f098c1e600c": 40,
+        "3595a03b67c5fe5baccda995": 40,
+        "4c671eec0011d8265819d6e0": 40,
+        "1674f6aae1eadcd2287c4727": 40,
+        "af7f92d7a1f3ecae3022dfdf": 39,
+        "0d457e29c4dd0f47acc75cb3": 38,
+        "12cdd6b93c0ba40b4f308412": 40
+      },
+      "non_200_samples": [
+        "{\"detail\":\"internal server error\",\"request_id\":\"46ea0f1264cb463797c19dc020543842\"}",
+        "{\"detail\":\"internal server error\",\"request_id\":\"c464f6b5a1c7468f841dcf457bca2922\"}",
+        "{\"detail\":\"internal server error\",\"request_id\":\"62ff25afe7734955bff99481943e6508\"}"
+      ],
+      "checks": {
+        "all_created": false,
+        "no_server_errors": false,
+        "per_principal_quota_isolated": false
+      }
+    },
+    "quota_enforcement": {
+      "params": {
+        "quota_limit": 25,
+        "attempts": 60,
+        "concurrency": 8
+      },
+      "wall_s": 1.731,
+      "status_counts": {
+        "200": 25,
+        "429": 35
+      },
+      "created_exactly_limit": true,
+      "rejected": 35,
+      "reject_retry_after_values": [
+        "86400"
+      ],
+      "reject_details": {
+        "daily job quota exceeded (25)": 35
+      },
+      "quota_status_after": {
+        "day": "2026-09-21",
+        "used": 25,
+        "limit": 25,
+        "remaining": 0
+      },
+      "admin_override_status": {
+        "day": "2026-09-21",
+        "used": 25,
+        "limit": 35,
+        "remaining": 10
+      },
+      "create_after_override": 200,
+      "checks": {
+        "exactly_limit_created": true,
+        "overflow_rejected_429": true,
+        "retry_after_is_daily": true,
+        "usage_stops_at_limit": true,
+        "admin_override_restores": true
+      }
+    },
+    "rate_limit": {
+      "params": {
+        "limit": 30,
+        "window_seconds": 60,
+        "attempts": 45,
+        "concurrency": 4
+      },
+      "wall_s": 1.296,
+      "status_counts": {
+        "200": 30,
+        "429": 15
+      },
+      "ratelimit_limit_header_values": [
+        "30"
+      ],
+      "retry_after_range_s": [
+        58,
+        59
+      ],
+      "checks": {
+        "exactly_limit_allowed": true,
+        "overflow_rejected_429": true,
+        "retry_after_within_window": true,
+        "limit_header_matches": true
+      }
+    },
+    "retention_sweep": {
+      "params": {
+        "old_jobs": 10000,
+        "events_per_job": 3
+      },
+      "seeded": {
+        "old_terminal_jobs": 10000,
+        "old_job_events": 30000,
+        "protected_queued_jobs": 500,
+        "old_memories": 5000,
+        "fresh_memories": 50,
+        "expired_idempotency": 2000,
+        "live_idempotency": 50,
+        "stale_rate_windows": 500
+      },
+      "wall_s": 0.406,
+      "cli_report": {
+        "job_events": 30000,
+        "terminal_jobs": 10000,
+        "memories": 5000,
+        "audit_entries": 0,
+        "idempotency": 2000,
+        "rate_limits": 500
+      },
+      "remaining_after_sweep": {
+        "jobs": 500,
+        "job_events": 500,
+        "queued_jobs": 500,
+        "memories": 50
+      },
+      "sweep_rows_per_s": 117124.0,
+      "checks": {
+        "old_jobs_deleted": true,
+        "old_events_deleted": true,
+        "queued_jobs_protected": true,
+        "old_memories_deleted": true,
+        "expired_idempotency_deleted": true,
+        "stale_windows_deleted": true,
+        "audit_untouched": true
+      }
+    }
+  },
+  "checks": {
+    "job_create_throughput.all_created": false,
+    "job_create_throughput.no_server_errors": false,
+    "job_create_throughput.quota_accounting_consistent": true,
+    "sse_fanout.all_connected": true,
+    "sse_fanout.all_received_terminal": true,
+    "sse_fanout.no_errors": true,
+    "concurrent_principals.all_created": false,
+    "concurrent_principals.no_server_errors": false,
+    "concurrent_principals.per_principal_quota_isolated": false,
+    "quota_enforcement.exactly_limit_created": true,
+    "quota_enforcement.overflow_rejected_429": true,
+    "quota_enforcement.retry_after_is_daily": true,
+    "quota_enforcement.usage_stops_at_limit": true,
+    "quota_enforcement.admin_override_restores": true,
+    "rate_limit.exactly_limit_allowed": true,
+    "rate_limit.overflow_rejected_429": true,
+    "rate_limit.retry_after_within_window": true,
+    "rate_limit.limit_header_matches": true,
+    "retention_sweep.old_jobs_deleted": true,
+    "retention_sweep.old_events_deleted": true,
+    "retention_sweep.queued_jobs_protected": true,
+    "retention_sweep.old_memories_deleted": true,
+    "retention_sweep.expired_idempotency_deleted": true,
+    "retention_sweep.stale_windows_deleted": true,
+    "retention_sweep.audit_untouched": true
+  },
+  "all_checks_passed": false
+}
