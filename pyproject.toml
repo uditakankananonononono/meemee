@@ -1,41 +1,25 @@
 [build-system]
-requires = ["hatchling>=1.25"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
 
 [project]
-name = "meemee-agent"
-version = "0.20.0"
-description = "A local-first, auditable autonomous agent runtime"
+name = "meemee-client"
+version = "0.1.0"
+description = "Typed Python client SDK for the Meemee agent platform API (targets server v0.16.0)."
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "Proprietary"}
-authors = [{name = "Udita Phookan"}]
+license = { text = "Proprietary" }
+authors = [{ name = "Udita Phookan" }]
 dependencies = [
-  "cryptography>=43,<46",
-  "fastapi>=0.115,<1",
-  "httpx>=0.27,<1",
-  "pydantic>=2.8,<3",
-  "pydantic-settings>=2.4,<3",
-  "prometheus-client>=0.21,<1",
-  "PyJWT[crypto]>=2.9,<3",
-  "typer>=0.12,<1",
-  "uvicorn>=0.30,<1",
+    "httpx>=0.27,<1.0",
+    "pydantic>=2.5,<3.0",
 ]
 
 [project.optional-dependencies]
-browser = ["playwright>=1.47,<2"]
-dev = ["pytest>=8.2,<9", "pytest-asyncio>=0.23,<1", "respx>=0.21,<1", "ruff>=0.6,<1"]
+dev = ["pytest>=8.0"]
 
-[project.scripts]
-meemee = "meemee.cli:app"
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.pytest.ini_options]
-asyncio_mode = "auto"
 testpaths = ["tests"]
-
-[tool.ruff]
-line-length = 100
-target-version = "py310"
-
-[tool.hatch.build.targets.wheel]
-packages = ["meemee"]
