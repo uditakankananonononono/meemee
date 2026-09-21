@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working v1, not a claim to be finished general intelligence.
 
-## Verified in v0.25.1 (47)
+## Verified in v0.25.2 (47)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -130,3 +130,6 @@ Combined-tree verification for v0.22.0: 79 core tests passed; 107 SDK tests pass
 
 
 Concurrency contract: all shared SQLite connections are serialized at the store boundary. Token create/authenticate/revoke and audit append/verify/list use reentrant locks plus a five-second SQLite busy timeout. Load regression tests execute 2,000 parallel authentications and 1,000 parallel audit appends with concurrent verification.
+
+
+Application lifecycle uses FastAPI lifespan context rather than deprecated event hooks. Shutdown drains active runs and closes model transport from the lifespan finalizer, with a direct regression test.

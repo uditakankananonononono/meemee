@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
@@ -36,7 +37,19 @@ settings = Settings()
 settings.data_dir.mkdir(parents=True, exist_ok=True)
 configure_logging(settings.log_level, settings.log_json)
 log = logging.getLogger("meemee.api")
-app = FastAPI(title="Meemee", version=__version__)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    yield
+    drained = await run_gate.drain(settings.shutdown_grace_seconds)
+    if not drained:
+        log.warning("shutdown grace period elapsed", extra={"active_runs": run_gate.active})
+    close = getattr(agent.model, "aclose", None)
+    if close is not None:
+        await close()
+
+app = FastAPI(title="Meemee", version=__version__, lifespan=lifespan)
 mount_console(app)
 app.add_middleware(MetricsMiddleware)
 app.add_middleware(RateLimitMiddleware, limiter=SQLiteRateLimiter(settings.data_dir / "rate-limits.sqlite3", settings.rate_limit_requests, settings.rate_limit_window_seconds))
@@ -275,12 +288,3 @@ def set_quota(principal_id: str, request: QuotaRequest):
     audit.append("api", "quota.update", principal_id, "success", {"daily_jobs": request.daily_jobs})
     return quotas.status(principal_id)
 
-
-@app.on_event("shutdown")
-async def graceful_shutdown():
-    drained = await run_gate.drain(settings.shutdown_grace_seconds)
-    if not drained:
-        log.warning("shutdown grace period elapsed", extra={"active_runs": run_gate.active})
-    close = getattr(agent.model, "aclose", None)
-    if close is not None:
-        await close()
