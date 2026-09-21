@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working v1, not a claim to be finished general intelligence.
 
-## Verified in v0.3.0 (19)
+## Verified in v0.4.0 (22)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -23,18 +23,22 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 17. AES-256-GCM encrypted local secrets vault with per-record nonces and no secret-value listing.
 18. Playwright Chromium navigation with title/text/status/screenshot capture, public-address enforcement, and workspace-safe screenshot paths.
 19. Kubernetes API/worker deployments, persistent data claim, probes, resource limits, and restricted container security contexts.
+20. Browser click/fill/press/select/wait action sequences with optional persistent named profiles and action provenance.
+21. Queued-job cancellation with explicit state conflict handling.
+22. Sliding-window API rate limiting with Retry-After responses.
 
-## Thin (5)
+## Thin (6)
 
 - Plans are deterministic sentence decomposition, not a persisted editable plan state machine.
 - Memory uses lexical FTS5, without embeddings or semantic reranking.
 - Immediate API runs remain in-process; queued jobs support multiple workers but there is no event streaming or cancellation yet.
 - API authentication is a single operator bearer token, not OIDC, users, roles, or scoped permissions.
-- Browser navigation is real but limited to page reads and screenshots; interaction primitives and persistent profiles are not built yet.
+- Browser interaction and persistent profiles are real, but there is no human takeover UI, download manager, challenge handling, or per-site policy layer.
+- Rate limiting is per process; multi-pod deployments need a shared external limiter.
 
 ## Missing, not claimed
 
-Browser interaction/forms and persistent profiles, remote Git push/PR operations, permissions UI, OIDC/users/roles, rate limiting, semantic memory, event streaming, and job cancellation.
+Browser human takeover/downloads/challenge handling, remote Git push/PR operations, permissions UI, OIDC/users/roles, semantic memory, event streaming, and running-job cancellation.
 
 ## Install
 

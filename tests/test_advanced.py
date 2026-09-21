@@ -43,3 +43,11 @@ def test_job_retries_then_fails(tmp_path: Path):
 def test_git_path_escape(tmp_path: Path):
     with pytest.raises(ValueError, match="escapes"):
         GitCommit(tmp_path).safe_path("../outside")
+
+
+def test_cancel_queued_job(tmp_path: Path):
+    store = JobStore(tmp_path / "jobs.db")
+    ident = store.enqueue("cancel me")
+    assert store.cancel(ident)
+    assert store.get(ident)["error"] == "cancelled"
+    assert not store.cancel(ident)

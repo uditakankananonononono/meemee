@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     worker_poll_seconds: float = 1.0
     vault_key: str | None = None
     browser_headless: bool = True
+    rate_limit_requests: int = 60
+    rate_limit_window_seconds: int = 60
 
     @property
     def database_path(self) -> Path:

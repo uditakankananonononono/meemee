@@ -6,10 +6,14 @@ from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from .auth import require_api_token
+from .config import Settings
 from .jobs import JobStore
+from .rate_limit import RateLimitMiddleware
 from .runtime import build_agent
 
-app = FastAPI(title="Meemee", version="0.1.0")
+settings = Settings()
+app = FastAPI(title="Meemee", version="0.4.0")
+app.add_middleware(RateLimitMiddleware, requests=settings.rate_limit_requests, window_seconds=settings.rate_limit_window_seconds)
 agent = build_agent()
 jobs = JobStore(Path(agent.memory.connection.execute("PRAGMA database_list").fetchone()[2]).with_name("jobs.sqlite3"))
 
@@ -52,3 +56,13 @@ def get_job(job_id: str):
     if job is None:
         raise HTTPException(status_code=404, detail="job not found")
     return job
+
+
+@app.delete("/v1/jobs/{job_id}", dependencies=[Depends(require_api_token)])
+def cancel_job(job_id: str):
+    if jobs.cancel(job_id):
+        return {"id": job_id, "cancelled": True}
+    job = jobs.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="job not found")
+    raise HTTPException(status_code=409, detail=f"cannot cancel job in {job['status']} state")

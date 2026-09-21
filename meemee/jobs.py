@@ -57,6 +57,13 @@ class JobStore:
         with self.lock, self.db:
             self.db.execute("UPDATE jobs SET status=CASE WHEN attempts<max_attempts THEN 'queued' ELSE 'failed' END, error=?, updated_at=? WHERE id=? AND status='running'", (error, now, ident))
 
+
+    def cancel(self, ident: str) -> bool:
+        now = datetime.now(timezone.utc).isoformat()
+        with self.lock, self.db:
+            changed = self.db.execute("UPDATE jobs SET status='failed', error='cancelled', updated_at=? WHERE id=? AND status='queued'", (now, ident)).rowcount
+        return bool(changed)
+
     def get(self, ident: str) -> dict[str, Any] | None:
         with self.lock:
             row = self.db.execute("SELECT * FROM jobs WHERE id=?", (ident,)).fetchone()

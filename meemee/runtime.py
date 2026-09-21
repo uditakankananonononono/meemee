@@ -25,7 +25,7 @@ def build_agent(settings: Settings | None = None, include_delegation: bool = Tru
     registry.register(ShellCommand(settings.workspace, set(settings.shell_allowlist.split(","))))
     registry.register(GitInspect(settings.workspace))
     registry.register(GitCommit(settings.workspace))
-    registry.register(BrowserNavigate(settings.workspace, settings.browser_headless))
+    registry.register(BrowserNavigate(settings.workspace, settings.browser_headless, settings.data_dir / "browser-profiles"))
     if include_delegation:
         registry.register(DelegateTasks(lambda: AgentTeam(lambda: build_agent(settings, False))))
     model = OpenAICompatibleModel(
