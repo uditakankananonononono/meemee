@@ -33,6 +33,7 @@ from .runtime import build_agent
 from .shutdown import RunGate
 from .streaming import job_event_stream
 from .web_login import WebLogin, WebLoginConfig
+from .webhooks import WebhookStore
 
 settings = Settings()
 settings.data_dir.mkdir(parents=True, exist_ok=True)
@@ -62,6 +63,7 @@ quotas = QuotaStore(settings.data_dir / "quotas.sqlite3", settings.default_daily
 tokens = TokenStore(settings.data_dir / "auth.sqlite3")
 audit = AuditLog(settings.data_dir / "audit.sqlite3")
 approvals = ApprovalStore(settings.data_dir / "approvals.sqlite3")
+webhooks = WebhookStore(settings.data_dir / "webhooks.sqlite3")
 oidc = None
 if any((settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url)):
     if not all((settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url)):
@@ -197,6 +199,8 @@ def cancel_job(job_id: str):
     if status is None:
         raise HTTPException(404, "job not found")
     if status in {"cancelled", "cancel_requested"}:
+        if status == "cancelled":
+            webhooks.enqueue(f"job:{job_id}:cancelled", "job.cancelled", {"job_id": job_id, "status": "cancelled"})
         audit.append("api", "job.cancel", job_id, "success", {"status": status})
         return {"id": job_id, "status": status}
     raise HTTPException(409, f"cannot cancel job in {status} state")
@@ -326,3 +330,36 @@ def revoke_tool_approval(principal_id: str, tool_name: str):
 @app.get("/v1/approvals/{principal_id}", dependencies=[Depends(auth.dependency("admin"))])
 def list_tool_approvals(principal_id: str):
     return {"approvals": approvals.list(principal_id)}
+
+
+class WebhookRequest(BaseModel):
+    url: str = Field(min_length=8, max_length=2048)
+    events: set[str] = Field(min_length=1, max_length=20)
+
+
+@app.post("/v1/webhooks")
+def create_webhook(request: WebhookRequest, principal=jobs_write_dependency):
+    allowed = {"job.done", "job.failed", "job.cancelled", "*"}
+    if not request.events <= allowed:
+        raise HTTPException(422, f"unknown webhook events: {sorted(request.events - allowed)}")
+    try:
+        ident, secret = webhooks.subscribe(principal.id, request.url, request.events)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    audit.append(principal.id, "webhook.create", ident, "success", {"url": request.url, "events": sorted(request.events)})
+    return {"id": ident, "secret": secret, "warning": "shown once; store it securely"}
+
+
+@app.get("/v1/webhooks", dependencies=[Depends(auth.dependency("jobs:read"))])
+def list_webhooks(request: Request):
+    principal = request.state.principal
+    rows = webhooks.db.execute("SELECT id,url,events,active,created_at FROM webhook_subscriptions WHERE principal=? ORDER BY created_at", (principal.id,)).fetchall()
+    return {"webhooks": [dict(row) for row in rows]}
+
+
+@app.delete("/v1/webhooks/{webhook_id}")
+def delete_webhook(webhook_id: str, principal=jobs_write_dependency):
+    if not webhooks.unsubscribe(webhook_id, principal.id):
+        raise HTTPException(404, "active webhook not found")
+    audit.append(principal.id, "webhook.delete", webhook_id, "success")
+    return {"id": webhook_id, "deleted": True}

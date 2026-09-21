@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.28.0
+
+- Exposed authenticated webhook subscription/list/delete APIs.
+- Added dispatcher worker CLI and end-to-end terminal job event emission.
+- Core verification: 102 tests passed; Ruff clean.
+
 ## 0.27.0
 
 - Added durable filtered webhook subscriptions and deduplicated delivery outbox.

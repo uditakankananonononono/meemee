@@ -142,3 +142,17 @@ class WebhookDispatcher:
         except httpx.HTTPError as exc:
             self.store.retry(delivery["id"], type(exc).__name__)
         return True
+
+
+async def dispatch_forever(store: WebhookStore, poll_seconds: float = 1.0) -> None:
+    """Deliver queued webhooks continuously. Safe to run in multiple processes."""
+    dispatcher = WebhookDispatcher(store)
+    try:
+        while True:
+            delivered = await dispatcher.deliver_one()
+            if not delivered:
+                import asyncio
+
+                await asyncio.sleep(poll_seconds)
+    finally:
+        await dispatcher.client.aclose()

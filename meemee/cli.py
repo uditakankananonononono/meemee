@@ -15,6 +15,7 @@ from .retention import RetentionManager
 from .runtime import build_agent
 from .tools.github import GitHubRepoSearch, GitHubSearchArgs
 from .vault import SecretVault
+from .webhooks import WebhookStore, dispatch_forever
 from .worker import work_forever
 
 app = typer.Typer(no_args_is_help=True, help="Meemee local-first agent runtime")
@@ -111,3 +112,10 @@ def retention_run() -> None:
         audit_days=settings.retention_audit_days,
     )
     typer.echo(json.dumps(report.__dict__, indent=2))
+
+
+@app.command("webhook-worker")
+def webhook_worker() -> None:
+    """Run the durable signed-webhook dispatcher."""
+    settings = Settings()
+    asyncio.run(dispatch_forever(WebhookStore(settings.data_dir / "webhooks.sqlite3"), settings.webhook_poll_seconds))
