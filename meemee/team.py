@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from .agent import Agent
+if TYPE_CHECKING:
+    from .agent import Agent
 
 
 class AgentTeam:

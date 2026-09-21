@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from . import __version__
@@ -24,6 +24,7 @@ from .observability import (
 from .oidc import OIDCConfig, OIDCValidator
 from .rate_limit import RateLimitMiddleware, SQLiteRateLimiter
 from .runtime import build_agent
+from .streaming import job_event_stream
 from .web_login import WebLogin, WebLoginConfig
 
 settings = Settings()
@@ -206,3 +207,20 @@ def web_logout():
     response = RedirectResponse("/", 303)
     response.delete_cookie("meemee_session", path="/")
     return response
+
+
+@app.get("/v1/jobs/{job_id}/stream", dependencies=[Depends(auth.dependency("jobs:read"))])
+def stream_job_events(request: Request, job_id: str, after: int = 0):
+    if jobs.get(job_id) is None:
+        raise HTTPException(404, "job not found")
+    last_event = request.headers.get("last-event-id")
+    if last_event:
+        try:
+            after = max(after, int(last_event))
+        except ValueError as exc:
+            raise HTTPException(400, "Last-Event-ID must be an integer") from exc
+    return StreamingResponse(
+        job_event_stream(jobs, job_id, after),
+        media_type="text/event-stream",
+        headers={"Cache-Control":"no-cache, no-transform", "X-Accel-Buffering":"no"},
+    )

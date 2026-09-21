@@ -83,3 +83,7 @@ Configure the authorization endpoint, token endpoint, client ID/secret, exact HT
 ## Rate limits
 
 The limiter uses a dedicated SQLite/WAL database and atomic transactions, so all API processes on the supported single host share one limit. Authenticated callers are isolated by a non-reversible prefix of the bearer-token digest; unauthenticated callers use the directly connected client IP. Do not trust forwarded headers in Meemee itself: terminate TLS at a controlled proxy and enforce edge limits there too. Health/readiness checks are exempt. Responses include `RateLimit-Limit`, `RateLimit-Remaining`, and `RateLimit-Reset`; blocked requests also include `Retry-After`. Cross-host deployments still require a future distributed limiter.
+
+## Live job progress
+
+Use `GET /v1/jobs/{id}/stream` with `Accept: text/event-stream` and a token carrying `jobs:read`. Each event has a durable numeric ID. Reconnect with the `Last-Event-ID` header to replay only later events; the server closes after a terminal done/failed event. Heartbeat comments keep idle connections alive. Disable response buffering for this route at the reverse proxy; Meemee also sends `X-Accel-Buffering: no` and `Cache-Control: no-cache, no-transform`.
