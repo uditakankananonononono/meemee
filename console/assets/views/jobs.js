@@ -204,13 +204,6 @@ export async function renderJobs(root, ctx) {
   };
 
   const create = h("button", { class: "button", type: "button" }, "Queue job");
-  // One idempotency key per form fill. A retried submission (double click,
-  // network retry) replays the same key, so the server can never enqueue a
-  // duplicate of this exact request; the key rotates after a successful queue.
-  let idemKey = crypto.randomUUID();
-  const idemLabel = h("span", { class: "muted small" });
-  const renderIdem = () => { idemLabel.textContent = `idempotency key: ${idemKey} (replays return the original job)`; };
-  renderIdem();
   create.addEventListener("click", async () => {
     const text = goal.value.trim();
     if (text.length < 2) { toast("Goal must be at least 2 characters.", "warn"); return; }
@@ -222,29 +215,15 @@ export async function renderJobs(root, ctx) {
     }
     create.disabled = true;
     try {
-      const created = await api.createJob(text, iso, { idempotencyKey: idemKey });
+      const created = await api.createJob(text, iso);
       knownJobs.remember(created.id, { goal: text.slice(0, 80) });
-      const quota = created.quota
-        ? ` Daily quota: ${created.quota.used}/${created.quota.limit} used (${created.quota.remaining} left, UTC day ${created.quota.day}).`
-        : "";
-      toast(`Job queued: ${created.id}.${quota}`, "ok", 8000);
+      toast(`Job queued: ${created.id}`, "ok");
       goal.value = ""; runAt.value = "";
-      idemKey = crypto.randomUUID();
-      renderIdem();
-      refreshQuota();
       await renderList();
       clear(detailHost).append(jobDetail(detailHost, created.id, ctx));
     } catch (error) {
-      if (error instanceof api.ApiError && error.status === 403) {
-        toast("The current credential lacks jobs:write.", "bad");
-      } else if (error instanceof api.ApiError && error.status === 409) {
-        toast(`Idempotency conflict: ${error.detail}. The key was already used with a different request; a fresh key was generated.`, "bad", 9000);
-        idemKey = crypto.randomUUID();
-        renderIdem();
-      } else if (error instanceof api.ApiError && error.status === 429 && /quota/i.test(error.detail)) {
-        toast(`Daily job quota exceeded: ${error.detail}. Resets at midnight UTC.`, "warn", 9000);
-        refreshQuota();
-      } else reportError(error, "could not create job");
+      if (error instanceof api.ApiError && error.status === 403) toast("The current credential lacks jobs:write.", "bad");
+      else reportError(error, "could not create job");
     } finally { create.disabled = false; }
   });
 
@@ -265,66 +244,14 @@ export async function renderJobs(root, ctx) {
     }
   });
 
-  const quotaBox = h("div", null, "Loading quota…");
-  const refreshQuota = async () => {
-    try {
-      const quota = await api.getQuota();
-      clear(quotaBox).append(
-        h("div", { class: "kv-grid" },
-          h("div", { class: "kv" }, h("span", { class: "kv-key" }, "UTC day"), h("code", null, quota.day)),
-          h("div", { class: "kv" }, h("span", { class: "kv-key" }, "used"), `${quota.used} / ${quota.limit}`),
-          h("div", { class: "kv" }, h("span", { class: "kv-key" }, "remaining"),
-            h("span", { class: `badge badge-${quota.remaining === 0 ? "bad" : quota.remaining <= quota.limit * 0.1 ? "warn" : "ok"}` }, String(quota.remaining)))));
-    } catch (error) {
-      if (error instanceof api.ApiError && error.status === 403) {
-        clear(quotaBox).append(h("p", { class: "muted" }, "GET /v1/quota requires the jobs:write scope; the current credential cannot read its quota."));
-      } else if (error instanceof api.ApiError && error.status === 404) {
-        clear(quotaBox).append(h("p", { class: "muted" }, "This server does not expose /v1/quota (pre-v0.20)."));
-      } else {
-        clear(quotaBox).append(h("p", { class: "bad-text" }, error.message));
-      }
-    }
-  };
-  const adminPrincipal = h("input", { class: "input", placeholder: "principal id (e.g. bootstrap, oidc:sub)", style: "max-width:18rem" });
-  const adminLimit = h("input", { class: "input", type: "number", min: 1, max: 1000000, placeholder: "daily jobs", style: "max-width:10rem" });
-  const adminSet = h("button", { class: "button button-quiet", type: "button" }, "Set quota");
-  const adminResult = h("span", { class: "muted small" });
-  adminSet.addEventListener("click", async () => {
-    const principal = adminPrincipal.value.trim();
-    const limit = Number(adminLimit.value);
-    if (!principal || !Number.isInteger(limit) || limit < 1) {
-      toast("Principal id and a positive integer daily limit are required.", "warn");
-      return;
-    }
-    adminSet.disabled = true;
-    try {
-      const status = await api.setQuota(principal, limit);
-      adminResult.textContent = ` ${status.day}: ${status.used}/${status.limit} used (${status.remaining} remaining). Recorded in the audit chain as quota.update.`;
-      toast("Quota updated.", "ok");
-      refreshQuota();
-    } catch (error) {
-      if (error instanceof api.ApiError && (error.status === 401 || error.status === 403)) {
-        toast("Quota overrides require the admin scope.", "bad");
-      } else if (error instanceof api.ApiError && error.status === 404) {
-        toast("This server does not expose quota overrides (pre-v0.20).", "warn");
-      } else reportError(error, "quota update failed");
-    } finally { adminSet.disabled = false; }
-  });
-
   root.append(
-    h("section", { class: "card" },
-      h("h2", null, "Daily job quota"),
-      quotaBox,
-      h("h3", null, "Admin: set a principal's quota"),
-      h("p", { class: "muted" }, "Requires the admin scope. Overrides are per principal, reset at midnight UTC, and audited."),
-      h("div", { class: "row" }, adminPrincipal, adminLimit, adminSet, adminResult)),
     h("section", { class: "card" },
       h("h2", null, "New job"),
       h("p", { class: "muted" }, "Requires jobs:write. Leave run_at empty to queue for immediate execution by a worker."),
       goal,
       h("label", { class: "field-label", for: "job-run-at" }, "Run at (optional, local time)"),
       runAt,
-      h("div", { class: "row" }, create, idemLabel)),
+      h("div", { class: "row" }, create)),
     h("section", { class: "card" },
       h("h2", null, "Tracked jobs (this browser)"),
       missingNote("No job listing endpoint", "GET /v1/jobs does not exist. The console polls each tracked job by ID against the server; the ID list itself lives in this browser only."),
@@ -333,7 +260,6 @@ export async function renderJobs(root, ctx) {
     detailHost);
 
   await renderList();
-  refreshQuota();
   pollTimer = setInterval(() => {
     if (document.hidden) return;
     renderList();

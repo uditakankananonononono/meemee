@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .sensitive import scrub_text
+
 
 class MemoryStore:
     """Durable SQLite event memory with full-text retrieval."""
@@ -43,7 +45,7 @@ class MemoryStore:
         with self.lock, self.connection:
             cursor = self.connection.execute(
                 "INSERT INTO memories(run_id, kind, content, metadata, created_at) VALUES (?, ?, ?, ?, ?)",
-                (run_id, kind, content, json.dumps(metadata or {}), datetime.now(timezone.utc).isoformat()),
+                (run_id, kind, scrub_text(content), json.dumps(metadata or {}), datetime.now(timezone.utc).isoformat()),
             )
             return int(cursor.lastrowid)
 

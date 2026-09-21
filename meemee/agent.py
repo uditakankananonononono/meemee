@@ -9,6 +9,7 @@ from .llm import Model
 from .memory import MemoryStore
 from .planner import TaskPlanner
 from .policy import PolicyEngine
+from .sensitive import scrub_text
 from .tool_audit import redact
 from .tools.base import ToolRegistry
 from .types import Risk, RunReport
@@ -33,6 +34,7 @@ class Agent:
 
     async def run(self, goal: str, approve: Approval | None = None, cancel: Event | None = None) -> RunReport:
         run_id = uuid.uuid4().hex
+        goal = scrub_text(goal)
         plan = self.planner.plan(goal)
         prior = self.memory.search(goal, limit=5)
         messages = [
