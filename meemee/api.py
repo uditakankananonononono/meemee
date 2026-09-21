@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import sqlite3
 import uuid
 from datetime import datetime
 
@@ -13,6 +12,7 @@ from . import __version__
 from .audit import AuditLog
 from .auth import Authenticator, TokenStore
 from .config import Settings
+from .health import ReadinessChecker
 from .idempotency import IdempotencyConflict, IdempotencyStore
 from .jobs import JobStore
 from .observability import (
@@ -55,6 +55,7 @@ if any(web_values):
         raise RuntimeError("interactive login requires complete OIDC and web-login configuration")
     web_login = WebLogin(WebLoginConfig(*web_values), oidc)
 auth = Authenticator(tokens, settings.api_token, oidc, web_login.authenticate_session if web_login else None)
+readiness = ReadinessChecker(settings.data_dir, {"memory": lambda: agent.memory.connection.execute("SELECT 1").fetchone(), "jobs": lambda: jobs.db.execute("SELECT 1").fetchone(), "tokens": lambda: tokens.db.execute("SELECT 1").fetchone()}, settings.model_base_url, settings.readiness_min_free_bytes)
 jobs_write_auth = auth.dependency("jobs:write")
 jobs_write_dependency = Depends(jobs_write_auth)
 
@@ -96,13 +97,11 @@ def health():
 
 
 @app.get("/ready")
-def ready():
-    try:
-        agent.memory.connection.execute("SELECT 1").fetchone()
-        jobs.db.execute("SELECT 1").fetchone()
-    except sqlite3.Error as exc:
-        raise HTTPException(503, "database unavailable") from exc
-    return {"status": "ready"}
+async def ready():
+    result = await readiness.check()
+    if result["status"] != "ready":
+        return JSONResponse(result, status_code=503)
+    return result
 
 
 @app.post("/v1/runs", dependencies=[Depends(auth.dependency("runs:write"))])
