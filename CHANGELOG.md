@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.27.0
+
+- Added durable filtered webhook subscriptions and deduplicated delivery outbox.
+- Added HMAC-signed HTTPS delivery, SSRF defenses and bounded retries.
+- Core verification: 100 tests passed; Ruff clean.
+
 ## 0.26.0
 
 - Added per-run exact-tool approvals and persistent per-principal grants with expiry/revocation.
