@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     oidc_issuer: str | None = None
     oidc_audience: str | None = None
     oidc_jwks_url: str | None = None
+    log_level: str = "INFO"
+    log_json: bool = True
     oidc_role_claim: str = "roles"
     oidc_role_scopes: str = "admin=admin;operator=runs:write,jobs:read,jobs:write;viewer=jobs:read"
 

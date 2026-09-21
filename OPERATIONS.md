@@ -71,3 +71,7 @@ The issuer and JWKS URL must be HTTPS on the same host. Meemee verifies the sign
 SQLite/WAL is the supported production database for a single host. Run multiple worker processes on that host if needed; atomic queue claims prevent duplicate claims. Do not mount the database over NFS and do not run multiple Kubernetes pods against one ReadWriteOnce SQLite volume. Meemee does not yet claim a supported PostgreSQL path or multi-node control plane.
 
 Before an upgrade, run `meemee backup /secure/backups/meemee-YYYYMMDD` and `meemee backup-verify` on the result. `meemee db-migrate` applies forward-only checksummed migrations and refuses edited migration history. Backup manifests contain file size and SHA-256, and verification also runs SQLite integrity checks. Restore into a stopped instance, verify it, then start one API process before workers.
+
+## Observability
+
+`GET /metrics` is Prometheus format and requires an admin bearer token. Scrape it through a protected internal route; do not expose it publicly. Metrics include request count by route/status, latency histograms, in-flight requests, agent outcomes and jobs created. Set `MEEMEE_LOG_JSON=true` for structured UTC JSON logs and `MEEMEE_LOG_LEVEL` to `INFO`, `WARNING` or `ERROR`. Ship stdout to your log platform and alert on sustained 5xx responses, p95 latency, failed agent runs, worker absence and disk pressure. Request responses carry `X-Request-ID`; preserve it at the proxy and use it to correlate logs.

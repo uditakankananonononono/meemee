@@ -14,14 +14,23 @@ from .audit import AuditLog
 from .auth import Authenticator, TokenStore
 from .config import Settings
 from .jobs import JobStore
+from .observability import (
+    AGENT_RUNS,
+    JOBS_CREATED,
+    MetricsMiddleware,
+    configure_logging,
+    metrics_response,
+)
 from .oidc import OIDCConfig, OIDCValidator
 from .rate_limit import RateLimitMiddleware
 from .runtime import build_agent
 
 settings = Settings()
 settings.data_dir.mkdir(parents=True, exist_ok=True)
+configure_logging(settings.log_level, settings.log_json)
 log = logging.getLogger("meemee.api")
 app = FastAPI(title="Meemee", version=__version__)
+app.add_middleware(MetricsMiddleware)
 app.add_middleware(RateLimitMiddleware, requests=settings.rate_limit_requests, window_seconds=settings.rate_limit_window_seconds)
 agent = build_agent(settings)
 jobs = JobStore(settings.data_dir / "jobs.sqlite3")
@@ -89,8 +98,10 @@ async def create_run(request: RunRequest):
     try:
         report = await agent.run(request.goal, approve=lambda *_: request.approve_writes)
         audit.append("api", "run.create", report.run_id, "success", {"steps": report.steps_used})
+        AGENT_RUNS.labels("success").inc()
         return report
     except (OSError, ValueError, RuntimeError) as exc:
+        AGENT_RUNS.labels("failed").inc()
         raise HTTPException(status_code=502, detail=f"agent run failed: {exc}") from exc
 
 
@@ -102,6 +113,7 @@ def create_job(request: JobRequest):
         raise HTTPException(422, "run_at must be ISO 8601") from exc
     ident = jobs.enqueue(request.goal, run_at)
     audit.append("api", "job.create", ident, "success", {"scheduled": bool(run_at)})
+    JOBS_CREATED.inc()
     return {"id": ident}
 
 
@@ -155,3 +167,8 @@ def list_audit(after: int = 0, limit: int = 100):
     if not valid:
         raise HTTPException(500, f"audit chain verification failed at {broken_at}")
     return {"verified": True, "entries": audit.list(after, limit)}
+
+
+@app.get("/metrics", dependencies=[Depends(auth.dependency("admin"))], include_in_schema=False)
+def prometheus_metrics():
+    return metrics_response()
