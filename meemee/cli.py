@@ -3,11 +3,14 @@ from __future__ import annotations
 import asyncio
 import getpass
 import json
+from pathlib import Path
 
 import typer
 import uvicorn
 
+from .backup import BackupManager
 from .config import Settings
+from .migrations import CORE_MIGRATIONS, Migrator
 from .runtime import build_agent
 from .tools.github import GitHubRepoSearch, GitHubSearchArgs
 from .vault import SecretVault
@@ -75,3 +78,23 @@ def vault_list() -> None:
         raise typer.BadParameter("MEEMEE_VAULT_KEY is required")
     for name in SecretVault(settings.data_dir / "vault.sqlite3", settings.vault_key).names():
         typer.echo(name)
+
+
+@app.command("db-migrate")
+def db_migrate() -> None:
+    """Apply checksummed forward-only operational schema migrations."""
+    settings = Settings()
+    applied = Migrator(settings.data_dir / "operations.sqlite3", CORE_MIGRATIONS).migrate()
+    typer.echo(json.dumps({"applied": applied}))
+
+
+@app.command("backup")
+def backup(destination: Path) -> None:
+    """Create a consistent verified online backup of all SQLite databases."""
+    typer.echo(json.dumps(BackupManager(Settings().data_dir).create(destination), indent=2))
+
+
+@app.command("backup-verify")
+def backup_verify(directory: Path) -> None:
+    """Verify backup checksums and SQLite integrity."""
+    typer.echo(json.dumps(BackupManager.verify(directory), indent=2))

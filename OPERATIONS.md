@@ -65,3 +65,9 @@ MEEMEE_OIDC_JWKS_URL=https://login.example.com/.well-known/jwks.json
 ```
 
 The issuer and JWKS URL must be HTTPS on the same host. Meemee verifies the signature, algorithm, issuer, audience, expiry, issued-at time and subject. Configure roles with `MEEMEE_OIDC_ROLE_SCOPES`; unknown roles receive no rights. Rotate signing keys at the identity provider; JWKS keys are cached for five minutes. Keep a break-glass bootstrap token offline. Meemee accepts access tokens as bearer tokens; it does not implement an interactive browser login screen yet.
+
+## Supported database and scale boundary
+
+SQLite/WAL is the supported production database for a single host. Run multiple worker processes on that host if needed; atomic queue claims prevent duplicate claims. Do not mount the database over NFS and do not run multiple Kubernetes pods against one ReadWriteOnce SQLite volume. Meemee does not yet claim a supported PostgreSQL path or multi-node control plane.
+
+Before an upgrade, run `meemee backup /secure/backups/meemee-YYYYMMDD` and `meemee backup-verify` on the result. `meemee db-migrate` applies forward-only checksummed migrations and refuses edited migration history. Backup manifests contain file size and SHA-256, and verification also runs SQLite integrity checks. Restore into a stopped instance, verify it, then start one API process before workers.
