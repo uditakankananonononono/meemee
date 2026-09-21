@@ -1,0 +1,7 @@
+[project]
+name="meemee-persist-pg"
+version="0.1.0"
+requires-python=">=3.10"
+dependencies=["psycopg[binary,pool]>=3.2,<4"]
+[tool.hatch.build.targets.wheel]
+packages=["meemee_persist_pg"]
