@@ -1,7 +1,9 @@
 from __future__ import annotations
+
 import hashlib
 from dataclasses import dataclass
 from importlib.resources import files
+
 from ._db import Database
 
 _LOCK = 6758712042962291

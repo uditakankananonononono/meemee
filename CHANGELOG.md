@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.109.0
+
+- Added PostgreSQL migration 003 for multi-instance customer identity: accounts, token ownership/kinds, email verification and password reset state.
+- Added a transactional PostgreSQL account store with atomic unique signup, row-locked login failure/lockout updates, shared sessions and recovery challenges, and account-wide token revocation on disable.
+- Source verification: 303 core tests, 133 SDK tests and 6 PostgreSQL contract tests passed; 15 live SDK and 2 live PostgreSQL tests skipped. Ruff, wheel package audit and explicit 0.109.0 release audit clean. Live Neon evidence is owned by the separate live-gate lane and is not claimed by this source drop until reported.
+
 ## 0.108.0
 
 - Added self-serve customer data export for built-in identity and complete companion profile, facts, conversations, messages and check-ins.

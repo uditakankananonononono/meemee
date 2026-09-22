@@ -1,7 +1,10 @@
 from __future__ import annotations
+
 import uuid
 from typing import Any
+
 from ._db import Database
+
 
 class PlanStore:
     def __init__(self, db: Database): self.db=db
@@ -39,7 +42,7 @@ class PlanStore:
         return self.get(ident)
     def update_status(self, ident: str, step_id: str, status: str, expected_version: int) -> dict[str,Any]:
         current=self.get(ident); plan=current["plan"]; found=False
-        from meemee.types import Plan,PlanStep
+        from meemee.types import Plan, PlanStep
         steps=[]
         for step in plan.steps:
             payload=step.model_dump()

@@ -1,11 +1,19 @@
 from __future__ import annotations
-import hashlib,json,sqlite3,time,uuid
-from contextlib import ExitStack,contextmanager
+
+import hashlib
+import json
+import sqlite3
+import time
+import uuid
+from collections.abc import Iterator
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
-from datetime import datetime,timezone
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any,Iterator
+from typing import Any
+
 from ._db import Database
+
 
 @dataclass(frozen=True,slots=True)
 class TableSpec:

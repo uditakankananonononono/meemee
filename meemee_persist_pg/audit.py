@@ -1,8 +1,12 @@
 from __future__ import annotations
-import hashlib,json
-from datetime import datetime,timezone
+
+import hashlib
+import json
+from datetime import datetime, timezone
 from typing import Any
+
 from ._db import Database
+
 _LOCK=6758712042962292
 
 class AuditLog:

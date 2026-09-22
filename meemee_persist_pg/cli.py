@@ -1,8 +1,15 @@
 from __future__ import annotations
-import argparse,json,os,sqlite3,sys
+
+import argparse
+import json
+import os
+import sqlite3
+import sys
 from pathlib import Path
-from . import Database,MigrationStore
-from .cutover import Cutover,SPECS
+
+from . import Database, MigrationStore
+from .cutover import SPECS, Cutover
+
 
 def parser()->argparse.ArgumentParser:
     p=argparse.ArgumentParser(prog="meemee-pg",description="Offline SQLite to PostgreSQL cutover tools")

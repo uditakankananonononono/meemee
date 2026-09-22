@@ -1,6 +1,8 @@
 from __future__ import annotations
+
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator, Any
+from typing import Any
 
 try:
     from psycopg import Connection
@@ -21,11 +23,10 @@ class Database:
 
     @contextmanager
     def transaction(self, *, isolation: str | None = None) -> Iterator[Connection[Any]]:
-        with self.pool.connection() as conn:
-            with conn.transaction():
-                if isolation:
-                    conn.execute(f"SET TRANSACTION ISOLATION LEVEL {isolation}")
-                yield conn
+        with self.pool.connection() as conn, conn.transaction():
+            if isolation:
+                conn.execute(f"SET TRANSACTION ISOLATION LEVEL {isolation}")
+            yield conn
 
     def close(self) -> None:
         self.pool.close()

@@ -1,6 +1,9 @@
-import pathlib,re
+import pathlib
+import re
+
 from meemee_persist_pg.audit import AuditLog
 from meemee_persist_pg.migrations import bundled_migrations
+
 
 def test_audit_hash_is_deterministic():
     assert AuditLog.hash("0"*64,"2026-01-01T00:00:00+00:00","a","x","r","ok","{}") == AuditLog.hash("0"*64,"2026-01-01T00:00:00+00:00","a","x","r","ok","{}")
@@ -13,3 +16,10 @@ def test_initial_schema_has_all_six_surfaces():
     for name in ("memories","jobs","plans","api_tokens","audit_log"):
         assert f"meemee_{name}" in sql
     assert "SKIP LOCKED" not in sql  # claim semantics live in prepared application SQL
+
+def test_customer_identity_migration_is_multi_instance_safe():
+    sql=pathlib.Path("meemee_persist_pg/sql/003_customer_identity.sql").read_text()
+    for name in ("meemee_accounts","meemee_email_verifications","meemee_password_resets"):
+        assert name in sql
+    source=pathlib.Path("meemee_persist_pg/accounts.py").read_text()
+    assert "FOR UPDATE" in source and "meemee_api_tokens" in source and "600_000" in source
