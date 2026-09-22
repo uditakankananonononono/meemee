@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.57.0
+
+- Added signed-checkpoint-gated audit prefix pruning with retained cryptographic chain bases and post-prune suffix verification.
+- Historical anchors remain verifiable; invalid, wrong-key and stale checkpoints refuse deletion.
+- Verification: 174 core tests passed; Ruff and explicit 0.57.0 release audit clean. SDK remains 110 passed from v0.55.0; no SDK surface changed.
+
 ## 0.56.0
 
 - Added bounded structured model-driven replanning when evidence invalidates the active plan, with validated replacement DAGs, a three-revision ceiling, feedback and durable provenance.

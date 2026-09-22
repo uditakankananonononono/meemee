@@ -11,7 +11,7 @@ import uvicorn
 from .account_export import export_account, import_account, inspect_import
 from .api_loadcheck import run_api_loadcheck
 from .audit import AuditLog
-from .audit_anchor import create_anchor, verify_anchor
+from .audit_anchor import create_anchor, prune_to_anchor, verify_anchor
 from .backup import BackupManager
 from .config import Settings
 from .key_rotation import rotate_keys
@@ -166,6 +166,16 @@ def audit_anchor(destination: Path) -> None:
     if not settings.audit_anchor_key:
         raise typer.BadParameter("MEEMEE_AUDIT_ANCHOR_KEY is required")
     report = create_anchor(AuditLog(settings.data_dir / "audit.sqlite3"), destination, settings.audit_anchor_key)
+    typer.echo(json.dumps(report, indent=2))
+
+
+@app.command("audit-prune")
+def audit_prune(anchor: Path) -> None:
+    """Prune only a prefix protected by a valid external signed checkpoint."""
+    settings = Settings()
+    if not settings.audit_anchor_key:
+        raise typer.BadParameter("MEEMEE_AUDIT_ANCHOR_KEY is required")
+    report = prune_to_anchor(AuditLog(settings.data_dir / "audit.sqlite3"), anchor, settings.audit_anchor_key)
     typer.echo(json.dumps(report, indent=2))
 
 

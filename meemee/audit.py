@@ -27,6 +27,10 @@ class AuditLog:
                     outcome TEXT NOT NULL, metadata TEXT NOT NULL,
                     previous_hash TEXT NOT NULL, entry_hash TEXT NOT NULL UNIQUE
                 );
+                CREATE TABLE IF NOT EXISTS audit_chain_base (
+                    singleton INTEGER PRIMARY KEY CHECK(singleton=1),
+                    sequence INTEGER NOT NULL, entry_hash TEXT NOT NULL
+                );
             """)
 
     @staticmethod
@@ -39,7 +43,11 @@ class AuditLog:
         encoded = json.dumps(metadata or {}, sort_keys=True, separators=(",", ":"))
         with self.lock, self.db:
             previous_row = self.db.execute("SELECT entry_hash FROM audit_log ORDER BY sequence DESC LIMIT 1").fetchone()
-            previous = previous_row[0] if previous_row else "0" * 64
+            if previous_row:
+                previous = previous_row[0]
+            else:
+                base = self.db.execute("SELECT entry_hash FROM audit_chain_base WHERE singleton=1").fetchone()
+                previous = base[0] if base else "0" * 64
             digest = self.hash(previous, occurred, actor, action, resource, outcome, encoded)
             cursor = self.db.execute(
                 "INSERT INTO audit_log(occurred_at,actor_id,action,resource,outcome,metadata,previous_hash,entry_hash) VALUES(?,?,?,?,?,?,?,?)",
@@ -49,12 +57,17 @@ class AuditLog:
 
     def verify(self) -> tuple[bool, int | None]:
         with self.lock:
-            previous = "0" * 64
+            base = self.db.execute("SELECT sequence,entry_hash FROM audit_chain_base WHERE singleton=1").fetchone()
+            previous = base["entry_hash"] if base else "0" * 64
+            expected_sequence = int(base["sequence"]) + 1 if base else 1
             for row in self.db.execute("SELECT * FROM audit_log ORDER BY sequence"):
+                if row["sequence"] != expected_sequence:
+                    return False, expected_sequence
                 digest = self.hash(previous, row["occurred_at"], row["actor_id"], row["action"], row["resource"], row["outcome"], row["metadata"])
                 if row["previous_hash"] != previous or row["entry_hash"] != digest:
                     return False, row["sequence"]
                 previous = row["entry_hash"]
+                expected_sequence += 1
             return True, None
 
     def list_page(self, after: int = 0, limit: int = 100) -> tuple[list[dict[str, Any]], str | None]:
