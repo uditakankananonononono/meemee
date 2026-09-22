@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel, Field
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from console.mount import mount_console
 
@@ -64,6 +65,10 @@ async def lifespan(_app: FastAPI):
         await close()
 
 app = FastAPI(title="Meemee", version=__version__, lifespan=lifespan)
+trusted_hosts = [host.strip() for host in settings.trusted_hosts.split(",") if host.strip()]
+if not trusted_hosts:
+    raise RuntimeError("MEEMEE_TRUSTED_HOSTS must contain at least one host")
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=trusted_hosts)
 mount_console(app)
 app.add_middleware(MetricsMiddleware)
 app.add_middleware(RateLimitMiddleware, limiter=SQLiteRateLimiter(settings.data_dir / "rate-limits.sqlite3", settings.rate_limit_requests, settings.rate_limit_window_seconds))
@@ -109,6 +114,18 @@ async def request_context(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; "
+        "form-action 'self'; object-src 'none'; connect-src 'self'"
+    )
+    if request.url.path.startswith(("/v1/", "/auth/")):
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Pragma"] = "no-cache"
+    if settings.hsts_enabled:
+        response.headers["Strict-Transport-Security"] = (
+            f"max-age={settings.hsts_max_age_seconds}; includeSubDomains"
+        )
     return response
 
 

@@ -4,6 +4,8 @@
 
 Run Meemee behind TLS at a reverse proxy or ingress. Set these as secrets, never in source control:
 
+Set `MEEMEE_TRUSTED_HOSTS` to the comma-separated public/internal hostnames accepted by the API. Keep the default local names only for local development. After confirming every route is HTTPS, set `MEEMEE_HSTS_ENABLED=true`; the default max age is one year and includes subdomains. Do not enable HSTS on a hostname that must still serve HTTP.
+
 - `MEEMEE_API_TOKEN`: a long random bootstrap administrator token. Use it only to mint scoped tokens, then keep it offline.
 - `MEEMEE_MODEL_API_KEY`: model provider credential, or `local` for an isolated local endpoint.
 - `MEEMEE_VAULT_KEY`: output of `meemee vault-key`. Required at API and webhook-worker startup; it encrypts both vault records and webhook signing secrets. Loss of this key makes those records unrecoverable.

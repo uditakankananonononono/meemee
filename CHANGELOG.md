@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.40.0
+
+- Added trusted-host enforcement, restrictive CSP, permissions/referrer/frame/content-type controls and no-store API/auth caching policy.
+- Added operator-controlled HSTS so TLS deployments can enforce transport security without breaking local HTTP defaults.
+- Core verification: 133 tests passed; Ruff and release audit clean.
+
 ## 0.39.0
 
 - Fixed source-versus-wheel drift by packaging the complete operator console and PEP 561 marker with the core distribution.

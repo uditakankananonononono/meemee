@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     oidc_token_endpoint: str | None = None
     oidc_redirect_uri: str | None = None
     session_key: str | None = None
+    trusted_hosts: str = "localhost,127.0.0.1,testserver"
+    hsts_enabled: bool = False
+    hsts_max_age_seconds: int = 31_536_000
     oidc_role_scopes: str = "admin=admin;operator=runs:write,jobs:read,jobs:write;viewer=jobs:read"
 
     @property
