@@ -113,3 +113,7 @@ Run `meemee retention-run` from cron after backups. Defaults retain terminal job
 ## Webhook alerts and recovery
 
 Alert when `meemee_webhook_success_rate` falls below 0.95 for 10 minutes, `meemee_webhook_oldest_queued_seconds` exceeds 300, any `meemee_webhook_suspended_subscriptions` is nonzero, or failed outbox depth grows. The circuit breaker suspends a subscription after five terminal failures. Operators should inspect the attempt timeline, fix the endpoint, wait the configured cooldown (`MEEMEE_WEBHOOK_BREAKER_COOLDOWN_SECONDS`, default 300), send a test delivery, then resume. Do not bypass TLS or SSRF checks to clear an alert.
+
+## Product plans and billing boundary
+
+`GET /v1/product/plans` is the authoritative machine-readable catalog. Starter, team and business plans currently enforce daily queued-job and active-webhook limits; admin assignment through `PUT /v1/entitlements/{principal}` updates the atomic job quota and records an audit event. Meemee does not process payments, publish prices or infer billing state. Connect a licensed external billing system to the admin entitlement endpoint only after verifying its signed events.

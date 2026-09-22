@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     readiness_min_free_bytes: int = 100_000_000
     readiness_require_model: bool = False
     default_daily_jobs: int = 100
+    default_plan: str = "starter"
     retention_jobs_days: int = 30
     retention_memory_days: int = 90
     retention_audit_days: int = 365

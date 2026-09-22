@@ -19,6 +19,7 @@ from .approvals import ApprovalStore
 from .audit import AuditLog
 from .auth import Authenticator, TokenStore
 from .config import Settings
+from .entitlements import EntitlementStore, public_catalog
 from .health import ReadinessChecker
 from .idempotency import IdempotencyConflict, IdempotencyStore
 from .jobs import JobStore
@@ -77,6 +78,7 @@ run_gate = RunGate()
 jobs = JobStore(settings.data_dir / "jobs.sqlite3")
 idempotency = IdempotencyStore(settings.data_dir / "idempotency.sqlite3")
 quotas = QuotaStore(settings.data_dir / "quotas.sqlite3", settings.default_daily_jobs)
+entitlements = EntitlementStore(settings.data_dir / "entitlements.sqlite3", settings.default_plan)
 tokens = TokenStore(settings.data_dir / "auth.sqlite3")
 audit = AuditLog(settings.data_dir / "audit.sqlite3")
 approvals = ApprovalStore(settings.data_dir / "approvals.sqlite3")
@@ -367,6 +369,31 @@ def list_tool_approvals(principal_id: str):
     return {"approvals": approvals.list(principal_id)}
 
 
+class PlanAssignmentRequest(BaseModel):
+    plan: str
+
+
+@app.get("/v1/product/plans")
+def product_plans():
+    return public_catalog()
+
+
+@app.get("/v1/entitlements")
+def current_entitlements(principal=jobs_write_dependency):
+    return entitlements.get(principal.id)
+
+
+@app.put("/v1/entitlements/{principal_id}", dependencies=[Depends(auth.dependency("admin"))])
+def assign_entitlements(principal_id: str, request: PlanAssignmentRequest):
+    try:
+        result = entitlements.assign(principal_id, request.plan, datetime.now(timezone.utc).isoformat())
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    quotas.set_limit(principal_id, int(result["limits"]["daily_jobs"]))
+    audit.append("api-admin", "entitlements.assign", principal_id, "success", {"plan": request.plan})
+    return result
+
+
 class WebhookRequest(BaseModel):
     url: str = Field(min_length=8, max_length=2048)
     events: set[str] = Field(min_length=1, max_length=20)
@@ -376,6 +403,11 @@ class WebhookRequest(BaseModel):
 
 @app.post("/v1/webhooks")
 def create_webhook(request: WebhookRequest, principal=jobs_write_dependency):
+    current = webhooks.db.execute(
+        "SELECT count(*) FROM webhook_subscriptions WHERE principal=? AND active=1", (principal.id,)
+    ).fetchone()[0]
+    if not entitlements.allows(principal.id, "webhooks", current):
+        raise HTTPException(403, "plan webhook limit reached")
     allowed = {"job.done", "job.failed", "job.cancelled", "*"}
     if not request.events <= allowed:
         raise HTTPException(422, f"unknown webhook events: {sorted(request.events - allowed)}")

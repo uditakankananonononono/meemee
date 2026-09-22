@@ -2,6 +2,13 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.42.0
+
+- Added persistent starter/team/business entitlement assignments and a public machine-readable product catalog.
+- Enforced plan daily-job limits through quota assignment and active-webhook limits at creation; assignments are admin-only and audited.
+- Billing remains explicitly external: no prices, checkout or payment state are claimed.
+- Verification: 138 core and 109 SDK tests passed; Ruff and release audit clean.
+
 ## 0.41.0
 
 - Corrected OpenAPI authentication to publish standard HTTP Bearer security requirements on protected operations.
