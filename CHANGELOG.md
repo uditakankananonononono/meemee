@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.89.0
+
+- Package audit now verifies complete wheel RECORD coverage, SHA-256 digests and byte sizes.
+- Added post-build payload tampering regression coverage.
+- Verification: 219 core and 112 SDK tests plus 3 PostgreSQL contract tests passed; Ruff, deprecation-free core/SDK wheel builds, RECORD-verifying package audit and explicit 0.89.0 release audit clean. Live PostgreSQL remains unrun here.
+
 ## 0.88.0
 
 - Hardened package audit against malformed/corrupt archives, path traversal and duplicate ZIP members.

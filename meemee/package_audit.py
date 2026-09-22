@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import base64
+import csv
+import hashlib
+import io
 import re
 import zipfile
 from pathlib import Path, PurePosixPath
@@ -60,6 +64,25 @@ def audit_wheel(wheel: Path, expected_version: str) -> dict:
                 findings.append({"code":"wheel_cli_entry_missing"})
             if len(record_names) != 1:
                 findings.append({"code":"wheel_record_missing"})
+            else:
+                record_rows = list(csv.reader(io.StringIO(archive.read(record_names[0]).decode(errors="replace"))))
+                recorded: set[str] = set()
+                record_invalid = False
+                for row in record_rows:
+                    if len(row) != 3 or row[0] in recorded:
+                        record_invalid = True; continue
+                    name, digest, size = row; recorded.add(name)
+                    if name not in unique:
+                        record_invalid = True; continue
+                    if name == record_names[0]:
+                        if digest or size: record_invalid = True
+                        continue
+                    content = archive.read(name)
+                    expected = base64.urlsafe_b64encode(hashlib.sha256(content).digest()).rstrip(b"=").decode()
+                    if digest != f"sha256={expected}" or size != str(len(content)):
+                        record_invalid = True
+                if recorded != unique or record_invalid:
+                    findings.append({"code":"wheel_record_invalid"})
     except (OSError, zipfile.BadZipFile, RuntimeError) as exc:
         findings.append({"code":"wheel_archive_invalid","detail":str(exc)})
     return {"status":"pass" if not findings else "fail","findings":findings,"summary":{"findings":len(findings)}}
