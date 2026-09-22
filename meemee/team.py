@@ -17,14 +17,21 @@ class AgentTeam:
         self.factory = factory
         self.limit = asyncio.Semaphore(max_concurrency)
 
-    async def delegate(self, goals: list[str]) -> list[dict[str, Any]]:
+    async def delegate(self, goals: list[str], cancel=None) -> list[dict[str, Any]]:
         if not goals or len(goals) > 32:
             raise ValueError("delegate between 1 and 32 goals")
 
         async def one(index: int, goal: str) -> dict[str, Any]:
             async with self.limit:
                 try:
-                    report = await self.factory().run(goal)
+                    if cancel is not None and cancel.is_set():
+                        return {"index": index, "goal": goal, "ok": False, "error": "delegation cancelled"}
+                    child = self.factory()
+                    try:
+                        parameters = __import__("inspect").signature(child.run).parameters
+                        report = await child.run(goal, cancel=cancel) if "cancel" in parameters else await child.run(goal)
+                    except (TypeError, ValueError):
+                        report = await child.run(goal)
                     return {"index": index, "goal": goal, "ok": True, "report": report.model_dump()}
                 except (OSError, ValueError, RuntimeError) as exc:
                     return {"index": index, "goal": goal, "ok": False, "error": str(exc)}

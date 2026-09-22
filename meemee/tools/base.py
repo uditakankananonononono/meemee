@@ -52,7 +52,11 @@ class ToolRegistry:
         try:
             tool = self.get(name)
             parsed = tool.arguments_model.model_validate(arguments)
-            value = tool.run(parsed)
+            try:
+                parameters = inspect.signature(tool.run).parameters
+                value = tool.run(parsed, cancel=cancel) if "cancel" in parameters else tool.run(parsed)
+            except (TypeError, ValueError):
+                value = tool.run(parsed)
             if inspect.isawaitable(value):
                 task = asyncio.create_task(value)
                 if cancel is not None:
