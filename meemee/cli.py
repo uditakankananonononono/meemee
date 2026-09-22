@@ -19,6 +19,7 @@ from .loadcheck import run_loadcheck
 from .migrations import CORE_MIGRATIONS, Migrator
 from .onboarding import initialize
 from .package_audit import audit_wheel
+from .postgres_copy import export_sqlite, import_postgresql
 from .preflight import run_preflight
 from .release_audit import audit_tree
 from .retention import RetentionManager
@@ -129,6 +130,25 @@ def schema_status_command() -> None:
         if components:
             databases.append({"database": path.name, "components": components})
     typer.echo(json.dumps({"databases": databases}, indent=2))
+
+
+@app.command("postgres-copy-export")
+def postgres_copy_export(destination: Path) -> None:
+    """Export checksummed SQLite core data for PostgreSQL cutover."""
+    typer.echo(json.dumps(export_sqlite(Settings().data_dir, destination), indent=2))
+
+
+@app.command("postgres-copy-import")
+def postgres_copy_import(source: Path) -> None:
+    """Import a verified export into empty PostgreSQL tables transactionally."""
+    settings=Settings()
+    if not settings.postgres_dsn: raise typer.BadParameter("MEEMEE_POSTGRES_DSN is required")
+    from meemee_persist_pg import Database, MigrationStore
+    database=Database(settings.postgres_dsn)
+    try:
+        MigrationStore(database).apply()
+        typer.echo(json.dumps(import_postgresql(source,database),indent=2))
+    finally: database.close()
 
 
 @app.command("db-migrate")

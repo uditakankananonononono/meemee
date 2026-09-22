@@ -2,9 +2,15 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.68.0
+
+- Added checksummed SQLite-to-PostgreSQL core-data export and transactional empty-target import CLIs.
+- Copy covers memory, jobs/events, token digests and audit while refusing tampered exports or target collisions.
+- Verification: 193 core and 112 SDK tests passed; Ruff and explicit 0.68.0 release audit clean.
+
 ## 0.67.0
 
-- Aligned the Python SDK package/import version with core at 0.67.0 and removed stale v0.41 contract labels from SDK docs and metadata.
+- Aligned the Python SDK package/import version with core at 0.68.0 and removed stale v0.41 contract labels from SDK docs and metadata.
 - Added an explicit parity regression check.
 - Verification: 191 core and 112 SDK tests passed; Ruff and explicit 0.67.0 release audit clean.
 
