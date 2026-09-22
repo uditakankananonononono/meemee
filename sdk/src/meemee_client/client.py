@@ -371,8 +371,8 @@ class RunsResource:
         an interactive approval gate; leave it False for a read-only run.
         The default read timeout is 15 minutes because a full agent loop is slow.
 
-        Note: POST is not retried automatically (the server has no idempotency
-        keys). A NetworkError here can mean the run still executed server-side.
+        Note: synchronous runs are not idempotent, so POST is not retried automatically.
+        A NetworkError here can mean the run still executed server-side.
         """
         _validate_goal(goal)
         payload = self._client._request_json(

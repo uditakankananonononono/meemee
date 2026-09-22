@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.97.0
+
+- Exported the previously omitted public SDK `TokenMetadata` model.
+- Added mechanical package-root coverage for every public SDK model and error, and removed stale no-idempotency prose.
+- Verification: 225 core and 115 SDK tests plus 3 PostgreSQL contract tests passed; Ruff, deprecation-free core/SDK wheel builds, package audit and explicit 0.97.0 release audit clean. Live PostgreSQL remains unrun here.
+
 ## 0.96.0
 
 - Exported the missing SDK `IdempotencyConflictError` and mapped idempotency-specific HTTP 409 responses to it.

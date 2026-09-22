@@ -1,7 +1,7 @@
 # meemee-client
 
 Typed Python SDK for the [Meemee](../README.md) agent platform API. Targets the
-server **v0.96.0** HTTP contract: scoped API tokens and OIDC bearer auth,
+server **v0.97.0** HTTP contract: scoped API tokens and OIDC bearer auth,
 synchronous runs, durable queued jobs, resume-safe SSE progress, fixed-window
 rate limiting, and the tamper-evident audit chain.
 
@@ -93,7 +93,7 @@ All HTTP errors raise typed subclasses of `ApiError`:
 | 401 | `AuthenticationError` | `www_authenticate` |
 | 403 | `PermissionDeniedError` | `missing_scope` |
 | 404 | `NotFoundError` | |
-| 409 | `ConflictError` | |
+| 409 | `ConflictError` / `IdempotencyConflictError` | typed subclass for reused key with a different payload |
 | 422 | `ValidationError` | `issues` (FastAPI issue list when present) |
 | 429 | `RateLimitError` | `retry_after` |
 | 5xx | `ServerError` | |
@@ -104,9 +104,9 @@ SSE failures raise `StreamError`.
 
 Retries follow the server's own transport semantics: bounded attempts (3),
 jittered exponential backoff, `Retry-After` honoured on 429/503, and transient
-statuses only (408/429/5xx). Because the server has no idempotency keys, only
-idempotent methods (`GET`, `HEAD`, `DELETE`) are retried automatically - a
-retried `POST /v1/runs` or `/v1/jobs` could execute the goal twice. Tune with
+statuses only (408/429/5xx). Only idempotent methods (`GET`, `HEAD`, `DELETE`)
+are retried automatically. Queued-job creation accepts `idempotency_key=` for safe
+caller-directed retries; synchronous runs remain non-idempotent. Tune with
 `MeemeeClient(..., retry=RetryPolicy(...))`.
 
 Rate-limit headers on every response are exposed as `client.last_response_info`
@@ -116,7 +116,7 @@ are limiter-exempt server-side.
 ## Verified, Thin, Missing
 
 **Verified (107 tests: 96 against a mocked transport implementing the server
-v0.96.0 contract, plus 11 live integration tests that boot the real server
+v0.97.0 contract, plus 11 live integration tests that boot the real server
 package and exercise it end to end):**
 
 1. Auth header attachment, 401/403 mapping including `WWW-Authenticate` and
