@@ -26,3 +26,11 @@ def test_release_audit_finds_stub_missing_file_and_version_drift(tmp_path):
     assert report["status"] == "fail"
     assert codes == {"missing_required_file", "version_document_drift", "stub_marker"}
     assert next(item for item in report["findings"] if item["code"] == "stub_marker")["line"] == 1
+
+
+def test_release_audit_rejects_stale_but_aligned_version(tmp_path):
+    valid_tree(tmp_path)
+    report = audit_tree(tmp_path, expected_version="0.50.0")
+    assert report["status"] == "fail"
+    finding = next(item for item in report["findings"] if item["code"] == "expected_version_mismatch")
+    assert finding["actual"] == "0.37.0" and finding["expected"] == "0.50.0"

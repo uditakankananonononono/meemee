@@ -192,9 +192,12 @@ def package_audit(wheel: Path, expected_version: str | None = None) -> None:
 
 
 @app.command("release-audit")
-def release_audit(root: Path = ROOT_ARGUMENT) -> None:
-    """Fail when a release tree has stub markers, omissions or version drift."""
-    report = audit_tree(root.resolve())
+def release_audit(
+    root: Path = ROOT_ARGUMENT,
+    expected_version: str | None = typer.Option(None, "--expected-version"),
+) -> None:
+    """Fail on release defects; expected-version prevents stale aligned metadata."""
+    report = audit_tree(root.resolve(), expected_version)
     typer.echo(json.dumps(report, indent=2))
     if report["status"] != "pass":
         raise typer.Exit(1)

@@ -41,7 +41,7 @@ curl -sS -X POST http://127.0.0.1:8787/v1/tokens \
 
 The raw token is returned once. Store it in a secret manager. Meemee stores only its digest. Revoke it with `DELETE /v1/tokens/{id}` using an admin token.
 
-Before building a release, run `meemee release-audit .`; after building the wheel, run `meemee package-audit dist/meemee_agent-*.whl` and install it into a clean virtual environment for CLI smoke checks. it fails on missing commercial assets, version drift and explicit stub markers. Before starting API or worker traffic, run `meemee preflight --require-model`. Treat its JSON output as a deployment gate: exit 0 means all required checks passed; exit 1 identifies each failed check without exposing secret values. Omit `--require-model` only when temporary model downtime is acceptable.
+Before building a release, run `meemee release-audit . --expected-version X.Y.Z`; the explicit target prevents stale but internally aligned release metadata from passing. after building the wheel, run `meemee package-audit dist/meemee_agent-*.whl` and install it into a clean virtual environment for CLI smoke checks. it fails on missing commercial assets, version drift and explicit stub markers. Before starting API or worker traffic, run `meemee preflight --require-model`. Treat its JSON output as a deployment gate: exit 0 means all required checks passed; exit 1 identifies each failed check without exposing secret values. Omit `--require-model` only when temporary model downtime is acceptable.
 
 ## Backups and recovery
 

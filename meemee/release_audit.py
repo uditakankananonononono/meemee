@@ -21,7 +21,7 @@ def _version(path: Path) -> str | None:
     return match.group(1) if match else None
 
 
-def audit_tree(root: Path) -> dict:
+def audit_tree(root: Path, expected_version: str | None = None) -> dict:
     """Apply deterministic release invariants to the exact source tree."""
     findings: list[dict] = []
     for relative in REQUIRED:
@@ -29,6 +29,15 @@ def audit_tree(root: Path) -> dict:
             findings.append({"code": "missing_required_file", "path": relative})
     pyproject = root / "pyproject.toml"
     package = root / "meemee" / "__init__.py"
+    if expected_version is not None:
+        actual = _version(pyproject) if pyproject.exists() else None
+        if actual != expected_version:
+            findings.append({
+                "code": "expected_version_mismatch",
+                "path": "pyproject.toml",
+                "expected": expected_version,
+                "actual": actual,
+            })
     if pyproject.exists() and package.exists():
         versions = {_version(pyproject), _version(package)}
         if None in versions or len(versions) != 1:

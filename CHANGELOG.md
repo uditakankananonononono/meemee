@@ -2,6 +2,14 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.50.0
+
+- Added checksummed component schema/version registry to evolving jobs, webhooks, runs and entitlements databases.
+- Added same-version drift and newer-database refusal plus `meemee schema-status` cross-database visibility.
+- Existing additive constructor upgrades remain compatible and are registered after successful upgrade.
+- Added an explicit expected-version release-audit gate so a stale but internally aligned release number cannot pass packaging.
+- Metadata-fix verification: 160 tests passed; Ruff and explicit 0.50.0 release audit clean.
+
 ## 0.49.0
 
 - Added checksummed owner-scoped account export for jobs, completed runs and entitlement assignment.
