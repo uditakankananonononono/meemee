@@ -26,7 +26,7 @@ class JobStore:
             c.execute("INSERT INTO meemee_jobs(id,goal,run_at,status,max_attempts,principal) VALUES(%s,%s,COALESCE(%s,clock_timestamp()),'queued',%s,%s)",(ident,goal,run_at,max_attempts,principal)); self._event(c,ident,"queued",{"run_at":run_at.isoformat() if run_at else None})
         return str(ident)
     def _reap(self,c):
-        rows=c.execute("""UPDATE meemee_jobs SET status=CASE WHEN attempts<max_attempts THEN 'queued' ELSE 'failed' END,
+        rows=c.execute("""UPDATE meemee_jobs SET status=CASE WHEN attempts<max_attempts THEN 'queued'::meemee_job_status ELSE 'failed'::meemee_job_status END,
           error='worker lease expired',lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL,updated_at=clock_timestamp()
           WHERE status='running' AND lease_expires_at<=clock_timestamp() RETURNING id,status""").fetchall()
         for r in rows:self._event(c,r["id"],"retry" if r["status"]=="queued" else "failed",{"error":"worker lease expired"})

@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.111.0
+
+- Fixed PostgreSQL expired-lease reaping by explicitly casting both `CASE` branches to the `meemee_job_status` enum.
+- Added a regression guard rejecting implicit text branches in enum-column `CASE` assignments.
+- Source verification: 303 core, 133 SDK, PostgreSQL suite 8 passed/2 live skipped; Ruff, wheel/package/release audits clean. Live 0.110.0 gate had verified every JSONB fix and exposed this final enum mismatch; final live 0.111.0 rerun is owned separately.
+
 ## 0.110.0
 
 - Fixed live PostgreSQL JSONB writes by wrapping memory metadata, job events/results and audit metadata with psycopg's explicit `Jsonb` adapter.
