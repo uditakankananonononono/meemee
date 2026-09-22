@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.63.0
+
+- Added authenticated owner-scoped WebSocket job-event streaming with durable cursor replay and terminal closure.
+- Token, OIDC and session authentication plus scope/ownership rejection are enforced before acceptance.
+- Verification: 186 core tests passed; Ruff and explicit 0.63.0 release audit clean. SDK remains 110 passed from v0.55.0; no SDK surface changed.
+
 ## 0.62.0
 
 - Added a complete operator-console permissions view for listing, granting, constraining, expiring and revoking persistent tool approvals.

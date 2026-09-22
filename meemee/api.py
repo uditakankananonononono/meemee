@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import hmac
 import json
 import logging
 import time
@@ -7,7 +9,7 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -17,7 +19,7 @@ from console.mount import mount_console
 from . import __version__
 from .approvals import ApprovalStore
 from .audit import AuditLog
-from .auth import Authenticator, TokenStore
+from .auth import Authenticator, Principal, TokenStore
 from .config import Settings
 from .entitlements import EntitlementStore, public_catalog
 from .health import ReadinessChecker
@@ -383,6 +385,45 @@ def stream_job_events(request: Request, job_id: str, after: int = 0):
         media_type="text/event-stream",
         headers={"Cache-Control":"no-cache, no-transform", "X-Accel-Buffering":"no"},
     )
+
+
+@app.websocket("/v1/jobs/{job_id}/ws")
+async def websocket_job_events(websocket: WebSocket, job_id: str):
+    """Stream owner-scoped durable job events over an authenticated WebSocket."""
+    authorization = websocket.headers.get("authorization", "")
+    principal = None
+    if authorization.lower().startswith("bearer "):
+        supplied = authorization[7:]
+        if settings.api_token and hmac.compare_digest(supplied, settings.api_token):
+            principal = Principal("bootstrap", "bootstrap", frozenset({"admin", "jobs:read"}))
+        else:
+            principal = tokens.authenticate(supplied)
+            if principal is None and oidc is not None:
+                principal = oidc.authenticate(supplied)
+    if principal is None and web_login is not None:
+        principal = web_login.authenticate_session(websocket.cookies.get("meemee_session", ""))
+    if principal is None:
+        await websocket.close(code=4401, reason="authentication required"); return
+    if "jobs:read" not in principal.scopes and "admin" not in principal.scopes:
+        await websocket.close(code=4403, reason="missing jobs:read scope"); return
+    if jobs.get_owned(job_id, principal.id) is None:
+        await websocket.close(code=4404, reason="job not found"); return
+    try: after = int(websocket.query_params.get("after", "0"))
+    except ValueError:
+        await websocket.close(code=4400, reason="after must be an integer"); return
+    await websocket.accept()
+    try:
+        while True:
+            events = jobs.events(job_id, after)
+            for event in events:
+                after = event["sequence"]
+                await websocket.send_json(event)
+            current = jobs.get_owned(job_id, principal.id)
+            if current and current["status"] in {"done", "failed", "cancelled"} and not events:
+                await websocket.close(code=1000); return
+            await asyncio.sleep(0.25)
+    except WebSocketDisconnect:
+        return
 
 
 @app.get("/v1/quota")
