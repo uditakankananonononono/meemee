@@ -254,6 +254,39 @@ def verify_account_email(request: EmailVerifyRequest):
     return {"account_id": request.account_id, "email_verified": True}
 
 
+class PasswordForgotRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+
+
+class PasswordResetRequest(BaseModel):
+    account_id: str = Field(min_length=8, max_length=80)
+    token: str = Field(min_length=20, max_length=200)
+    password: str = Field(min_length=12, max_length=200)
+
+
+@app.post("/v1/accounts/forgot-password", status_code=202)
+def forgot_password(request: PasswordForgotRequest):
+    account = tokens.account_by_email(request.email)
+    if account is not None and mailer.configured:
+        raw = email_verifications.issue_password_reset(account["id"])
+        mailer.send_password_reset(account["email"], account["id"], raw)
+    return {"status": "accepted", "detail": "If that account exists, a reset email was sent."}
+
+
+@app.post("/v1/accounts/reset-password")
+def reset_password(request: PasswordResetRequest):
+    if not email_verifications.consume_password_reset(request.account_id, request.token):
+        raise HTTPException(400, "invalid or expired reset link")
+    try:
+        changed = tokens.reset_password(request.account_id, request.password)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    if not changed:
+        raise HTTPException(400, "invalid or expired reset link")
+    audit.append(request.account_id, "account.password.reset", request.account_id, "success")
+    return {"account_id": request.account_id, "password_reset": True, "sessions_revoked": True}
+
+
 @app.post("/v1/accounts/login")
 def account_login(request: LoginRequest):
     result = tokens.login_account(request.email, request.password)

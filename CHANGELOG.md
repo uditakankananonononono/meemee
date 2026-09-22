@@ -2,6 +2,11 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.107.0
+
+- Added privacy-preserving password recovery with a uniform forgot-password response, 20-minute one-time digest-only reset links delivered through Resend, password replacement with fresh salts, lockout clearing and immediate revocation of all active account tokens.
+- Verification: 302 core tests, 133 SDK tests and 5 PostgreSQL contract tests passed; 15 live SDK and 2 live PostgreSQL tests skipped. Ruff, wheel package audit and explicit 0.107.0 release audit clean.
+
 ## 0.106.0
 
 - Added one-time, 30-minute email verification with digest-only token persistence, atomic consumption, verified account status and a public verification endpoint.

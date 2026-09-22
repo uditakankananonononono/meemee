@@ -168,6 +168,21 @@ class TokenStore:
         _, token = self.create(row["display_name"], {"runs:write", "jobs:read", "jobs:write", "companion:read", "companion:write"}, (datetime.now(timezone.utc) + timedelta(days=30)).isoformat(), row["id"], "session")
         return {"id": row["id"], "email": row["email"], "display_name": row["display_name"], "created_at": row["created_at"]}, token
 
+    def account_by_email(self, email: str) -> dict | None:
+        with self.lock:
+            row = self.db.execute("SELECT id,email,display_name,created_at FROM accounts WHERE email=? AND disabled_at IS NULL", (email.strip().lower(),)).fetchone()
+        return dict(row) if row else None
+
+    def reset_password(self, account_id: str, password: str) -> bool:
+        if len(password) < 12 or len(password) > 200:
+            raise ValueError("password must be 12-200 characters")
+        salt = secrets.token_bytes(16)
+        with self.lock, self.db:
+            changed = self.db.execute("UPDATE accounts SET password_hash=?,password_salt=?,failed_logins=0,locked_until=NULL WHERE id=? AND disabled_at IS NULL", (self._password(password, salt), salt, account_id)).rowcount
+            if changed:
+                self.db.execute("UPDATE api_tokens SET revoked_at=? WHERE owner_id=? AND revoked_at IS NULL", (datetime.now(timezone.utc).isoformat(), account_id))
+        return bool(changed)
+
     def get_account(self, account_id: str) -> dict | None:
         with self.lock:
             row = self.db.execute("SELECT id,email,display_name,created_at FROM accounts WHERE id=? AND disabled_at IS NULL", (account_id,)).fetchone()
