@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.94.0
+
+- Added the durable webhook dispatcher to the safe default Kubernetes pod so queued events are delivered.
+- Webhook-worker now uses the configured payload ceiling as well as the required encryption key.
+- Verification: 224 core and 112 SDK tests plus 3 PostgreSQL contract tests passed; Ruff, deprecation-free core/SDK wheel builds, package audit and explicit 0.94.0 release audit clean. Live PostgreSQL remains unrun here.
+
 ## 0.93.0
 
 - Fixed durable worker startup by passing the required vault key to its webhook outbox.

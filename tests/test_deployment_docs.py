@@ -16,4 +16,4 @@ def test_operations_has_no_obsolete_postgres_or_rate_limit_claims():
 def test_kubernetes_manifest_uses_current_image_version():
     from meemee import __version__
     text=(ROOT/"deploy/k8s/meemee.yaml").read_text()
-    assert text.count(f"ghcr.io/uditakankananonononono/meemee:{__version__}") == 2
+    assert text.count(f"ghcr.io/uditakankananonononono/meemee:{__version__}") == 3

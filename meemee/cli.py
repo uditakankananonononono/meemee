@@ -312,7 +312,12 @@ def preflight(require_model: bool = typer.Option(False, "--require-model")) -> N
 def webhook_worker() -> None:
     """Run the durable signed-webhook dispatcher."""
     settings = Settings()
-    asyncio.run(dispatch_forever(WebhookStore(settings.data_dir / "webhooks.sqlite3", encryption_key=settings.vault_key), settings.webhook_poll_seconds))
+    store = WebhookStore(
+        settings.data_dir / "webhooks.sqlite3",
+        settings.webhook_max_payload_bytes,
+        settings.vault_key,
+    )
+    asyncio.run(dispatch_forever(store, settings.webhook_poll_seconds))
 
 
 @app.command("webhook-verify")

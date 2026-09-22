@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.93.0 (117)
+## Verified in v0.94.0 (118)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -121,6 +121,7 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 115. Commercial container context includes console, PostgreSQL runtime/migrations and proprietary license, excludes local secrets/state, probes readiness rather than liveness, and keeps Kubernetes image pins current.
 116. Safe default Kubernetes topology co-locates one API and one worker in a single Recreate pod for SQLite state, with read-only roots, separate liveness/readiness probes and no unsafe cross-node PVC writers.
 117. Durable job worker now supplies the required vault encryption key and configured payload ceiling to its webhook outbox, eliminating a startup failure and keeping API/worker webhook configuration identical.
+118. Safe default deployment includes the durable webhook-dispatcher sidecar, with the same encrypted outbox and payload configuration, so queued signed deliveries actually leave the system.
 
 ## Thin (0)
 

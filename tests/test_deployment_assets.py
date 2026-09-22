@@ -15,10 +15,11 @@ def test_kubernetes_manifest_uses_current_image_and_readiness():
     root = Path(__file__).parents[1]
     manifest = (root / "deploy/k8s/meemee.yaml").read_text()
     from meemee import __version__
-    assert manifest.count(f"ghcr.io/uditakankananonononono/meemee:{__version__}") == 2
+    assert manifest.count(f"ghcr.io/uditakankananonononono/meemee:{__version__}") == 3
     assert manifest.count("kind: Deployment") == 1
-    assert "name: api" in manifest and "name: worker" in manifest
+    assert all(f"name: {name}" in manifest for name in ("api", "worker", "webhook-worker"))
     assert "replicas: 1" in manifest and "strategy: {type: Recreate}" in manifest
-    assert "readOnlyRootFilesystem: true" in manifest
+    assert manifest.count("readOnlyRootFilesystem: true") == 3
+    assert 'args: ["meemee", "webhook-worker"]' in manifest
     assert "readinessProbe: {httpGet: {path: /ready" in manifest
     assert "livenessProbe: {httpGet: {path: /health" in manifest

@@ -1,13 +1,13 @@
 # Meemee status
 
-**Current core version:** 0.93.0  
-**Ledger:** 117 verified, 0 thin  
+**Current core version:** 0.94.0  
+**Ledger:** 118 verified, 0 thin  
 **Supported production shape:** SQLite/WAL single-host; PostgreSQL memory and owner-scoped jobs are selectable but require target-environment live verification  
-**Last core verification:** 223 passed; 112 SDK passed; Ruff and explicit 0.93.0 release audit clean
+**Last core verification:** 224 passed; 112 SDK passed; Ruff and explicit 0.94.0 release audit clean
 
 ## What is production-usable now
 
-The authoritative detailed list is the 117-item "Verified" section in [README.md](README.md). The main product surfaces are:
+The authoritative detailed list is the 118-item "Verified" section in [README.md](README.md). The main product surfaces are:
 
 - Bounded agent loop, typed tools, per-run and persistent exact-tool approvals, deterministic policy, secret scrubbing and safe provenance.
 - Local and scheduled jobs, atomic claims, retries, cooperative cancellation, resumable SSE and idempotent submission.
@@ -21,10 +21,10 @@ The authoritative detailed list is the 117-item "Verified" section in [README.md
 
 | Surface | Latest evidence in this tree | Result |
 |---|---|---|
-| Core server/runtime | `pytest -q` after v0.93.0 | 223 passed |
-| Core lint | `ruff check meemee tests examples/webhook_receiver` after v0.93.0 | clean |
-| SDK | v0.93.0 full run | 112 passed, including 11 against a booted server |
-| PostgreSQL package | contract run at v0.93.0 | 3 contract tests passed; 2 live tests skipped without `MEEMEE_TEST_DATABASE_URL` |
+| Core server/runtime | `pytest -q` after v0.94.0 | 224 passed |
+| Core lint | `ruff check meemee tests examples/webhook_receiver` after v0.94.0 | clean |
+| SDK | v0.94.0 full run | 112 passed, including 11 against a booted server |
+| PostgreSQL package | contract run at v0.94.0 | 3 contract tests passed; 2 live tests skipped without `MEEMEE_TEST_DATABASE_URL` |
 | Console | core mount test plus console worker's headless live test | passed at merge |
 | Concurrency regression | `tests/test_concurrency.py` | 2,000 parallel token auths and 1,000 parallel audit appends passed |
 
