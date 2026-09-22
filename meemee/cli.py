@@ -12,6 +12,7 @@ from .account_export import export_account, import_account, inspect_import
 from .backup import BackupManager
 from .config import Settings
 from .key_rotation import rotate_keys
+from .loadcheck import run_loadcheck
 from .migrations import CORE_MIGRATIONS, Migrator
 from .onboarding import initialize
 from .package_audit import audit_wheel
@@ -215,6 +216,14 @@ def init(
         typer.echo(json.dumps({"status": "error", "error": str(exc)}))
         raise typer.Exit(1) from exc
     typer.echo(json.dumps(report, indent=2))
+
+
+@app.command("loadcheck")
+def loadcheck(operations: int = 1_000, workers: int = 16) -> None:
+    """Run the release-blocking shared-store contention harness."""
+    report = run_loadcheck(operations, workers)
+    typer.echo(json.dumps(report, indent=2))
+    if report["status"] != "pass": raise typer.Exit(1)
 
 
 @app.command("preflight")

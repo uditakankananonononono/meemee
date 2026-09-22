@@ -2,6 +2,13 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.53.0
+
+- Added a release-blocking shared-store contention harness across authentication, audit, jobs and entitlements.
+- Reports exact operation/write counts, captured error types and audit-chain verification; exits nonzero on mismatch.
+- Verified 1,000 operations across 16 worker threads with zero errors or lost job writes.
+- Verification: 166 tests passed; Ruff, explicit 0.53.0 release audit and 1,000-op loadcheck clean.
+
 ## 0.52.0
 
 - Added stable keyset pagination and next cursors for webhook subscriptions and delivery history.
