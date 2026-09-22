@@ -3,7 +3,7 @@ from meemee.api import app
 
 def test_openapi_has_current_version_and_bearer_security():
     schema = app.openapi()
-    assert schema["info"]["version"] == "0.77.0"
+    assert schema["info"]["version"] == "0.78.0"
     schemes = schema["components"]["securitySchemes"]
     assert schemes["HTTPBearer"] == {"type":"http","scheme":"bearer"}
     for path, method in (("/v1/jobs","post"),("/v1/tokens","post"),("/v1/webhooks","post")):
