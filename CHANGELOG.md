@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.58.0
+
+- Added deterministic local semantic embeddings persisted beside memory, cosine retrieval and reciprocal-rank fusion with FTS.
+- Agent context now uses hybrid lexical/semantic retrieval with no external embedding service.
+- Verification: 176 core tests passed; Ruff and explicit 0.58.0 release audit clean. SDK remains 110 passed from v0.55.0; no SDK surface changed.
+
 ## 0.57.0
 
 - Added signed-checkpoint-gated audit prefix pruning with retained cryptographic chain bases and post-prune suffix verification.

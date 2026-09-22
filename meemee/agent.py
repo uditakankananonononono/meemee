@@ -37,7 +37,7 @@ class Agent:
         run_id = uuid.uuid4().hex
         goal = scrub_text(goal)
         plan = self.planner.plan(goal)
-        prior = self.memory.search(goal, limit=5)
+        prior = self.memory.hybrid_search(goal, limit=5)
         messages = [
             {"role": "system", "content": SYSTEM},
             {"role": "user", "content": json.dumps({
