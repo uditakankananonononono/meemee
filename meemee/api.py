@@ -29,6 +29,7 @@ from .email_verification import EmailVerificationStore, ResendMailer
 from .entitlements import EntitlementStore, public_catalog
 from .health import ReadinessChecker
 from .idempotency import IdempotencyConflict, IdempotencyStore
+from .monitors import MonitorInput, MonitorStore
 from .observability import (
     AGENT_RUNS,
     JOBS_CREATED,
@@ -105,6 +106,7 @@ tokens = TokenStore(settings.data_dir / "auth.sqlite3")
 email_verifications = EmailVerificationStore(settings.data_dir / "email-verifications.sqlite3")
 mailer = ResendMailer(settings.resend_api_key, settings.email_from_address, settings.public_url)
 personal_model = PersonalModelStore(settings.data_dir / "personal-model.sqlite3")
+monitors = MonitorStore(settings.data_dir / "monitors.sqlite3")
 audit = AuditLog(settings.data_dir / "audit.sqlite3")
 approvals = ApprovalStore(settings.data_dir / "approvals.sqlite3")
 webhooks = WebhookStore(settings.data_dir / "webhooks.sqlite3", settings.webhook_max_payload_bytes, settings.vault_key)
@@ -163,6 +165,10 @@ class RunRequest(BaseModel):
     goal: str = Field(min_length=2, max_length=20_000)
     approve_writes: bool = False
     approved_tools: set[str] = Field(default_factory=set, max_length=100)
+
+
+class MonitorRequest(MonitorInput):
+    pass
 
 
 class PersonalModelRequest(PersonalItemInput):
@@ -348,6 +354,33 @@ def create_account_api_key(request: AccountTokenRequest, principal=jobs_read_dep
     ident, token = tokens.create(request.name, request.scopes, request.expires_at, principal.id, "api")
     audit.append(principal.id, "account.api_key.create", ident, "success", {"scopes": sorted(request.scopes)})
     return {"id": ident, "token": token, "warning": "shown once; store it securely"}
+
+
+@app.get("/v1/monitors")
+def list_monitors(status: str | None = None, principal=jobs_read_dependency):
+    return {"monitors": monitors.list(principal.id, status)}
+
+
+@app.post("/v1/monitors", status_code=201)
+def create_monitor(request: MonitorRequest, principal=runs_write_dependency):
+    result = monitors.create(principal.id, MonitorInput(**request.model_dump()))
+    audit.append(principal.id, "monitor.create", result["id"], "success")
+    return result
+
+
+@app.delete("/v1/monitors/{monitor_id}")
+def cancel_monitor(monitor_id: str, principal=runs_write_dependency):
+    if not monitors.cancel(principal.id, monitor_id):
+        raise HTTPException(404, "active monitor not found")
+    audit.append(principal.id, "monitor.cancel", monitor_id, "success")
+    return {"id": monitor_id, "cancelled": True}
+
+
+@app.get("/v1/monitors/{monitor_id}/events")
+def monitor_events(monitor_id: str, principal=jobs_read_dependency):
+    if monitors.get(principal.id, monitor_id) is None:
+        raise HTTPException(404, "monitor not found")
+    return {"events": monitors.events(principal.id, monitor_id)}
 
 
 @app.post("/v1/personal-model/reflect")
