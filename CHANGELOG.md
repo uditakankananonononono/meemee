@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.110.0
+
+- Fixed live PostgreSQL JSONB writes by wrapping memory metadata, job events/results and audit metadata with psycopg's explicit `Jsonb` adapter.
+- Added a regression guard covering every runtime JSONB write site that failed the live Neon gate.
+- Source verification: 303 core, 133 SDK, PostgreSQL suite 7 passed/2 live skipped; Ruff, wheel/package/release audits clean. Corrected PostgreSQL evidence terminology: the local `tests_pg` suite contains 9 tests total; 7 pass locally and 2 require a live database. `test_contract.py` itself contains 4 tests at this version.
+
 ## 0.109.0
 
 - Added PostgreSQL migration 003 for multi-instance customer identity: accounts, token ownership/kinds, email verification and password reset state.

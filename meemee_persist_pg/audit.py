@@ -5,6 +5,8 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
+from psycopg.types.json import Jsonb
+
 from ._db import Database
 
 _LOCK=6758712042962292
@@ -23,7 +25,7 @@ class AuditLog:
             if row:previous=row["entry_hash"]
             digest=self.hash(previous,occurred.isoformat(),actor,action,resource,outcome,encoded)
             result=c.execute("""INSERT INTO meemee_audit_log(occurred_at,actor_id,action,resource,outcome,metadata,previous_hash,entry_hash)
-             VALUES(%s,%s,%s,%s,%s,%s,%s,%s) RETURNING sequence""",(occurred,actor,action,resource,outcome,metadata or {},previous,digest)).fetchone()
+             VALUES(%s,%s,%s,%s,%s,%s,%s,%s) RETURNING sequence""",(occurred,actor,action,resource,outcome,Jsonb(metadata or {}),previous,digest)).fetchone()
             return int(result["sequence"])
     def verify(self)->tuple[bool,int|None]:
         previous="0"*64

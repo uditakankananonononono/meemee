@@ -4,6 +4,8 @@ import uuid
 from datetime import datetime
 from typing import Any
 
+from psycopg.types.json import Jsonb
+
 from ._db import Database
 
 
@@ -16,7 +18,7 @@ class JobStore:
         if not row:return None
         result=dict(row); result["id"]=str(result["id"]); result["lease_token"]=str(result["lease_token"]) if result.get("lease_token") else None
         return result
-    def _event(self,c,ident,kind,payload): c.execute("INSERT INTO meemee_job_events(job_id,kind,payload) VALUES(%s,%s,%s)",(ident,kind,payload))
+    def _event(self,c,ident,kind,payload): c.execute("INSERT INTO meemee_job_events(job_id,kind,payload) VALUES(%s,%s,%s)",(ident,kind,Jsonb(payload)))
     def enqueue(self,goal:str,run_at:datetime|None=None,max_attempts:int=3,principal:str|None=None)->str:
         if not goal.strip() or max_attempts<1: raise ValueError("goal and positive max_attempts required")
         ident=uuid.uuid4()
@@ -44,7 +46,7 @@ class JobStore:
     def _terminal(self,ident,lease_token,status,result=None,error=None):
         with self.db.transaction() as c:
             row=c.execute("""UPDATE meemee_jobs SET status=%s,result=%s,error=%s,lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL,updated_at=clock_timestamp()
-             WHERE id=%s AND status IN ('running','cancel_requested') AND lease_owner=%s AND lease_token=%s AND lease_expires_at>clock_timestamp() RETURNING id""",(status,result,error,ident,self.worker_id,lease_token)).fetchone()
+             WHERE id=%s AND status IN ('running','cancel_requested') AND lease_owner=%s AND lease_token=%s AND lease_expires_at>clock_timestamp() RETURNING id""",(status,Jsonb(result) if result is not None else None,error,ident,self.worker_id,lease_token)).fetchone()
             if not row: raise LeaseLostError(f"job {ident} lease is no longer owned")
             self._event(c,ident,status,{"result":result} if result is not None else {"error":error})
     def finish(self,ident:str,result:dict[str,Any],lease_token:str|None=None)->None:
