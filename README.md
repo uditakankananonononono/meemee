@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.100.0 (134)
+## Verified in v0.101.0 (135)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -138,6 +138,7 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 132. WhatsApp and iMessage provider adapters are real HTTP deliveries that stay config-gated: without provider endpoint and token they fail closed with an explicit configuration error naming the missing settings.
 133. The companion HTTP API (profiles, persona, facts, chat, conversations, check-in planning and an admin delivery tick) and the `meemee companion` CLI (user/persona/fact management, interactive chat, check-in worker) enforce dedicated companion:read and companion:write scopes with audit events.
 134. The typed SDK companion resource covers users, persona and check-in updates, fact CRUD and search, chat turns, conversations and message history, check-in planning and the admin delivery tick, with the new scopes included in client-side scope validation.
+135. Live booted-server integration tests exercise the companion API end to end through the SDK: profiles and persona, fact CRUD and search, chat turns with durable fact extraction and history, check-in planning, the admin tick and scope enforcement, against a stubbed external model endpoint.
 
 ## Thin (0)
 

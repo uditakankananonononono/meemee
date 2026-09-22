@@ -1,9 +1,9 @@
 # Meemee status
 
-**Current core version:** 0.100.0  
+**Current core version:** 0.101.0  
 **Ledger:** 133 verified, 0 thin  
 **Supported production shape:** SQLite/WAL single-host; PostgreSQL memory and owner-scoped jobs are selectable but require target-environment live verification  
-**Last core verification:** 287 passed; 144 SDK passed; Ruff and explicit 0.100.0 release audit clean
+**Last core verification:** 287 passed; 148 SDK passed; Ruff and explicit 0.101.0 release audit clean
 
 ## What is production-usable now
 
@@ -24,7 +24,7 @@ The authoritative detailed list is the 123-item "Verified" section in [README.md
 |---|---|---|
 | Core server/runtime | `pytest -q` after v0.100.0 | 287 passed |
 | Core lint | `ruff check meemee tests examples/webhook_receiver` after v0.100.0 | clean |
-| SDK | v0.100.0 full run | 144 passed, including 11 against a booted server |
+| SDK | v0.101.0 full run | 148 passed, including 15 against a booted server |
 | PostgreSQL package | contract run at v0.100.0 | 3 contract tests passed; 2 live tests skipped without `MEEMEE_TEST_DATABASE_URL` |
 | Console | core mount test plus console worker's headless live test | passed at merge |
 | Concurrency regression | `tests/test_concurrency.py` | 2,000 parallel token auths and 1,000 parallel audit appends passed |

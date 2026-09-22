@@ -2,6 +2,11 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.101.0
+
+- Added live booted-server SDK integration coverage for the full companion API: profiles, persona, facts, chat turns with durable fact extraction and history, check-in planning, the admin delivery tick and scope enforcement. The server under test is real end to end; only the external model endpoint is stubbed locally.
+- Verification: 287 core and 148 SDK tests (15 live) plus 3 PostgreSQL contract tests passed; Ruff, deprecation-free core/SDK wheel builds, package audit and explicit 0.101.0 release audit clean. Live PostgreSQL and live WhatsApp/iMessage provider delivery remain unrun here.
+
 ## 0.100.0
 
 - Added the companion layer: persistent per-user profiles with validated persona configuration and real IANA timezones.
