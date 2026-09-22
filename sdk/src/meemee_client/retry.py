@@ -1,6 +1,6 @@
 """Retry policy matching Meemee server semantics.
 
-The platform's own transport contract (server v0.16.0, model transport): bounded
+The platform's own transport contract (current server model transport): bounded
 retries for transient network/408/429/5xx failures, Retry-After support, jittered
 exponential backoff, fail-fast permanent errors. The SDK applies the same rules to
 API calls, with one addition: only idempotent methods are retried automatically,

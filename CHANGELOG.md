@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.67.0
+
+- Aligned the Python SDK package/import version with core at 0.67.0 and removed stale v0.41 contract labels from SDK docs and metadata.
+- Added an explicit parity regression check.
+- Verification: 191 core and 112 SDK tests passed; Ruff and explicit 0.67.0 release audit clean.
+
 ## 0.66.0
 
 - Added Python SDK parity for argument-scoped approval administration and corrected the approval response model to current server fields.
