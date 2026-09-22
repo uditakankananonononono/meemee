@@ -75,7 +75,7 @@ quotas = QuotaStore(settings.data_dir / "quotas.sqlite3", settings.default_daily
 tokens = TokenStore(settings.data_dir / "auth.sqlite3")
 audit = AuditLog(settings.data_dir / "audit.sqlite3")
 approvals = ApprovalStore(settings.data_dir / "approvals.sqlite3")
-webhooks = WebhookStore(settings.data_dir / "webhooks.sqlite3", settings.webhook_max_payload_bytes)
+webhooks = WebhookStore(settings.data_dir / "webhooks.sqlite3", settings.webhook_max_payload_bytes, settings.vault_key)
 oidc = None
 if any((settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url)):
     if not all((settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url)):

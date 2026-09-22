@@ -10,13 +10,15 @@ from meemee.webhooks import (
     replay_delivery,
 )
 
+TEST_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+
 
 def public_dns(*args): return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34",443))]
 
 
 def populated(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(socket, "getaddrinfo", public_dns)
-    store = WebhookStore(tmp_path / "w.db")
+    store = WebhookStore(tmp_path / "w.db", encryption_key=TEST_KEY)
     store.subscribe("u", "https://hooks.example/a", {"*"})
     store.enqueue("e1", "job.done", {"x":1})
     claimed = store.claim(now=4102444800); store.retry(claimed["id"], "bad", max_attempts=1)

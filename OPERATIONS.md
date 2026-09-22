@@ -6,7 +6,7 @@ Run Meemee behind TLS at a reverse proxy or ingress. Set these as secrets, never
 
 - `MEEMEE_API_TOKEN`: a long random bootstrap administrator token. Use it only to mint scoped tokens, then keep it offline.
 - `MEEMEE_MODEL_API_KEY`: model provider credential, or `local` for an isolated local endpoint.
-- `MEEMEE_VAULT_KEY`: output of `meemee vault-key`. Loss of this key makes vault records unrecoverable.
+- `MEEMEE_VAULT_KEY`: output of `meemee vault-key`. Required at API and webhook-worker startup; it encrypts both vault records and webhook signing secrets. Loss of this key makes those records unrecoverable.
 - `MEEMEE_GITHUB_TOKEN`: optional, required for sustained GitHub search usage.
 
 Mount `MEEMEE_DATA_DIR` on persistent encrypted storage. The API and workers must share it only on one host. SQLite is a supported single-node deployment. Kubernetes replicas need a future shared database/queue and are listed as missing rather than claimed production support.
@@ -39,7 +39,7 @@ Recommended daily retention: 7 daily, 4 weekly, 6 monthly encrypted backups. Mon
 
 1. Back up `MEEMEE_DATA_DIR` and the external vault key.
 2. Read the release ledger and missing list.
-3. Install the new version in a fresh environment.
+3. Install the new version in a fresh environment. For v0.35+, provide the existing `MEEMEE_VAULT_KEY` on first start; webhook subscription secrets are upgraded from plaintext in one transaction. Back up first and do not interrupt that first startup.
 4. Run `pytest` from source or the release smoke checks.
 5. Start one API process, verify `/ready`, then start workers.
 6. Keep the prior image/package available for rollback.
@@ -50,7 +50,7 @@ Schema creation is idempotent. There is not yet a formal migration framework, so
 
 - Leaked API token: revoke its ID, inspect `last_used_at`, issue a replacement.
 - Leaked bootstrap token: replace the environment secret and restart all API processes.
-- Leaked vault key: rotate the key by exporting and re-encrypting secrets on an offline trusted host; treat all stored values as exposed.
+- Leaked vault key: rotate vault records and webhook signing secrets on an offline trusted host, then rotate receiver secrets through the API; treat all stored values as exposed. A built-in all-record key-rotation command remains missing.
 - Stuck queued work: inspect `/v1/jobs/{id}` and `/events`, cancel queued work, then check worker/model logs.
 - Repeated browser challenge: stop automation for that site. Meemee does not claim challenge bypass.
 

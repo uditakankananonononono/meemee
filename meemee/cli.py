@@ -119,7 +119,7 @@ def retention_run() -> None:
 def webhook_worker() -> None:
     """Run the durable signed-webhook dispatcher."""
     settings = Settings()
-    asyncio.run(dispatch_forever(WebhookStore(settings.data_dir / "webhooks.sqlite3"), settings.webhook_poll_seconds))
+    asyncio.run(dispatch_forever(WebhookStore(settings.data_dir / "webhooks.sqlite3", encryption_key=settings.vault_key), settings.webhook_poll_seconds))
 
 
 @app.command("webhook-verify")

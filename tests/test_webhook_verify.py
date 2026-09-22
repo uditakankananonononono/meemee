@@ -1,6 +1,7 @@
 from meemee.webhook_verify import verify_signature
 from meemee.webhooks import WebhookDispatcher
 
+TEST_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
 def test_signature_helper_matches_dispatcher():
     body='{"ok":true}'
@@ -23,7 +24,7 @@ def test_custom_headers_reject_sensitive_and_deliver_safe(tmp_path, monkeypatch)
 
     from meemee.webhooks import WebhookDispatcher, WebhookStore
     monkeypatch.setattr(socket,"getaddrinfo",lambda *a:[(2,1,6,"",("93.184.216.34",443))])
-    store=WebhookStore(tmp_path/"w.db")
+    store=WebhookStore(tmp_path/"w.db", encryption_key=TEST_KEY)
     with pytest.raises(ValueError,match="forbidden"):
         store.subscribe("u","https://hooks.example/a",{"*"},headers={"Authorization":"bad"})
     store.subscribe("u","https://hooks.example/a",{"*"},headers={"X-Tenant":"alpha"}); store.enqueue("e","x",{})

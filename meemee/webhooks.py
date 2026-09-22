@@ -16,6 +16,8 @@ from urllib.parse import urlparse
 
 import httpx
 
+from .secret_cipher import SecretCipher
+
 
 def validate_webhook_url(url: str) -> str:
     parsed = urlparse(url)
@@ -30,10 +32,13 @@ def validate_webhook_url(url: str) -> str:
 class WebhookStore:
     """Durable webhook subscriptions and transactional delivery outbox."""
 
-    def __init__(self, path: Path, max_payload_bytes: int = 256_000):
+    def __init__(self, path: Path, max_payload_bytes: int = 256_000, encryption_key: str | None = None):
         if max_payload_bytes < 1024:
             raise ValueError("webhook payload ceiling must be at least 1024 bytes")
         self.max_payload_bytes = max_payload_bytes
+        if not encryption_key:
+            raise ValueError("webhook secret encryption requires MEEMEE_VAULT_KEY")
+        self.secret_cipher = SecretCipher(encryption_key)
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False, isolation_level=None, timeout=5)
         self.db.row_factory = sqlite3.Row
@@ -71,6 +76,35 @@ class WebhookStore:
             self.db.execute("ALTER TABLE webhook_subscriptions ADD COLUMN headers TEXT")
         if "sending_started_at" not in columns:
             self.db.execute("ALTER TABLE webhook_deliveries ADD COLUMN sending_started_at REAL")
+        self._encrypt_legacy_secrets()
+
+    def _secret_context(self, ident: str) -> str:
+        return f"webhook-subscription:{ident}"
+
+    def _encrypt_legacy_secrets(self) -> None:
+        """Upgrade legacy plaintext secrets in one transaction; safe to resume."""
+        with self.lock, self.db:
+            rows = self.db.execute("SELECT id,secret FROM webhook_subscriptions").fetchall()
+            for row in rows:
+                if not row["secret"].startswith(SecretCipher.PREFIX):
+                    encrypted = self.secret_cipher.encrypt(
+                        row["secret"], self._secret_context(row["id"])
+                    )
+                    self.db.execute(
+                        "UPDATE webhook_subscriptions SET secret=? WHERE id=?",
+                        (encrypted, row["id"]),
+                    )
+                else:
+                    # Fail closed at startup if the configured key cannot read stored secrets.
+                    self.secret_cipher.decrypt(
+                        row["secret"], self._secret_context(row["id"])
+                    )
+
+    def _encrypt_secret(self, ident: str, secret: str) -> str:
+        return self.secret_cipher.encrypt(secret, self._secret_context(ident))
+
+    def _decrypt_secret(self, ident: str, secret: str) -> str:
+        return self.secret_cipher.decrypt(secret, self._secret_context(ident))
 
     def subscribe(
         self,
@@ -93,7 +127,7 @@ class WebhookStore:
         with self.lock, self.db:
             self.db.execute(
                 "INSERT INTO webhook_subscriptions(id,principal,url,secret,events,fields,headers,active,created_at) VALUES(?,?,?,?,?,?,?,1,?)",
-                (ident, principal, url, secret, " ".join(sorted(events)), " ".join(sorted(fields or ())) or None, json.dumps(headers, sort_keys=True) if headers else None, datetime.now(timezone.utc).isoformat()),
+                (ident, principal, url, self._encrypt_secret(ident, secret), " ".join(sorted(events)), " ".join(sorted(fields or ())) or None, json.dumps(headers, sort_keys=True) if headers else None, datetime.now(timezone.utc).isoformat()),
             )
         return ident, secret
 
@@ -143,7 +177,9 @@ class WebhookStore:
                 (row["id"], row["attempts"] + 1, datetime.now(timezone.utc).isoformat()),
             )
             self.db.execute("COMMIT")
-        return dict(row)
+        delivery = dict(row)
+        delivery["secret"] = self._decrypt_secret(delivery["subscription_id"], delivery["secret"])
+        return delivery
 
     def succeed(self, ident: str, status: int) -> None:
         now = datetime.now(timezone.utc).isoformat()
@@ -243,7 +279,7 @@ class WebhookStore:
         with self.lock, self.db:
             changed = self.db.execute(
                 "UPDATE webhook_subscriptions SET secret=? WHERE id=? AND principal=? AND active=1",
-                (secret, ident, principal),
+                (self._encrypt_secret(ident, secret), ident, principal),
             ).rowcount
         return secret if changed else None
 

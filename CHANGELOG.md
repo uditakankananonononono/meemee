@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.35.0
+
+- Encrypt webhook signing secrets at rest with the existing required vault key using per-record AES-256-GCM nonces and subscription-bound authenticated context.
+- Automatically upgrade legacy plaintext webhook secrets transactionally; fail closed on a missing or wrong key; keep create/rotation one-time reveal behavior.
+- Core verification: 120 tests passed; Ruff clean.
+
 ## 0.34.0
 
 - Added receiver signature verification helper/CLI, safe custom headers and receiver fixture.

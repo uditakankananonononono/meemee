@@ -6,13 +6,14 @@ from fastapi.testclient import TestClient
 from meemee import api
 from meemee.webhooks import WebhookStore
 
+TEST_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
 def public_dns(*args): return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443))]
 
 
 def test_webhook_api_create_list_delete(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(socket, "getaddrinfo", public_dns)
-    fresh = WebhookStore(tmp_path / "webhooks.db")
+    fresh = WebhookStore(tmp_path / "webhooks.db", encryption_key=TEST_KEY)
     monkeypatch.setattr(api, "webhooks", fresh)
     client = TestClient(api.app)
     headers = {"Authorization":"Bearer test-bootstrap-token"}
@@ -25,7 +26,7 @@ def test_webhook_api_create_list_delete(monkeypatch, tmp_path: Path):
 
 
 def test_terminal_event_enqueue_is_idempotent(tmp_path: Path, monkeypatch):
-    store = WebhookStore(tmp_path / "webhooks.db")
+    store = WebhookStore(tmp_path / "webhooks.db", encryption_key=TEST_KEY)
     monkeypatch.setattr(socket, "getaddrinfo", public_dns)
     store.subscribe("u", "https://hooks.example/mee", {"job.done"})
     payload = {"job_id":"j1","status":"done"}
