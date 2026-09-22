@@ -43,7 +43,7 @@ class WebhookStore:
             PRAGMA busy_timeout=5000;
             CREATE TABLE IF NOT EXISTS webhook_subscriptions (
                 id TEXT PRIMARY KEY, principal TEXT NOT NULL, url TEXT NOT NULL,
-                secret TEXT NOT NULL, events TEXT NOT NULL, fields TEXT, active INTEGER NOT NULL,
+                secret TEXT NOT NULL, events TEXT NOT NULL, fields TEXT, headers TEXT, active INTEGER NOT NULL,
                 created_at TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS webhook_deliveries (
@@ -67,18 +67,33 @@ class WebhookStore:
         subscription_columns = {row[1] for row in self.db.execute("PRAGMA table_info(webhook_subscriptions)")}
         if "fields" not in subscription_columns:
             self.db.execute("ALTER TABLE webhook_subscriptions ADD COLUMN fields TEXT")
+        if "headers" not in subscription_columns:
+            self.db.execute("ALTER TABLE webhook_subscriptions ADD COLUMN headers TEXT")
         if "sending_started_at" not in columns:
             self.db.execute("ALTER TABLE webhook_deliveries ADD COLUMN sending_started_at REAL")
 
-    def subscribe(self, principal: str, url: str, events: set[str], fields: set[str] | None = None) -> tuple[str, str]:
+    def subscribe(
+        self,
+        principal: str,
+        url: str,
+        events: set[str],
+        fields: set[str] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> tuple[str, str]:
         validate_webhook_url(url)
         if not events or any(not event.strip() for event in events):
             raise ValueError("at least one non-empty event is required")
+        reserved = {"authorization","cookie","host","content-length","content-type","x-meemee-signature-256","x-meemee-timestamp","x-meemee-delivery","x-meemee-event"}
+        headers = headers or {}
+        if any(name.lower() in reserved or name.lower().startswith("proxy-") for name in headers):
+            raise ValueError("custom headers contain a forbidden sensitive or transport name")
+        if len(headers) > 20 or any(len(name)>100 or len(value)>1000 for name,value in headers.items()):
+            raise ValueError("custom headers exceed count or size limits")
         ident, secret = uuid.uuid4().hex, secrets.token_urlsafe(32)
         with self.lock, self.db:
             self.db.execute(
-                "INSERT INTO webhook_subscriptions(id,principal,url,secret,events,fields,active,created_at) VALUES(?,?,?,?,?,?,1,?)",
-                (ident, principal, url, secret, " ".join(sorted(events)), " ".join(sorted(fields or ())) or None, datetime.now(timezone.utc).isoformat()),
+                "INSERT INTO webhook_subscriptions(id,principal,url,secret,events,fields,headers,active,created_at) VALUES(?,?,?,?,?,?,?,1,?)",
+                (ident, principal, url, secret, " ".join(sorted(events)), " ".join(sorted(fields or ())) or None, json.dumps(headers, sort_keys=True) if headers else None, datetime.now(timezone.utc).isoformat()),
             )
         return ident, secret
 
@@ -116,7 +131,7 @@ class WebhookStore:
         current = time.time() if now is None else now
         with self.lock, self.db:
             self.db.execute("BEGIN IMMEDIATE")
-            row = self.db.execute("""SELECT d.*,s.url,s.secret FROM webhook_deliveries d
+            row = self.db.execute("""SELECT d.*,s.url,s.secret,s.headers FROM webhook_deliveries d
                 JOIN webhook_subscriptions s ON s.id=d.subscription_id
                 WHERE d.status='queued' AND d.next_attempt_at<=? AND s.active=1
                 ORDER BY d.next_attempt_at,d.id LIMIT 1""", (current,)).fetchone()
@@ -246,13 +261,14 @@ class WebhookDispatcher:
         delivery = self.store.claim()
         if delivery is None: return False
         timestamp = str(int(time.time()))
-        headers = {
+        headers = json.loads(delivery["headers"] or "{}")
+        headers.update({
             "Content-Type":"application/json",
             "X-Meemee-Event":delivery["event_type"],
             "X-Meemee-Delivery":delivery["id"],
             "X-Meemee-Timestamp":timestamp,
             "X-Meemee-Signature-256":self.signature(delivery["secret"], timestamp, delivery["payload"]),
-        }
+        })
         try:
             response = await self.client.post(delivery["url"], content=delivery["payload"], headers=headers)
             if 200 <= response.status_code < 300:

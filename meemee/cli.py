@@ -15,6 +15,7 @@ from .retention import RetentionManager
 from .runtime import build_agent
 from .tools.github import GitHubRepoSearch, GitHubSearchArgs
 from .vault import SecretVault
+from .webhook_verify import verify_signature
 from .webhooks import WebhookStore, dispatch_forever
 from .worker import work_forever
 
@@ -119,3 +120,23 @@ def webhook_worker() -> None:
     """Run the durable signed-webhook dispatcher."""
     settings = Settings()
     asyncio.run(dispatch_forever(WebhookStore(settings.data_dir / "webhooks.sqlite3"), settings.webhook_poll_seconds))
+
+
+@app.command("webhook-verify")
+def webhook_verify(
+    secret_name: str,
+    timestamp: str,
+    signature: str,
+    body_file: Path | None = None,
+    tolerance_seconds: int = 300,
+) -> None:
+    """Verify a received webhook using a vault secret and file/stdin body bytes."""
+    settings = Settings()
+    if not settings.vault_key:
+        raise typer.BadParameter("MEEMEE_VAULT_KEY is required")
+    secret = SecretVault(settings.data_dir / "vault.sqlite3", settings.vault_key).get(secret_name)
+    body = body_file.read_bytes() if body_file else __import__("sys").stdin.buffer.read()
+    valid = verify_signature(secret, timestamp, body, signature, tolerance_seconds)
+    typer.echo(json.dumps({"valid": valid}))
+    if not valid:
+        raise typer.Exit(1)

@@ -2,6 +2,11 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.34.0
+
+- Added receiver signature verification helper/CLI, safe custom headers and receiver fixture.
+- Core verification: 116 tests passed; Ruff clean.
+
 ## 0.33.0
 
 - Added versioned webhook envelope, payload ceiling, field selection and body hashes.

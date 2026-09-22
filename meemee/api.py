@@ -354,6 +354,7 @@ class WebhookRequest(BaseModel):
     url: str = Field(min_length=8, max_length=2048)
     events: set[str] = Field(min_length=1, max_length=20)
     fields: set[str] = Field(default_factory=set, max_length=50)
+    headers: dict[str, str] = Field(default_factory=dict, max_length=20)
 
 
 @app.post("/v1/webhooks")
@@ -362,10 +363,10 @@ def create_webhook(request: WebhookRequest, principal=jobs_write_dependency):
     if not request.events <= allowed:
         raise HTTPException(422, f"unknown webhook events: {sorted(request.events - allowed)}")
     try:
-        ident, secret = webhooks.subscribe(principal.id, request.url, request.events, request.fields)
+        ident, secret = webhooks.subscribe(principal.id, request.url, request.events, request.fields, request.headers)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
-    audit.append(principal.id, "webhook.create", ident, "success", {"url": request.url, "events": sorted(request.events), "fields": sorted(request.fields)})
+    audit.append(principal.id, "webhook.create", ident, "success", {"url": request.url, "events": sorted(request.events), "fields": sorted(request.fields), "header_names": sorted(request.headers)})
     return {"id": ident, "secret": secret, "warning": "shown once; store it securely"}
 
 
