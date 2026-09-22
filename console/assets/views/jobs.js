@@ -1,7 +1,7 @@
 // Jobs view: create, track, watch (SSE) and cancel durable queued jobs.
 // The source-of-truth owner-scoped list comes from the API; browser tracking only
 // preserves explicit IDs added by operators for compatibility with legacy jobs.
-import { h, clear, toast, missingNote, statusBadge, jsonBlock, fullTime, timeAgo } from "../dom.js";
+import { h, clear, toast, statusBadge, jsonBlock, fullTime, timeAgo } from "../dom.js";
 import * as api from "../api.js";
 import { openJobStream } from "../sse.js";
 import { knownJobs } from "../store.js";
@@ -248,8 +248,8 @@ export async function renderJobs(root, ctx) {
       runAt,
       h("div", { class: "row" }, create)),
     h("section", { class: "card" },
-      h("h2", null, "Tracked jobs (this browser)"),
-      missingNote("No job listing endpoint", "GET /v1/jobs does not exist. The console polls each tracked job by ID against the server; the ID list itself lives in this browser only."),
+      h("h2", null, "Account jobs"),
+      h("p", { class: "muted" }, "Owner-scoped jobs are loaded from the server. Track by ID can reopen a known job directly."),
       h("div", { class: "row" }, addId, addButton),
       listBox),
     detailHost);

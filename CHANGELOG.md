@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.85.0
+
+- Fixed the operator console job inventory copy to match the implemented owner-scoped server listing.
+- Added regression coverage that blocks the obsolete browser-only/no-list-endpoint claim from returning.
+- Verification: 216 core and 112 SDK tests plus 3 PostgreSQL contract tests passed; Ruff, core/SDK wheel builds and explicit 0.85.0 release audit clean. Live PostgreSQL remains unrun here.
+
 ## 0.84.0
 
 - Added verified backup restore rehearsal into a new empty data directory.
