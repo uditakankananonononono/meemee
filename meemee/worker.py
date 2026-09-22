@@ -21,7 +21,11 @@ async def work_forever(settings: Settings | None = None) -> None:
     settings = settings or Settings()
     persistence = build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn)
     jobs = persistence.jobs
-    webhooks = WebhookStore(settings.data_dir / "webhooks.sqlite3")
+    webhooks = WebhookStore(
+        settings.data_dir / "webhooks.sqlite3",
+        settings.webhook_max_payload_bytes,
+        settings.vault_key,
+    )
     while True:
         job = jobs.claim()
         if job is None:

@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.93.0
+
+- Fixed durable worker startup by passing the required vault key to its webhook outbox.
+- Worker and API now use the same configured webhook payload ceiling and encryption settings.
+- Verification: 223 core and 112 SDK tests plus 3 PostgreSQL contract tests passed; Ruff, deprecation-free core/SDK wheel builds, package audit and explicit 0.93.0 release audit clean. Live PostgreSQL remains unrun here.
+
 ## 0.92.0
 
 - Replaced the unsafe split-pod SQLite Kubernetes topology with one API/worker pod on one host.
