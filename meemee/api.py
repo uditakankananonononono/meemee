@@ -162,6 +162,11 @@ class RunRequest(BaseModel):
     approved_tools: set[str] = Field(default_factory=set, max_length=100)
 
 
+class EmailTaskRequest(BaseModel):
+    subject: str = Field(min_length=1, max_length=200)
+    body: str = Field(min_length=1, max_length=20_000)
+
+
 class JobRequest(BaseModel):
     goal: str = Field(min_length=2, max_length=20_000)
     run_at: str | None = None
@@ -332,6 +337,33 @@ def create_account_api_key(request: AccountTokenRequest, principal=jobs_read_dep
     ident, token = tokens.create(request.name, request.scopes, request.expires_at, principal.id, "api")
     audit.append(principal.id, "account.api_key.create", ident, "success", {"scopes": sorted(request.scopes)})
     return {"id": ident, "token": token, "warning": "shown once; store it securely"}
+
+
+@app.get("/v1/email-bridge/status")
+def email_bridge_status(principal=jobs_read_dependency):
+    account = tokens.get_account(principal.id)
+    return {
+        "outbound_configured": mailer.configured,
+        "recipient": account["email"] if account else None,
+        "gmail_connected": bool(settings.gmail_access_token),
+        "gmail_connection_required": not bool(settings.gmail_access_token),
+        "gmail_required_scope": "https://www.googleapis.com/auth/gmail.readonly",
+    }
+
+
+@app.post("/v1/email-bridge/send-task")
+def send_email_task(request: EmailTaskRequest, principal=runs_write_dependency):
+    account = tokens.get_account(principal.id)
+    if account is None or not account.get("email"):
+        raise HTTPException(409, "the authenticated account has no email recipient")
+    if not email_verifications.status(principal.id):
+        raise HTTPException(403, "verify the recipient email before sending tasks")
+    try:
+        delivery_id = mailer.send_task(account["email"], request.subject, request.body, settings.email_reply_to)
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc)) from exc
+    audit.append(principal.id, "email_bridge.task.send", delivery_id, "success", {"recipient": account["email"]})
+    return {"delivery_id": delivery_id, "recipient": account["email"], "reply_to": settings.email_reply_to}
 
 
 @app.get("/v1/account/api-keys")

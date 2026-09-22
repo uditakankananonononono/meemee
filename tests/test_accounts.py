@@ -55,3 +55,14 @@ def test_login_locks_for_fifteen_minutes_after_five_failures(tmp_path: Path):
     assert store.login_account("lock@example.com", "correct horse battery") is None
     row = store.db.execute("SELECT failed_logins,locked_until FROM accounts WHERE email='lock@example.com'").fetchone()
     assert row["failed_logins"] == 5 and row["locked_until"]
+
+def test_email_bridge_status_exposes_gmail_connection_requirement(monkeypatch, tmp_path: Path):
+    store = TokenStore(tmp_path / "bridge-accounts.db")
+    monkeypatch.setattr(api, "tokens", store)
+    monkeypatch.setattr(api.auth, "store", store)
+    client = TestClient(api.app)
+    token=client.post('/v1/accounts/signup',json={'email':'bridge@example.com','password':'correct horse battery','display_name':'Bridge'}).json()['token']
+    response=client.get('/v1/email-bridge/status',headers={'Authorization':f'Bearer {token}'})
+    assert response.status_code==200
+    assert response.json()['gmail_connection_required'] is True
+    assert response.json()['gmail_required_scope'].endswith('gmail.readonly')

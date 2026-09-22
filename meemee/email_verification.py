@@ -84,13 +84,13 @@ class ResendMailer:
     def configured(self) -> bool:
         return bool(self.api_key and self.from_address and self.public_url.startswith("https://"))
 
-    def _send(self, recipient: str, subject: str, html: str) -> str:
+    def _send(self, recipient: str, subject: str, html: str, reply_to: str | None = None) -> str:
         if not self.configured:
             raise RuntimeError("transactional email is not configured")
         response = httpx.post(
             "https://api.resend.com/emails",
             headers={"Authorization": f"Bearer {self.api_key}"},
-            json={"from": self.from_address, "to": [recipient], "subject": subject, "html": html},
+            json={k: v for k, v in {"from": self.from_address, "to": [recipient], "subject": subject, "html": html, "reply_to": reply_to}.items() if v},
             timeout=15,
         )
         response.raise_for_status()
@@ -103,3 +103,10 @@ class ResendMailer:
     def send_password_reset(self, recipient: str, account_id: str, token: str) -> str:
         url = f"{self.public_url}/app/?reset={token}&account={account_id}"
         return self._send(recipient, "Reset your Meemee password", f'<p>Reset your Meemee password:</p><p><a href="{url}">Choose a new password</a></p><p>This link expires in 20 minutes. If you did not request it, ignore this email.</p>')
+
+
+    def send_task(self, recipient: str, subject: str, body: str, reply_to: str | None = None) -> str:
+        if not subject.strip() or not body.strip():
+            raise ValueError("subject and body are required")
+        safe_body = body.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+        return self._send(recipient, subject.strip(), f"<p>{safe_body}</p>", reply_to=reply_to)

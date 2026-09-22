@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     signup_enabled: bool = True
     resend_api_key: str | None = None
     email_from_address: str = "onboarding@resend.dev"
+    email_reply_to: str | None = None
+    gmail_access_token: str | None = None
+    gmail_address: str = "me"
     public_url: str = "http://localhost:8787"
     shell_allowlist: str = "python3,pytest,ruff,git,ls,find,cat,wc"
     worker_poll_seconds: float = 1.0

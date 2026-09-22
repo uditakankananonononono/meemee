@@ -75,3 +75,48 @@ class SignedWebhookConnector:
         required=("id","kind","title","content","occurred_at")
         if any(not payload.get(key) for key in required):raise ValueError("webhook event requires id, kind, title, content and occurred_at")
         return ContextRecord(owner_id,source_id,str(payload["id"]),payload["kind"],str(payload["title"]),str(payload["content"]),str(payload["occurred_at"]),{"connector":"signed_webhook","received":True},payload.get("visibility","private"),payload.get("cursor"),payload.get("metadata",{}))
+
+@dataclass
+class GmailConnector:
+    """Read Gmail messages through the OAuth bearer supplied by the owner."""
+    access_token: str
+    address: str = "me"
+    base_url: str = "https://gmail.googleapis.com/gmail/v1"
+    timeout: float = 15
+    name: str = "gmail"
+
+    @property
+    def connected(self) -> bool:
+        return bool(self.access_token)
+
+    def _get(self, path: str, params: dict | None = None) -> dict:
+        import httpx
+        if not self.connected:
+            raise RuntimeError("Gmail is not connected; complete OAuth with gmail.readonly permission")
+        response = httpx.get(f"{self.base_url}/users/{self.address}/{path}", params=params,
+                             headers={"Authorization": f"Bearer {self.access_token}"}, timeout=self.timeout)
+        response.raise_for_status()
+        return response.json()
+
+    def fetch(self, owner_id: str, source_id: str, cursor: str | None = None) -> list[ContextRecord]:
+        import base64
+        params = {"maxResults": 100, "q": "in:inbox"}
+        if cursor:
+            params["q"] += f" after:{cursor}"
+        listing = self._get("messages", params)
+        records = []
+        for item in listing.get("messages", []):
+            message = self._get(f"messages/{item['id']}", {"format": "full"})
+            headers = {row["name"].lower(): row["value"] for row in message.get("payload", {}).get("headers", [])}
+            data = message.get("payload", {}).get("body", {}).get("data", "")
+            if not data:
+                for part in message.get("payload", {}).get("parts", []):
+                    if part.get("mimeType") == "text/plain" and part.get("body", {}).get("data"):
+                        data = part["body"]["data"]
+                        break
+            body = base64.urlsafe_b64decode(data + "=" * (-len(data) % 4)).decode("utf-8", "replace") if data else message.get("snippet", "")
+            stamp = datetime.fromtimestamp(int(message.get("internalDate", "0")) / 1000, timezone.utc).isoformat()
+            records.append(ContextRecord(owner_id, source_id, item["id"], "document", headers.get("subject", "Email"), body, stamp,
+                                         {"connector": "gmail", "message_id": item["id"], "thread_id": message.get("threadId"), "from": headers.get("from")},
+                                         cursor=str(int(message.get("internalDate", "0")) // 1000), metadata={"to": headers.get("to")}))
+        return records

@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.114.0
+
+- Added an authenticated email bridge status endpoint and verified-address task-email endpoint using the existing Resend transactional delivery path, including a configured Reply-To address.
+- Added a Gmail read-only connector that normalizes inbox messages into the durable owner-scoped context ledger with message/thread provenance and cursor-based dedupe.
+- Gmail operation is not claimed until OAuth is connected and a live read succeeds; status returns the exact required scope and connection requirement.
+
 ## 0.113.0
 
 - Wired the unified context assembler into companion chat: each turn retrieves only that user's permitted cross-source records and includes content plus provenance in the system grounding.

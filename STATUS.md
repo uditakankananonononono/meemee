@@ -1,7 +1,7 @@
 # Meemee status
 
-**Current core version:** 0.113.0  
-**Ledger:** 149 verified, 0 thin  
+**Current core version:** 0.114.0  
+**Ledger:** 150 verified, 0 thin  
 **Supported production shape:** SQLite/WAL single-host; PostgreSQL memory and owner-scoped jobs are selectable but require target-environment live verification  
 **Last core verification:** 308 passed; 133 SDK passed (15 live skipped); PostgreSQL suite 8 passed, 2 live skipped; Ruff, package audit and explicit 0.112.0 release audit clean
 
@@ -55,3 +55,5 @@ Before calling a release ready:
 5. Open `/console/`, verify login, job creation, SSE progress, cancellation and audit verification.
 6. Create and verify a backup, then rehearse restore on a separate instance.
 7. Check README, STATUS and CHANGELOG version/counts in the same change.
+
+- Email bridge: outbound task delivery is implemented through verified Resend configuration. Gmail reply ingestion is implemented but blocked on OAuth connection and has no live-read evidence yet.

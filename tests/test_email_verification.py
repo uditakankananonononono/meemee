@@ -24,3 +24,11 @@ def test_resend_delivery_uses_provider_and_safe_link():
 
 def test_mailer_fails_closed_without_https_configuration():
     with pytest.raises(RuntimeError): ResendMailer(None,'x@y.com','http://localhost').send_verification('u@e.com','a','t')
+
+@respx.mock
+def test_resend_task_email_sets_reply_to_and_escapes_html():
+    route=respx.post('https://api.resend.com/emails').mock(return_value=httpx.Response(200,json={'id':'email_task'}))
+    mailer=ResendMailer('re_test','Meemee <onboarding@resend.dev>','https://meemee.example')
+    assert mailer.send_task('u@example.com','Question','Use <safe>\nReply here','reply@example.com')=='email_task'
+    payload=route.calls[0].request.content.decode()
+    assert 'reply@example.com' in payload and '&lt;safe&gt;' in payload
