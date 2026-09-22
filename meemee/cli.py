@@ -12,6 +12,7 @@ from .backup import BackupManager
 from .config import Settings
 from .migrations import CORE_MIGRATIONS, Migrator
 from .onboarding import initialize
+from .package_audit import audit_wheel
 from .preflight import run_preflight
 from .release_audit import audit_tree
 from .retention import RetentionManager
@@ -121,6 +122,17 @@ def retention_run() -> None:
         audit_days=settings.retention_audit_days,
     )
     typer.echo(json.dumps(report.__dict__, indent=2))
+
+
+@app.command("package-audit")
+def package_audit(wheel: Path, expected_version: str | None = None) -> None:
+    """Verify a built wheel contains the CLI, typed package and web console."""
+    from . import __version__
+
+    report = audit_wheel(wheel, expected_version or __version__)
+    typer.echo(json.dumps(report, indent=2))
+    if report["status"] != "pass":
+        raise typer.Exit(1)
 
 
 @app.command("release-audit")

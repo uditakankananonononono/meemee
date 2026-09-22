@@ -2,6 +2,13 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.39.0
+
+- Fixed source-versus-wheel drift by packaging the complete operator console and PEP 561 marker with the core distribution.
+- Added `meemee package-audit` for wheel metadata, CLI entry point and required-content verification.
+- Proved isolated wheel installation, installed CLI help/init execution and installed console asset import outside the repository checkout.
+- Core verification: 130 tests passed; Ruff, release audit, package audit and isolated install smoke clean.
+
 ## 0.38.0
 
 - Added deterministic `meemee release-audit` CI/release gating for required assets, version drift and explicit stub markers, with structured findings.
