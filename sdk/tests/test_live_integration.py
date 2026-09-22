@@ -1,6 +1,6 @@
 """Live integration tests: the SDK against a real Meemee server process.
 
-Boots the actual v0.101.0 server (the meemee package next to sdk/ in the repo
+Boots the actual v0.102.0 server (the meemee package next to sdk/ in the repo
 tree) on a throwaway port with a bootstrap token, then exercises the full
 contract. Skips cleanly when the server package or its dependencies are not
 installed - the mocked-transport suite above always runs.

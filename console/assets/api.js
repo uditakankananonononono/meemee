@@ -129,7 +129,7 @@ export const getMetrics = (opts) => request("/metrics", { ...opts, headers: { ac
 //     proves the scope was present; 401 means unauthenticated; 403 means the
 //     scope is missing.
 export async function probeScopes() {
-  const result = { authenticated: false, admin: false, runsWrite: null, jobsRead: false, jobsWrite: false };
+  const result = { authenticated: false, admin: false, runsWrite: null, jobsRead: false, jobsWrite: false, companionRead: false, companionWrite: false };
   const apply = (key, promise, extra) =>
     promise.then(() => { result[key] = true; result.authenticated = true; })
       .catch((error) => {
@@ -148,6 +148,8 @@ export async function probeScopes() {
     apply("jobsRead", getJob("00000000000000000000000000000000")),
     apply("jobsWrite", cancelJob("00000000000000000000000000000000")),
     apply("runsWrite", createRun("", false)),
+    apply("companionRead", getCompanionUser("__probe__")),
+    apply("companionWrite", updateCompanionPersona("__probe__", {})),
   ]);
   return result;
 }
@@ -175,3 +177,47 @@ export const setPrincipalQuota = (principal, dailyJobs, opts) =>
   request(`/v1/quota/${encodeURIComponent(principal)}`, { method: "PUT", body: { daily_jobs: dailyJobs }, ...opts });
 export const assignPrincipalPlan = (principal, plan, opts) =>
   request(`/v1/entitlements/${encodeURIComponent(principal)}`, { method: "PUT", body: { plan }, ...opts });
+
+// --- Companion layer (scopes: companion:read / companion:write) --------------
+export const listCompanionUsers = (limit = 100, opts) =>
+  request(`/v1/companion/users?limit=${limit}`, opts);
+export const getCompanionUser = (userId, opts) =>
+  request(`/v1/companion/users/${encodeURIComponent(userId)}`, opts);
+export const upsertCompanionUser = (userId, body, opts) =>
+  request(`/v1/companion/users/${encodeURIComponent(userId)}`, { method: "PUT", body, ...opts });
+export const updateCompanionPersona = (userId, persona, opts) =>
+  request(`/v1/companion/users/${encodeURIComponent(userId)}/persona`, { method: "PUT", body: { persona }, ...opts });
+export const updateCompanionCheckins = (userId, checkins, opts) =>
+  request(`/v1/companion/users/${encodeURIComponent(userId)}/checkins`, { method: "PUT", body: { checkins }, ...opts });
+export const listCompanionFacts = (userId, query = null, opts) => {
+  const params = new URLSearchParams();
+  if (query) params.set("query", query);
+  const suffix = params.toString() ? `?${params}` : "";
+  return request(`/v1/companion/users/${encodeURIComponent(userId)}/facts${suffix}`, opts);
+};
+export const addCompanionFact = (userId, category, text, opts) =>
+  request(`/v1/companion/users/${encodeURIComponent(userId)}/facts`, {
+    method: "POST", body: { category, text, confidence: 1.0 }, ...opts,
+  });
+export const retireCompanionFact = (userId, factId, opts) =>
+  request(`/v1/companion/users/${encodeURIComponent(userId)}/facts/${encodeURIComponent(factId)}`, { method: "DELETE", ...opts });
+export const companionChat = (userId, text, conversationId = null, opts) =>
+  request("/v1/companion/chat", {
+    method: "POST",
+    body: conversationId
+      ? { user_id: userId, text, channel: "local", conversation_id: conversationId }
+      : { user_id: userId, text, channel: "local" },
+    ...opts,
+  });
+export const listCompanionConversations = (userId, opts) =>
+  request(`/v1/companion/users/${encodeURIComponent(userId)}/conversations`, opts);
+export const getCompanionMessages = (conversationId, limit = 100, opts) =>
+  request(`/v1/companion/conversations/${encodeURIComponent(conversationId)}/messages?limit=${limit}`, opts);
+export const planCompanionCheckin = (userId, opts) =>
+  request(`/v1/companion/users/${encodeURIComponent(userId)}/checkins/plan`, { method: "POST", ...opts });
+export const listCompanionCheckins = (userId, status = null, opts) => {
+  const params = new URLSearchParams();
+  if (status) params.set("status", status);
+  const suffix = params.toString() ? `?${params}` : "";
+  return request(`/v1/companion/users/${encodeURIComponent(userId)}/checkins${suffix}`, opts);
+};

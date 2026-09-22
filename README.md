@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.101.0 (135)
+## Verified in v0.102.0 (136)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -139,6 +139,7 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 133. The companion HTTP API (profiles, persona, facts, chat, conversations, check-in planning and an admin delivery tick) and the `meemee companion` CLI (user/persona/fact management, interactive chat, check-in worker) enforce dedicated companion:read and companion:write scopes with audit events.
 134. The typed SDK companion resource covers users, persona and check-in updates, fact CRUD and search, chat turns, conversations and message history, check-in planning and the admin delivery tick, with the new scopes included in client-side scope validation.
 135. Live booted-server integration tests exercise the companion API end to end through the SDK: profiles and persona, fact CRUD and search, chat turns with durable fact extraction and history, check-in planning, the admin tick and scope enforcement, against a stubbed external model endpoint.
+136. The operator console ships a companion view: user creation and selection, full persona editing, durable fact search/add/retire with provenance, a working local-channel chat box with history, and check-in settings with on-demand planning and recent-delivery status; companion scopes are mintable in the tokens view and probed in the session chip.
 
 ## Thin (0)
 
@@ -146,7 +147,7 @@ Nothing is classified as thin. A capability is either implemented and tested at 
 
 ## Missing, not claimed
 
-Live WhatsApp and iMessage delivery over real provider networks is unverified: the adapters and durable delivery queue are implemented and config-gated, but no provider account exists yet, and the console has no companion screens yet (HTTP API and CLI only). Live PostgreSQL integration is not verified in this environment; target deployments must run the unskipped PostgreSQL suite and preflight. Identity creation/deletion and password policy remain at the configured IdP, while Meemee plan, quota and permission administration is implemented. Browser challenges are detected and handed off, but an interactive live human-control channel is not built in. Async tools can be cancelled; blocking third-party native code that does not yield cannot be forcibly interrupted safely. Multi-region failover, online dual-write migration and logical replication remain deployment/infrastructure work and are not claimed.
+Live WhatsApp and iMessage delivery over real provider networks is unverified: the adapters and durable delivery queue are implemented and config-gated, but no provider account exists yet. Live PostgreSQL integration is not verified in this environment; target deployments must run the unskipped PostgreSQL suite and preflight. Identity creation/deletion and password policy remain at the configured IdP, while Meemee plan, quota and permission administration is implemented. Browser challenges are detected and handed off, but an interactive live human-control channel is not built in. Async tools can be cancelled; blocking third-party native code that does not yield cannot be forcibly interrupted safely. Multi-region failover, online dual-write migration and logical replication remain deployment/infrastructure work and are not claimed.
 
 The SQLite single-host shape and PostgreSQL memory, owner-scoped jobs and shared rate limiting are stated at their tested boundaries. SSE and authenticated WebSocket job streams are implemented. No missing item is represented as shipped.
 

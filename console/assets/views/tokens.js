@@ -8,6 +8,8 @@ const KNOWN_SCOPES = [
   { value: "runs:write", note: "create synchronous agent runs" },
   { value: "jobs:read", note: "read job status, events and SSE streams" },
   { value: "jobs:write", note: "create and cancel queued jobs" },
+  { value: "companion:read", note: "read companion users, facts, conversations and check-ins" },
+  { value: "companion:write", note: "manage companion users, persona, facts, chat and check-ins" },
 ];
 
 export async function renderTokens(root) {
@@ -96,7 +98,7 @@ export async function renderTokens(root) {
   root.append(
     h("section", { class: "card" },
       h("h2", null, "Create API token"),
-      h("p", { class: "muted" }, "Requires the admin scope. Allowed scopes: admin, runs:write, jobs:read, jobs:write."),
+      h("p", { class: "muted" }, "Requires the admin scope. Allowed scopes: admin, runs:write, jobs:read, jobs:write, companion:read, companion:write."),
       h("label", { class: "field-label" }, "Name"), name,
       h("label", { class: "field-label" }, "Scopes"), ...scopeBoxes.map(({ node }) => node),
       h("label", { class: "field-label" }, "Expires at (optional, local time)"), expiry,

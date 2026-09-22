@@ -9,6 +9,7 @@ import { renderTokens } from "./views/tokens.js";
 import { renderAudit } from "./views/audit.js";
 import { renderPermissions } from "./views/permissions.js";
 import { renderAccounts } from "./views/accounts.js";
+import { renderCompanion } from "./views/companion.js";
 
 const VIEWS = {
   status: { title: "Status", render: renderStatus },
@@ -18,6 +19,7 @@ const VIEWS = {
   audit: { title: "Audit chain", render: renderAudit },
   permissions: { title: "Permissions", render: renderPermissions },
   accounts: { title: "Accounts", render: renderAccounts },
+  companion: { title: "Companion", render: renderCompanion },
 };
 
 const ctx = {
@@ -70,6 +72,8 @@ function renderSessionChip() {
     if (caps.runsWrite) scopes.push("runs:write");
     if (caps.jobsRead) scopes.push("jobs:read");
     if (caps.jobsWrite) scopes.push("jobs:write");
+    if (caps.companionRead) scopes.push("companion:read");
+    if (caps.companionWrite) scopes.push("companion:write");
     chip.append(badge(scopes.length ? scopes.join(" · ") : "authenticated (no known scopes)", caps.admin ? "ok" : "info"));
   }
   if (token) chip.append(badge("bearer token set", "info"));

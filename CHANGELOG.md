@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.102.0
+
+- Added the operator console companion view: user creation and selection, persona editing, durable fact search/add/retire with provenance, a working local-channel chat box with history, and check-in settings with on-demand planning and recent-delivery status.
+- Companion scopes are mintable in the console tokens view and probed in the session capability chip.
+- Verification: 289 core and 148 SDK tests plus 3 PostgreSQL contract tests passed; Ruff, deprecation-free core/SDK wheel builds, package audit and explicit 0.102.0 release audit clean. Live PostgreSQL and live WhatsApp/iMessage provider delivery remain unrun here.
+
 ## 0.101.0
 
 - Added live booted-server SDK integration coverage for the full companion API: profiles, persona, facts, chat turns with durable fact extraction and history, check-in planning, the admin delivery tick and scope enforcement. The server under test is real end to end; only the external model endpoint is stubbed locally.
