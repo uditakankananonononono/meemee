@@ -47,11 +47,14 @@ class WebhookStore:
                 id TEXT PRIMARY KEY, subscription_id TEXT NOT NULL, event_id TEXT NOT NULL,
                 event_type TEXT NOT NULL, payload TEXT NOT NULL, status TEXT NOT NULL,
                 attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at REAL NOT NULL,
-                response_status INTEGER, last_error TEXT, created_at TEXT NOT NULL,
+                response_status INTEGER, last_error TEXT, sending_started_at REAL, created_at TEXT NOT NULL,
                 UNIQUE(subscription_id,event_id)
             );
             CREATE INDEX IF NOT EXISTS webhook_due ON webhook_deliveries(status,next_attempt_at);
         """)
+        columns = {row[1] for row in self.db.execute("PRAGMA table_info(webhook_deliveries)")}
+        if "sending_started_at" not in columns:
+            self.db.execute("ALTER TABLE webhook_deliveries ADD COLUMN sending_started_at REAL")
 
     def subscribe(self, principal: str, url: str, events: set[str]) -> tuple[str, str]:
         validate_webhook_url(url)
@@ -96,13 +99,13 @@ class WebhookStore:
                 ORDER BY d.next_attempt_at,d.id LIMIT 1""", (current,)).fetchone()
             if row is None:
                 self.db.execute("COMMIT"); return None
-            self.db.execute("UPDATE webhook_deliveries SET status='sending',attempts=attempts+1 WHERE id=?", (row["id"],))
+            self.db.execute("UPDATE webhook_deliveries SET status='sending',attempts=attempts+1,sending_started_at=? WHERE id=?", (current, row["id"]))
             self.db.execute("COMMIT")
         return dict(row)
 
     def succeed(self, ident: str, status: int) -> None:
         with self.lock, self.db:
-            self.db.execute("UPDATE webhook_deliveries SET status='delivered',response_status=?,last_error=NULL WHERE id=? AND status='sending'", (status, ident))
+            self.db.execute("UPDATE webhook_deliveries SET status='delivered',response_status=?,last_error=NULL,sending_started_at=NULL WHERE id=? AND status='sending'", (status, ident))
 
     def retry(self, ident: str, error: str, max_attempts: int = 8) -> None:
         with self.lock, self.db:
@@ -110,7 +113,24 @@ class WebhookStore:
             if row is None: return
             terminal = row["attempts"] >= max_attempts
             delay = min(2 ** max(row["attempts"] - 1, 0), 3600)
-            self.db.execute("UPDATE webhook_deliveries SET status=?,next_attempt_at=?,last_error=? WHERE id=?", ("failed" if terminal else "queued", time.time()+delay, error[:1000], ident))
+            self.db.execute("UPDATE webhook_deliveries SET status=?,next_attempt_at=?,last_error=?,sending_started_at=NULL WHERE id=?", ("failed" if terminal else "queued", time.time()+delay, error[:1000], ident))
+
+
+    def recover_stale(self, stale_before: float) -> int:
+        with self.lock, self.db:
+            return self.db.execute(
+                "UPDATE webhook_deliveries SET status='queued',next_attempt_at=?,last_error='dispatcher lease expired',sending_started_at=NULL WHERE status='sending' AND sending_started_at<?",
+                (time.time(), stale_before),
+            ).rowcount
+
+    def rotate_secret(self, ident: str, principal: str) -> str | None:
+        secret = secrets.token_urlsafe(32)
+        with self.lock, self.db:
+            changed = self.db.execute(
+                "UPDATE webhook_subscriptions SET secret=? WHERE id=? AND principal=? AND active=1",
+                (secret, ident, principal),
+            ).rowcount
+        return secret if changed else None
 
 
 class WebhookDispatcher:
@@ -147,9 +167,14 @@ class WebhookDispatcher:
 async def dispatch_forever(store: WebhookStore, poll_seconds: float = 1.0) -> None:
     """Deliver queued webhooks continuously. Safe to run in multiple processes."""
     dispatcher = WebhookDispatcher(store)
+    store.recover_stale(time.time() - 300)
+    deliveries = 0
     try:
         while True:
             delivered = await dispatcher.deliver_one()
+            deliveries += int(delivered)
+            if deliveries and deliveries % 1000 == 0:
+                store.recover_stale(time.time() - 300)
             if not delivered:
                 import asyncio
 

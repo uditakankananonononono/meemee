@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
 import logging
+import time
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
@@ -391,3 +393,25 @@ def replay_webhook_delivery(request: Request, delivery_id: str):
         raise HTTPException(409, "delivery is not a replayable failed delivery")
     audit.append(principal.id, "webhook.delivery.replay", delivery_id, "success")
     return {"id": delivery_id, "status": "queued"}
+
+
+@app.post("/v1/webhooks/{webhook_id}/rotate-secret")
+def rotate_webhook_secret(webhook_id: str, principal=jobs_write_dependency):
+    secret = webhooks.rotate_secret(webhook_id, principal.id)
+    if secret is None:
+        raise HTTPException(404, "active webhook not found")
+    audit.append(principal.id, "webhook.secret.rotate", webhook_id, "success")
+    return {"id": webhook_id, "secret": secret, "warning": "shown once; store it securely"}
+
+
+@app.post("/v1/webhooks/{webhook_id}/test")
+def test_webhook(webhook_id: str, principal=jobs_write_dependency):
+    owned = webhooks.db.execute("SELECT 1 FROM webhook_subscriptions WHERE id=? AND principal=? AND active=1", (webhook_id, principal.id)).fetchone()
+    if owned is None:
+        raise HTTPException(404, "active webhook not found")
+    event_id = f"test:{uuid.uuid4().hex}"
+    payload = json.dumps({"webhook_id": webhook_id, "test": True}, sort_keys=True, separators=(",", ":"))
+    with webhooks.lock, webhooks.db:
+        webhooks.db.execute("INSERT INTO webhook_deliveries(id,subscription_id,event_id,event_type,payload,status,next_attempt_at,created_at) VALUES(?,?,?,?,?,'queued',?,?)", (uuid.uuid4().hex, webhook_id, event_id, "webhook.test", payload, time.time(), datetime.now(timezone.utc).isoformat()))
+    audit.append(principal.id, "webhook.test", webhook_id, "success", {"event_id": event_id})
+    return {"event_id": event_id, "queued": True}

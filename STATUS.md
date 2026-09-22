@@ -1,9 +1,9 @@
 # Meemee status
 
-**Current core version:** 0.29.0  
-**Ledger:** 51 verified, 0 thin  
+**Current core version:** 0.30.0  
+**Ledger:** 52 verified, 0 thin  
 **Supported production shape:** one host, one or more API/worker processes, SQLite/WAL on local persistent storage  
-**Last core verification:** 104 passed, Ruff clean, Ruff clean
+**Last core verification:** 106 passed, Ruff clean, Ruff clean
 
 ## What is production-usable now
 

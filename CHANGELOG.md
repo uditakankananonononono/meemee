@@ -2,6 +2,11 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.30.0
+
+- Added stale dispatcher-lease recovery, webhook secret rotation and test delivery.
+- Core verification: 106 tests passed; Ruff clean.
+
 ## 0.29.0
 
 - Added delivery list/status and failed-replay APIs with owner isolation and audit.
