@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.64.0
+
+- Added cooperative mid-tool cancellation for asynchronous tools with prompt task cancellation and cleanup propagation.
+- Cancelled tool results are durably recorded and the agent exits before another model step.
+- Verification: 187 core tests passed; Ruff and explicit 0.64.0 release audit clean. SDK remains 110 passed from v0.55.0; no SDK surface changed.
+
 ## 0.63.0
 
 - Added authenticated owner-scoped WebSocket job-event streaming with durable cursor replay and terminal closure.

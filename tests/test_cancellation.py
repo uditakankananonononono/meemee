@@ -44,3 +44,31 @@ def test_repeated_cancel_is_idempotent_state(tmp_path: Path):
     assert jobs.request_cancel(ident) == "cancelled"
     assert jobs.request_cancel(ident) == "cancelled"
     assert [e["kind"] for e in jobs.events(ident)].count("cancelled") == 1
+
+@pytest.mark.asyncio
+async def test_cancellation_interrupts_running_async_tool(tmp_path: Path):
+    import asyncio
+
+    from pydantic import BaseModel
+
+    from meemee.tools.base import Tool
+    from meemee.types import ToolCall
+    class Args(BaseModel): pass
+    class Slow(Tool):
+        name="slow"; description="slow"; arguments_model=Args
+        def __init__(self): self.cleaned=False
+        async def run(self,arguments):
+            try: await asyncio.sleep(10)
+            finally: self.cleaned=True
+    class Calls:
+        def __init__(self): self.calls=0
+        async def decide(self,messages):
+            self.calls+=1
+            return AgentDecision(tool_call=ToolCall(name="slow")) if self.calls==1 else AgentDecision(final="done")
+    registry=ToolRegistry(); slow=Slow(); registry.register(slow)
+    cancel=Event()
+    async def trigger(): await asyncio.sleep(.1); cancel.set()
+    task=asyncio.create_task(Agent(Calls(),registry,MemoryStore(tmp_path/"m.db")).run("work",cancel=cancel))
+    await trigger(); report=await task
+    assert slow.cleaned and report.tool_results[0]["result"]["error"]=="tool cancelled"
+    assert report.final.startswith("Cancelled")

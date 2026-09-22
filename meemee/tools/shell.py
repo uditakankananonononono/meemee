@@ -41,6 +41,10 @@ class ShellCommand(Tool):
         )
         try:
             stdout, stderr = await asyncio.wait_for(process.communicate(), arguments.timeout_seconds)
+        except asyncio.CancelledError:
+            process.kill()
+            await process.wait()
+            raise
         except TimeoutError:
             process.kill()
             await process.wait()

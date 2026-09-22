@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import inspect
 import time
 from abc import ABC, abstractmethod
@@ -46,13 +47,25 @@ class ToolRegistry:
     def schemas(self) -> list[dict[str, Any]]:
         return [tool.schema() for tool in self._tools.values()]
 
-    async def execute(self, name: str, arguments: dict[str, Any]) -> ToolResult:
+    async def execute(self, name: str, arguments: dict[str, Any], cancel=None) -> ToolResult:
         started = time.perf_counter()
         try:
             tool = self.get(name)
             parsed = tool.arguments_model.model_validate(arguments)
             value = tool.run(parsed)
-            content = await value if inspect.isawaitable(value) else value
+            if inspect.isawaitable(value):
+                task = asyncio.create_task(value)
+                if cancel is not None:
+                    while not task.done():
+                        if cancel.is_set():
+                            task.cancel()
+                            try: await task
+                            except asyncio.CancelledError: pass
+                            return ToolResult(ok=False, error="tool cancelled", elapsed_ms=round((time.perf_counter()-started)*1000))
+                        await asyncio.sleep(0.05)
+                content = await task
+            else:
+                content = value
             return ToolResult(
                 ok=True,
                 content=content,

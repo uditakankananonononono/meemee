@@ -85,7 +85,7 @@ class Agent:
                 elif policy.require_approval and (approve is None or not approve(call.name, call.arguments, tool.risk)):
                     result = {"ok": False, "error": f"approval denied for {tool.risk.value} tool"}
                 else:
-                    result = (await self.tools.execute(call.name, call.arguments)).model_dump()
+                    result = (await self.tools.execute(call.name, call.arguments, cancel=cancel)).model_dump()
             event = {"tool": call.name, "arguments": redact(call.arguments), "result": redact(result)}
             events.append(event)
             self.memory.add(run_id, "tool", json.dumps(event, default=str))
