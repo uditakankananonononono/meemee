@@ -1,4 +1,4 @@
-"""MeemeeClient: typed, retry-aware access to the Meemee API (server v0.41.0).
+"""MeemeeClient: typed, retry-aware access to the current Meemee API.
 
 Endpoint contract implemented here:
 - GET  /health, GET /ready                          (unauthenticated, rate-limit exempt)
@@ -684,15 +684,22 @@ class ApprovalsResource:
         self._client = client
 
     def list(self, principal_id: str) -> list[Approval]:
-        payload = self._client._request_json("GET", f"/v1/approvals/{principal_id}")
+        principal = httpx.URL("https://local").copy_with(path=f"/{principal_id}").raw_path.decode().lstrip("/")
+        payload = self._client._request_json("GET", f"/v1/approvals/{principal}")
         return [Approval.model_validate(item) for item in payload["approvals"]]
 
-    def grant(self, principal_id: str, tool: str, expires_at: datetime | str | None = None) -> dict:
-        body = {"tool": tool, "expires_at": _iso_or_none(expires_at, "expires_at")}
-        return self._client._request_json("PUT", f"/v1/approvals/{principal_id}", json_body=body)
+    def grant(self, principal_id: str, tool: str, expires_at: datetime | str | None = None, *, argument_constraints: dict[str, Any] | None = None) -> dict:
+        if argument_constraints is not None and not isinstance(argument_constraints, dict):
+            raise TypeError("argument_constraints must be a dict or None")
+        body = {"tool": tool, "expires_at": _iso_or_none(expires_at, "expires_at"), "argument_constraints": argument_constraints}
+        principal = httpx.URL("https://local").copy_with(path=f"/{principal_id}").raw_path.decode().lstrip("/")
+        return self._client._request_json("PUT", f"/v1/approvals/{principal}", json_body=body)
 
     def revoke(self, principal_id: str, tool: str) -> dict:
-        return self._client._request_json("DELETE", f"/v1/approvals/{principal_id}/{tool}")
+        root = httpx.URL("https://local")
+        principal = root.copy_with(path=f"/{principal_id}").raw_path.decode().lstrip("/")
+        encoded_tool = root.copy_with(path=f"/{tool}").raw_path.decode().lstrip("/")
+        return self._client._request_json("DELETE", f"/v1/approvals/{principal}/{encoded_tool}")
 
 
 class WebhooksResource:

@@ -1,4 +1,4 @@
-"""Typed models for the Meemee API (server v0.41.0 contract)."""
+"""Typed models for the current Meemee API contract."""
 from __future__ import annotations
 
 import json
@@ -192,8 +192,10 @@ class Approval(BaseModel):
     principal: str
     tool: str
     granted_by: str
+    granted_at: datetime
     expires_at: datetime | None = None
-    created_at: datetime
+    revoked_at: datetime | None = None
+    argument_constraints: dict[str, Any] | None = None
 
 
 class WebhookSubscription(BaseModel):

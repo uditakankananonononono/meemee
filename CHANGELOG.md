@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.66.0
+
+- Added Python SDK parity for argument-scoped approval administration and corrected the approval response model to current server fields.
+- Principal/tool paths are safely encoded; constraints are validated before requests.
+- Verification: 190 core and 112 SDK tests passed; Ruff and explicit 0.66.0 release audit clean.
+
 ## 0.65.0
 
 - Added fail-closed SQLite/PostgreSQL persistence composition selection with automatic PostgreSQL migrations and optional dependency packaging.

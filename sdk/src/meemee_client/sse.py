@@ -51,8 +51,7 @@ class SSEParser:
             raw = self._buffer[:newline]
             self._buffer = self._buffer[newline + 1:]
             line = raw.decode("utf-8", errors="replace")
-            if line.endswith("\r"):
-                line = line[:-1]
+            line = line.removesuffix("\r")
             message = self._process_line(line)
             if message is not None:
                 messages.append(message)
