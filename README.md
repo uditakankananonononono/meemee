@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.85.0 (109)
+## Verified in v0.86.0 (110)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -113,6 +113,7 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 107. Console and operator documentation synchronized to the current API, stream, account-administration and deployment image surfaces, guarded against legacy v0.46 claims.
 108. Verified backup restore rehearsal CLI with source integrity checks, empty-destination enforcement, SQLite online restore, post-restore integrity/checksum validation and partial-failure cleanup.
 109. Operator console job inventory uses the implemented owner-scoped server listing, with regression protection against the obsolete browser-only/no-list-endpoint claim.
+110. Standards-compliant proprietary package metadata and license-file inclusion in both core and SDK wheels, guarded by real build regressions without setuptools deprecation warnings.
 
 ## Thin (0)
 

@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.86.0
+
+- Modernized core and SDK proprietary license metadata to the current packaging standard.
+- Both real wheel regressions now require bundled license files and reject the deprecated metadata warning.
+- Verification: 216 core and 112 SDK tests plus 3 PostgreSQL contract tests passed; Ruff, deprecation-free core/SDK wheel builds, package audit and explicit 0.86.0 release audit clean. Live PostgreSQL remains unrun here.
+
 ## 0.85.0
 
 - Fixed the operator console job inventory copy to match the implemented owner-scoped server listing.
