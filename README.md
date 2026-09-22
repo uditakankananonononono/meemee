@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.76.0 (78)
+## Verified in v0.77.0 (78)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -94,7 +94,7 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 88. Cooperative mid-tool cancellation for asynchronous tools with prompt task cancellation, cleanup propagation, a recorded cancelled tool result and immediate agent termination before another model step.
 89. Fail-closed persistence composition selector with explicit SQLite/PostgreSQL configuration, automatic PostgreSQL migrations, optional dependency packaging and runtime agent-memory selection; queued-job/API parity remains an explicit boundary.
 90. Python SDK parity for argument-scoped approval administration, including corrected current response models, validated constraint maps, expiry support and safely encoded principal/tool paths.
-91. Core/SDK version parity at 0.76.0 with stale server-contract labels removed across package metadata, imports, README and live-integration documentation.
+91. Core/SDK version parity at 0.77.0 with stale server-contract labels removed across package metadata, imports, README and live-integration documentation.
 92. Checksummed SQLite-to-PostgreSQL core-data export and transactional empty-target import CLIs covering memory, jobs/events, tokens and audit, with tamper detection, byte preservation and fail-closed collision checks.
 93. API/worker composition selection for PostgreSQL memory and owner-scoped queued jobs, with automatic ownership migration, owner reads/lists/events and leased worker execution.
 94. PostgreSQL job-list opaque keyset cursor parity with malformed-cursor rejection, stable updated-at/UUID ordering and compatible next-cursor envelopes.
@@ -104,6 +104,7 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 98. PostgreSQL agent-memory contract parity for secret-scrubbed writes and hybrid/semantic retrieval calls, using ranked native full-text fallback until an optional vector extension is configured.
 99. Fail-closed readiness disk probing that handles not-yet-created data directories and disk-stat failures without crashing the health endpoint.
 100. Cancellation propagation through delegated agent teams, preventing new child work after cancellation and passing the shared signal into active child agents and async tools.
+101. PostgreSQL runtime package and bundled SQL migrations included in the commercial wheel, enforced by package audit and a real wheel-build regression test.
 
 ## Thin (0)
 

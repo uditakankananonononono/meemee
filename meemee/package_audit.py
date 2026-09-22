@@ -13,6 +13,9 @@ REQUIRED_WHEEL_PATHS = (
     "meemee/api.py",
     "meemee/cli.py",
     "meemee/py.typed",
+    "meemee_persist_pg/__init__.py",
+    "meemee_persist_pg/sql/001_initial.sql",
+    "meemee_persist_pg/sql/002_job_ownership.sql",
 )
 
 
