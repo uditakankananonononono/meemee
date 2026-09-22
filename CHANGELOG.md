@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.60.0
+
+- Added per-run browser domain allowlists and workspace-confined managed download capture.
+- Added explicit CAPTCHA/security-challenge detection and human-required handoff signaling without bypass attempts.
+- Verification: 181 core tests passed; Ruff and explicit 0.60.0 release audit clean. SDK remains 110 passed from v0.55.0; no SDK surface changed.
+
 ## 0.59.0
 
 - Added approval-gated GitHub branch push and pull-request tools using authenticated API mutations.

@@ -20,3 +20,22 @@ def test_screenshot_escape(tmp_path):
     from meemee.tools.browser import BrowserNavigate
     with pytest.raises(ValueError, match="escapes"):
         BrowserNavigate(tmp_path).safe_screenshot("../shot.png")
+
+
+def test_browser_domain_policy_blocks_unlisted_public_host(monkeypatch, tmp_path):
+    import pytest
+
+    from meemee.tools.browser import BrowseArgs, BrowserNavigate
+    monkeypatch.setattr("socket.getaddrinfo", lambda *a: [(None,None,None,None,("8.8.8.8",443))])
+    with pytest.raises(ValueError,match="domain policy"):
+        import asyncio
+        asyncio.run(BrowserNavigate(tmp_path).run(BrowseArgs(url="https://example.com",allowed_domains=["allowed.example"])))
+
+
+def test_browser_download_and_screenshot_paths_cannot_escape(tmp_path):
+    import pytest
+
+    from meemee.tools.browser import BrowserNavigate
+    browser=BrowserNavigate(tmp_path)
+    with pytest.raises(ValueError,match="escapes workspace"): browser.safe_screenshot("../secret")
+    assert browser.safe_screenshot("downloads") == tmp_path/"downloads"

@@ -25,6 +25,8 @@ class BrowseArgs(BaseModel):
     wait_ms: int = Field(default=500, ge=0, le=10_000)
     screenshot_path: str | None = None
     profile: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_.-]{1,64}$")
+    allowed_domains: list[str] = Field(default_factory=list, max_length=100)
+    download_dir: str | None = None
 
 
 def validate_public_url(url: str) -> str:
@@ -58,6 +60,9 @@ class BrowserNavigate(Tool):
 
     async def run(self, arguments: BrowseArgs) -> dict[str, object]:
         url = validate_public_url(arguments.url)
+        hostname = (urlparse(url).hostname or "").lower()
+        if arguments.allowed_domains and not any(hostname == domain.lower() or hostname.endswith("." + domain.lower()) for domain in arguments.allowed_domains):
+            raise ValueError("browser URL is outside the per-run domain policy")
         try:
             from playwright.async_api import async_playwright
         except ImportError as exc:
@@ -76,6 +81,16 @@ class BrowserNavigate(Tool):
                 context = await browser.new_context()
                 page = await context.new_page()
                 close = browser.close
+            downloads: list[dict[str, object]] = []
+            download_root = self.safe_screenshot(arguments.download_dir) if arguments.download_dir else None
+            if download_root: download_root.mkdir(parents=True, exist_ok=True)
+            async def save_download(download):
+                if not download_root: return
+                suggested = Path(download.suggested_filename).name
+                target = download_root / suggested
+                await download.save_as(target)
+                downloads.append({"filename":suggested,"path":str(target.relative_to(self.workspace))})
+            page.on("download", save_download)
             response = await page.goto(url, wait_until="domcontentloaded", timeout=30_000)
             for index, action in enumerate(arguments.actions):
                 if action.kind == "wait":
@@ -99,6 +114,9 @@ class BrowserNavigate(Tool):
                 target.parent.mkdir(parents=True, exist_ok=True)
                 await page.screenshot(path=str(target), full_page=True)
                 screenshot = str(target.relative_to(self.workspace))
-            result = {"url": page.url, "title": await page.title(), "text": (await page.locator("body").inner_text())[:200_000], "status": response.status if response else None, "screenshot": screenshot, "actions": events}
+            text = (await page.locator("body").inner_text())[:200_000]
+            lowered = text.lower()
+            challenge = any(marker in lowered for marker in ("verify you are human", "captcha", "security challenge", "checking your browser"))
+            result = {"url": page.url, "title": await page.title(), "text": text, "status": response.status if response else None, "screenshot": screenshot, "actions": events, "downloads": downloads, "challenge": {"detected":challenge,"requires_human":challenge}}
             await close()
             return result

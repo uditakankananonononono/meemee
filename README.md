@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.59.0 (78)
+## Verified in v0.60.0 (78)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -87,6 +87,7 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 81. Signed-checkpoint-gated audit prefix pruning that refuses invalid or stale checkpoints, retains a cryptographic chain base, verifies the surviving suffix and keeps historical anchors verifiable.
 82. Local deterministic semantic memory embeddings with durable vectors, cosine reranking and reciprocal-rank fusion with FTS, automatically used for agent context without a network dependency.
 83. Approval-gated GitHub branch push and pull-request tools with token-required API mutations, exact commit targeting, optimistic remote-head protection, structured errors and canonical result URLs.
+84. Browser per-run domain policy, workspace-confined managed downloads, and explicit CAPTCHA/security-challenge detection that returns a human-required handoff signal without attempting bypass.
 
 ## Thin (0)
 
@@ -94,7 +95,7 @@ Nothing is classified as thin. A capability is either implemented and tested at 
 
 ## Missing, not claimed
 
-core runtime selection for the additive PostgreSQL stores and an automated SQLite-to-PostgreSQL data-copy CLI; end-user account administration UI (interactive OIDC login/session/logout, bearer auth and scoped API tokens are implemented); browser human takeover, managed downloads, challenge handoff and per-site policy; a permissions UI; cross-host/cross-pod rate limiting (single-host multi-process limiting is implemented); WebSocket streaming (resume-safe SSE is implemented); forced mid-tool cancellation (cooperative between-step cancellation is implemented); and a core-wired shared database/queue suitable for Kubernetes replicas (the additive PostgreSQL package exists, but the runtime still uses SQLite).
+core runtime selection for the additive PostgreSQL stores and an automated SQLite-to-PostgreSQL data-copy CLI; end-user account administration UI (interactive OIDC login/session/logout, bearer auth and scoped API tokens are implemented); interactive browser human takeover beyond explicit challenge detection/handoff; a permissions UI; cross-host/cross-pod rate limiting (single-host multi-process limiting is implemented); WebSocket streaming (resume-safe SSE is implemented); forced mid-tool cancellation (cooperative between-step cancellation is implemented); and a core-wired shared database/queue suitable for Kubernetes replicas (the additive PostgreSQL package exists, but the runtime still uses SQLite).
 
 The existing deterministic goal decomposition, lexical FTS, scoped/revocable API token system, browser automation, single-host shared limiter, SQLite queue, and cursor event API and SSE stream remain useful internal or single-node features, but they are not presented as completed versions of the advanced capabilities above.
 
