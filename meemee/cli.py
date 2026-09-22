@@ -11,6 +11,7 @@ import uvicorn
 from .backup import BackupManager
 from .config import Settings
 from .migrations import CORE_MIGRATIONS, Migrator
+from .onboarding import initialize
 from .preflight import run_preflight
 from .retention import RetentionManager
 from .runtime import build_agent
@@ -21,6 +22,10 @@ from .webhooks import WebhookStore, dispatch_forever
 from .worker import work_forever
 
 app = typer.Typer(no_args_is_help=True, help="Meemee local-first agent runtime")
+DEFAULT_DATA_DIR = Path.home() / ".meemee"
+DEFAULT_ENV_FILE = Path(".env")
+DATA_DIR_OPTION = typer.Option(DEFAULT_DATA_DIR, "--data-dir")
+ENV_FILE_OPTION = typer.Option(DEFAULT_ENV_FILE, "--env-file")
 
 
 @app.command()
@@ -114,6 +119,20 @@ def retention_run() -> None:
         audit_days=settings.retention_audit_days,
     )
     typer.echo(json.dumps(report.__dict__, indent=2))
+
+
+@app.command("init")
+def init(
+    instance_dir: Path = DATA_DIR_OPTION,
+    env_file: Path = ENV_FILE_OPTION,
+) -> None:
+    """Create a secure first-run instance and configuration without overwrites."""
+    try:
+        report = initialize(instance_dir, env_file)
+    except (FileExistsError, OSError, RuntimeError) as exc:
+        typer.echo(json.dumps({"status": "error", "error": str(exc)}))
+        raise typer.Exit(1) from exc
+    typer.echo(json.dumps(report, indent=2))
 
 
 @app.command("preflight")

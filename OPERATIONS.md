@@ -13,6 +13,16 @@ Mount `MEEMEE_DATA_DIR` on persistent encrypted storage. The API and workers mus
 
 ## First start and scoped credentials
 
+Initialize a new instance without hand-writing secrets:
+
+```bash
+meemee init --data-dir ~/.meemee --env-file .env
+set -a; . ./.env; set +a
+meemee preflight --require-model
+```
+
+Initialization refuses existing config and non-empty data targets. The generated env file is mode `0600` and contains the bootstrap and vault secrets; store and back it up as a secret, never commit it.
+
 ```bash
 export MEEMEE_API_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')"
 meemee serve --host 127.0.0.1 --port 8787

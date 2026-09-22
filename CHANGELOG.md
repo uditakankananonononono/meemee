@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.37.0
+
+- Added secure, non-destructive `meemee init` onboarding for a commercial first-run path.
+- Generates required credentials into an owner-only env file, creates an owner-only data directory, uses exclusive creation to prevent race overwrites, redacts generated values from output, and prints exact preflight/start commands.
+- Core verification: 126 tests passed; Ruff clean.
+
 ## 0.36.0
 
 - Added `meemee preflight` as a production/CI deployment gate with structured checks for required credentials, storage safety and integrity, model reachability and the supported deployment boundary.

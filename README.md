@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.36.0 (58)
+## Verified in v0.37.0 (59)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -62,6 +62,7 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 56. Receiver compatibility: HMAC/timestamp verification helper and vault-backed CLI, custom non-secret subscription headers with reserved/sensitive-name bans and size limits, plus a runnable verified FastAPI receiver fixture.
 57. Encrypted webhook signing secrets at rest with AES-256-GCM, per-record random nonces, subscription-bound authenticated context, automatic transactional plaintext upgrade, encrypted rotation, and fail-closed missing/wrong-key startup.
 58. Production preflight CLI with machine-readable pass/fail output for bootstrap-token strength, vault-key validity, data-directory writability/permissions/free space, SQLite quick integrity checks, model reachability and the supported single-host boundary.
+59. Secure first-run `meemee init` onboarding that creates owner-only data/config paths, generates strong bootstrap and vault credentials, uses exclusive atomic configuration creation, refuses overwrite/non-empty targets, redacts generated secrets from output, and prints exact preflight/start steps.
 
 ## Thin (0)
 
@@ -83,9 +84,13 @@ Python 3.10+ is required.
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -e '.[dev]'
-cp .env.example .env
+meemee init --data-dir ~/.meemee --env-file .env
+set -a; . ./.env; set +a
+meemee preflight --require-model
 pytest
 ```
+
+`meemee init` refuses to overwrite an existing `.env` or initialize a non-empty data directory. It writes the generated credentials only to an owner-readable file and never echoes them.
 
 The default model endpoint is Ollama's OpenAI-compatible API:
 
