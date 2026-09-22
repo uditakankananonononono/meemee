@@ -2,6 +2,11 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.33.0
+
+- Added versioned webhook envelope, payload ceiling, field selection and body hashes.
+- Core verification: 113 tests passed; Ruff clean.
+
 ## 0.32.0
 
 - Added webhook breaker cooldown, success/queue/suspension metrics and alert guidance.

@@ -75,7 +75,7 @@ quotas = QuotaStore(settings.data_dir / "quotas.sqlite3", settings.default_daily
 tokens = TokenStore(settings.data_dir / "auth.sqlite3")
 audit = AuditLog(settings.data_dir / "audit.sqlite3")
 approvals = ApprovalStore(settings.data_dir / "approvals.sqlite3")
-webhooks = WebhookStore(settings.data_dir / "webhooks.sqlite3")
+webhooks = WebhookStore(settings.data_dir / "webhooks.sqlite3", settings.webhook_max_payload_bytes)
 oidc = None
 if any((settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url)):
     if not all((settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url)):
@@ -353,6 +353,7 @@ def list_tool_approvals(principal_id: str):
 class WebhookRequest(BaseModel):
     url: str = Field(min_length=8, max_length=2048)
     events: set[str] = Field(min_length=1, max_length=20)
+    fields: set[str] = Field(default_factory=set, max_length=50)
 
 
 @app.post("/v1/webhooks")
@@ -361,10 +362,10 @@ def create_webhook(request: WebhookRequest, principal=jobs_write_dependency):
     if not request.events <= allowed:
         raise HTTPException(422, f"unknown webhook events: {sorted(request.events - allowed)}")
     try:
-        ident, secret = webhooks.subscribe(principal.id, request.url, request.events)
+        ident, secret = webhooks.subscribe(principal.id, request.url, request.events, request.fields)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
-    audit.append(principal.id, "webhook.create", ident, "success", {"url": request.url, "events": sorted(request.events)})
+    audit.append(principal.id, "webhook.create", ident, "success", {"url": request.url, "events": sorted(request.events), "fields": sorted(request.fields)})
     return {"id": ident, "secret": secret, "warning": "shown once; store it securely"}
 
 

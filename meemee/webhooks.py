@@ -30,7 +30,10 @@ def validate_webhook_url(url: str) -> str:
 class WebhookStore:
     """Durable webhook subscriptions and transactional delivery outbox."""
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, max_payload_bytes: int = 256_000):
+        if max_payload_bytes < 1024:
+            raise ValueError("webhook payload ceiling must be at least 1024 bytes")
+        self.max_payload_bytes = max_payload_bytes
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False, isolation_level=None, timeout=5)
         self.db.row_factory = sqlite3.Row
@@ -40,12 +43,12 @@ class WebhookStore:
             PRAGMA busy_timeout=5000;
             CREATE TABLE IF NOT EXISTS webhook_subscriptions (
                 id TEXT PRIMARY KEY, principal TEXT NOT NULL, url TEXT NOT NULL,
-                secret TEXT NOT NULL, events TEXT NOT NULL, active INTEGER NOT NULL,
+                secret TEXT NOT NULL, events TEXT NOT NULL, fields TEXT, active INTEGER NOT NULL,
                 created_at TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS webhook_deliveries (
                 id TEXT PRIMARY KEY, subscription_id TEXT NOT NULL, event_id TEXT NOT NULL,
-                event_type TEXT NOT NULL, payload TEXT NOT NULL, status TEXT NOT NULL,
+                event_type TEXT NOT NULL, payload TEXT NOT NULL, payload_sha256 TEXT, status TEXT NOT NULL,
                 attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at REAL NOT NULL,
                 response_status INTEGER, last_error TEXT, sending_started_at REAL, created_at TEXT NOT NULL,
                 UNIQUE(subscription_id,event_id)
@@ -59,18 +62,23 @@ class WebhookStore:
             CREATE INDEX IF NOT EXISTS webhook_attempt_delivery ON webhook_attempts(delivery_id,id);
         """)
         columns = {row[1] for row in self.db.execute("PRAGMA table_info(webhook_deliveries)")}
+        if "payload_sha256" not in columns:
+            self.db.execute("ALTER TABLE webhook_deliveries ADD COLUMN payload_sha256 TEXT")
+        subscription_columns = {row[1] for row in self.db.execute("PRAGMA table_info(webhook_subscriptions)")}
+        if "fields" not in subscription_columns:
+            self.db.execute("ALTER TABLE webhook_subscriptions ADD COLUMN fields TEXT")
         if "sending_started_at" not in columns:
             self.db.execute("ALTER TABLE webhook_deliveries ADD COLUMN sending_started_at REAL")
 
-    def subscribe(self, principal: str, url: str, events: set[str]) -> tuple[str, str]:
+    def subscribe(self, principal: str, url: str, events: set[str], fields: set[str] | None = None) -> tuple[str, str]:
         validate_webhook_url(url)
         if not events or any(not event.strip() for event in events):
             raise ValueError("at least one non-empty event is required")
         ident, secret = uuid.uuid4().hex, secrets.token_urlsafe(32)
         with self.lock, self.db:
             self.db.execute(
-                "INSERT INTO webhook_subscriptions(id,principal,url,secret,events,active,created_at) VALUES(?,?,?,?,?,1,?)",
-                (ident, principal, url, secret, " ".join(sorted(events)), datetime.now(timezone.utc).isoformat()),
+                "INSERT INTO webhook_subscriptions(id,principal,url,secret,events,fields,active,created_at) VALUES(?,?,?,?,?,?,1,?)",
+                (ident, principal, url, secret, " ".join(sorted(events)), " ".join(sorted(fields or ())) or None, datetime.now(timezone.utc).isoformat()),
             )
         return ident, secret
 
@@ -82,16 +90,25 @@ class WebhookStore:
             ).rowcount)
 
     def enqueue(self, event_id: str, event_type: str, payload: dict) -> int:
-        encoded, now = json.dumps(payload, sort_keys=True, separators=(",", ":")), time.time()
+        envelope = {"schema":"meemee.webhook.v1","event_id":event_id,"event_type":event_type,"data":payload}
+        encoded, now = json.dumps(envelope, sort_keys=True, separators=(",", ":")), time.time()
+        if len(encoded.encode()) > self.max_payload_bytes:
+            raise ValueError(f"webhook payload exceeds {self.max_payload_bytes} bytes")
         with self.lock, self.db:
-            subscriptions = self.db.execute("SELECT id,events FROM webhook_subscriptions WHERE active=1").fetchall()
+            subscriptions = self.db.execute("SELECT id,events,fields FROM webhook_subscriptions WHERE active=1").fetchall()
             created = 0
             for subscription in subscriptions:
                 if event_type not in subscription["events"].split() and "*" not in subscription["events"].split():
                     continue
+                body = encoded
+                if subscription["fields"]:
+                    selected = {key: payload[key] for key in subscription["fields"].split() if key in payload}
+                    selected_envelope = {"schema":"meemee.webhook.v1","event_id":event_id,"event_type":event_type,"data":selected}
+                    body = json.dumps(selected_envelope, sort_keys=True, separators=(",", ":"))
+                digest = hashlib.sha256(body.encode()).hexdigest()
                 created += self.db.execute(
-                    "INSERT OR IGNORE INTO webhook_deliveries(id,subscription_id,event_id,event_type,payload,status,next_attempt_at,created_at) VALUES(?,?,?,?,?,'queued',?,?)",
-                    (uuid.uuid4().hex, subscription["id"], event_id, event_type, encoded, now, datetime.now(timezone.utc).isoformat()),
+                    "INSERT OR IGNORE INTO webhook_deliveries(id,subscription_id,event_id,event_type,payload,payload_sha256,status,next_attempt_at,created_at) VALUES(?,?,?,?,?,?,'queued',?,?)",
+                    (uuid.uuid4().hex, subscription["id"], event_id, event_type, body, digest, now, datetime.now(timezone.utc).isoformat()),
                 ).rowcount
         return created
 
@@ -291,7 +308,7 @@ def list_deliveries(
     if after:
         clauses.append("d.id>?"); parameters.append(after)
     parameters.append(min(max(limit, 1), 500))
-    query = f"""SELECT d.id,d.subscription_id,d.event_id,d.event_type,d.status,d.attempts,
+    query = f"""SELECT d.id,d.subscription_id,d.event_id,d.event_type,d.payload_sha256,d.status,d.attempts,
         d.next_attempt_at,d.response_status,d.last_error,d.created_at
         FROM webhook_deliveries d JOIN webhook_subscriptions s ON s.id=d.subscription_id
         WHERE {' AND '.join(clauses)} ORDER BY d.id LIMIT ?"""
