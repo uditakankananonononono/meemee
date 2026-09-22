@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.114.0 (150)
+## Verified in v0.115.0 (151)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -166,6 +166,8 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 149. Cross-source unified personal-context retrieval and provenance grounding wired into both companion chat and autonomous agent runs.
 
 150. Verified-address Resend task-email bridge plus a Gmail read-only reply connector with explicit OAuth status, durable cursor and provenance normalization.
+
+151. Evidence-backed typed personal model with owner isolation, conflicts/supersession, confidence, temporal validity, user deletion and model-path grounding.
 
 ## Thin (0)
 

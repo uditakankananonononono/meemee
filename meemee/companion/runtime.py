@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from ..config import Settings
 from ..context import ContextStore
 from ..llm import OpenAICompatibleModel
+from ..personal_model import PersonalModelStore
 from .channels import build_channels
 from .engine import CompanionEngine
 from .store import CompanionStore
@@ -23,6 +24,7 @@ def build_companion(settings: Settings | None = None, store: CompanionStore | No
     settings = settings or Settings()
     companion_store = store or CompanionStore(settings.data_dir / "companion.sqlite3")
     context_store = ContextStore(settings.data_dir / "context.sqlite3")
+    personal_model = PersonalModelStore(settings.data_dir / "personal-model.sqlite3")
     model = OpenAICompatibleModel(
         settings.model_base_url,
         settings.model_name,
@@ -37,6 +39,7 @@ def build_companion(settings: Settings | None = None, store: CompanionStore | No
         fact_limit=settings.companion_fact_limit,
         temperature=settings.companion_model_temperature,
         context=context_store,
+        personal_model=personal_model,
     )
     channels = build_channels(settings, companion_store)
     return Companion(companion_store, engine, channels, model)

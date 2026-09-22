@@ -3,6 +3,7 @@ from .config import Settings
 from .context import ContextStore
 from .llm import OpenAICompatibleModel
 from .persistence import build_persistence
+from .personal_model import PersonalModelStore
 from .policy import PolicyEngine
 from .team import AgentTeam
 from .tools import (
@@ -39,4 +40,5 @@ def build_agent(settings: Settings | None = None, include_delegation: bool = Tru
     )
     selected_memory = memory or build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn).memory
     context = ContextStore(settings.data_dir / "context.sqlite3")
-    return Agent(model, registry, selected_memory, settings.max_steps, PolicyEngine.from_file(settings.policy_file), context)
+    personal_model = PersonalModelStore(settings.data_dir / "personal-model.sqlite3")
+    return Agent(model, registry, selected_memory, settings.max_steps, PolicyEngine.from_file(settings.policy_file), context, personal_model)

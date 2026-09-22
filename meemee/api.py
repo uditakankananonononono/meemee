@@ -42,6 +42,7 @@ from .observability import (
 )
 from .oidc import OIDCConfig, OIDCValidator
 from .persistence import build_persistence
+from .personal_model import PersonalItemInput, PersonalModelStore
 from .quotas import QuotaExceeded, QuotaStore
 from .rate_limit import RateLimitMiddleware, SQLiteRateLimiter
 from .runs import RunStore
@@ -102,6 +103,7 @@ entitlements = EntitlementStore(settings.data_dir / "entitlements.sqlite3", sett
 tokens = TokenStore(settings.data_dir / "auth.sqlite3")
 email_verifications = EmailVerificationStore(settings.data_dir / "email-verifications.sqlite3")
 mailer = ResendMailer(settings.resend_api_key, settings.email_from_address, settings.public_url)
+personal_model = PersonalModelStore(settings.data_dir / "personal-model.sqlite3")
 audit = AuditLog(settings.data_dir / "audit.sqlite3")
 approvals = ApprovalStore(settings.data_dir / "approvals.sqlite3")
 webhooks = WebhookStore(settings.data_dir / "webhooks.sqlite3", settings.webhook_max_payload_bytes, settings.vault_key)
@@ -160,6 +162,10 @@ class RunRequest(BaseModel):
     goal: str = Field(min_length=2, max_length=20_000)
     approve_writes: bool = False
     approved_tools: set[str] = Field(default_factory=set, max_length=100)
+
+
+class PersonalModelRequest(PersonalItemInput):
+    pass
 
 
 class EmailTaskRequest(BaseModel):
@@ -337,6 +343,29 @@ def create_account_api_key(request: AccountTokenRequest, principal=jobs_read_dep
     ident, token = tokens.create(request.name, request.scopes, request.expires_at, principal.id, "api")
     audit.append(principal.id, "account.api_key.create", ident, "success", {"scopes": sorted(request.scopes)})
     return {"id": ident, "token": token, "warning": "shown once; store it securely"}
+
+
+@app.get("/v1/personal-model")
+def list_personal_model(kind: str | None = None, include_history: bool = False, principal=jobs_read_dependency):
+    allowed = {"goal", "relationship", "project", "preference", "routine", "constraint"}
+    if kind is not None and kind not in allowed:
+        raise HTTPException(422, "invalid personal-model kind")
+    return {"items": personal_model.list(principal.id, kind, include_history)}
+
+
+@app.post("/v1/personal-model", status_code=201)
+def write_personal_model(request: PersonalModelRequest, principal=runs_write_dependency):
+    result = personal_model.upsert(principal.id, PersonalItemInput(**request.model_dump()))
+    audit.append(principal.id, "personal_model.upsert", result["id"], "success", {"kind": result["kind"]})
+    return result
+
+
+@app.delete("/v1/personal-model/{item_id}")
+def delete_personal_model(item_id: str, principal=runs_write_dependency):
+    if not personal_model.delete(principal.id, item_id):
+        raise HTTPException(404, "personal-model item not found")
+    audit.append(principal.id, "personal_model.delete", item_id, "success")
+    return {"id": item_id, "deleted": True}
 
 
 @app.get("/v1/email-bridge/status")

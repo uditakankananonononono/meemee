@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.115.0
+
+- Added the evidence-backed personal-model foundation for goals, relationships, projects, preferences, routines and constraints.
+- Added owner isolation, confidence merging, conflict supersession with retained history, temporal validity, source evidence and scoped deletion.
+- Wired the active personal model into companion and agent grounding and added authenticated list/write/delete APIs with audit events.
+
 ## 0.114.0
 
 - Added an authenticated email bridge status endpoint and verified-address task-email endpoint using the existing Resend transactional delivery path, including a configured Reply-To address.

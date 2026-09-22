@@ -8,6 +8,7 @@ from threading import Event
 from .context import ContextStore
 from .llm import Model
 from .memory import MemoryStore
+from .personal_model import PersonalModelStore
 from .planner import TaskPlanner
 from .policy import PolicyEngine
 from .sensitive import scrub_text
@@ -26,7 +27,7 @@ Do not repeat a failed call unchanged. Stop when done or when blocked and name t
 
 
 class Agent:
-    def __init__(self, model: Model, tools: ToolRegistry, memory: MemoryStore, max_steps: int = 12, policy: PolicyEngine | None = None, context: ContextStore | None = None):
+    def __init__(self, model: Model, tools: ToolRegistry, memory: MemoryStore, max_steps: int = 12, policy: PolicyEngine | None = None, context: ContextStore | None = None, personal_model: PersonalModelStore | None = None):
         self.model = model
         self.tools = tools
         self.memory = memory
@@ -34,6 +35,7 @@ class Agent:
         self.planner = TaskPlanner()
         self.policy = policy or PolicyEngine()
         self.context = context
+        self.personal_model = personal_model
 
     async def run(self, goal: str, approve: Approval | None = None, cancel: Event | None = None, owner_id: str = "default") -> RunReport:
         run_id = uuid.uuid4().hex
@@ -41,6 +43,7 @@ class Agent:
         plan = self.planner.plan(goal)
         prior = self.memory.hybrid_search(goal, limit=5)
         personal_context = self.context.assemble(owner_id, goal, 8) if self.context else {"records": []}
+        personal_model = self.personal_model.list(owner_id) if self.personal_model else []
         messages = [
             {"role": "system", "content": SYSTEM},
             {"role": "user", "content": json.dumps({
@@ -49,6 +52,7 @@ class Agent:
                 "tools": self.tools.schemas(),
                 "relevant_memory": prior,
                 "unified_personal_context": personal_context["records"],
+                "evidence_backed_personal_model": personal_model,
             }, default=str)},
         ]
         self.memory.add(run_id, "goal", goal, {"plan": plan.model_dump()})
