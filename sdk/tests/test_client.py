@@ -278,3 +278,15 @@ def test_jobs_create_sends_idempotency_key():
         assert json.loads(request.content) == {"goal": "goal ok"}
         return httpx.Response(200, json={"id": JOB_ID})
     assert make_client(handler).jobs.create("goal ok", idempotency_key="job-once-123").id == JOB_ID
+
+
+def test_created_job_preserves_quota_snapshot():
+    client = make_client(lambda r: httpx.Response(200, json={"id": JOB_ID, "quota":{"day":"2026-09-22","limit":100,"used":1,"remaining":99}}))
+    created = client.jobs.create("goal ok")
+    assert created.quota == {"day":"2026-09-22","limit":100,"used":1,"remaining":99}
+
+
+def test_ready_parses_503_diagnostics_without_raising():
+    client = make_client(lambda r: httpx.Response(503, json={"status":"not_ready","components":{"db":{"ok":False}}}))
+    status = client.ready()
+    assert not status.is_ready and status.components["db"]["ok"] is False

@@ -248,3 +248,13 @@ def test_idempotency_conflict_has_specific_exported_error():
     with pytest.raises(Exported) as caught:
         make_client(handler).jobs.create("goal ok", idempotency_key="same-key")
     assert isinstance(caught.value, ConflictError)
+
+
+def test_idempotent_job_post_retries_transient_status(sleeper: FakeSleeper):
+    attempts=[]
+    def handler(request: httpx.Request) -> httpx.Response:
+        attempts.append(1)
+        if len(attempts) < 3: return httpx.Response(500, json={"detail":"temporary"})
+        return httpx.Response(200, json={"id":"job1","quota":{"day":"2026-09-22","limit":10,"used":1,"remaining":9}})
+    created=make_client(handler,sleeper=sleeper).jobs.create("goal ok",idempotency_key="once")
+    assert created.id=="job1" and len(attempts)==3 and len(sleeper.calls)==2

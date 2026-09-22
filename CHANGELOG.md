@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.98.0
+
+- Fixed SDK parity for CreatedJob quota snapshots, real quota status responses and readiness 503 diagnostics.
+- Keyed job POSTs now safely retry transient transport/server failures under the bounded retry policy.
+- Verification: 225 core and 118 SDK tests plus 3 PostgreSQL contract tests passed; Ruff, deprecation-free core/SDK wheel builds, package audit and explicit 0.98.0 release audit clean. Live PostgreSQL remains unrun here.
+
 ## 0.97.0
 
 - Exported the previously omitted public SDK `TokenMetadata` model.

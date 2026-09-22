@@ -165,8 +165,8 @@ class MeemeeClient:
         return HealthStatus.model_validate(self._request_json("GET", "/health"))
 
     def ready(self) -> ReadinessStatus:
-        """GET /ready - database-backed readiness; raises ServerError on 503."""
-        return ReadinessStatus.model_validate(self._request_json("GET", "/ready"))
+        """GET /ready - parse both ready (200) and diagnostic not-ready (503) bodies."""
+        return ReadinessStatus.model_validate(self._request_json("GET", "/ready", allowed_statuses={503}))
 
     def metrics(self) -> str:
         """GET /metrics - Prometheus exposition text (admin scope)."""
@@ -192,6 +192,7 @@ class MeemeeClient:
         json_body: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
         timeout: httpx.Timeout | float | None = None,
+        allowed_statuses: set[int] | None = None,
     ) -> httpx.Response:
         policy = self._retry
         attempt = 0
@@ -205,7 +206,8 @@ class MeemeeClient:
                 )
             except httpx.TransportError as exc:
                 error = NetworkError(f"{method} {path} failed before a response: {exc}")
-                if policy.can_retry(method, attempt):
+                retryable_write = method.upper() == "POST" and bool(headers and headers.get("Idempotency-Key"))
+                if (policy.can_retry(method, attempt) or (retryable_write and attempt < policy.max_attempts)):
                     self._sleeper(policy.delay(attempt))
                     continue
                 raise error from exc
@@ -213,15 +215,16 @@ class MeemeeClient:
                 request_id=response.headers.get("X-Request-ID"),
                 rate_limit=RateLimitInfo.from_headers(response.headers),
             )
+            retryable_write = method.upper() == "POST" and bool(headers and headers.get("Idempotency-Key"))
             if (
                 response.status_code >= 400
                 and policy.is_retryable_status(response.status_code)
-                and policy.can_retry(method, attempt)
+                and (policy.can_retry(method, attempt) or (retryable_write and attempt < policy.max_attempts))
             ):
                 retry_after = _parse_retry_after(response.headers.get("Retry-After"))
                 self._sleeper(policy.delay(attempt, retry_after))
                 continue
-            if response.status_code >= 400:
+            if response.status_code >= 400 and response.status_code not in (allowed_statuses or set()):
                 raise _map_error(response)
             return response
 

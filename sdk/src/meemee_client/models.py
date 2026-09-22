@@ -16,6 +16,11 @@ class HealthStatus(BaseModel):
 
 class ReadinessStatus(BaseModel):
     status: str
+    components: dict[str, dict[str, Any]] = Field(default_factory=dict)
+
+    @property
+    def is_ready(self) -> bool:
+        return self.status == "ready"
 
 
 class RunReport(BaseModel):
@@ -82,6 +87,7 @@ class Job(BaseModel):
 
 class CreatedJob(BaseModel):
     id: str
+    quota: dict[str, int | str] | None = None
 
 
 class JobCancelResult(BaseModel):
@@ -181,11 +187,12 @@ class ResponseInfo(BaseModel):
     rate_limit: RateLimitInfo | None = None
 
 class QuotaStatus(BaseModel):
-    principal: str
+    day: str | None = None
+    principal: str | None = None
     limit: int
     used: int
     remaining: int
-    resets_at: datetime
+    resets_at: datetime | None = None
 
 
 class Approval(BaseModel):
