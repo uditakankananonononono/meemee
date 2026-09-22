@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.108.0
+
+- Added self-serve customer data export for built-in identity and complete companion profile, facts, conversations, messages and check-ins.
+- Added self-serve account deletion: companion content is transactionally removed, the account is disabled, all active sessions/API keys are revoked, and the tamper-evident deletion audit is retained.
+- Verification: 303 core tests, 133 SDK tests and 5 PostgreSQL contract tests passed; 15 live SDK and 2 live PostgreSQL tests skipped. Ruff, wheel package audit and explicit 0.108.0 release audit clean.
+
 ## 0.107.0
 
 - Added privacy-preserving password recovery with a uniform forgot-password response, 20-minute one-time digest-only reset links delivered through Resend, password replacement with fresh salts, lockout clearing and immediate revocation of all active account tokens.

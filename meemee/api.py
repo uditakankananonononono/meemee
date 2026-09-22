@@ -305,6 +305,25 @@ def get_account(principal=jobs_read_dependency):
     return {**account, "external": False, "email_verified": email_verifications.status(principal.id)}
 
 
+@app.get("/v1/account/export")
+def export_my_account(principal=jobs_read_dependency):
+    account = tokens.get_account(principal.id)
+    if account is None:
+        raise HTTPException(404, "built-in account not found")
+    return {"format": "meemee.customer-export.v1", "exported_at": datetime.now(timezone.utc).isoformat(), "account": account, "companion": companion.store.export_user_data(principal.id)}
+
+
+@app.delete("/v1/account")
+def delete_my_account(principal=jobs_read_dependency):
+    if tokens.get_account(principal.id) is None:
+        raise HTTPException(404, "built-in account not found")
+    deleted = companion.store.delete_user_data(principal.id)
+    if not tokens.disable_account(principal.id):
+        raise HTTPException(409, "account is already disabled")
+    audit.append(principal.id, "account.delete", principal.id, "success", deleted)
+    return {"account_id": principal.id, "deleted": True, "sessions_revoked": True, "companion_records": deleted, "audit_retained": True}
+
+
 @app.post("/v1/account/api-keys", status_code=201)
 def create_account_api_key(request: AccountTokenRequest, principal=jobs_read_dependency):
     allowed = {"runs:write", "jobs:read", "jobs:write", "companion:read", "companion:write"}

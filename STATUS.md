@@ -1,9 +1,9 @@
 # Meemee status
 
-**Current core version:** 0.107.0  
-**Ledger:** 143 verified, 0 thin  
+**Current core version:** 0.108.0  
+**Ledger:** 144 verified, 0 thin  
 **Supported production shape:** SQLite/WAL single-host; PostgreSQL memory and owner-scoped jobs are selectable but require target-environment live verification  
-**Last core verification:** 302 passed; 133 SDK passed (15 live skipped); 5 PostgreSQL contract tests passed (2 live skipped); Ruff, package audit and explicit 0.107.0 release audit clean
+**Last core verification:** 303 passed; 133 SDK passed (15 live skipped); 5 PostgreSQL contract tests passed (2 live skipped); Ruff, package audit and explicit 0.108.0 release audit clean
 
 ## What is production-usable now
 
@@ -39,7 +39,7 @@ Nothing is classified as thin. A capability is either verified at a stated bound
 
 - Live WhatsApp/iMessage delivery over real provider networks: adapters and the delivery queue are implemented and config-gated, but no provider account exists to verify against. Console screens for the companion layer are not built; the surface is HTTP API, CLI, SDK and the console companion view.
 - Live PostgreSQL test run in this environment. Checksummed SQLite-to-PostgreSQL copy/import tooling is implemented.
-- Self-serve account deletion for built-in accounts. External OIDC remains optional.
+- Built-in account deletion covers customer identity and companion content; product-wide jobs/runs remain covered by the existing portable export and retention tools rather than immediate destructive deletion. External OIDC remains optional.
 - Interactive browser human takeover after explicit challenge detection/handoff.
 - Forced interruption inside blocking third-party native code; async tools are interruptible.
 - Multi-region failover, online dual-write database migration and logical replication.

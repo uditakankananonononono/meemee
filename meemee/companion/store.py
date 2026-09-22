@@ -375,3 +375,32 @@ class CompanionStore:
                 tuple(parameters),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def export_user_data(self, user_id: str) -> dict[str, Any]:
+        """Return one user's complete companion state as JSON-safe records."""
+        with self.lock:
+            user = self.db.execute("SELECT * FROM companion_users WHERE user_id=?", (user_id,)).fetchone()
+            facts = self.db.execute("SELECT * FROM companion_facts WHERE user_id=? ORDER BY id", (user_id,)).fetchall()
+            conversations = self.db.execute("SELECT * FROM companion_conversations WHERE user_id=? ORDER BY created_at", (user_id,)).fetchall()
+            ids = [row["id"] for row in conversations]
+            messages = []
+            for conversation_id in ids:
+                messages.extend(self.db.execute("SELECT * FROM companion_messages WHERE conversation_id=? ORDER BY id", (conversation_id,)).fetchall())
+            checkins = self.db.execute("SELECT * FROM companion_checkins WHERE user_id=? ORDER BY created_at", (user_id,)).fetchall()
+        return {"profile": dict(user) if user else None, "facts": [dict(x) for x in facts], "conversations": [dict(x) for x in conversations], "messages": [dict(x) for x in messages], "checkins": [dict(x) for x in checkins]}
+
+    def delete_user_data(self, user_id: str) -> dict[str, int]:
+        """Delete customer companion content transactionally; audit lives elsewhere."""
+        with self.lock, self.db:
+            conversation_ids = [row[0] for row in self.db.execute("SELECT id FROM companion_conversations WHERE user_id=?", (user_id,))]
+            messages = 0
+            for conversation_id in conversation_ids:
+                messages += self.db.execute("DELETE FROM companion_messages WHERE conversation_id=?", (conversation_id,)).rowcount
+            counts = {
+                "messages": messages,
+                "conversations": self.db.execute("DELETE FROM companion_conversations WHERE user_id=?", (user_id,)).rowcount,
+                "facts": self.db.execute("DELETE FROM companion_facts WHERE user_id=?", (user_id,)).rowcount,
+                "checkins": self.db.execute("DELETE FROM companion_checkins WHERE user_id=?", (user_id,)).rowcount,
+                "profiles": self.db.execute("DELETE FROM companion_users WHERE user_id=?", (user_id,)).rowcount,
+            }
+        return counts

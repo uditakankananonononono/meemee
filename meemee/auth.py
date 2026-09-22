@@ -183,6 +183,14 @@ class TokenStore:
                 self.db.execute("UPDATE api_tokens SET revoked_at=? WHERE owner_id=? AND revoked_at IS NULL", (datetime.now(timezone.utc).isoformat(), account_id))
         return bool(changed)
 
+    def disable_account(self, account_id: str) -> bool:
+        now = datetime.now(timezone.utc).isoformat()
+        with self.lock, self.db:
+            changed = self.db.execute("UPDATE accounts SET disabled_at=? WHERE id=? AND disabled_at IS NULL", (now, account_id)).rowcount
+            if changed:
+                self.db.execute("UPDATE api_tokens SET revoked_at=? WHERE owner_id=? AND revoked_at IS NULL", (now, account_id))
+        return bool(changed)
+
     def get_account(self, account_id: str) -> dict | None:
         with self.lock:
             row = self.db.execute("SELECT id,email,display_name,created_at FROM accounts WHERE id=? AND disabled_at IS NULL", (account_id,)).fetchone()
