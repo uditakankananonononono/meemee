@@ -14,6 +14,7 @@ class Persistence:
     memory: Any
     jobs: Any
     close: Any
+    database: Any = None
 
     def check_memory(self) -> bool:
         if self.backend == "sqlite":
@@ -40,4 +41,4 @@ def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = N
     from meemee_persist_pg import Database, JobStore, MemoryStore, MigrationStore
     database = Database(postgres_dsn)
     MigrationStore(database).apply()
-    return Persistence("postgresql", MemoryStore(database), JobStore(database), database.close)
+    return Persistence("postgresql", MemoryStore(database), JobStore(database), database.close, database)

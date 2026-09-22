@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.73.0
+
+- Added atomic PostgreSQL-backed fixed-window rate limiting shared across hosts/pods and selected automatically with the PostgreSQL backend.
+- Existing headers, cleanup cadence and credential/IP identity rules remain compatible.
+- Verification: 201 core and 112 SDK tests plus 3 PostgreSQL contract tests passed; Ruff and explicit 0.73.0 release audit clean. Live PostgreSQL remains unrun here.
+
 ## 0.72.0
 
 - Added PostgreSQL production preflight for required DSN, live connection/pool setup and zero pending migrations.
@@ -34,7 +40,7 @@ All entries describe shipped repository behavior. Missing work is never presente
 
 ## 0.67.0
 
-- Aligned the Python SDK package/import version with core at 0.72.0 and removed stale v0.41 contract labels from SDK docs and metadata.
+- Aligned the Python SDK package/import version with core at 0.73.0 and removed stale v0.41 contract labels from SDK docs and metadata.
 - Added an explicit parity regression check.
 - Verification: 191 core and 112 SDK tests passed; Ruff and explicit 0.67.0 release audit clean.
 

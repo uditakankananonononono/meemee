@@ -78,11 +78,16 @@ if not trusted_hosts:
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=trusted_hosts)
 mount_console(app)
 app.add_middleware(MetricsMiddleware)
-app.add_middleware(RateLimitMiddleware, limiter=SQLiteRateLimiter(settings.data_dir / "rate-limits.sqlite3", settings.rate_limit_requests, settings.rate_limit_window_seconds))
 persistence = build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn)
 agent = build_agent(settings, memory=persistence.memory)
 run_gate = RunGate()
 jobs = persistence.jobs
+if persistence.backend == "postgresql":
+    from meemee_persist_pg.rate_limit import PostgreSQLRateLimiter
+    rate_limiter = PostgreSQLRateLimiter(persistence.database, settings.rate_limit_requests, settings.rate_limit_window_seconds)
+else:
+    rate_limiter = SQLiteRateLimiter(settings.data_dir / "rate-limits.sqlite3", settings.rate_limit_requests, settings.rate_limit_window_seconds)
+app.add_middleware(RateLimitMiddleware, limiter=rate_limiter)
 runs = RunStore(settings.data_dir / "runs.sqlite3")
 idempotency = IdempotencyStore(settings.data_dir / "idempotency.sqlite3")
 quotas = QuotaStore(settings.data_dir / "quotas.sqlite3", settings.default_daily_jobs)

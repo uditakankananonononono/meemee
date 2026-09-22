@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.72.0 (78)
+## Verified in v0.73.0 (78)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -94,12 +94,13 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 88. Cooperative mid-tool cancellation for asynchronous tools with prompt task cancellation, cleanup propagation, a recorded cancelled tool result and immediate agent termination before another model step.
 89. Fail-closed persistence composition selector with explicit SQLite/PostgreSQL configuration, automatic PostgreSQL migrations, optional dependency packaging and runtime agent-memory selection; queued-job/API parity remains an explicit boundary.
 90. Python SDK parity for argument-scoped approval administration, including corrected current response models, validated constraint maps, expiry support and safely encoded principal/tool paths.
-91. Core/SDK version parity at 0.72.0 with stale server-contract labels removed across package metadata, imports, README and live-integration documentation.
+91. Core/SDK version parity at 0.73.0 with stale server-contract labels removed across package metadata, imports, README and live-integration documentation.
 92. Checksummed SQLite-to-PostgreSQL core-data export and transactional empty-target import CLIs covering memory, jobs/events, tokens and audit, with tamper detection, byte preservation and fail-closed collision checks.
 93. API/worker composition selection for PostgreSQL memory and owner-scoped queued jobs, with automatic ownership migration, owner reads/lists/events and leased worker execution.
 94. PostgreSQL job-list opaque keyset cursor parity with malformed-cursor rejection, stable updated-at/UUID ordering and compatible next-cursor envelopes.
 95. Backend-neutral persistence lifecycle with one shared composition per API/worker process, SQLite/PostgreSQL readiness probes, shared worker memory and clean pooled-database shutdown.
 96. PostgreSQL production preflight that fails on missing DSNs, connection/pool errors or unapplied migrations and reports the exact selected deployment boundary.
+97. PostgreSQL-backed atomic fixed-window rate limiting shared across hosts/pods, selected automatically with the PostgreSQL backend and retaining compatible headers, cleanup and token/IP identity semantics.
 
 ## Thin (0)
 
@@ -107,7 +108,7 @@ Nothing is classified as thin. A capability is either implemented and tested at 
 
 ## Missing, not claimed
 
-end-user account administration UI (interactive OIDC login/session/logout, bearer auth and scoped API tokens are implemented); interactive browser human takeover beyond explicit challenge detection/handoff; cross-host/cross-pod rate limiting (single-host multi-process limiting is implemented); WebSocket streaming (resume-safe SSE is implemented); forced mid-tool cancellation (cooperative between-step cancellation is implemented); and a core-wired shared database/queue suitable for Kubernetes replicas (the additive PostgreSQL package exists, but the runtime still uses SQLite).
+end-user account administration UI (interactive OIDC login/session/logout, bearer auth and scoped API tokens are implemented); interactive browser human takeover beyond explicit challenge detection/handoff; WebSocket streaming (resume-safe SSE is implemented); forced mid-tool cancellation (cooperative between-step cancellation is implemented); and a core-wired shared database/queue suitable for Kubernetes replicas (the additive PostgreSQL package exists, but the runtime still uses SQLite).
 
 The existing deterministic goal decomposition, lexical FTS, scoped/revocable API token system, browser automation, single-host shared limiter, SQLite queue, and cursor event API and SSE stream remain useful internal or single-node features, but they are not presented as completed versions of the advanced capabilities above.
 
