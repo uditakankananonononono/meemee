@@ -3,11 +3,11 @@
 A real, static, dependency-free operator console for the Meemee API, served by
 the API itself as an additive `console/` directory. No build step, no
 framework, no CDN: plain HTML/CSS/ES-module JavaScript that talks only to the
-documented v0.16.0 HTTP surface.
+documented v0.44.0 HTTP surface.
 
 ## What it does
 
-- **Status** - `/health`, `/ready`, session capability probes, and an admin-only
+- **Status** - `/health`, `/ready`, exact `/v1/whoami` identity/scopes/plan usage, and an admin-only
   `/metrics` viewer (Prometheus text parsed into a table).
 - **Runs** - `POST /v1/runs` with an explicit `approve_writes` opt-in, full
   run-report rendering (final answer, steps used, per-tool arguments, results,
@@ -60,7 +60,7 @@ configure - same-origin mounting is the supported shape.
 
 ## Honest gaps (labelled "Missing" in the UI)
 
-These do not exist in the documented v0.16.0 API; the console says so where it
+These do not exist in the documented v0.44.0 API; the console says so where it
 matters instead of faking data:
 
 - **No `GET /v1/tokens`** - tokens cannot be listed. The console keeps a
@@ -69,8 +69,6 @@ matters instead of faking data:
 - **No `GET /v1/jobs`** - jobs cannot be listed. The console tracks jobs
   created or added by ID in this browser and polls each one.
 - **No `GET /v1/runs` or `/v1/runs/{id}`** - run history is browser-local.
-- **No `/v1/whoami`** - capabilities are inferred with side-effect-free probes
-  (a validation-failed 422 proves the scope; 401/403 deny it).
 - **No per-entry verification endpoint** - the server verifies the chain as a
   whole on every `/v1/audit` call; the console adds its own full
   recomputation in the browser as a second opinion.

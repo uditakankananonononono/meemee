@@ -1,5 +1,5 @@
 // Status view: service health, readiness, session capabilities, Prometheus metrics.
-import { h, clear, toast, missingNote, fullTime } from "../dom.js";
+import { h, clear, toast, fullTime } from "../dom.js";
 import * as api from "../api.js";
 import { reportError } from "../app.js";
 
@@ -35,18 +35,19 @@ export async function renderStatus(root, ctx) {
   const readyBox = h("div", null, "Loading…");
   const capsBox = h("div", null, "Loading…");
   const metricsBox = h("div", null, "Metrics require the admin scope.");
+  const accountBox = h("div", null, "Loading…");
 
   root.append(
     h("div", { class: "grid" },
       card("Health", healthBox),
       card("Readiness", readyBox)),
+    card("Account and plan", accountBox),
     card("Session capabilities",
       h("p", { class: "muted" },
         "Inferred with side-effect-free probes against the live API (invalid payloads fail validation ",
         "before any write, so a validation error proves the scope is present)."),
       capsBox),
     card("Metrics (admin)", metricsBox),
-    missingNote("No /v1/whoami endpoint", "The API cannot return the current principal's name or scopes, so capabilities above are probed rather than read."),
   );
 
   api.getHealth()
@@ -61,6 +62,22 @@ export async function renderStatus(root, ctx) {
     .catch((error) => clear(readyBox).append(
       h("span", { class: "badge badge-bad" }, error instanceof api.ApiError && error.status === 503 ? "not ready" : "error"),
       h("div", { class: "muted" }, error.message)));
+
+  api.getWhoami()
+    .then((data) => {
+      const limits = data.entitlement.limits;
+      const usage = data.entitlement.usage;
+      clear(accountBox).append(
+        kv("identity", data.name),
+        kv("principal", h("code", null, data.id)),
+        kv("scopes", data.scopes.join(", ")),
+        kv("plan", h("span", { class: "badge badge-ok" }, data.entitlement.plan)),
+        kv("daily jobs", `${usage.daily_jobs} / ${limits.daily_jobs}`),
+        kv("active webhooks", `${usage.webhooks} / ${limits.webhooks}`),
+        kv("persistent approvals", `${usage.persistent_approvals} / ${limits.persistent_approvals}`));
+    })
+    .catch((error) => clear(accountBox).append(
+      h("span", { class: "badge badge-warn" }, error.status === 401 ? "not authenticated" : error.message)));
 
   const renderCaps = () => {
     clear(capsBox);

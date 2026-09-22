@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.44.0
+
+- Added exact authenticated `/v1/whoami` identity, scopes, plan limits and live usage.
+- Updated the packaged console Status view to render account and plan usage, removing its former whoami gap.
+- Core verification: 142 tests passed; Ruff and release audit clean.
+
 ## 0.43.0
 
 - Enforced each plan's persistent exact-tool approval limit using active, non-expired grants.

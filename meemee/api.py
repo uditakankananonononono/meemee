@@ -102,6 +102,7 @@ readiness = ReadinessChecker(settings.data_dir, {"memory": lambda: agent.memory.
 jobs_write_auth = auth.dependency("jobs:write")
 jobs_write_dependency = Depends(jobs_write_auth)
 runs_write_dependency = Depends(auth.dependency("runs:write"))
+jobs_read_dependency = Depends(auth.dependency("jobs:read"))
 
 
 @app.middleware("http")
@@ -159,6 +160,26 @@ async def ready():
     if result["status"] != "ready":
         return JSONResponse(result, status_code=503)
     return result
+
+
+@app.get("/v1/whoami")
+def whoami(principal=jobs_read_dependency):
+    entitlement = entitlements.get(principal.id)
+    active_webhooks = webhooks.db.execute(
+        "SELECT count(*) FROM webhook_subscriptions WHERE principal=? AND active=1", (principal.id,)
+    ).fetchone()[0]
+    quota = quotas.status(principal.id)
+    entitlement["usage"] = {
+        "daily_jobs": quota["used"],
+        "webhooks": int(active_webhooks),
+        "persistent_approvals": approvals.active_count(principal.id),
+    }
+    return {
+        "id": principal.id,
+        "name": principal.name,
+        "scopes": sorted(principal.scopes),
+        "entitlement": entitlement,
+    }
 
 
 @app.post("/v1/runs")

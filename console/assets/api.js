@@ -72,6 +72,7 @@ async function request(path, { method = "GET", body, headers = {}, signal } = {}
 // --- Unauthenticated probes -------------------------------------------------
 export const getHealth = (opts) => request("/health", opts);
 export const getReady = (opts) => request("/ready", opts);
+export const getWhoami = (opts) => request("/v1/whoami", opts);
 
 // --- Runs (scope: runs:write) ------------------------------------------------
 export const createRun = (goal, approveWrites, opts) =>
