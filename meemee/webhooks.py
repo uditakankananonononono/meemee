@@ -156,3 +156,62 @@ async def dispatch_forever(store: WebhookStore, poll_seconds: float = 1.0) -> No
                 await asyncio.sleep(poll_seconds)
     finally:
         await dispatcher.client.aclose()
+
+
+def delivery_metrics(store: WebhookStore) -> dict[str, int]:
+    """Return exact outbox counts by delivery status."""
+    with store.lock:
+        rows = store.db.execute(
+            "SELECT status,count(*) AS count FROM webhook_deliveries GROUP BY status"
+        ).fetchall()
+    counts = {status: 0 for status in ("queued", "sending", "delivered", "failed")}
+    counts.update({row["status"]: int(row["count"]) for row in rows})
+    return counts
+
+
+def list_deliveries(
+    store: WebhookStore,
+    principal: str,
+    status: str | None = None,
+    after: str | None = None,
+    limit: int = 100,
+) -> list[dict]:
+    """List principal-owned deliveries without signing secrets or payload bodies."""
+    clauses, parameters = ["s.principal=?"], [principal]
+    if status:
+        clauses.append("d.status=?"); parameters.append(status)
+    if after:
+        clauses.append("d.id>?"); parameters.append(after)
+    parameters.append(min(max(limit, 1), 500))
+    query = f"""SELECT d.id,d.subscription_id,d.event_id,d.event_type,d.status,d.attempts,
+        d.next_attempt_at,d.response_status,d.last_error,d.created_at
+        FROM webhook_deliveries d JOIN webhook_subscriptions s ON s.id=d.subscription_id
+        WHERE {' AND '.join(clauses)} ORDER BY d.id LIMIT ?"""
+    with store.lock:
+        return [dict(row) for row in store.db.execute(query, tuple(parameters)).fetchall()]
+
+
+def replay_delivery(store: WebhookStore, principal: str, delivery_id: str) -> bool:
+    """Requeue a failed principal-owned delivery without resetting attempt history."""
+    with store.lock, store.db:
+        changed = store.db.execute(
+            """UPDATE webhook_deliveries SET status='queued',next_attempt_at=?,last_error=NULL
+            WHERE id=? AND status='failed' AND subscription_id IN
+            (SELECT id FROM webhook_subscriptions WHERE principal=? AND active=1)""",
+            (time.time(), delivery_id, principal),
+        ).rowcount
+    return bool(changed)
+
+
+def cleanup_deliveries(store: WebhookStore, delivered_before: str, failed_before: str) -> dict[str, int]:
+    """Delete old terminal delivery records; queued/sending rows are never touched."""
+    with store.lock, store.db:
+        delivered = store.db.execute(
+            "DELETE FROM webhook_deliveries WHERE status='delivered' AND created_at<?",
+            (delivered_before,),
+        ).rowcount
+        failed = store.db.execute(
+            "DELETE FROM webhook_deliveries WHERE status='failed' AND created_at<?",
+            (failed_before,),
+        ).rowcount
+    return {"delivered": delivered, "failed": failed}

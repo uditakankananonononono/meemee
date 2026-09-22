@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.29.0
+
+- Added delivery list/status and failed-replay APIs with owner isolation and audit.
+- Added webhook outbox Prometheus gauges and terminal delivery retention.
+- Core verification: 104 tests passed; Ruff clean.
+
 ## 0.28.0
 
 - Exposed authenticated webhook subscription/list/delete APIs.

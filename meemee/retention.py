@@ -14,6 +14,8 @@ class RetentionReport:
     audit_entries: int = 0
     idempotency: int = 0
     rate_limits: int = 0
+    webhook_delivered: int = 0
+    webhook_failed: int = 0
 
 
 class RetentionManager:
@@ -53,6 +55,8 @@ class RetentionManager:
         memories = self.delete(self.data_dir / "meemee.sqlite3", "DELETE FROM memories WHERE created_at<?", (memory_cutoff,))
         # Tamper-evident audit chains are intentionally retained; pruning needs signed anchors.
         audit_entries = 0
+        webhook_delivered = self.delete(self.data_dir / "webhooks.sqlite3", "DELETE FROM webhook_deliveries WHERE status='delivered' AND created_at<?", (jobs_cutoff,))
+        webhook_failed = self.delete(self.data_dir / "webhooks.sqlite3", "DELETE FROM webhook_deliveries WHERE status='failed' AND created_at<?", (_audit_cutoff,))
         idempotency = self.delete(self.data_dir / "idempotency.sqlite3", "DELETE FROM idempotency WHERE expires_at<=?", (now.isoformat(),))
         rate_limits = self.delete(self.data_dir / "rate-limits.sqlite3", "DELETE FROM rate_limits WHERE window_start<?", (int(now.timestamp()) - 86400,))
-        return RetentionReport(job_events, terminal_jobs, memories, audit_entries, idempotency, rate_limits)
+        return RetentionReport(job_events, terminal_jobs, memories, audit_entries, idempotency, rate_limits, webhook_delivered, webhook_failed)

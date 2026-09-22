@@ -22,6 +22,7 @@ from .jobs import JobStore
 from .observability import (
     AGENT_RUNS,
     JOBS_CREATED,
+    WEBHOOK_OUTBOX,
     MetricsMiddleware,
     configure_logging,
     metrics_response,
@@ -33,7 +34,7 @@ from .runtime import build_agent
 from .shutdown import RunGate
 from .streaming import job_event_stream
 from .web_login import WebLogin, WebLoginConfig
-from .webhooks import WebhookStore
+from .webhooks import WebhookStore, delivery_metrics, list_deliveries, replay_delivery
 
 settings = Settings()
 settings.data_dir.mkdir(parents=True, exist_ok=True)
@@ -241,6 +242,8 @@ def list_audit(after: int = 0, limit: int = 100):
 
 @app.get("/metrics", dependencies=[Depends(auth.dependency("admin"))], include_in_schema=False)
 def prometheus_metrics():
+    for status, count in delivery_metrics(webhooks).items():
+        WEBHOOK_OUTBOX.labels(status).set(count)
     return metrics_response()
 
 
@@ -363,3 +366,28 @@ def delete_webhook(webhook_id: str, principal=jobs_write_dependency):
         raise HTTPException(404, "active webhook not found")
     audit.append(principal.id, "webhook.delete", webhook_id, "success")
     return {"id": webhook_id, "deleted": True}
+
+
+@app.get("/v1/webhook-deliveries", dependencies=[Depends(auth.dependency("jobs:read"))])
+def get_webhook_deliveries(request: Request, status: str | None = None, after: str | None = None, limit: int = 100):
+    if status and status not in {"queued", "sending", "delivered", "failed"}:
+        raise HTTPException(422, "invalid delivery status")
+    return {"deliveries": list_deliveries(webhooks, request.state.principal.id, status, after, limit)}
+
+
+@app.get("/v1/webhook-deliveries/{delivery_id}", dependencies=[Depends(auth.dependency("jobs:read"))])
+def get_webhook_delivery(request: Request, delivery_id: str):
+    rows = list_deliveries(webhooks, request.state.principal.id, after=None, limit=500)
+    match = next((row for row in rows if row["id"] == delivery_id), None)
+    if match is None:
+        raise HTTPException(404, "delivery not found")
+    return match
+
+
+@app.post("/v1/webhook-deliveries/{delivery_id}/replay", dependencies=[Depends(auth.dependency("jobs:write"))])
+def replay_webhook_delivery(request: Request, delivery_id: str):
+    principal = request.state.principal
+    if not replay_delivery(webhooks, principal.id, delivery_id):
+        raise HTTPException(409, "delivery is not a replayable failed delivery")
+    audit.append(principal.id, "webhook.delivery.replay", delivery_id, "success")
+    return {"id": delivery_id, "status": "queued"}

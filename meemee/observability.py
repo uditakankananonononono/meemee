@@ -14,6 +14,7 @@ HTTP_DURATION = Histogram("meemee_http_request_duration_seconds", "HTTP request 
 HTTP_INFLIGHT = Gauge("meemee_http_requests_inflight", "In-flight HTTP requests")
 AGENT_RUNS = Counter("meemee_agent_runs_total", "Agent runs", ("outcome",))
 JOBS_CREATED = Counter("meemee_jobs_created_total", "Queued jobs created")
+WEBHOOK_OUTBOX = Gauge("meemee_webhook_deliveries", "Webhook outbox rows", ("status",))
 
 
 class MetricsMiddleware(BaseHTTPMiddleware):
