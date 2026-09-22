@@ -61,6 +61,15 @@ def audit_tree(root: Path, expected_version: str | None = None) -> dict:
         numbered = [int(value) for value in re.findall(r"^(\d+)\. ", text, re.MULTILINE)]
         if not heading or heading.group(1) != _version(pyproject) or not numbered or int(heading.group(2)) != max(numbered):
             findings.append({"code":"verified_ledger_drift","path":"README.md"})
+    if pyproject.exists():
+        version = _version(pyproject)
+        for relative in ("sdk/README.md", "sdk/src/meemee_client/__init__.py", "sdk/src/meemee_client/auth.py", "sdk/tests/test_live_integration.py"):
+            target = root / relative
+            if target.exists():
+                labels = set(re.findall(r"v(\d+\.\d+\.\d+)", target.read_text()))
+                stale = sorted(label for label in labels if label != version)
+                if stale:
+                    findings.append({"code":"sdk_contract_version_drift","path":relative,"versions":stale,"expected":version})
     stale_claims = {
         "README.md": (
             "WebSocket streaming (resume-safe SSE is implemented)",

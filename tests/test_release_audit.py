@@ -51,3 +51,14 @@ def test_release_audit_rejects_verified_heading_count_drift(tmp_path):
     valid_tree(tmp_path)
     (tmp_path/"README.md").write_text("0.37.0\n## Verified in v0.37.0 (2)\n1. one\n")
     assert "verified_ledger_drift" in {item["code"] for item in audit_tree(tmp_path)["findings"]}
+
+
+def test_release_audit_rejects_stale_sdk_contract_label(tmp_path):
+    import shutil
+    root = Path(__file__).parents[1]
+    for relative in ("README.md", "STATUS.md", "CHANGELOG.md", "OPERATIONS.md", "LICENSE", "pyproject.toml", "Dockerfile", ".dockerignore", ".env.example", ".github/workflows/ci.yml", "meemee/__init__.py", "sdk/pyproject.toml", "sdk/src/meemee_client/_version.py", "sdk/README.md"):
+        source = root / relative; target = tmp_path / relative; target.parent.mkdir(parents=True, exist_ok=True); shutil.copy(source, target)
+    target = tmp_path / "sdk/README.md"
+    target.write_text(target.read_text().replace("v0.95.0", "v0.1.0"))
+    report = audit_tree(tmp_path, "0.95.0")
+    assert "sdk_contract_version_drift" in {item["code"] for item in report["findings"]}

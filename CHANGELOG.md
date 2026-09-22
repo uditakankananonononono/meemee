@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.95.0
+
+- Synchronized all SDK public/live-integration contract labels to the core version.
+- Release audit now rejects stale embedded SDK server-version labels.
+- Verification: 225 core and 112 SDK tests plus 3 PostgreSQL contract tests passed; Ruff, deprecation-free core/SDK wheel builds, package audit and explicit 0.95.0 release audit clean. Live PostgreSQL remains unrun here.
+
 ## 0.94.0
 
 - Added the durable webhook dispatcher to the safe default Kubernetes pod so queued events are delivered.
