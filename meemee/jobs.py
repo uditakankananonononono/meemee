@@ -32,6 +32,12 @@ class JobStore:
             );
             CREATE INDEX IF NOT EXISTS job_events_job ON job_events(job_id, sequence);
         """)
+        columns = {row[1] for row in self.db.execute("PRAGMA table_info(jobs)")}
+        if "principal" not in columns:
+            self.db.execute("ALTER TABLE jobs ADD COLUMN principal TEXT")
+        self.db.execute(
+            "CREATE INDEX IF NOT EXISTS jobs_principal_updated ON jobs(principal,updated_at DESC,id DESC)"
+        )
 
     def event(self, ident: str, kind: str, payload: dict[str, Any]) -> None:
         with self.lock, self.db:
@@ -48,14 +54,14 @@ class JobStore:
             ).fetchall()
         return [{**dict(row), "payload": json.loads(row["payload"])} for row in rows]
 
-    def enqueue(self, goal: str, run_at: datetime | None = None, max_attempts: int = 3) -> str:
+    def enqueue(self, goal: str, run_at: datetime | None = None, max_attempts: int = 3, principal: str | None = None) -> str:
         ident = uuid.uuid4().hex
         now = datetime.now(timezone.utc).isoformat()
         due = (run_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
         with self.lock, self.db:
             self.db.execute(
-                "INSERT INTO jobs(id,goal,run_at,status,max_attempts,created_at,updated_at) VALUES(?,?,?,'queued',?,?,?)",
-                (ident, goal, due, max_attempts, now, now),
+                "INSERT INTO jobs(id,goal,run_at,status,max_attempts,created_at,updated_at,principal) VALUES(?,?,?,'queued',?,?,?,?)",
+                (ident, goal, due, max_attempts, now, now, principal),
             )
         self.event(ident, "queued", {"run_at": due})
         return ident
@@ -134,6 +140,29 @@ class JobStore:
         if changed:
             self.event(ident, "cancelled", {})
         return bool(changed)
+
+    def list_for_principal(
+        self, principal: str, status: str | None = None, before: str | None = None, limit: int = 100
+    ) -> list[dict[str, Any]]:
+        clauses, parameters = ["principal=?"], [principal]
+        if status is not None:
+            clauses.append("status=?"); parameters.append(status)
+        if before is not None:
+            clauses.append("updated_at<?"); parameters.append(before)
+        parameters.append(min(max(limit, 1), 500))
+        with self.lock:
+            rows = self.db.execute(
+                f"SELECT * FROM jobs WHERE {' AND '.join(clauses)} ORDER BY updated_at DESC,id DESC LIMIT ?",
+                tuple(parameters),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def get_owned(self, ident: str, principal: str) -> dict[str, Any] | None:
+        with self.lock:
+            row = self.db.execute(
+                "SELECT * FROM jobs WHERE id=? AND principal=?", (ident, principal)
+            ).fetchone()
+        return dict(row) if row else None
 
     def get(self, ident: str) -> dict[str, Any] | None:
         with self.lock:

@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.44.0 (67)
+## Verified in v0.45.0 (68)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -71,6 +71,7 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 65. Enforceable commercial packaging metadata with persistent starter/team/business plan assignments, plan-derived daily-job and active-webhook limits, authenticated entitlement APIs, public machine-readable product catalog, audited admin assignment, and explicit external-billing/no-price boundary.
 66. Complete plan-limit enforcement and usage visibility: active non-expired persistent approvals are counted and capped per plan without blocking regrant of an existing tool, while the current entitlement response reports exact daily-job, active-webhook and persistent-approval usage beside limits.
 67. Exact authenticated account introspection through `/v1/whoami` with principal ID/name, sorted scopes, plan, limits and live usage; the packaged operator console renders this account/plan state and removes its former whoami gap while retaining probes only as compatibility fallback.
+68. Principal-owned queued jobs with additive legacy-safe owner migration, owner-scoped get/cancel/events/SSE reads, status/cursor/limit list API, Python SDK listing, and source-of-truth console listing that no longer depends on browser-local job history.
 
 ## Thin (0)
 

@@ -380,6 +380,17 @@ class JobsResource:
         payload = self._client._request_json("POST", "/v1/jobs", json_body=body)
         return CreatedJob.model_validate(payload)
 
+    def list(
+        self, *, status: str | None = None, before: str | None = None, limit: int = 100
+    ) -> list[Job]:
+        if not 1 <= limit <= 500:
+            raise ValueError("limit must be 1-500")
+        params: dict[str, Any] = {"limit": limit}
+        if status is not None: params["status"] = status
+        if before is not None: params["before"] = before
+        payload = self._client._request_json("GET", "/v1/jobs", params=params)
+        return [Job.model_validate(item) for item in payload["jobs"]]
+
     def get(self, job_id: str) -> Job:
         """GET /v1/jobs/{id} - current state; raises NotFoundError for unknown ids."""
         return Job.model_validate(self._client._request_json("GET", f"/v1/jobs/{job_id}"))

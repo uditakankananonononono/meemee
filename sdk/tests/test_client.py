@@ -3,8 +3,7 @@ from __future__ import annotations
 
 import httpx
 import pytest
-from conftest import BASE_URL, JOB_ID, NOW, event_dict, job_payload, make_client
-
+from conftest import JOB_ID, NOW, event_dict, job_payload, make_client
 from meemee_client import JobStatus, MeemeeClient
 
 
@@ -262,3 +261,11 @@ def test_client_rejects_bad_base_url() -> None:
 def test_context_manager_closes() -> None:
     with make_client(lambda r: httpx.Response(200, json={"status": "ok", "version": "0.16.0"})) as client:
         assert client.health().status == "ok"
+
+
+def test_jobs_list_uses_owner_scoped_endpoint() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/jobs" and request.url.params["status"] == "queued"
+        return httpx.Response(200, json={"jobs":[job_payload("queued")]})
+    jobs = make_client(handler).jobs.list(status="queued", limit=20)
+    assert jobs[0].status is JobStatus.QUEUED

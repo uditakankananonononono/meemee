@@ -81,6 +81,12 @@ export const createRun = (goal, approveWrites, opts) =>
 // --- Jobs (scopes: jobs:read / jobs:write) -----------------------------------
 export const createJob = (goal, runAt, opts) =>
   request("/v1/jobs", { method: "POST", body: runAt ? { goal, run_at: runAt } : { goal }, ...opts });
+export const listJobs = (status = null, before = null, limit = 100, opts) => {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (status) params.set("status", status);
+  if (before) params.set("before", before);
+  return request(`/v1/jobs?${params}`, opts);
+};
 export const getJob = (id, opts) => request(`/v1/jobs/${encodeURIComponent(id)}`, opts);
 export const cancelJob = (id, opts) =>
   request(`/v1/jobs/${encodeURIComponent(id)}`, { method: "DELETE", ...opts });

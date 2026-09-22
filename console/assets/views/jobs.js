@@ -1,6 +1,6 @@
 // Jobs view: create, track, watch (SSE) and cancel durable queued jobs.
-// The API has no job listing endpoint, so the console follows jobs created
-// here or added by ID, refreshing each known job against the source of truth.
+// The source-of-truth owner-scoped list comes from the API; browser tracking only
+// preserves explicit IDs added by operators for compatibility with legacy jobs.
 import { h, clear, toast, missingNote, statusBadge, jsonBlock, fullTime, timeAgo } from "../dom.js";
 import * as api from "../api.js";
 import { openJobStream } from "../sse.js";
@@ -159,20 +159,15 @@ export async function renderJobs(root, ctx) {
   const detailHost = h("div");
 
   const renderList = async () => {
-    const entries = knownJobs.all();
     clear(listBox);
-    if (!entries.length) {
-      listBox.append(h("p", { class: "muted" }, "No jobs tracked in this browser yet. Create one above or add one by ID."));
+    let serverJobs;
+    try { serverJobs = (await api.listJobs()).jobs; }
+    catch (error) { reportError(error, "could not list jobs"); return; }
+    if (!serverJobs.length) {
+      listBox.append(h("p", { class: "muted" }, "No jobs for this account yet. Create one above."));
       return;
     }
-    const rows = await Promise.all(entries.map(async (entry) => {
-      try {
-        const job = await api.getJob(entry.id);
-        return { entry, job };
-      } catch (error) {
-        return { entry, job: null, error };
-      }
-    }));
+    const rows = serverJobs.map((job) => ({ entry: { id: job.id }, job }));
     const table = h("table", { class: "table" },
       h("thead", null, h("tr", null,
         h("th", null, "Status"), h("th", null, "Goal"), h("th", null, "Attempts"),

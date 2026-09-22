@@ -2,6 +2,13 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.45.0
+
+- Added persisted job ownership and owner-scoped get/cancel/events/SSE/list operations with status and cursor filters.
+- Updated the Python SDK and packaged console to list jobs from the server source of truth instead of browser-local history.
+- Legacy jobs remain unowned rather than being silently exposed to a principal.
+- Verification: 146 core and 110 SDK tests passed; Ruff and release audit clean.
+
 ## 0.44.0
 
 - Added exact authenticated `/v1/whoami` identity, scopes, plan limits and live usage.

@@ -228,7 +228,7 @@ def create_job(
         quota = quotas.consume_job(principal.id)
     except QuotaExceeded as exc:
         raise HTTPException(429, str(exc), headers={"Retry-After":"86400"}) from exc
-    ident = jobs.enqueue(request.goal, run_at)
+    ident = jobs.enqueue(request.goal, run_at, principal=principal.id)
     response = {"id": ident, "quota": quota}
     if idempotency_key:
         idempotency.put(principal.id, "/v1/jobs", idempotency_key, payload, 200, response)
@@ -237,16 +237,25 @@ def create_job(
     return response
 
 
+@app.get("/v1/jobs", dependencies=[Depends(auth.dependency("jobs:read"))])
+def list_jobs(request: Request, status: str | None = None, before: str | None = None, limit: int = 100):
+    if status is not None and status not in {"queued","running","done","failed","cancel_requested","cancelled"}:
+        raise HTTPException(422, "invalid job status")
+    return {"jobs": jobs.list_for_principal(request.state.principal.id, status, before, limit)}
+
+
 @app.get("/v1/jobs/{job_id}", dependencies=[Depends(auth.dependency("jobs:read"))])
-def get_job(job_id: str):
-    job = jobs.get(job_id)
+def get_job(request: Request, job_id: str):
+    job = jobs.get_owned(job_id, request.state.principal.id)
     if job is None:
         raise HTTPException(404, "job not found")
     return job
 
 
 @app.delete("/v1/jobs/{job_id}", dependencies=[Depends(auth.dependency("jobs:write"))])
-def cancel_job(job_id: str):
+def cancel_job(request: Request, job_id: str):
+    if jobs.get_owned(job_id, request.state.principal.id) is None:
+        raise HTTPException(404, "job not found")
     status = jobs.request_cancel(job_id)
     if status is None:
         raise HTTPException(404, "job not found")
@@ -259,8 +268,8 @@ def cancel_job(job_id: str):
 
 
 @app.get("/v1/jobs/{job_id}/events", dependencies=[Depends(auth.dependency("jobs:read"))])
-def get_job_events(job_id: str, after: int = 0):
-    if jobs.get(job_id) is None:
+def get_job_events(request: Request, job_id: str, after: int = 0):
+    if jobs.get_owned(job_id, request.state.principal.id) is None:
         raise HTTPException(404, "job not found")
     return {"events": jobs.events(job_id, after)}
 
@@ -331,7 +340,7 @@ def web_logout():
 
 @app.get("/v1/jobs/{job_id}/stream", dependencies=[Depends(auth.dependency("jobs:read"))])
 def stream_job_events(request: Request, job_id: str, after: int = 0):
-    if jobs.get(job_id) is None:
+    if jobs.get_owned(job_id, request.state.principal.id) is None:
         raise HTTPException(404, "job not found")
     last_event = request.headers.get("last-event-id")
     if last_event:
