@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.38.0
+
+- Added deterministic `meemee release-audit` CI/release gating for required assets, version drift and explicit stub markers, with structured findings.
+- Added the previously missing complete proprietary license file.
+- Core verification: 128 tests passed; Ruff and release audit clean.
+
 ## 0.37.0
 
 - Added secure, non-destructive `meemee init` onboarding for a commercial first-run path.

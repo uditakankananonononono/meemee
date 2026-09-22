@@ -13,6 +13,7 @@ from .config import Settings
 from .migrations import CORE_MIGRATIONS, Migrator
 from .onboarding import initialize
 from .preflight import run_preflight
+from .release_audit import audit_tree
 from .retention import RetentionManager
 from .runtime import build_agent
 from .tools.github import GitHubRepoSearch, GitHubSearchArgs
@@ -26,6 +27,7 @@ DEFAULT_DATA_DIR = Path.home() / ".meemee"
 DEFAULT_ENV_FILE = Path(".env")
 DATA_DIR_OPTION = typer.Option(DEFAULT_DATA_DIR, "--data-dir")
 ENV_FILE_OPTION = typer.Option(DEFAULT_ENV_FILE, "--env-file")
+ROOT_ARGUMENT = typer.Argument(Path("."))
 
 
 @app.command()
@@ -119,6 +121,15 @@ def retention_run() -> None:
         audit_days=settings.retention_audit_days,
     )
     typer.echo(json.dumps(report.__dict__, indent=2))
+
+
+@app.command("release-audit")
+def release_audit(root: Path = ROOT_ARGUMENT) -> None:
+    """Fail when a release tree has stub markers, omissions or version drift."""
+    report = audit_tree(root.resolve())
+    typer.echo(json.dumps(report, indent=2))
+    if report["status"] != "pass":
+        raise typer.Exit(1)
 
 
 @app.command("init")
