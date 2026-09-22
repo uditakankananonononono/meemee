@@ -2,6 +2,13 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.54.0
+
+- Added a full-ASGI parallel API load gate through the production middleware/auth/routing stack.
+- Requires every response to complete with a request ID and zero network errors or unexpected 5xx responses.
+- Verified 500 requests at concurrency 32 with all 500 returning 200.
+- Verification: 168 tests passed; Ruff, explicit 0.54.0 release audit and 500-request API loadcheck clean.
+
 ## 0.53.0
 
 - Added a release-blocking shared-store contention harness across authentication, audit, jobs and entitlements.

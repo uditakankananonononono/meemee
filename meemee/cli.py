@@ -9,6 +9,7 @@ import typer
 import uvicorn
 
 from .account_export import export_account, import_account, inspect_import
+from .api_loadcheck import run_api_loadcheck
 from .backup import BackupManager
 from .config import Settings
 from .key_rotation import rotate_keys
@@ -216,6 +217,18 @@ def init(
         typer.echo(json.dumps({"status": "error", "error": str(exc)}))
         raise typer.Exit(1) from exc
     typer.echo(json.dumps(report, indent=2))
+
+
+@app.command("api-loadcheck")
+def api_loadcheck(requests: int = 200, concurrency: int = 20) -> None:
+    """Run parallel requests through the complete in-process API stack."""
+    settings = Settings()
+    if not settings.api_token:
+        raise typer.BadParameter("MEEMEE_API_TOKEN is required")
+    from .api import app as api_app
+    report = asyncio.run(run_api_loadcheck(api_app, settings.api_token, requests, concurrency))
+    typer.echo(json.dumps(report, indent=2))
+    if report["status"] != "pass": raise typer.Exit(1)
 
 
 @app.command("loadcheck")

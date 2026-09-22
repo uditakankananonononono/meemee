@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.53.0 (77)
+## Verified in v0.54.0 (78)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -81,6 +81,7 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 75. Opaque stable keyset pagination for principal jobs, completed runs and safe token metadata, with tamper/malformed cursor rejection, backward-compatible legacy before filters, explicit next_cursor envelopes, and Python SDK page/iter_all helpers.
 76. Pagination consistency for webhook subscriptions, webhook delivery history and the audit chain: stable keyset/sequence continuation, next_cursor envelopes, malformed-cursor refusal and Python SDK page/iterator support while retaining legacy delivery/audit cursors.
 77. Release-blocking shared-store contention harness spanning token authentication, tamper-evident audit appends, owner-bound job writes and entitlement reads, with configurable concurrency, exact lane/write counts, error capture, audit-chain verification and nonzero CLI exit on any mismatch.
+78. Full-ASGI API parallel load gate that drives health, authenticated whoami and owner job-list requests through trusted-host, metrics, rate-limit, auth, request-context and routing middleware, requiring complete responses, request IDs and zero unexpected 5xx/network errors.
 
 ## Thin (0)
 
