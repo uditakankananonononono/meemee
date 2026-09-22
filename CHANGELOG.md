@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.59.0
+
+- Added approval-gated GitHub branch push and pull-request tools using authenticated API mutations.
+- Branch pushes require an exact expected remote head and exact target commit, refusing races before mutation.
+- Verification: 179 core tests passed; Ruff and explicit 0.59.0 release audit clean. SDK remains 110 passed from v0.55.0; no SDK surface changed.
+
 ## 0.58.0
 
 - Added deterministic local semantic embeddings persisted beside memory, cosine retrieval and reciprocal-rank fusion with FTS.

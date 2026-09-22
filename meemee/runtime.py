@@ -8,6 +8,8 @@ from .tools import (
     BrowserNavigate,
     DelegateTasks,
     GitCommit,
+    GitHubCreatePullRequest,
+    GitHubPushBranch,
     GitHubRepoSearch,
     GitInspect,
     ReadFile,
@@ -21,6 +23,8 @@ def build_agent(settings: Settings | None = None, include_delegation: bool = Tru
     settings = settings or Settings()
     registry = ToolRegistry()
     registry.register(GitHubRepoSearch(settings.github_token))
+    registry.register(GitHubPushBranch(settings.github_token))
+    registry.register(GitHubCreatePullRequest(settings.github_token))
     registry.register(ReadFile(settings.workspace))
     registry.register(WriteFile(settings.workspace))
     registry.register(ShellCommand(settings.workspace, set(settings.shell_allowlist.split(","))))
