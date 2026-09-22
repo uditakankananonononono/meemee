@@ -51,6 +51,12 @@ class WebhookStore:
                 UNIQUE(subscription_id,event_id)
             );
             CREATE INDEX IF NOT EXISTS webhook_due ON webhook_deliveries(status,next_attempt_at);
+            CREATE TABLE IF NOT EXISTS webhook_attempts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, delivery_id TEXT NOT NULL,
+                attempt INTEGER NOT NULL, started_at TEXT NOT NULL, finished_at TEXT,
+                outcome TEXT, response_status INTEGER, error TEXT
+            );
+            CREATE INDEX IF NOT EXISTS webhook_attempt_delivery ON webhook_attempts(delivery_id,id);
         """)
         columns = {row[1] for row in self.db.execute("PRAGMA table_info(webhook_deliveries)")}
         if "sending_started_at" not in columns:
@@ -100,12 +106,21 @@ class WebhookStore:
             if row is None:
                 self.db.execute("COMMIT"); return None
             self.db.execute("UPDATE webhook_deliveries SET status='sending',attempts=attempts+1,sending_started_at=? WHERE id=?", (current, row["id"]))
+            self.db.execute(
+                "INSERT INTO webhook_attempts(delivery_id,attempt,started_at) VALUES(?,?,?)",
+                (row["id"], row["attempts"] + 1, datetime.now(timezone.utc).isoformat()),
+            )
             self.db.execute("COMMIT")
         return dict(row)
 
     def succeed(self, ident: str, status: int) -> None:
+        now = datetime.now(timezone.utc).isoformat()
         with self.lock, self.db:
             self.db.execute("UPDATE webhook_deliveries SET status='delivered',response_status=?,last_error=NULL,sending_started_at=NULL WHERE id=? AND status='sending'", (status, ident))
+            self.db.execute(
+                "UPDATE webhook_attempts SET finished_at=?,outcome='delivered',response_status=? WHERE id=(SELECT max(id) FROM webhook_attempts WHERE delivery_id=?)",
+                (now, status, ident),
+            )
 
     def retry(self, ident: str, error: str, max_attempts: int = 8) -> None:
         with self.lock, self.db:
@@ -113,7 +128,22 @@ class WebhookStore:
             if row is None: return
             terminal = row["attempts"] >= max_attempts
             delay = min(2 ** max(row["attempts"] - 1, 0), 3600)
-            self.db.execute("UPDATE webhook_deliveries SET status=?,next_attempt_at=?,last_error=?,sending_started_at=NULL WHERE id=?", ("failed" if terminal else "queued", time.time()+delay, error[:1000], ident))
+            status = "failed" if terminal else "queued"
+            self.db.execute("UPDATE webhook_deliveries SET status=?,next_attempt_at=?,last_error=?,sending_started_at=NULL WHERE id=?", (status, time.time()+delay, error[:1000], ident))
+            self.db.execute(
+                "UPDATE webhook_attempts SET finished_at=?,outcome=?,error=? WHERE id=(SELECT max(id) FROM webhook_attempts WHERE delivery_id=?)",
+                (datetime.now(timezone.utc).isoformat(), status, error[:1000], ident),
+            )
+            if terminal:
+                failures = self.db.execute(
+                    "SELECT count(*) FROM webhook_deliveries WHERE subscription_id=(SELECT subscription_id FROM webhook_deliveries WHERE id=?) AND status='failed'",
+                    (ident,),
+                ).fetchone()[0]
+                if failures >= 5:
+                    self.db.execute(
+                        "UPDATE webhook_subscriptions SET active=0 WHERE id=(SELECT subscription_id FROM webhook_deliveries WHERE id=?)",
+                        (ident,),
+                    )
 
 
     def recover_stale(self, stale_before: float) -> int:
@@ -122,6 +152,43 @@ class WebhookStore:
                 "UPDATE webhook_deliveries SET status='queued',next_attempt_at=?,last_error='dispatcher lease expired',sending_started_at=NULL WHERE status='sending' AND sending_started_at<?",
                 (time.time(), stale_before),
             ).rowcount
+
+    def set_active(self, ident: str, principal: str, active: bool) -> bool:
+        with self.lock, self.db:
+            return bool(self.db.execute(
+                "UPDATE webhook_subscriptions SET active=? WHERE id=? AND principal=?",
+                (int(active), ident, principal),
+            ).rowcount)
+
+    def attempt_timeline(self, delivery_id: str, principal: str) -> list[dict]:
+        with self.lock:
+            rows = self.db.execute(
+                """SELECT a.* FROM webhook_attempts a JOIN webhook_deliveries d ON d.id=a.delivery_id
+                JOIN webhook_subscriptions s ON s.id=d.subscription_id
+                WHERE a.delivery_id=? AND s.principal=? ORDER BY a.id""",
+                (delivery_id, principal),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def health(self, ident: str, principal: str) -> dict | None:
+        with self.lock:
+            subscription = self.db.execute(
+                "SELECT id,url,events,active,created_at FROM webhook_subscriptions WHERE id=? AND principal=?",
+                (ident, principal),
+            ).fetchone()
+            if subscription is None:
+                return None
+            rows = self.db.execute(
+                "SELECT status,count(*) AS count FROM webhook_deliveries WHERE subscription_id=? GROUP BY status",
+                (ident,),
+            ).fetchall()
+            latest = self.db.execute(
+                "SELECT status,response_status,last_error,created_at FROM webhook_deliveries WHERE subscription_id=? ORDER BY created_at DESC,id DESC LIMIT 1",
+                (ident,),
+            ).fetchone()
+        counts = {status: 0 for status in ("queued","sending","delivered","failed")}
+        counts.update({row["status"]: int(row["count"]) for row in rows})
+        return {**dict(subscription), "counts": counts, "latest": dict(latest) if latest else None}
 
     def rotate_secret(self, ident: str, principal: str) -> str | None:
         secret = secrets.token_urlsafe(32)

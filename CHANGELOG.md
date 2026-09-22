@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.31.0
+
+- Added webhook pause/resume, health summaries and attempt timelines.
+- Added automatic suspension after five terminal delivery failures.
+- Core verification: 108 tests passed; Ruff clean.
+
 ## 0.30.0
 
 - Added stale dispatcher-lease recovery, webhook secret rotation and test delivery.

@@ -415,3 +415,37 @@ def test_webhook(webhook_id: str, principal=jobs_write_dependency):
         webhooks.db.execute("INSERT INTO webhook_deliveries(id,subscription_id,event_id,event_type,payload,status,next_attempt_at,created_at) VALUES(?,?,?,?,?,'queued',?,?)", (uuid.uuid4().hex, webhook_id, event_id, "webhook.test", payload, time.time(), datetime.now(timezone.utc).isoformat()))
     audit.append(principal.id, "webhook.test", webhook_id, "success", {"event_id": event_id})
     return {"event_id": event_id, "queued": True}
+
+
+@app.post("/v1/webhooks/{webhook_id}/pause")
+def pause_webhook(webhook_id: str, principal=jobs_write_dependency):
+    if not webhooks.set_active(webhook_id, principal.id, False):
+        raise HTTPException(404, "webhook not found")
+    audit.append(principal.id, "webhook.pause", webhook_id, "success")
+    return {"id": webhook_id, "active": False}
+
+
+@app.post("/v1/webhooks/{webhook_id}/resume")
+def resume_webhook(webhook_id: str, principal=jobs_write_dependency):
+    if not webhooks.set_active(webhook_id, principal.id, True):
+        raise HTTPException(404, "webhook not found")
+    audit.append(principal.id, "webhook.resume", webhook_id, "success")
+    return {"id": webhook_id, "active": True}
+
+
+@app.get("/v1/webhooks/{webhook_id}/health", dependencies=[Depends(auth.dependency("jobs:read"))])
+def webhook_health(request: Request, webhook_id: str):
+    result = webhooks.health(webhook_id, request.state.principal.id)
+    if result is None:
+        raise HTTPException(404, "webhook not found")
+    return result
+
+
+@app.get("/v1/webhook-deliveries/{delivery_id}/attempts", dependencies=[Depends(auth.dependency("jobs:read"))])
+def webhook_delivery_attempts(request: Request, delivery_id: str):
+    attempts = webhooks.attempt_timeline(delivery_id, request.state.principal.id)
+    if not attempts:
+        owned = list_deliveries(webhooks, request.state.principal.id, limit=500)
+        if not any(row["id"] == delivery_id for row in owned):
+            raise HTTPException(404, "delivery not found")
+    return {"attempts": attempts}
