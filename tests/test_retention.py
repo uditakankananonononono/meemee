@@ -22,3 +22,14 @@ def test_retention_removes_old_terminal_and_memory_but_not_active(tmp_path: Path
 def test_retention_rejects_zero_window(tmp_path: Path):
     import pytest
     with pytest.raises(ValueError): RetentionManager(tmp_path).run(jobs_days=0)
+
+
+def test_retention_removes_old_run_history(tmp_path: Path):
+    from meemee.runs import RunStore
+    from meemee.types import RunReport
+    store=RunStore(tmp_path/"runs.sqlite3")
+    store.add("u",RunReport(run_id="r",goal="g",final="f",steps_used=1,tool_results=[]))
+    past=(datetime.now(timezone.utc)-timedelta(days=100)).isoformat()
+    store.db.execute("UPDATE runs SET created_at=?",(past,)); store.db.commit()
+    report=RetentionManager(tmp_path).run(runs_days=30)
+    assert report.runs==1 and store.list("u")==[]

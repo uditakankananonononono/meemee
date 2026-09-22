@@ -2,6 +2,13 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.47.0
+
+- Extended readiness to the durable run and entitlement stores.
+- Added configurable completed-run retention with exact deletion reporting.
+- Proved verified online backup/restore coverage for run, entitlement, approval and webhook commercial state.
+- Core verification: 152 tests passed; Ruff and release audit clean.
+
 ## 0.46.0
 
 - Added admin-only safe token metadata listing without digest or raw-credential disclosure.

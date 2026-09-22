@@ -46,3 +46,15 @@ def test_backup_detects_tampering(tmp_path: Path):
     (destination / manifest["files"][0]["name"]).write_bytes(b"tampered")
     with pytest.raises(RuntimeError, match="wrong size|checksum"):
         BackupManager.verify(destination)
+
+
+def test_backup_captures_all_commercial_state_databases(tmp_path: Path):
+    data=tmp_path/"data"; data.mkdir()
+    for name in ("runs.sqlite3","entitlements.sqlite3","approvals.sqlite3","webhooks.sqlite3"):
+        db=sqlite3.connect(data/name); db.execute("CREATE TABLE state(value TEXT)"); db.execute("INSERT INTO state VALUES('kept')"); db.commit(); db.close()
+    manifest=BackupManager(data).create(tmp_path/"commercial-backup")
+    assert {row["name"] for row in manifest["files"]}=={"runs.sqlite3","entitlements.sqlite3","approvals.sqlite3","webhooks.sqlite3"}
+    for row in manifest["files"]:
+        restored=sqlite3.connect(tmp_path/"commercial-backup"/row["name"])
+        assert restored.execute("SELECT value FROM state").fetchone()[0]=="kept"
+        restored.close()

@@ -120,6 +120,7 @@ def retention_run() -> None:
         jobs_days=settings.retention_jobs_days,
         memory_days=settings.retention_memory_days,
         audit_days=settings.retention_audit_days,
+        runs_days=settings.retention_runs_days,
     )
     typer.echo(json.dumps(report.__dict__, indent=2))
 

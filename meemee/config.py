@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     default_plan: str = "starter"
     retention_jobs_days: int = 30
     retention_memory_days: int = 90
+    retention_runs_days: int = 90
     retention_audit_days: int = 365
     shutdown_grace_seconds: float = 30.0
     webhook_poll_seconds: float = 1.0

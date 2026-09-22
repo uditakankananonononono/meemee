@@ -45,7 +45,9 @@ Before building a release, run `meemee release-audit .`; after building the whee
 
 ## Backups and recovery
 
-Stop API/workers or use SQLite's online backup API before copying databases. Back up all files under `MEEMEE_DATA_DIR`, plus the vault key stored separately. Test restoration on a separate host. Never restore two active writers from the same copied SQLite state.
+Stop API/workers or use SQLite's online backup API before copying databases. Back up all files under `MEEMEE_DATA_DIR`, including runs, entitlements, approvals and webhooks, plus the vault key stored separately. The built-in online backup discovers every `.sqlite3` file and records each in its verified manifest. Test restoration on a separate host. Never restore two active writers from the same copied SQLite state.
+
+`MEEMEE_RETENTION_RUNS_DAYS` controls completed immediate-run history independently from queued-job and memory retention.
 
 Recommended daily retention: 7 daily, 4 weekly, 6 monthly encrypted backups. Monitor disk usage, failed job events, HTTP 429/5xx rates, worker liveness, and model latency.
 
