@@ -57,7 +57,15 @@ class AuditLog:
                 previous = row["entry_hash"]
             return True, None
 
-    def list(self, after: int = 0, limit: int = 100) -> list[dict[str, Any]]:
+    def list_page(self, after: int = 0, limit: int = 100) -> tuple[list[dict[str, Any]], str | None]:
+        page_size = min(max(limit, 1), 500)
         with self.lock:
-            rows = self.db.execute("SELECT * FROM audit_log WHERE sequence>? ORDER BY sequence LIMIT ?", (after, min(limit, 500))).fetchall()
-        return [{**dict(row), "metadata": json.loads(row["metadata"])} for row in rows]
+            rows = self.db.execute(
+                "SELECT * FROM audit_log WHERE sequence>? ORDER BY sequence LIMIT ?",
+                (after, page_size + 1),
+            ).fetchall()
+        items = [{**dict(row), "metadata": json.loads(row["metadata"])} for row in rows[:page_size]]
+        return items, str(items[-1]["sequence"]) if len(rows) > page_size else None
+
+    def list(self, after: int = 0, limit: int = 100) -> list[dict[str, Any]]:
+        return self.list_page(after, limit)[0]

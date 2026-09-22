@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 
 import httpx
 
+from .cursors import decode_cursor, encode_cursor
 from .schema_registry import register_schema
 from .secret_cipher import SecretCipher
 
@@ -358,20 +359,28 @@ def list_deliveries(
     status: str | None = None,
     after: str | None = None,
     limit: int = 100,
-) -> list[dict]:
+    cursor: str | None = None,
+) -> tuple[list[dict], str | None]:
     """List principal-owned deliveries without signing secrets or payload bodies."""
     clauses, parameters = ["s.principal=?"], [principal]
     if status:
         clauses.append("d.status=?"); parameters.append(status)
     if after:
         clauses.append("d.id>?"); parameters.append(after)
-    parameters.append(min(max(limit, 1), 500))
+    if cursor:
+        cursor_time, cursor_id = decode_cursor(cursor)
+        clauses.append("(d.created_at<? OR (d.created_at=? AND d.id<?))")
+        parameters.extend((cursor_time, cursor_time, cursor_id))
+    page_size = min(max(limit, 1), 500); parameters.append(page_size + 1)
     query = f"""SELECT d.id,d.subscription_id,d.event_id,d.event_type,d.payload_sha256,d.status,d.attempts,
         d.next_attempt_at,d.response_status,d.last_error,d.created_at
         FROM webhook_deliveries d JOIN webhook_subscriptions s ON s.id=d.subscription_id
-        WHERE {' AND '.join(clauses)} ORDER BY d.id LIMIT ?"""
+        WHERE {' AND '.join(clauses)} ORDER BY d.created_at DESC,d.id DESC LIMIT ?"""
     with store.lock:
-        return [dict(row) for row in store.db.execute(query, tuple(parameters)).fetchall()]
+        rows = store.db.execute(query, tuple(parameters)).fetchall()
+    items = [dict(row) for row in rows[:page_size]]
+    next_cursor = encode_cursor(items[-1]["created_at"], items[-1]["id"]) if len(rows) > page_size else None
+    return items, next_cursor
 
 
 def replay_delivery(store: WebhookStore, principal: str, delivery_id: str) -> bool:

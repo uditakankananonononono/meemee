@@ -20,7 +20,7 @@ def test_envelope_selection_and_hash(tmp_path: Path, monkeypatch):
     body=json.loads(row["payload"])
     assert body=={"schema":"meemee.webhook.v1","event_id":"e1","event_type":"job.done","data":{"job_id":"j","status":"done"}}
     assert row["payload_sha256"]==hashlib.sha256(row["payload"].encode()).hexdigest()
-    listed=list_deliveries(store,"u")[0]
+    listed=list_deliveries(store,"u")[0][0]
     assert listed["payload_sha256"]==row["payload_sha256"] and "payload" not in listed
 
 

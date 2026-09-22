@@ -639,15 +639,17 @@ class AuditResource:
     def __init__(self, client: MeemeeClient) -> None:
         self._client = client
 
-    def list(self, *, after: int = 0, limit: int = 100) -> AuditPage:
-        """GET /v1/audit - entries with sequence > ``after``, oldest first.
-        The server caps limit at 500."""
+    def page(self, *, after: int = 0, limit: int = 100) -> tuple[AuditPage, str | None]:
         if not (1 <= limit <= 500):
             raise ValueError("limit must be 1-500 (the server caps at 500)")
         payload = self._client._request_json(
             "GET", "/v1/audit", params={"after": after, "limit": limit}
         )
-        return AuditPage.model_validate(payload)
+        return AuditPage.model_validate(payload), payload.get("next_cursor")
+
+    def list(self, *, after: int = 0, limit: int = 100) -> AuditPage:
+        """GET /v1/audit - entries with sequence > ``after``, oldest first."""
+        return self.page(after=after, limit=limit)[0]
 
     def iter_entries(self, *, after: int = 0, limit: int = 100) -> Iterator[AuditEntry]:
         """Walk the whole chain from ``after``, following the sequence cursor."""
@@ -716,12 +718,23 @@ class WebhooksResource:
         payload = self._client._request_json("POST", f"/v1/webhooks/{webhook_id}/rotate-secret")
         return CreatedWebhook.model_validate(payload)
 
-    def deliveries(self, *, status: str | None = None, after: str | None = None, limit: int = 100) -> list[WebhookDelivery]:
+    def deliveries_page(self, *, status: str | None = None, after: str | None = None, cursor: str | None = None, limit: int = 100) -> tuple[list[WebhookDelivery], str | None]:
         params = {"limit": limit}
         if status is not None: params["status"] = status
         if after is not None: params["after"] = after
+        if cursor is not None: params["cursor"] = cursor
         payload = self._client._request_json("GET", "/v1/webhook-deliveries", params=params)
-        return [WebhookDelivery.model_validate(item) for item in payload["deliveries"]]
+        return [WebhookDelivery.model_validate(item) for item in payload["deliveries"]], payload.get("next_cursor")
+
+    def deliveries(self, *, status: str | None = None, after: str | None = None, limit: int = 100) -> list[WebhookDelivery]:
+        return self.deliveries_page(status=status, after=after, limit=limit)[0]
+
+    def iter_deliveries(self, *, status: str | None = None, limit: int = 100) -> Iterator[WebhookDelivery]:
+        cursor = None
+        while True:
+            items, cursor = self.deliveries_page(status=status, cursor=cursor, limit=limit)
+            yield from items
+            if cursor is None: return
 
     def replay(self, delivery_id: str) -> dict:
         return self._client._request_json("POST", f"/v1/webhook-deliveries/{delivery_id}/replay")

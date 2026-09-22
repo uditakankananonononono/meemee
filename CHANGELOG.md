@@ -2,6 +2,13 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.52.0
+
+- Added stable keyset pagination and next cursors for webhook subscriptions and delivery history.
+- Added explicit audit next cursors while preserving the sequence-after contract.
+- Added Python SDK audit page and webhook delivery page/iterator helpers.
+- Verification: 164 core and 110 SDK tests passed; Ruff and explicit 0.52.0 release audit clean.
+
 ## 0.51.0
 
 - Added opaque stable keyset cursors and `next_cursor` envelopes to principal jobs, completed runs and safe token metadata lists.

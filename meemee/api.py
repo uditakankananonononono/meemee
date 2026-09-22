@@ -326,7 +326,8 @@ def list_audit(after: int = 0, limit: int = 100):
     valid, broken_at = audit.verify()
     if not valid:
         raise HTTPException(500, f"audit chain verification failed at {broken_at}")
-    return {"verified": True, "entries": audit.list(after, limit)}
+    entries, next_cursor = audit.list_page(after, limit)
+    return {"verified": True, "entries": entries, "next_cursor": next_cursor}
 
 
 @app.get("/metrics", dependencies=[Depends(auth.dependency("admin"))], include_in_schema=False)
@@ -494,10 +495,24 @@ def create_webhook(request: WebhookRequest, principal=jobs_write_dependency):
 
 
 @app.get("/v1/webhooks", dependencies=[Depends(auth.dependency("jobs:read"))])
-def list_webhooks(request: Request):
+def list_webhooks(request: Request, cursor: str | None = None, limit: int = 100):
+    from .cursors import decode_cursor, encode_cursor
+
     principal = request.state.principal
-    rows = webhooks.db.execute("SELECT id,url,events,active,created_at FROM webhook_subscriptions WHERE principal=? ORDER BY created_at", (principal.id,)).fetchall()
-    return {"webhooks": [dict(row) for row in rows]}
+    clauses, parameters = ["principal=?"], [principal.id]
+    if cursor:
+        try: cursor_time, cursor_id = decode_cursor(cursor)
+        except ValueError as exc: raise HTTPException(422, str(exc)) from exc
+        clauses.append("(created_at<? OR (created_at=? AND id<?))")
+        parameters.extend((cursor_time, cursor_time, cursor_id))
+    page_size = min(max(limit, 1), 500); parameters.append(page_size + 1)
+    rows = webhooks.db.execute(
+        f"SELECT id,url,events,active,created_at FROM webhook_subscriptions WHERE {' AND '.join(clauses)} ORDER BY created_at DESC,id DESC LIMIT ?",
+        tuple(parameters),
+    ).fetchall()
+    items = [dict(row) for row in rows[:page_size]]
+    next_cursor = encode_cursor(items[-1]["created_at"], items[-1]["id"]) if len(rows)>page_size else None
+    return {"webhooks": items, "next_cursor": next_cursor}
 
 
 @app.delete("/v1/webhooks/{webhook_id}")
@@ -509,15 +524,17 @@ def delete_webhook(webhook_id: str, principal=jobs_write_dependency):
 
 
 @app.get("/v1/webhook-deliveries", dependencies=[Depends(auth.dependency("jobs:read"))])
-def get_webhook_deliveries(request: Request, status: str | None = None, after: str | None = None, limit: int = 100):
+def get_webhook_deliveries(request: Request, status: str | None = None, after: str | None = None, limit: int = 100, cursor: str | None = None):
     if status and status not in {"queued", "sending", "delivered", "failed"}:
         raise HTTPException(422, "invalid delivery status")
-    return {"deliveries": list_deliveries(webhooks, request.state.principal.id, status, after, limit)}
+    try: items, next_cursor = list_deliveries(webhooks, request.state.principal.id, status, after, limit, cursor)
+    except ValueError as exc: raise HTTPException(422, str(exc)) from exc
+    return {"deliveries": items, "next_cursor": next_cursor}
 
 
 @app.get("/v1/webhook-deliveries/{delivery_id}", dependencies=[Depends(auth.dependency("jobs:read"))])
 def get_webhook_delivery(request: Request, delivery_id: str):
-    rows = list_deliveries(webhooks, request.state.principal.id, after=None, limit=500)
+    rows = list_deliveries(webhooks, request.state.principal.id, after=None, limit=500)[0]
     match = next((row for row in rows if row["id"] == delivery_id), None)
     if match is None:
         raise HTTPException(404, "delivery not found")
@@ -592,7 +609,7 @@ def webhook_health(request: Request, webhook_id: str):
 def webhook_delivery_attempts(request: Request, delivery_id: str):
     attempts = webhooks.attempt_timeline(delivery_id, request.state.principal.id)
     if not attempts:
-        owned = list_deliveries(webhooks, request.state.principal.id, limit=500)
+        owned = list_deliveries(webhooks, request.state.principal.id, limit=500)[0]
         if not any(row["id"] == delivery_id for row in owned):
             raise HTTPException(404, "delivery not found")
     return {"attempts": attempts}

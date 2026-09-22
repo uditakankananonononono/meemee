@@ -27,8 +27,8 @@ def populated(tmp_path: Path, monkeypatch):
 
 def test_owner_list_metrics_and_replay(tmp_path: Path, monkeypatch):
     store, ident = populated(tmp_path, monkeypatch)
-    assert list_deliveries(store, "other") == []
-    rows = list_deliveries(store, "u", status="failed")
+    assert list_deliveries(store, "other")[0] == []
+    rows = list_deliveries(store, "u", status="failed")[0]
     assert rows[0]["id"] == ident and "payload" not in rows[0] and "secret" not in rows[0]
     assert delivery_metrics(store)["failed"] == 1
     assert replay_delivery(store, "u", ident)
