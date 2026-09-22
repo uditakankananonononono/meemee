@@ -48,6 +48,28 @@ def audit_tree(root: Path, expected_version: str | None = None) -> dict:
                 target = root / document
                 if target.exists() and version not in target.read_text():
                     findings.append({"code": "version_document_drift", "path": document})
+    sdk_project = root / "sdk" / "pyproject.toml"
+    sdk_package = root / "sdk" / "src" / "meemee_client" / "_version.py"
+    if pyproject.exists() and sdk_project.exists() and sdk_package.exists():
+        versions = {_version(pyproject), _version(sdk_project), _version(sdk_package)}
+        if None in versions or len(versions) != 1:
+            findings.append({"code":"sdk_version_drift","path":"sdk/pyproject.toml"})
+    stale_claims = {
+        "README.md": (
+            "WebSocket streaming (resume-safe SSE is implemented)",
+            "runtime still uses SQLite",
+            "remote Git push and pull-request operations",
+            "Semantic/embedding memory and reranking",
+        ),
+        "STATUS.md": ("still instantiate SQLite stores",),
+    }
+    for relative, phrases in stale_claims.items():
+        target = root / relative
+        if target.exists():
+            text = target.read_text()
+            for phrase in phrases:
+                if phrase in text:
+                    findings.append({"code":"stale_capability_claim","path":relative,"phrase":phrase})
     for path in sorted(root.rglob("*")):
         if not path.is_file() or path.suffix not in TEXT_SUFFIXES:
             continue

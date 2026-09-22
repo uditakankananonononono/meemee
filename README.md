@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.79.0 (78)
+## Verified in v0.80.0 (78)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -94,7 +94,7 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 88. Cooperative mid-tool cancellation for asynchronous tools with prompt task cancellation, cleanup propagation, a recorded cancelled tool result and immediate agent termination before another model step.
 89. Fail-closed persistence composition selector with explicit SQLite/PostgreSQL configuration, automatic PostgreSQL migrations, optional dependency packaging and runtime agent-memory selection; queued-job/API parity remains an explicit boundary.
 90. Python SDK parity for argument-scoped approval administration, including corrected current response models, validated constraint maps, expiry support and safely encoded principal/tool paths.
-91. Core/SDK version parity at 0.79.0 with stale server-contract labels removed across package metadata, imports, README and live-integration documentation.
+91. Core/SDK version parity at 0.80.0 with stale server-contract labels removed across package metadata, imports, README and live-integration documentation.
 92. Checksummed SQLite-to-PostgreSQL core-data export and transactional empty-target import CLIs covering memory, jobs/events, tokens and audit, with tamper detection, byte preservation and fail-closed collision checks.
 93. API/worker composition selection for PostgreSQL memory and owner-scoped queued jobs, with automatic ownership migration, owner reads/lists/events and leased worker execution.
 94. PostgreSQL job-list opaque keyset cursor parity with malformed-cursor rejection, stable updated-at/UUID ordering and compatible next-cursor envelopes.
@@ -107,6 +107,7 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 101. PostgreSQL runtime package and bundled SQL migrations included in the commercial wheel, enforced by package audit and a real wheel-build regression test.
 102. Typed Python SDK wheel build verification with core-version parity, required client/model modules and PEP 561 `py.typed` marker inspection.
 103. Operator-console account administration for IdP-backed principals, including explicit plan assignment and validated daily-job quota overrides with confirmation and structured results.
+104. Release-audit regression guards for core/SDK version drift and stale capability claims, preventing shipped features from remaining falsely listed as missing.
 
 ## Thin (0)
 
@@ -114,11 +115,9 @@ Nothing is classified as thin. A capability is either implemented and tested at 
 
 ## Missing, not claimed
 
-identity-provider-side user lifecycle (Meemee account plan/quota/permissions administration is implemented); interactive browser human takeover beyond explicit challenge detection/handoff; WebSocket streaming (resume-safe SSE is implemented); forced mid-tool cancellation (cooperative between-step cancellation is implemented); and a core-wired shared database/queue suitable for Kubernetes replicas (the additive PostgreSQL package exists, but the runtime still uses SQLite).
+Live PostgreSQL integration is not verified in this environment; target deployments must run the unskipped PostgreSQL suite and preflight. Identity creation/deletion and password policy remain at the configured IdP, while Meemee plan, quota and permission administration is implemented. Browser challenges are detected and handed off, but an interactive live human-control channel is not built in. Async tools can be cancelled; blocking third-party native code that does not yield cannot be forcibly interrupted safely. Multi-region failover, online dual-write migration and logical replication remain deployment/infrastructure work and are not claimed.
 
-The existing deterministic goal decomposition, lexical FTS, scoped/revocable API token system, browser automation, single-host shared limiter, SQLite queue, and cursor event API and SSE stream remain useful internal or single-node features, but they are not presented as completed versions of the advanced capabilities above.
-
-Commercial operation, credentials, backup, recovery, upgrades and incident steps are in [OPERATIONS.md](OPERATIONS.md).
+The SQLite single-host shape and PostgreSQL memory, owner-scoped jobs and shared rate limiting are stated at their tested boundaries. SSE and authenticated WebSocket job streams are implemented. No missing item is represented as shipped.
 
 ## Install
 

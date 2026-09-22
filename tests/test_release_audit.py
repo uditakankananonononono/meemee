@@ -34,3 +34,13 @@ def test_release_audit_rejects_stale_but_aligned_version(tmp_path):
     assert report["status"] == "fail"
     finding = next(item for item in report["findings"] if item["code"] == "expected_version_mismatch")
     assert finding["actual"] == "0.37.0" and finding["expected"] == "0.50.0"
+
+
+def test_release_audit_rejects_sdk_drift_and_stale_capability_claims(tmp_path):
+    valid_tree(tmp_path)
+    (tmp_path/"sdk/src/meemee_client").mkdir(parents=True)
+    (tmp_path/"sdk/pyproject.toml").write_text('version = "0.9.0"')
+    (tmp_path/"sdk/src/meemee_client/_version.py").write_text('__version__ = "0.9.0"')
+    (tmp_path/"README.md").write_text((tmp_path/"README.md").read_text()+"\nWebSocket streaming (resume-safe SSE is implemented)")
+    codes={item["code"] for item in audit_tree(tmp_path)["findings"]}
+    assert {"sdk_version_drift","stale_capability_claim"} <= codes
