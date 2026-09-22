@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     model_api_key: str = "local"
     github_token: str | None = None
     data_dir: Path = Field(default_factory=lambda: Path.home() / ".meemee")
+    persistence_backend: str = "sqlite"
+    postgres_dsn: str | None = None
     workspace: Path = Field(default_factory=Path.cwd)
     max_steps: int = 12
     request_timeout: float = 60.0

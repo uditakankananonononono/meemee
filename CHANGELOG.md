@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.65.0
+
+- Added fail-closed SQLite/PostgreSQL persistence composition selection with automatic PostgreSQL migrations and optional dependency packaging.
+- Agent memory can select PostgreSQL; API and worker job parity remain explicitly unclaimed until their ownership/event contracts match.
+- Verification: 190 core tests passed; Ruff and explicit 0.65.0 release audit clean. SDK remains 110 passed from v0.55.0; no SDK surface changed.
+
 ## 0.64.0
 
 - Added cooperative mid-tool cancellation for asynchronous tools with prompt task cancellation and cleanup propagation.

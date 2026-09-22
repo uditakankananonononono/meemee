@@ -1,7 +1,7 @@
 from .agent import Agent
 from .config import Settings
 from .llm import OpenAICompatibleModel
-from .memory import MemoryStore
+from .persistence import build_persistence
 from .policy import PolicyEngine
 from .team import AgentTeam
 from .tools import (
@@ -19,7 +19,7 @@ from .tools import (
 )
 
 
-def build_agent(settings: Settings | None = None, include_delegation: bool = True) -> Agent:
+def build_agent(settings: Settings | None = None, include_delegation: bool = True, memory=None) -> Agent:
     settings = settings or Settings()
     registry = ToolRegistry()
     registry.register(GitHubRepoSearch(settings.github_token))
@@ -36,4 +36,5 @@ def build_agent(settings: Settings | None = None, include_delegation: bool = Tru
     model = OpenAICompatibleModel(
         settings.model_base_url, settings.model_name, settings.model_api_key, settings.request_timeout, settings.model_max_attempts
     )
-    return Agent(model, registry, MemoryStore(settings.database_path), settings.max_steps, PolicyEngine.from_file(settings.policy_file))
+    selected_memory = memory or build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn).memory
+    return Agent(model, registry, selected_memory, settings.max_steps, PolicyEngine.from_file(settings.policy_file))
