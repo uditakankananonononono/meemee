@@ -81,12 +81,28 @@ async def run_preflight(
     ))
     checks.extend(_check_data_dir(settings.data_dir, settings.readiness_min_free_bytes))
     checks.extend(_check_databases(settings.data_dir))
-    checks.append(_result(
-        "single_host_boundary",
-        True,
-        "warning",
-        supported_shape="SQLite/WAL on one host; do not share the data directory across hosts",
-    ))
+    if settings.persistence_backend.lower() == "postgresql":
+        postgres_ok = False
+        error = None
+        if not settings.postgres_dsn:
+            error = "MEEMEE_POSTGRES_DSN is required"
+        else:
+            try:
+                from meemee_persist_pg import Database, MigrationStore
+                database = Database(settings.postgres_dsn, min_size=1, max_size=2, timeout=5)
+                try:
+                    pending = MigrationStore(database).pending()
+                    postgres_ok = not pending
+                    error = f"pending migrations: {pending}" if pending else None
+                finally: database.close()
+            except (RuntimeError, OSError, ValueError) as exc:
+                error = f"{type(exc).__name__}: {exc}"
+        checks.append(_result("postgresql_connection_and_schema", postgres_ok, error=error))
+        checks.append(_result("deployment_boundary", True, "warning", supported_shape="PostgreSQL memory and owner-scoped jobs; validate remaining SQLite commercial stores per host"))
+    elif settings.persistence_backend.lower() == "sqlite":
+        checks.append(_result("deployment_boundary", True, "warning", supported_shape="SQLite/WAL on one host; do not share the data directory across hosts"))
+    else:
+        checks.append(_result("persistence_backend", False, configured=settings.persistence_backend, remediation="set sqlite or postgresql"))
     model_required = settings.readiness_require_model if require_model is None else require_model
     owns_client = client is None
     client = client or httpx.AsyncClient(timeout=httpx.Timeout(5, connect=2))

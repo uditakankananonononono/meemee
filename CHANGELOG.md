@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.72.0
+
+- Added PostgreSQL production preflight for required DSN, live connection/pool setup and zero pending migrations.
+- Preflight now reports the selected SQLite or PostgreSQL deployment boundary instead of always claiming single-host SQLite.
+- Verification: 199 core and 112 SDK tests plus 3 PostgreSQL contract tests passed; Ruff and explicit 0.72.0 release audit clean. Live PostgreSQL remains unrun here.
+
 ## 0.71.0
 
 - Added backend-neutral persistence lifecycle: one shared API/worker composition, SQLite/PostgreSQL readiness checks, shared worker memory and pooled shutdown.
@@ -28,7 +34,7 @@ All entries describe shipped repository behavior. Missing work is never presente
 
 ## 0.67.0
 
-- Aligned the Python SDK package/import version with core at 0.71.0 and removed stale v0.41 contract labels from SDK docs and metadata.
+- Aligned the Python SDK package/import version with core at 0.72.0 and removed stale v0.41 contract labels from SDK docs and metadata.
 - Added an explicit parity regression check.
 - Verification: 191 core and 112 SDK tests passed; Ruff and explicit 0.67.0 release audit clean.
 
