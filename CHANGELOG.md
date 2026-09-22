@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.87.0
+
+- Package audit now requires the proprietary license expression and one valid bundled license file.
+- Added corruption regressions so missing commercial/legal metadata cannot pass the release gate.
+- Verification: 217 core and 112 SDK tests plus 3 PostgreSQL contract tests passed; Ruff, deprecation-free core/SDK wheel builds, package audit and explicit 0.87.0 release audit clean. Live PostgreSQL remains unrun here.
+
 ## 0.86.0
 
 - Modernized core and SDK proprietary license metadata to the current packaging standard.

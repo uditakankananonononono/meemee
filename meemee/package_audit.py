@@ -38,6 +38,16 @@ def audit_wheel(wheel: Path, expected_version: str) -> dict:
             match = re.search(r"^Version: (.+)$", metadata, re.MULTILINE)
             if not match or match.group(1) != expected_version:
                 findings.append({"code":"wheel_version_mismatch", "expected":expected_version})
+            license_match = re.search(r"^License-Expression: (.+)$", metadata, re.MULTILINE)
+            if not license_match or license_match.group(1) != "LicenseRef-Proprietary":
+                findings.append({"code":"wheel_license_expression_invalid"})
+        license_names = [name for name in names if name.endswith(".dist-info/licenses/LICENSE")]
+        if len(license_names) != 1:
+            findings.append({"code":"wheel_license_missing"})
+        else:
+            license_text = archive.read(license_names[0]).decode(errors="replace")
+            if "All rights reserved" not in license_text or "proprietary and confidential" not in license_text:
+                findings.append({"code":"wheel_license_invalid"})
         if len(entry_names) != 1 or "meemee = meemee.cli:app" not in archive.read(entry_names[0]).decode(errors="replace"):
             findings.append({"code":"wheel_cli_entry_missing"})
     return {"status":"pass" if not findings else "fail", "findings":findings, "summary":{"findings":len(findings)}}
