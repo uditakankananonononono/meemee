@@ -1,9 +1,6 @@
-// Token administration: create scoped tokens (one-time reveal) and revoke by
-// ID. The API has no token listing endpoint, so the console keeps a
-// browser-local registry of the tokens it created and can only revoke by ID.
-import { h, clear, toast, missingNote, fullTime, badge } from "../dom.js";
+// Token administration: create one-time secrets and list/revoke safe server metadata.
+import { h, clear, toast, fullTime, badge } from "../dom.js";
 import * as api from "../api.js";
-import { tokenRegistry } from "../store.js";
 import { reportError } from "../app.js";
 
 const KNOWN_SCOPES = [
@@ -25,34 +22,24 @@ export async function renderTokens(root) {
   const registryBox = h("div");
 
   const renderRegistry = () => {
-    const items = tokenRegistry.all();
     clear(registryBox);
-    if (!items.length) {
-      registryBox.append(h("p", { class: "muted" }, "No tokens created from this browser yet."));
-      return;
-    }
-    registryBox.append(h("div", { class: "scroll-x" }, h("table", { class: "table" },
-      h("thead", null, h("tr", null,
-        h("th", null, "Name"), h("th", null, "ID"), h("th", null, "Scopes"),
-        h("th", null, "Expires"), h("th", null, "Created"), h("th", null, "State"), h("th", null, ""))),
-      h("tbody", null, items.map((item) => h("tr", null,
-        h("td", null, item.name),
-        h("td", null, h("code", null, item.id)),
-        h("td", { class: "muted" }, (item.scopes || []).join(" ")),
-        h("td", { class: "muted nowrap" }, item.expiresAt ? fullTime(item.expiresAt) : "never"),
-        h("td", { class: "muted nowrap" }, fullTime(item.createdAt)),
-        h("td", null, item.revoked ? badge("revoked", "warn") : badge("active (recorded)", "ok")),
-        h("td", null, item.revoked ? null : h("button", {
-          class: "button button-quiet", type: "button",
-          onclick: () => revoke(item.id),
-        }, "Revoke"))))))));
+    api.listTokens().then(({ tokens: items }) => {
+      if (!items.length) { registryBox.append(h("p", { class: "muted" }, "No API tokens yet.")); return; }
+      registryBox.append(h("div", { class: "scroll-x" }, h("table", { class: "table" },
+        h("thead", null, h("tr", null, h("th", null, "Name"), h("th", null, "ID"), h("th", null, "Scopes"), h("th", null, "Last used"), h("th", null, "State"), h("th", null, ""))),
+        h("tbody", null, items.map((item) => h("tr", null,
+          h("td", null, item.name), h("td", null, h("code", null, item.id)),
+          h("td", { class: "muted" }, item.scopes.join(" ")),
+          h("td", { class: "muted" }, item.last_used_at ? fullTime(item.last_used_at) : "never"),
+          h("td", null, item.revoked_at ? badge("revoked", "warn") : badge("active", "ok")),
+          h("td", null, item.revoked_at ? null : h("button", { class: "button button-quiet", type: "button", onclick: () => revoke(item.id) }, "Revoke"))))))));
+    }).catch((error) => reportError(error, "could not list tokens"));
   };
 
   const revoke = async (id) => {
     if (!window.confirm(`Revoke token ${id}? This cannot be undone.`)) return;
     try {
       await api.revokeToken(id);
-      tokenRegistry.markRevoked(id);
       toast("Token revoked.", "ok");
     } catch (error) {
       if (error instanceof api.ApiError && error.status === 404) {
@@ -76,7 +63,6 @@ export async function renderTokens(root) {
     create.disabled = true;
     try {
       const created = await api.createToken(tokenName, scopes, expiresAt);
-      tokenRegistry.remember(created);
       clear(revealBox).append(
         h("div", { class: "reveal" },
           h("h3", null, "Token created - shown once"),
@@ -89,7 +75,7 @@ export async function renderTokens(root) {
                 .then(() => { e.target.textContent = "Copied"; })
                 .catch(() => toast("Clipboard unavailable; select and copy manually.", "warn"));
             } }, "Copy")),
-          h("p", { class: "muted small" }, `id ${created.id} · name recorded in the local registry below.`)));
+          h("p", { class: "muted small" }, `id ${created.id} · metadata is available from the server list below.`)));
       toast("Token created.", "ok");
       name.value = ""; expiry.value = "";
       scopeBoxes.forEach(({ box }) => { box.checked = false; });
@@ -117,10 +103,7 @@ export async function renderTokens(root) {
       h("div", { class: "row" }, create),
       revealBox),
     h("section", { class: "card" },
-      h("h2", null, "Tokens created from this browser"),
-      missingNote("No token listing endpoint",
-        "GET /v1/tokens does not exist: the server stores only SHA-256 digests and offers create/revoke by ID. This registry is browser-local metadata; revocation itself always hits the server."),
-      registryBox),
+      h("h2", null, "API tokens"), registryBox),
     h("section", { class: "card" },
       h("h2", null, "Revoke a token"),
       h("p", { class: "muted" }, "Revocation needs the token ID (the 24-hex-character identifier returned at creation)."),

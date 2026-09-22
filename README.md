@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.45.0 (68)
+## Verified in v0.46.0 (70)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -72,6 +72,8 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 66. Complete plan-limit enforcement and usage visibility: active non-expired persistent approvals are counted and capped per plan without blocking regrant of an existing tool, while the current entitlement response reports exact daily-job, active-webhook and persistent-approval usage beside limits.
 67. Exact authenticated account introspection through `/v1/whoami` with principal ID/name, sorted scopes, plan, limits and live usage; the packaged operator console renders this account/plan state and removes its former whoami gap while retaining probes only as compatibility fallback.
 68. Principal-owned queued jobs with additive legacy-safe owner migration, owner-scoped get/cancel/events/SSE reads, status/cursor/limit list API, Python SDK listing, and source-of-truth console listing that no longer depends on browser-local job history.
+69. Safe API-token inventory with admin-only cursor/filter listing of ID, name, scopes and lifecycle timestamps while never selecting or returning token digests or raw credentials; SDK and console use the server inventory.
+70. Principal-owned completed run history with durable reports, owner-scoped cursor list/get APIs, Python SDK support and source-of-truth console history, eliminating the remaining browser-local product histories.
 
 ## Thin (0)
 

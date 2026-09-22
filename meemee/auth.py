@@ -67,6 +67,23 @@ class TokenStore:
             self.db.execute("UPDATE api_tokens SET last_used_at=? WHERE id=?", (now, row["id"]))
             return Principal(row["id"], row["name"], frozenset(row["scopes"].split()))
 
+    def list_metadata(
+        self, revoked: bool | None = None, before: str | None = None, limit: int = 100
+    ) -> list[dict]:
+        clauses, parameters = [], []
+        if revoked is True: clauses.append("revoked_at IS NOT NULL")
+        elif revoked is False: clauses.append("revoked_at IS NULL")
+        if before is not None:
+            clauses.append("created_at<?"); parameters.append(before)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        parameters.append(min(max(limit, 1), 500))
+        with self.lock:
+            rows = self.db.execute(
+                f"SELECT id,name,scopes,created_at,last_used_at,expires_at,revoked_at FROM api_tokens {where} ORDER BY created_at DESC,id DESC LIMIT ?",
+                tuple(parameters),
+            ).fetchall()
+        return [{**dict(row), "scopes": row["scopes"].split()} for row in rows]
+
     def revoke(self, ident: str) -> bool:
         with self.lock, self.db:
             return bool(self.db.execute(

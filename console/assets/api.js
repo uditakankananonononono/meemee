@@ -100,6 +100,18 @@ export const createToken = (name, scopes, expiresAt, opts) =>
     body: expiresAt ? { name, scopes, expires_at: expiresAt } : { name, scopes },
     ...opts,
   });
+export const listTokens = (revoked = null, before = null, limit = 100, opts) => {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (revoked !== null) params.set("revoked", String(revoked));
+  if (before) params.set("before", before);
+  return request(`/v1/tokens?${params}`, opts);
+};
+export const listRuns = (before = null, limit = 100, opts) => {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (before) params.set("before", before);
+  return request(`/v1/runs?${params}`, opts);
+};
+export const getRun = (id, opts) => request(`/v1/runs/${encodeURIComponent(id)}`, opts);
 export const revokeToken = (id, opts) =>
   request(`/v1/tokens/${encodeURIComponent(id)}`, { method: "DELETE", ...opts });
 

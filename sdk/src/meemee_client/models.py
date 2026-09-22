@@ -26,6 +26,7 @@ class RunReport(BaseModel):
     final: str
     steps_used: int
     tool_results: list[dict[str, Any]] = Field(default_factory=list)
+    created_at: datetime | None = None
 
 
 class JobStatus(str, Enum):
@@ -221,3 +222,13 @@ class WebhookDelivery(BaseModel):
     response_status: int | None = None
     last_error: str | None = None
     created_at: datetime
+
+
+class TokenMetadata(BaseModel):
+    id: str
+    name: str
+    scopes: list[str]
+    created_at: datetime
+    last_used_at: datetime | None = None
+    expires_at: datetime | None = None
+    revoked_at: datetime | None = None

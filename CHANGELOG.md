@@ -2,6 +2,13 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.46.0
+
+- Added admin-only safe token metadata listing without digest or raw-credential disclosure.
+- Added durable principal-owned completed run history with owner-scoped list/get APIs.
+- Updated Python SDK and packaged console token/run views to use server source-of-truth inventory.
+- Verification: 150 core and 110 SDK tests passed; Ruff and release audit clean.
+
 ## 0.45.0
 
 - Added persisted job ownership and owner-scoped get/cancel/events/SSE/list operations with status and cursor filters.

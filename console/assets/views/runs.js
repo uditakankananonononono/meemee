@@ -1,9 +1,6 @@
-// Runs view: create synchronous agent runs (POST /v1/runs) and keep a
-// browser-local history. The API has no run listing or retrieval endpoint,
-// so history beyond this browser is honestly labelled as missing.
-import { h, clear, toast, missingNote, jsonBlock, fullTime, timeAgo } from "../dom.js";
+// Runs view: create synchronous agent runs and read owner-scoped durable history.
+import { h, clear, toast, jsonBlock, fullTime, timeAgo } from "../dom.js";
 import * as api from "../api.js";
-import { runHistory } from "../store.js";
 import { reportError } from "../app.js";
 
 function runReportView(report, expanded) {
@@ -27,7 +24,7 @@ function runReportView(report, expanded) {
         h("div", { class: "run-goal" }, report.goal),
         h("div", { class: "muted small" },
           h("code", null, report.run_id), " · ", `${report.steps_used} steps`,
-          report.recordedAt ? ` · ${timeAgo(report.recordedAt)}` : "")),
+          report.created_at ? ` · ${timeAgo(report.created_at)}` : "")),
       h("span", { class: "muted small" }, report.final ? "finished" : "stopped")),
     h("h3", null, "Final answer"),
     h("p", { class: "final" }, report.final || "(no final answer)"),
@@ -45,24 +42,17 @@ export async function renderRuns(root) {
   const historyBox = h("div");
 
   const renderHistory = () => {
-    const items = runHistory.all();
     clear(historyBox);
-    if (!items.length) {
-      historyBox.append(h("p", { class: "muted" }, "No runs recorded in this browser yet."));
-      return;
-    }
-    for (const report of items) {
+    api.listRuns().then(({ runs: items }) => {
+      if (!items.length) { historyBox.append(h("p", { class: "muted" }, "No runs for this account yet.")); return; }
+      for (const report of items) {
       historyBox.append(h("details", { class: "history-item" },
         h("summary", null,
           h("span", { class: "history-goal" }, report.goal.slice(0, 120)),
           h("span", { class: "muted small" }, ` ${report.steps_used} steps · ${timeAgo(report.recordedAt)}`)),
-        runReportView(report, false),
-        h("button", { class: "button button-quiet", type: "button", onclick: (e) => {
-          e.preventDefault();
-          runHistory.forget(report.run_id);
-          renderHistory();
-        } }, "Remove from history")));
-    }
+        runReportView(report, false)));
+      }
+    }).catch((error) => reportError(error, "could not list runs"));
   };
 
   submit.addEventListener("click", async () => {
@@ -73,7 +63,6 @@ export async function renderRuns(root) {
     spinner.textContent = "Running… POST /v1/runs is synchronous: this request stays open until the agent finishes or fails, and can take minutes depending on the model.";
     try {
       const report = await api.createRun(text, approve.checked);
-      runHistory.remember(report);
       clear(resultBox).append(runReportView(report, true));
       toast("Run finished.", "ok");
     } catch (error) {
@@ -99,8 +88,6 @@ export async function renderRuns(root) {
       h("div", { class: "row" }, submit, spinner),
       resultBox),
     h("section", { class: "card" },
-      h("h2", null, "Run history (this browser)"),
-      missingNote("No run listing or retrieval endpoint", "GET /v1/runs and GET /v1/runs/{id} do not exist, so history kept here is local to this browser profile and cannot be reconciled with the server."),
-      historyBox));
+      h("h2", null, "Run history"), historyBox));
   renderHistory();
 }

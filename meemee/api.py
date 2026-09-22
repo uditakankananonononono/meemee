@@ -37,6 +37,7 @@ from .observability import (
 from .oidc import OIDCConfig, OIDCValidator
 from .quotas import QuotaExceeded, QuotaStore
 from .rate_limit import RateLimitMiddleware, SQLiteRateLimiter
+from .runs import RunStore
 from .runtime import build_agent
 from .shutdown import RunGate
 from .streaming import job_event_stream
@@ -76,6 +77,7 @@ app.add_middleware(RateLimitMiddleware, limiter=SQLiteRateLimiter(settings.data_
 agent = build_agent(settings)
 run_gate = RunGate()
 jobs = JobStore(settings.data_dir / "jobs.sqlite3")
+runs = RunStore(settings.data_dir / "runs.sqlite3")
 idempotency = IdempotencyStore(settings.data_dir / "idempotency.sqlite3")
 quotas = QuotaStore(settings.data_dir / "quotas.sqlite3", settings.default_daily_jobs)
 entitlements = EntitlementStore(settings.data_dir / "entitlements.sqlite3", settings.default_plan)
@@ -196,6 +198,7 @@ async def create_run(request: RunRequest, principal=runs_write_dependency):
                 or approvals.allows(principal.id, name)
             ),
         )
+        runs.add(principal.id, report)
         audit.append("api", "run.create", report.run_id, "success", {"steps": report.steps_used})
         AGENT_RUNS.labels("success").inc()
         return report
@@ -204,6 +207,19 @@ async def create_run(request: RunRequest, principal=runs_write_dependency):
         raise HTTPException(status_code=502, detail=f"agent run failed: {exc}") from exc
     finally:
         await run_gate.leave()
+
+
+@app.get("/v1/runs", dependencies=[Depends(auth.dependency("runs:write"))])
+def list_runs(request: Request, before: str | None = None, limit: int = 100):
+    return {"runs": runs.list(request.state.principal.id, before, limit)}
+
+
+@app.get("/v1/runs/{run_id}", dependencies=[Depends(auth.dependency("runs:write"))])
+def get_run(request: Request, run_id: str):
+    result = runs.get(request.state.principal.id, run_id)
+    if result is None:
+        raise HTTPException(404, "run not found")
+    return result
 
 
 @app.post("/v1/jobs")
@@ -282,6 +298,11 @@ def create_token(request: TokenRequest):
     ident, token = tokens.create(request.name, request.scopes, request.expires_at)
     audit.append("api", "token.create", ident, "success", {"name": request.name, "scopes": sorted(request.scopes)})
     return {"id": ident, "token": token, "warning": "shown once; store it securely"}
+
+
+@app.get("/v1/tokens", dependencies=[Depends(auth.dependency("admin"))])
+def list_tokens(revoked: bool | None = None, before: str | None = None, limit: int = 100):
+    return {"tokens": tokens.list_metadata(revoked, before, limit)}
 
 
 @app.delete("/v1/tokens/{token_id}", dependencies=[Depends(auth.dependency("admin"))])

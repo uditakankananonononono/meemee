@@ -55,6 +55,7 @@ from .models import (
     ResponseInfo,
     RevokedToken,
     RunReport,
+    TokenMetadata,
     WebhookDelivery,
     WebhookSubscription,
 )
@@ -335,6 +336,15 @@ class RunsResource:
     def __init__(self, client: MeemeeClient) -> None:
         self._client = client
 
+    def list(self, *, before: str | None = None, limit: int = 100) -> list[RunReport]:
+        params: dict[str, Any] = {"limit": limit}
+        if before is not None: params["before"] = before
+        payload = self._client._request_json("GET", "/v1/runs", params=params)
+        return [RunReport.model_validate(item) for item in payload["runs"]]
+
+    def get(self, run_id: str) -> RunReport:
+        return RunReport.model_validate(self._client._request_json("GET", f"/v1/runs/{run_id}"))
+
     def create(
         self,
         goal: str,
@@ -574,6 +584,15 @@ class TokensResource:
             body["expires_at"] = expiry
         payload = self._client._request_json("POST", "/v1/tokens", json_body=body)
         return CreatedToken.model_validate(payload)
+
+    def list(
+        self, *, revoked: bool | None = None, before: str | None = None, limit: int = 100
+    ) -> list[TokenMetadata]:
+        params: dict[str, Any] = {"limit": limit}
+        if revoked is not None: params["revoked"] = revoked
+        if before is not None: params["before"] = before
+        payload = self._client._request_json("GET", "/v1/tokens", params=params)
+        return [TokenMetadata.model_validate(item) for item in payload["tokens"]]
 
     def revoke(self, token_id: str) -> RevokedToken:
         """DELETE /v1/tokens/{id} - revoke an active token (idempotent-safe:
