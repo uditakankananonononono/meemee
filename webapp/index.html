@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Your private AI companion with memory you can inspect.">
+  <title>Meemee</title><link rel="stylesheet" href="/app/assets/app.css">
+</head>
+<body>
+<div id="shell">
+  <aside>
+    <a class="brand" href="/">meemee <span>beta</span></a>
+    <button id="new-chat" class="primary">+ New conversation</button>
+    <nav id="conversations" aria-label="Conversations"></nav>
+    <div class="aside-bottom"><button id="persona-button">Persona</button><button id="sign-out">Sign out</button></div>
+  </aside>
+  <main>
+    <header><button id="menu" aria-label="Open menu">☰</button><div><strong id="assistant-name">Meemee</strong><small id="status">Ready</small></div><button id="settings">Customize</button></header>
+    <section id="welcome">
+      <div class="orb">m</div><h1>A companion that remembers with receipts.</h1>
+      <p>Talk naturally. Meemee keeps useful facts with their source, follows your persona, and can check in when you ask.</p>
+      <div class="prompts"><button>What do you remember about me?</button><button>Help me plan my week</button><button>Let’s set how you should talk to me</button></div>
+    </section>
+    <section id="messages" aria-live="polite"></section>
+    <form id="composer"><textarea id="message" rows="1" maxlength="8000" placeholder="Message Meemee" aria-label="Message"></textarea><button aria-label="Send">↑</button><small>Meemee can make mistakes. Check important information.</small></form>
+  </main>
+</div>
+<dialog id="onboarding"><form method="dialog" id="onboarding-form"><div class="step"><span class="eyebrow">WELCOME TO MEEMEE</span><h2>Make it yours</h2><p>Your profile and conversations stay attached to your account.</p><label>Your name<input id="display-name" maxlength="120" required autocomplete="name"></label><label>Your timezone<select id="timezone"></select></label><button class="primary" value="next">Continue</button></div></form></dialog>
+<dialog id="persona"><form method="dialog" id="persona-form"><button class="close" value="cancel" aria-label="Close">×</button><span class="eyebrow">PERSONA</span><h2>How should Meemee feel?</h2><label>Assistant name<input id="persona-name" maxlength="60" required></label><label>Tone<input id="tone" maxlength="200" required></label><label>Extra instructions<textarea id="instructions" maxlength="2000" rows="5" placeholder="For example: keep answers concise; challenge my assumptions."></textarea></label><label class="check"><input id="emoji" type="checkbox"> Use emoji</label><button class="primary" value="save">Save persona</button></form></dialog>
+<div id="toast" role="status"></div><script src="/app/assets/app.js" type="module"></script>
+</body></html>

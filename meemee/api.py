@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from console.mount import mount_console
+from webapp.mount import mount_webapp
 
 from . import __version__
 from .approvals import ApprovalStore
@@ -79,6 +80,7 @@ if not trusted_hosts:
     raise RuntimeError("MEEMEE_TRUSTED_HOSTS must contain at least one host")
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=trusted_hosts)
 mount_console(app)
+mount_webapp(app)
 app.add_middleware(MetricsMiddleware)
 persistence = build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn)
 agent = build_agent(settings, memory=persistence.memory)

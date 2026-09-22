@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.103.0
+
+- Added a packaged customer web app at `/app/` with responsive conversation history, new chats, real companion API messaging, first-run profile onboarding, timezone selection and persona editing.
+- The customer surface is separate from the operator console and uses safe DOM rendering, session/bearer authentication and accessible empty/error states.
+- Verification: 291 core tests, 133 SDK tests and 5 PostgreSQL contract tests passed; 15 live SDK and 2 live PostgreSQL tests skipped because their external services were unavailable. Ruff, wheel package audit and explicit 0.103.0 release audit clean.
+
 ## 0.102.0
 
 - Added the operator console companion view: user creation and selection, persona editing, durable fact search/add/retire with provenance, a working local-channel chat box with history, and check-in settings with on-demand planning and recent-delivery status.
