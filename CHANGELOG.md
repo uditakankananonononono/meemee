@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.105.0
+
+- Added a packaged public product site at `/product/` with clear landing content, current plan limits, direct signup entry, customer quickstart docs and a capability ledger.
+- Product claims are tied to shipped behavior. Pricing states that payment is not integrated; the capability page names account, billing, provider and deployment gaps.
+- Verification: 296 core tests, 133 SDK tests and 5 PostgreSQL contract tests passed; 15 live SDK and 2 live PostgreSQL tests skipped because external services were unavailable. Ruff, wheel package audit and explicit 0.105.0 release audit clean.
+
 ## 0.104.0
 
 - Added built-in email/password self-serve signup and login with normalized unique email identities, PBKDF2-HMAC-SHA256 password hashing at 600,000 iterations, random per-account salts, constant-time verification and 30-day revocable bearer sessions.

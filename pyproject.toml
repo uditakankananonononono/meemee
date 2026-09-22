@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "meemee-agent"
-version = "0.104.0"
+version = "0.105.0"
 description = "A local-first, auditable autonomous agent runtime"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -40,4 +40,4 @@ line-length = 100
 target-version = "py310"
 
 [tool.hatch.build.targets.wheel]
-packages = ["meemee", "console", "webapp", "meemee_persist_pg"]
+packages = ["meemee", "console", "webapp", "product_site", "meemee_persist_pg"]

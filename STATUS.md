@@ -1,9 +1,9 @@
 # Meemee status
 
-**Current core version:** 0.104.0  
-**Ledger:** 139 verified, 0 thin  
+**Current core version:** 0.105.0  
+**Ledger:** 140 verified, 0 thin  
 **Supported production shape:** SQLite/WAL single-host; PostgreSQL memory and owner-scoped jobs are selectable but require target-environment live verification  
-**Last core verification:** 294 passed; 133 SDK passed (15 live skipped); 5 PostgreSQL contract tests passed (2 live skipped); Ruff, package audit and explicit 0.104.0 release audit clean
+**Last core verification:** 296 passed; 133 SDK passed (15 live skipped); 5 PostgreSQL contract tests passed (2 live skipped); Ruff, package audit and explicit 0.105.0 release audit clean
 
 ## What is production-usable now
 

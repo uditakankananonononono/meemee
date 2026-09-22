@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from console.mount import mount_console
+from product_site.mount import mount_site
 from webapp.mount import mount_webapp
 
 from . import __version__
@@ -81,6 +82,7 @@ if not trusted_hosts:
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=trusted_hosts)
 mount_console(app)
 mount_webapp(app)
+mount_site(app)
 app.add_middleware(MetricsMiddleware)
 persistence = build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn)
 agent = build_agent(settings, memory=persistence.memory)
