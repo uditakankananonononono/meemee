@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.61.0
+
+- Added argument-scoped persistent tool approvals with exact constraint-subset matching and API/runtime enforcement.
+- Grants can now be repository-, branch-, command- or other argument-specific without widening the tool globally.
+- Verification: 183 core tests passed; Ruff and explicit 0.61.0 release audit clean. SDK remains 110 passed from v0.55.0; no SDK surface changed.
+
 ## 0.60.0
 
 - Added per-run browser domain allowlists and workspace-confined managed download capture.

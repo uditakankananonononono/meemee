@@ -197,7 +197,7 @@ async def create_run(request: RunRequest, principal=runs_write_dependency):
             approve=lambda name, _arguments, _risk: (
                 request.approve_writes
                 or name in request.approved_tools
-                or approvals.allows(principal.id, name)
+                or approvals.allows(principal.id, name, arguments=_arguments)
             ),
         )
         runs.add(principal.id, report)
@@ -405,6 +405,7 @@ def set_quota(principal_id: str, request: QuotaRequest):
 class ToolApprovalRequest(BaseModel):
     tool: str = Field(min_length=1, max_length=200)
     expires_at: str | None = None
+    argument_constraints: dict | None = None
 
 
 @app.put("/v1/approvals/{principal_id}", dependencies=[Depends(auth.dependency("admin"))])
@@ -416,8 +417,8 @@ def grant_tool_approval(principal_id: str, request: ToolApprovalRequest):
         principal_id, "persistent_approvals", approvals.active_count(principal_id)
     ):
         raise HTTPException(403, "plan persistent approval limit reached")
-    approvals.grant(principal_id, request.tool, "api-admin", request.expires_at)
-    audit.append("api-admin", "approval.grant", principal_id, "success", {"tool": request.tool, "expires_at": request.expires_at})
+    approvals.grant(principal_id, request.tool, "api-admin", request.expires_at, request.argument_constraints)
+    audit.append("api-admin", "approval.grant", principal_id, "success", {"tool": request.tool, "expires_at": request.expires_at, "argument_constraints": request.argument_constraints})
     return {"principal": principal_id, "tool": request.tool, "granted": True}
 
 

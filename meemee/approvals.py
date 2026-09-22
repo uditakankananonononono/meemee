@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 import threading
 from datetime import datetime, timezone
@@ -18,27 +19,35 @@ class ApprovalStore:
             self.db.execute("""CREATE TABLE IF NOT EXISTS tool_approvals (
                 principal TEXT NOT NULL, tool TEXT NOT NULL, granted_at TEXT NOT NULL,
                 expires_at TEXT, revoked_at TEXT, granted_by TEXT NOT NULL,
+                argument_constraints TEXT,
                 PRIMARY KEY(principal, tool)
             )""")
+            columns={row[1] for row in self.db.execute("PRAGMA table_info(tool_approvals)")}
+            if "argument_constraints" not in columns:
+                self.db.execute("ALTER TABLE tool_approvals ADD COLUMN argument_constraints TEXT")
 
-    def grant(self, principal: str, tool: str, granted_by: str, expires_at: str | None = None) -> None:
+    def grant(self, principal: str, tool: str, granted_by: str, expires_at: str | None = None, argument_constraints: dict | None = None) -> None:
         if not principal or not tool or not granted_by:
             raise ValueError("principal, tool and granted_by are required")
         now = datetime.now(timezone.utc).isoformat()
         with self.lock, self.db:
             self.db.execute(
-                "INSERT INTO tool_approvals VALUES(?,?,?,?,NULL,?) ON CONFLICT(principal,tool) DO UPDATE SET granted_at=excluded.granted_at,expires_at=excluded.expires_at,revoked_at=NULL,granted_by=excluded.granted_by",
-                (principal, tool, now, expires_at, granted_by),
+                "INSERT INTO tool_approvals(principal,tool,granted_at,expires_at,revoked_at,granted_by,argument_constraints) VALUES(?,?,?,?,NULL,?,?) ON CONFLICT(principal,tool) DO UPDATE SET granted_at=excluded.granted_at,expires_at=excluded.expires_at,revoked_at=NULL,granted_by=excluded.granted_by,argument_constraints=excluded.argument_constraints",
+                (principal, tool, now, expires_at, granted_by, json.dumps(argument_constraints, sort_keys=True) if argument_constraints is not None else None),
             )
 
-    def allows(self, principal: str, tool: str, now: datetime | None = None) -> bool:
+    def allows(self, principal: str, tool: str, now: datetime | None = None, arguments: dict | None = None) -> bool:
         current = (now or datetime.now(timezone.utc)).isoformat()
         with self.lock:
             row = self.db.execute(
-                "SELECT 1 FROM tool_approvals WHERE principal=? AND tool=? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>?)",
+                "SELECT argument_constraints FROM tool_approvals WHERE principal=? AND tool=? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>?)",
                 (principal, tool, current),
             ).fetchone()
-        return row is not None
+        if row is None: return False
+        constraints = json.loads(row["argument_constraints"]) if row["argument_constraints"] else None
+        if constraints is None: return True
+        supplied = arguments or {}
+        return all(key in supplied and supplied[key] == value for key, value in constraints.items())
 
     def revoke(self, principal: str, tool: str) -> bool:
         with self.lock, self.db:
@@ -59,7 +68,7 @@ class ApprovalStore:
     def list(self, principal: str) -> list[dict]:
         with self.lock:
             rows = self.db.execute(
-                "SELECT principal,tool,granted_at,expires_at,revoked_at,granted_by FROM tool_approvals WHERE principal=? ORDER BY tool",
+                "SELECT principal,tool,granted_at,expires_at,revoked_at,granted_by,argument_constraints FROM tool_approvals WHERE principal=? ORDER BY tool",
                 (principal,),
             ).fetchall()
-        return [dict(row) for row in rows]
+        return [{**dict(row), "argument_constraints": json.loads(row["argument_constraints"]) if row["argument_constraints"] else None} for row in rows]

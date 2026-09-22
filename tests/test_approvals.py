@@ -29,3 +29,20 @@ def test_active_count_excludes_revoked_and_expired(tmp_path: Path):
     store.grant("u","expired","admin",(datetime.now(timezone.utc)-timedelta(seconds=1)).isoformat())
     store.grant("u","revoked","admin"); store.revoke("u","revoked")
     assert store.active_count("u")==1
+
+
+def test_argument_scoped_approval_matches_exact_constraint_subset(tmp_path: Path):
+    store=ApprovalStore(tmp_path/"a.db")
+    store.grant("u","github.push_branch","admin",argument_constraints={"owner":"acme","repository":"safe"})
+    assert store.allows("u","github.push_branch",arguments={"owner":"acme","repository":"safe","branch":"feature"})
+    assert not store.allows("u","github.push_branch",arguments={"owner":"evil","repository":"safe"})
+    assert not store.allows("u","github.push_branch")
+    assert store.list("u")[0]["argument_constraints"] == {"owner":"acme","repository":"safe"}
+
+
+def test_regrant_can_narrow_then_remove_constraints(tmp_path: Path):
+    store=ApprovalStore(tmp_path/"a.db")
+    store.grant("u","shell.command","admin",argument_constraints={"command":"pytest"})
+    assert not store.allows("u","shell.command",arguments={"command":"git"})
+    store.grant("u","shell.command","admin")
+    assert store.allows("u","shell.command",arguments={"command":"git"})
