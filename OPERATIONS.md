@@ -11,7 +11,7 @@ Set `MEEMEE_TRUSTED_HOSTS` to the comma-separated public/internal hostnames acce
 - `MEEMEE_VAULT_KEY`: output of `meemee vault-key`. Required at API and webhook-worker startup; it encrypts both vault records and webhook signing secrets. Loss of this key makes those records unrecoverable.
 - `MEEMEE_GITHUB_TOKEN`: optional, required for sustained GitHub search usage.
 
-For SQLite, mount `MEEMEE_DATA_DIR` on persistent encrypted storage and keep API/workers on one host. For replicated Kubernetes API/workers, set `MEEMEE_PERSISTENCE_BACKEND=postgresql` and a shared `MEEMEE_POSTGRES_DSN`; PostgreSQL backs memory, owner-scoped jobs and rate limits. The remaining commercial-state SQLite stores still require per-host coordination, so run one API replica until those stores are migrated.
+For SQLite, mount `MEEMEE_DATA_DIR` on persistent encrypted storage and keep API/workers on one host. The shipped Kubernetes manifest keeps one API and one worker in the same single-replica pod so SQLite commercial state stays on one host. For a custom replicated Kubernetes API/worker deployment, set `MEEMEE_PERSISTENCE_BACKEND=postgresql` and a shared `MEEMEE_POSTGRES_DSN`; PostgreSQL backs memory, owner-scoped jobs and rate limits. The remaining commercial-state SQLite stores still require per-host coordination, so run one API replica until those stores are migrated.
 
 ## First start and scoped credentials
 

@@ -16,4 +16,9 @@ def test_kubernetes_manifest_uses_current_image_and_readiness():
     manifest = (root / "deploy/k8s/meemee.yaml").read_text()
     from meemee import __version__
     assert manifest.count(f"ghcr.io/uditakankananonononono/meemee:{__version__}") == 2
-    assert "path: /ready" in manifest and "path: /health" not in manifest
+    assert manifest.count("kind: Deployment") == 1
+    assert "name: api" in manifest and "name: worker" in manifest
+    assert "replicas: 1" in manifest and "strategy: {type: Recreate}" in manifest
+    assert "readOnlyRootFilesystem: true" in manifest
+    assert "readinessProbe: {httpGet: {path: /ready" in manifest
+    assert "livenessProbe: {httpGet: {path: /health" in manifest

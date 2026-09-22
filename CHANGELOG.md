@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.92.0
+
+- Replaced the unsafe split-pod SQLite Kubernetes topology with one API/worker pod on one host.
+- Added Recreate rollout, read-only root filesystems and distinct dependency readiness/liveness probes.
+- Verification: 222 core and 112 SDK tests plus 3 PostgreSQL contract tests passed; Ruff, deprecation-free core/SDK wheel builds, package audit and explicit 0.92.0 release audit clean. Live PostgreSQL remains unrun here.
+
 ## 0.91.0
 
 - Fixed the commercial container build context to include console, PostgreSQL assets and LICENSE while excluding secrets and local state.
