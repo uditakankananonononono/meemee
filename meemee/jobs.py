@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .cursors import decode_cursor, encode_cursor
 from .schema_registry import register_schema
 
 
@@ -147,20 +148,28 @@ class JobStore:
         return bool(changed)
 
     def list_for_principal(
-        self, principal: str, status: str | None = None, before: str | None = None, limit: int = 100
-    ) -> list[dict[str, Any]]:
+        self, principal: str, status: str | None = None, before: str | None = None,
+        limit: int = 100, cursor: str | None = None,
+    ) -> tuple[list[dict[str, Any]], str | None]:
         clauses, parameters = ["principal=?"], [principal]
         if status is not None:
             clauses.append("status=?"); parameters.append(status)
         if before is not None:
             clauses.append("updated_at<?"); parameters.append(before)
-        parameters.append(min(max(limit, 1), 500))
+        if cursor is not None:
+            cursor_time, cursor_id = decode_cursor(cursor)
+            clauses.append("(updated_at<? OR (updated_at=? AND id<?))")
+            parameters.extend((cursor_time, cursor_time, cursor_id))
+        page_size = min(max(limit, 1), 500); parameters.append(page_size + 1)
         with self.lock:
             rows = self.db.execute(
                 f"SELECT * FROM jobs WHERE {' AND '.join(clauses)} ORDER BY updated_at DESC,id DESC LIMIT ?",
                 tuple(parameters),
             ).fetchall()
-        return [dict(row) for row in rows]
+        items = [dict(row) for row in rows[:page_size]]
+        next_cursor = encode_cursor(items[-1]["updated_at"], items[-1]["id"]) if len(rows) > page_size else None
+        return items, next_cursor
+
 
     def get_owned(self, ident: str, principal: str) -> dict[str, Any] | None:
         with self.lock:

@@ -12,6 +12,8 @@ from pathlib import Path
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from .cursors import decode_cursor, encode_cursor
+
 
 @dataclass(frozen=True)
 class Principal:
@@ -68,21 +70,28 @@ class TokenStore:
             return Principal(row["id"], row["name"], frozenset(row["scopes"].split()))
 
     def list_metadata(
-        self, revoked: bool | None = None, before: str | None = None, limit: int = 100
-    ) -> list[dict]:
+        self, revoked: bool | None = None, before: str | None = None,
+        limit: int = 100, cursor: str | None = None,
+    ) -> tuple[list[dict], str | None]:
         clauses, parameters = [], []
         if revoked is True: clauses.append("revoked_at IS NOT NULL")
         elif revoked is False: clauses.append("revoked_at IS NULL")
-        if before is not None:
-            clauses.append("created_at<?"); parameters.append(before)
+        if before is not None: clauses.append("created_at<?"); parameters.append(before)
+        if cursor is not None:
+            cursor_time, cursor_id = decode_cursor(cursor)
+            clauses.append("(created_at<? OR (created_at=? AND id<?))")
+            parameters.extend((cursor_time, cursor_time, cursor_id))
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-        parameters.append(min(max(limit, 1), 500))
+        page_size = min(max(limit, 1), 500); parameters.append(page_size + 1)
         with self.lock:
             rows = self.db.execute(
                 f"SELECT id,name,scopes,created_at,last_used_at,expires_at,revoked_at FROM api_tokens {where} ORDER BY created_at DESC,id DESC LIMIT ?",
                 tuple(parameters),
             ).fetchall()
-        return [{**dict(row), "scopes": row["scopes"].split()} for row in rows]
+        items = [{**dict(row), "scopes": row["scopes"].split()} for row in rows[:page_size]]
+        next_cursor = encode_cursor(items[-1]["created_at"], items[-1]["id"]) if len(rows) > page_size else None
+        return items, next_cursor
+
 
     def revoke(self, ident: str) -> bool:
         with self.lock, self.db:

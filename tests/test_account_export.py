@@ -38,7 +38,7 @@ def test_account_import_retargets_and_refuses_collisions(tmp_path):
     target=tmp_path/"target"; target.mkdir(); JobStore(target/"jobs.sqlite3"); RunStore(target/"runs.sqlite3"); EntitlementStore(target/"entitlements.sqlite3")
     report=import_account(target,export,"new")
     assert report["target_principal"]=="new"
-    assert JobStore(target/"jobs.sqlite3").list_for_principal("new")[0]["goal"]=="mine"
+    assert JobStore(target/"jobs.sqlite3").list_for_principal("new")[0][0]["goal"]=="mine"
     assert RunStore(target/"runs.sqlite3").get("new","r")["final"]=="f"
     assert EntitlementStore(target/"entitlements.sqlite3").get("new")["plan"]=="team"
     with pytest.raises(ValueError,match="collision"): import_account(target,export,"newer")

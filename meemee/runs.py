@@ -6,6 +6,7 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .cursors import decode_cursor, encode_cursor
 from .schema_registry import register_schema
 from .types import RunReport
 
@@ -41,12 +42,23 @@ class RunStore:
             row=self.db.execute("SELECT * FROM runs WHERE principal=? AND run_id=?",(principal,run_id)).fetchone()
         return self._row(row) if row else None
 
-    def list(self, principal: str, before: str | None=None, limit: int=100) -> list[dict]:
-        query="SELECT * FROM runs WHERE principal=?"; params:list=[principal]
-        if before is not None: query+=" AND created_at<?"; params.append(before)
-        query+=" ORDER BY created_at DESC,run_id DESC LIMIT ?"; params.append(min(max(limit,1),500))
-        with self.lock: rows=self.db.execute(query,tuple(params)).fetchall()
-        return [self._row(row) for row in rows]
+    def list(
+        self, principal: str, before: str | None = None, limit: int = 100,
+        cursor: str | None = None,
+    ) -> tuple[list[dict], str | None]:
+        query = "SELECT * FROM runs WHERE principal=?"; params: list = [principal]
+        if before is not None: query += " AND created_at<?"; params.append(before)
+        if cursor is not None:
+            cursor_time, cursor_id = decode_cursor(cursor)
+            query += " AND (created_at<? OR (created_at=? AND run_id<?))"
+            params.extend((cursor_time, cursor_time, cursor_id))
+        page_size = min(max(limit, 1), 500)
+        query += " ORDER BY created_at DESC,run_id DESC LIMIT ?"; params.append(page_size + 1)
+        with self.lock: rows = self.db.execute(query, tuple(params)).fetchall()
+        items = [self._row(row) for row in rows[:page_size]]
+        next_cursor = encode_cursor(items[-1]["created_at"], items[-1]["run_id"]) if len(rows) > page_size else None
+        return items, next_cursor
+
 
     @staticmethod
     def _row(row: sqlite3.Row) -> dict:

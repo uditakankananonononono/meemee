@@ -5,7 +5,7 @@ from meemee.jobs import JobStore
 def test_job_owner_listing_and_isolation(tmp_path):
     store=JobStore(tmp_path/"j.db")
     a=store.enqueue("alpha",principal="a"); b=store.enqueue("beta",principal="b")
-    assert [job["id"] for job in store.list_for_principal("a")] == [a]
+    assert [job["id"] for job in store.list_for_principal("a")[0]] == [a]
     assert store.get_owned(a,"a")["goal"]=="alpha"
     assert store.get_owned(a,"b") is None
     assert store.get_owned(b,"a") is None
@@ -14,15 +14,15 @@ def test_job_owner_listing_and_isolation(tmp_path):
 def test_legacy_job_has_no_accidental_owner(tmp_path):
     store=JobStore(tmp_path/"j.db"); legacy=store.enqueue("legacy")
     assert store.get_owned(legacy,"bootstrap") is None
-    assert store.list_for_principal("bootstrap")==[]
+    assert store.list_for_principal("bootstrap")[0]==[]
 
 
 def test_job_listing_status_and_cursor(tmp_path):
     store=JobStore(tmp_path/"j.db")
     first=store.enqueue("first",principal="u"); second=store.enqueue("second",principal="u")
     store.db.execute("UPDATE jobs SET updated_at=? WHERE id=?",("2026-01-01T00:00:00+00:00",first))
-    assert [x["id"] for x in store.list_for_principal("u",limit=1)]==[second]
-    assert [x["id"] for x in store.list_for_principal("u",before="2026-02-01T00:00:00+00:00")]==[first]
+    assert [x["id"] for x in store.list_for_principal("u",limit=1)[0]]==[second]
+    assert [x["id"] for x in store.list_for_principal("u",before="2026-02-01T00:00:00+00:00")[0]]==[first]
 
 
 def test_api_job_reads_are_owner_scoped(monkeypatch, tmp_path):

@@ -24,12 +24,12 @@ def test_expired_token_is_rejected(tmp_path: Path):
 def test_token_metadata_listing_never_exposes_digest_or_secret(tmp_path: Path):
     store=TokenStore(tmp_path/"auth.db")
     ident, raw=store.create("ci",{"jobs:read"})
-    rows=store.list_metadata(revoked=False)
+    rows=store.list_metadata(revoked=False)[0]
     assert rows[0]["id"]==ident and rows[0]["scopes"]==["jobs:read"]
     assert "digest" not in rows[0] and raw not in str(rows)
     store.revoke(ident)
-    assert store.list_metadata(revoked=False)==[]
-    assert store.list_metadata(revoked=True)[0]["revoked_at"]
+    assert store.list_metadata(revoked=False)[0]==[]
+    assert store.list_metadata(revoked=True)[0][0]["revoked_at"]
 
 
 def test_token_list_api_returns_metadata_only(monkeypatch, tmp_path):

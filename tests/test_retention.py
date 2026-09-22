@@ -32,4 +32,4 @@ def test_retention_removes_old_run_history(tmp_path: Path):
     past=(datetime.now(timezone.utc)-timedelta(days=100)).isoformat()
     store.db.execute("UPDATE runs SET created_at=?",(past,)); store.db.commit()
     report=RetentionManager(tmp_path).run(runs_days=30)
-    assert report.runs==1 and store.list("u")==[]
+    assert report.runs==1 and store.list("u")[0]==[]

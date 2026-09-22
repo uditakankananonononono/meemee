@@ -2,6 +2,13 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.51.0
+
+- Added opaque stable keyset cursors and `next_cursor` envelopes to principal jobs, completed runs and safe token metadata lists.
+- Preserved legacy `before` filters and bounded limits; malformed cursors return validation errors.
+- Added Python SDK page and `iter_all` helpers.
+- Verification: 162 core and 110 SDK tests passed; Ruff and explicit 0.51.0 release audit clean.
+
 ## 0.50.0
 
 - Added checksummed component schema/version registry to evolving jobs, webhooks, runs and entitlements databases.

@@ -9,7 +9,7 @@ def test_run_history_owner_isolation_and_roundtrip(tmp_path):
     store=RunStore(tmp_path/"r.db"); store.add("a",report("r1")); store.add("b",report("r2"))
     assert store.get("a","r1")["final"]=="done"
     assert store.get("b","r1") is None
-    assert [r["run_id"] for r in store.list("a")]==["r1"]
+    assert [r["run_id"] for r in store.list("a")[0]]==["r1"]
 
 
 def test_run_api_history_is_owner_scoped(monkeypatch, tmp_path):

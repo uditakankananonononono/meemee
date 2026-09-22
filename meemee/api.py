@@ -212,8 +212,10 @@ async def create_run(request: RunRequest, principal=runs_write_dependency):
 
 
 @app.get("/v1/runs", dependencies=[Depends(auth.dependency("runs:write"))])
-def list_runs(request: Request, before: str | None = None, limit: int = 100):
-    return {"runs": runs.list(request.state.principal.id, before, limit)}
+def list_runs(request: Request, before: str | None = None, limit: int = 100, cursor: str | None = None):
+    try: items, next_cursor = runs.list(request.state.principal.id, before, limit, cursor)
+    except ValueError as exc: raise HTTPException(422, str(exc)) from exc
+    return {"runs": items, "next_cursor": next_cursor}
 
 
 @app.get("/v1/runs/{run_id}", dependencies=[Depends(auth.dependency("runs:write"))])
@@ -256,10 +258,12 @@ def create_job(
 
 
 @app.get("/v1/jobs", dependencies=[Depends(auth.dependency("jobs:read"))])
-def list_jobs(request: Request, status: str | None = None, before: str | None = None, limit: int = 100):
+def list_jobs(request: Request, status: str | None = None, before: str | None = None, limit: int = 100, cursor: str | None = None):
     if status is not None and status not in {"queued","running","done","failed","cancel_requested","cancelled"}:
         raise HTTPException(422, "invalid job status")
-    return {"jobs": jobs.list_for_principal(request.state.principal.id, status, before, limit)}
+    try: items, next_cursor = jobs.list_for_principal(request.state.principal.id, status, before, limit, cursor)
+    except ValueError as exc: raise HTTPException(422, str(exc)) from exc
+    return {"jobs": items, "next_cursor": next_cursor}
 
 
 @app.get("/v1/jobs/{job_id}", dependencies=[Depends(auth.dependency("jobs:read"))])
@@ -303,8 +307,10 @@ def create_token(request: TokenRequest):
 
 
 @app.get("/v1/tokens", dependencies=[Depends(auth.dependency("admin"))])
-def list_tokens(revoked: bool | None = None, before: str | None = None, limit: int = 100):
-    return {"tokens": tokens.list_metadata(revoked, before, limit)}
+def list_tokens(revoked: bool | None = None, before: str | None = None, limit: int = 100, cursor: str | None = None):
+    try: items, next_cursor = tokens.list_metadata(revoked, before, limit, cursor)
+    except ValueError as exc: raise HTTPException(422, str(exc)) from exc
+    return {"tokens": items, "next_cursor": next_cursor}
 
 
 @app.delete("/v1/tokens/{token_id}", dependencies=[Depends(auth.dependency("admin"))])

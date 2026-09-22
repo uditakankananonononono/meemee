@@ -336,11 +336,22 @@ class RunsResource:
     def __init__(self, client: MeemeeClient) -> None:
         self._client = client
 
-    def list(self, *, before: str | None = None, limit: int = 100) -> list[RunReport]:
+    def page(self, *, cursor: str | None = None, before: str | None = None, limit: int = 100) -> tuple[list[RunReport], str | None]:
         params: dict[str, Any] = {"limit": limit}
+        if cursor is not None: params["cursor"] = cursor
         if before is not None: params["before"] = before
         payload = self._client._request_json("GET", "/v1/runs", params=params)
-        return [RunReport.model_validate(item) for item in payload["runs"]]
+        return [RunReport.model_validate(item) for item in payload["runs"]], payload.get("next_cursor")
+
+    def list(self, *, before: str | None = None, limit: int = 100) -> list[RunReport]:
+        return self.page(before=before, limit=limit)[0]
+
+    def iter_all(self, *, limit: int = 100) -> Iterator[RunReport]:
+        cursor = None
+        while True:
+            items, cursor = self.page(cursor=cursor, limit=limit)
+            yield from items
+            if cursor is None: return
 
     def get(self, run_id: str) -> RunReport:
         return RunReport.model_validate(self._client._request_json("GET", f"/v1/runs/{run_id}"))
@@ -390,16 +401,24 @@ class JobsResource:
         payload = self._client._request_json("POST", "/v1/jobs", json_body=body)
         return CreatedJob.model_validate(payload)
 
-    def list(
-        self, *, status: str | None = None, before: str | None = None, limit: int = 100
-    ) -> list[Job]:
-        if not 1 <= limit <= 500:
-            raise ValueError("limit must be 1-500")
+    def page(self, *, status: str | None = None, cursor: str | None = None, before: str | None = None, limit: int = 100) -> tuple[list[Job], str | None]:
+        if not 1 <= limit <= 500: raise ValueError("limit must be 1-500")
         params: dict[str, Any] = {"limit": limit}
         if status is not None: params["status"] = status
+        if cursor is not None: params["cursor"] = cursor
         if before is not None: params["before"] = before
         payload = self._client._request_json("GET", "/v1/jobs", params=params)
-        return [Job.model_validate(item) for item in payload["jobs"]]
+        return [Job.model_validate(item) for item in payload["jobs"]], payload.get("next_cursor")
+
+    def list(self, *, status: str | None = None, before: str | None = None, limit: int = 100) -> list[Job]:
+        return self.page(status=status, before=before, limit=limit)[0]
+
+    def iter_all(self, *, status: str | None = None, limit: int = 100) -> Iterator[Job]:
+        cursor = None
+        while True:
+            items, cursor = self.page(status=status, cursor=cursor, limit=limit)
+            yield from items
+            if cursor is None: return
 
     def get(self, job_id: str) -> Job:
         """GET /v1/jobs/{id} - current state; raises NotFoundError for unknown ids."""
@@ -585,14 +604,23 @@ class TokensResource:
         payload = self._client._request_json("POST", "/v1/tokens", json_body=body)
         return CreatedToken.model_validate(payload)
 
-    def list(
-        self, *, revoked: bool | None = None, before: str | None = None, limit: int = 100
-    ) -> list[TokenMetadata]:
+    def page(self, *, revoked: bool | None = None, cursor: str | None = None, before: str | None = None, limit: int = 100) -> tuple[list[TokenMetadata], str | None]:
         params: dict[str, Any] = {"limit": limit}
         if revoked is not None: params["revoked"] = revoked
+        if cursor is not None: params["cursor"] = cursor
         if before is not None: params["before"] = before
         payload = self._client._request_json("GET", "/v1/tokens", params=params)
-        return [TokenMetadata.model_validate(item) for item in payload["tokens"]]
+        return [TokenMetadata.model_validate(item) for item in payload["tokens"]], payload.get("next_cursor")
+
+    def list(self, *, revoked: bool | None = None, before: str | None = None, limit: int = 100) -> list[TokenMetadata]:
+        return self.page(revoked=revoked, before=before, limit=limit)[0]
+
+    def iter_all(self, *, revoked: bool | None = None, limit: int = 100) -> Iterator[TokenMetadata]:
+        cursor = None
+        while True:
+            items, cursor = self.page(revoked=revoked, cursor=cursor, limit=limit)
+            yield from items
+            if cursor is None: return
 
     def revoke(self, token_id: str) -> RevokedToken:
         """DELETE /v1/tokens/{id} - revoke an active token (idempotent-safe:
