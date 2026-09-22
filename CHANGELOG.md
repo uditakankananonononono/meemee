@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.74.0
+
+- Added PostgreSQL agent-memory contract parity for scrubbed writes and hybrid/semantic retrieval calls.
+- PostgreSQL uses ranked native full-text fallback so agent runs work without an undeclared pgvector dependency.
+- Verification: 202 core and 112 SDK tests plus 3 PostgreSQL contract tests passed; Ruff and explicit 0.74.0 release audit clean. Live PostgreSQL remains unrun here.
+
 ## 0.73.0
 
 - Added atomic PostgreSQL-backed fixed-window rate limiting shared across hosts/pods and selected automatically with the PostgreSQL backend.
@@ -40,7 +46,7 @@ All entries describe shipped repository behavior. Missing work is never presente
 
 ## 0.67.0
 
-- Aligned the Python SDK package/import version with core at 0.73.0 and removed stale v0.41 contract labels from SDK docs and metadata.
+- Aligned the Python SDK package/import version with core at 0.74.0 and removed stale v0.41 contract labels from SDK docs and metadata.
 - Added an explicit parity regression check.
 - Verification: 191 core and 112 SDK tests passed; Ruff and explicit 0.67.0 release audit clean.
 
