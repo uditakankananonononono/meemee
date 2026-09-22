@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.90.0
+
+- Added a least-privilege GitHub commercial release gate for every push and pull request.
+- CI runs lint, all local suites, PostgreSQL contracts, wheel builds and both release audits, then uploads verified wheels.
+- Verification: 220 core and 112 SDK tests plus 3 PostgreSQL contract tests passed; Ruff, deprecation-free core/SDK wheel builds, package audit and explicit 0.90.0 release audit clean. Live PostgreSQL remains unrun here.
+
 ## 0.89.0
 
 - Package audit now verifies complete wheel RECORD coverage, SHA-256 digests and byte sizes.

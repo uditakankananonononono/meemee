@@ -1,3 +1,3 @@
 """Meemee agent runtime."""
 
-__version__ = "0.89.0"
+__version__ = "0.90.0"

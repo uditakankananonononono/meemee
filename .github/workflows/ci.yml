@@ -1,0 +1,43 @@
+name: commercial-release-gate
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+      - name: Install release dependencies
+        run: python -m pip install -e '.[dev,postgresql]' build && python -m pip install -e ./sdk
+      - name: Lint
+        run: ruff check meemee tests examples/webhook_receiver
+      - name: Core and PostgreSQL contract tests
+        run: pytest -q && pytest -q tests_pg/test_contract.py
+      - name: SDK tests
+        working-directory: sdk
+        run: pytest -q
+      - name: Build distributions
+        run: python -m build --wheel --outdir dist && python -m build --wheel --outdir sdk/dist sdk
+      - name: Audit release tree and wheel
+        shell: bash
+        run: |
+          VERSION=$(python -c 'import meemee; print(meemee.__version__)')
+          meemee release-audit . --expected-version "$VERSION"
+          meemee package-audit dist/meemee_agent-*.whl --expected-version "$VERSION"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: meemee-wheels
+          path: |
+            dist/*.whl
+            sdk/dist/*.whl
+          if-no-files-found: error

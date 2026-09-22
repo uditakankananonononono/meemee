@@ -5,7 +5,7 @@ from pathlib import Path
 
 REQUIRED = (
     "README.md", "STATUS.md", "CHANGELOG.md", "OPERATIONS.md", "LICENSE",
-    "pyproject.toml", "Dockerfile", ".env.example",
+    "pyproject.toml", "Dockerfile", ".env.example", ".github/workflows/ci.yml",
 )
 TEXT_SUFFIXES = {".py", ".js", ".html", ".css", ".md", ".toml", ".yaml", ".yml"}
 STUB_PATTERNS = (
