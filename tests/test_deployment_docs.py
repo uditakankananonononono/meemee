@@ -14,5 +14,6 @@ def test_operations_has_no_obsolete_postgres_or_rate_limit_claims():
     assert "keep one API replica" in text and "PostgreSQL workers scale horizontally" in text
 
 def test_kubernetes_manifest_uses_current_image_version():
+    from meemee import __version__
     text=(ROOT/"deploy/k8s/meemee.yaml").read_text()
-    assert ":0.83.0" in text and ":0.3.0" not in text
+    assert text.count(f"ghcr.io/uditakankananonononono/meemee:{__version__}") == 2

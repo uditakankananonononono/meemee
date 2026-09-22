@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.91.0
+
+- Fixed the commercial container build context to include console, PostgreSQL assets and LICENSE while excluding secrets and local state.
+- Updated Kubernetes image pins and changed its API readiness probe from liveness `/health` to dependency-aware `/ready`.
+- Verification: 222 core and 112 SDK tests plus 3 PostgreSQL contract tests passed; Ruff, deprecation-free core/SDK wheel builds, package audit and explicit 0.91.0 release audit clean. Live PostgreSQL remains unrun here.
+
 ## 0.90.0
 
 - Added a least-privilege GitHub commercial release gate for every push and pull request.
