@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.43.0
+
+- Enforced each plan's persistent exact-tool approval limit using active, non-expired grants.
+- Added exact current usage for daily jobs, active webhooks and persistent approvals to current entitlements.
+- Core verification: 140 tests passed; Ruff and release audit clean.
+
 ## 0.42.0
 
 - Added persistent starter/team/business entitlement assignments and a public machine-readable product catalog.

@@ -48,6 +48,14 @@ class ApprovalStore:
             ).rowcount
         return bool(changed)
 
+    def active_count(self, principal: str, now: datetime | None = None) -> int:
+        current = (now or datetime.now(timezone.utc)).isoformat()
+        with self.lock:
+            return int(self.db.execute(
+                "SELECT count(*) FROM tool_approvals WHERE principal=? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>?)",
+                (principal, current),
+            ).fetchone()[0])
+
     def list(self, principal: str) -> list[dict]:
         with self.lock:
             rows = self.db.execute(

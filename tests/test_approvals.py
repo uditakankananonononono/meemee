@@ -21,3 +21,11 @@ def test_approval_expiry_and_regrant(tmp_path: Path):
     store.grant("u", "workspace.write_file", "admin")
     assert store.allows("u", "workspace.write_file")
     assert store.list("u")[0]["revoked_at"] is None
+
+
+def test_active_count_excludes_revoked_and_expired(tmp_path: Path):
+    store=ApprovalStore(tmp_path/"a.db")
+    store.grant("u","a","admin")
+    store.grant("u","expired","admin",(datetime.now(timezone.utc)-timedelta(seconds=1)).isoformat())
+    store.grant("u","revoked","admin"); store.revoke("u","revoked")
+    assert store.active_count("u")==1

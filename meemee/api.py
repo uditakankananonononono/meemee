@@ -351,6 +351,11 @@ class ToolApprovalRequest(BaseModel):
 def grant_tool_approval(principal_id: str, request: ToolApprovalRequest):
     if request.tool not in {schema["name"] for schema in agent.tools.schemas()}:
         raise HTTPException(422, "unknown tool")
+    already_active = approvals.allows(principal_id, request.tool)
+    if not already_active and not entitlements.allows(
+        principal_id, "persistent_approvals", approvals.active_count(principal_id)
+    ):
+        raise HTTPException(403, "plan persistent approval limit reached")
     approvals.grant(principal_id, request.tool, "api-admin", request.expires_at)
     audit.append("api-admin", "approval.grant", principal_id, "success", {"tool": request.tool, "expires_at": request.expires_at})
     return {"principal": principal_id, "tool": request.tool, "granted": True}
@@ -380,7 +385,17 @@ def product_plans():
 
 @app.get("/v1/entitlements")
 def current_entitlements(principal=jobs_write_dependency):
-    return entitlements.get(principal.id)
+    result = entitlements.get(principal.id)
+    active_webhooks = webhooks.db.execute(
+        "SELECT count(*) FROM webhook_subscriptions WHERE principal=? AND active=1", (principal.id,)
+    ).fetchone()[0]
+    quota = quotas.status(principal.id)
+    result["usage"] = {
+        "daily_jobs": quota["used"],
+        "webhooks": int(active_webhooks),
+        "persistent_approvals": approvals.active_count(principal.id),
+    }
+    return result
 
 
 @app.put("/v1/entitlements/{principal_id}", dependencies=[Depends(auth.dependency("admin"))])

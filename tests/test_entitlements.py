@@ -38,3 +38,22 @@ def test_product_catalog_and_entitlement_api(monkeypatch, tmp_path):
     assert api.quotas.limit("customer-1")==1000
     invalid=client.put("/v1/entitlements/customer-1",headers=auth,json={"plan":"enterprise"})
     assert invalid.status_code==422
+
+
+def test_current_entitlements_includes_usage(monkeypatch, tmp_path):
+    from fastapi.testclient import TestClient
+
+    from meemee import api
+    from meemee.approvals import ApprovalStore
+    from meemee.entitlements import EntitlementStore
+    from meemee.quotas import QuotaStore
+    from meemee.webhooks import WebhookStore
+
+    key="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+    monkeypatch.setattr(api,"entitlements",EntitlementStore(tmp_path/"e.db"))
+    monkeypatch.setattr(api,"quotas",QuotaStore(tmp_path/"q.db"))
+    monkeypatch.setattr(api,"approvals",ApprovalStore(tmp_path/"a.db"))
+    monkeypatch.setattr(api,"webhooks",WebhookStore(tmp_path/"w.db",encryption_key=key))
+    response=TestClient(api.app).get("/v1/entitlements",headers={"Authorization":"Bearer test-bootstrap-token"})
+    assert response.status_code==200
+    assert response.json()["usage"]=={"daily_jobs":0,"webhooks":0,"persistent_approvals":0}
