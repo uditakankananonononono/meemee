@@ -1,9 +1,9 @@
 # Meemee status
 
-**Current core version:** 0.99.0  
-**Ledger:** 123 verified, 0 thin  
+**Current core version:** 0.100.0  
+**Ledger:** 133 verified, 0 thin  
 **Supported production shape:** SQLite/WAL single-host; PostgreSQL memory and owner-scoped jobs are selectable but require target-environment live verification  
-**Last core verification:** 225 passed; 136 SDK passed; Ruff and explicit 0.99.0 release audit clean
+**Last core verification:** 287 passed; 144 SDK passed; Ruff and explicit 0.100.0 release audit clean
 
 ## What is production-usable now
 
@@ -16,15 +16,16 @@ The authoritative detailed list is the 123-item "Verified" section in [README.md
 - Browser automation, safe workspace I/O, allowlisted command execution, local Git inspection/commit and GitHub repository scouting.
 - Metrics, JSON logs, dependency readiness, request IDs, graceful shutdown, Docker, Kubernetes manifests and operator documentation.
 - Operator console at `/console/` and the additive `meemee-client` Python SDK.
+- Companion layer: persistent per-user profiles with validated persona configuration, durable provenanced fact memory with full-text retrieval, per-channel conversation persistence, a persona-conditioned conversational engine with bounded fact extraction, proactive check-ins with timezone-aware quiet hours on a durable delivery queue, and local/webhook/WhatsApp/iMessage channel adapters (provider channels config-gated), exposed over scoped HTTP APIs and the `meemee companion` CLI.
 
 ## Verification evidence
 
 | Surface | Latest evidence in this tree | Result |
 |---|---|---|
-| Core server/runtime | `pytest -q` after v0.99.0 | 225 passed |
-| Core lint | `ruff check meemee tests examples/webhook_receiver` after v0.99.0 | clean |
-| SDK | v0.99.0 full run | 112 passed, including 11 against a booted server |
-| PostgreSQL package | contract run at v0.99.0 | 3 contract tests passed; 2 live tests skipped without `MEEMEE_TEST_DATABASE_URL` |
+| Core server/runtime | `pytest -q` after v0.100.0 | 287 passed |
+| Core lint | `ruff check meemee tests examples/webhook_receiver` after v0.100.0 | clean |
+| SDK | v0.100.0 full run | 144 passed, including 11 against a booted server |
+| PostgreSQL package | contract run at v0.100.0 | 3 contract tests passed; 2 live tests skipped without `MEEMEE_TEST_DATABASE_URL` |
 | Console | core mount test plus console worker's headless live test | passed at merge |
 | Concurrency regression | `tests/test_concurrency.py` | 2,000 parallel token auths and 1,000 parallel audit appends passed |
 
@@ -36,6 +37,7 @@ Nothing is classified as thin. A capability is either verified at a stated bound
 
 ## Missing, not claimed
 
+- Live WhatsApp/iMessage delivery over real provider networks: adapters and the delivery queue are implemented and config-gated, but no provider account exists to verify against. Console screens for the companion layer are not built; the surface is HTTP API and CLI.
 - Live PostgreSQL test run in this environment. Checksummed SQLite-to-PostgreSQL copy/import tooling is implemented.
 - Identity-provider-side user lifecycle. Meemee plan, quota and permissions administration is implemented; identity creation/deletion and password policy remain at the IdP.
 - Interactive browser human takeover after explicit challenge detection/handoff.

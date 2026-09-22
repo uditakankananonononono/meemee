@@ -43,13 +43,24 @@ from .models import (
     Approval,
     AuditEntry,
     AuditPage,
+    CheckInPreferences,
+    CheckInTickResult,
+    CheckInUpdateResult,
+    CompanionChatReply,
+    CompanionCheckIn,
+    CompanionConversation,
+    CompanionFact,
+    CompanionMessage,
+    CompanionUser,
     CreatedJob,
     CreatedToken,
     CreatedWebhook,
+    FactRetireResult,
     HealthStatus,
     Job,
     JobCancelResult,
     JobEvent,
+    PersonaConfig,
     QuotaStatus,
     RateLimitInfo,
     ReadinessStatus,
@@ -148,6 +159,7 @@ class MeemeeClient:
         self.quota = QuotaResource(self)
         self.approvals = ApprovalsResource(self)
         self.webhooks = WebhooksResource(self)
+        self.companion = CompanionResource(self)
 
     # ------------------------------------------------------------------ basics
 
@@ -754,3 +766,120 @@ class WebhooksResource:
 
     def replay(self, delivery_id: str) -> dict:
         return self._client._request_json("POST", f"/v1/webhook-deliveries/{delivery_id}/replay")
+
+
+class CompanionResource:
+    """Companion layer: profiles, persona, facts, chat and check-ins.
+
+    Scopes: companion:read for inspection, companion:write for mutation and
+    chat, admin for the delivery tick.
+    """
+
+    def __init__(self, client: MeemeeClient) -> None:
+        self._client = client
+
+    def list_users(self, *, limit: int = 100) -> list[CompanionUser]:
+        payload = self._client._request_json("GET", "/v1/companion/users", params={"limit": limit})
+        return [CompanionUser.model_validate(item) for item in payload["users"]]
+
+    def upsert_user(
+        self,
+        user_id: str,
+        display_name: str,
+        *,
+        timezone: str = "UTC",
+        persona: PersonaConfig | None = None,
+        checkins: CheckInPreferences | None = None,
+    ) -> CompanionUser:
+        body: dict[str, Any] = {"display_name": display_name, "timezone": timezone}
+        if persona is not None:
+            body["persona"] = persona.model_dump()
+        if checkins is not None:
+            body["checkins"] = checkins.model_dump()
+        payload = self._client._request_json("PUT", f"/v1/companion/users/{user_id}", json_body=body)
+        return CompanionUser.model_validate(payload)
+
+    def get_user(self, user_id: str) -> CompanionUser:
+        return CompanionUser.model_validate(self._client._request_json("GET", f"/v1/companion/users/{user_id}"))
+
+    def update_persona(self, user_id: str, persona: PersonaConfig) -> CompanionUser:
+        payload = self._client._request_json(
+            "PUT", f"/v1/companion/users/{user_id}/persona", json_body={"persona": persona.model_dump()}
+        )
+        return CompanionUser.model_validate(payload)
+
+    def update_checkins(self, user_id: str, checkins: CheckInPreferences) -> CheckInUpdateResult:
+        payload = self._client._request_json(
+            "PUT", f"/v1/companion/users/{user_id}/checkins", json_body={"checkins": checkins.model_dump()}
+        )
+        return CheckInUpdateResult.model_validate(payload)
+
+    def list_facts(self, user_id: str, *, query: str | None = None, limit: int = 200) -> list[CompanionFact]:
+        params: dict[str, Any] = {"limit": limit}
+        if query is not None:
+            params["query"] = query
+        payload = self._client._request_json("GET", f"/v1/companion/users/{user_id}/facts", params=params)
+        return [CompanionFact.model_validate(item) for item in payload["facts"]]
+
+    def add_fact(self, user_id: str, text: str, *, category: str = "general", confidence: float = 1.0) -> CompanionFact:
+        payload = self._client._request_json(
+            "POST", f"/v1/companion/users/{user_id}/facts",
+            json_body={"category": category, "text": text, "confidence": confidence},
+        )
+        return CompanionFact.model_validate(payload)
+
+    def retire_fact(self, user_id: str, fact_id: int) -> FactRetireResult:
+        payload = self._client._request_json("DELETE", f"/v1/companion/users/{user_id}/facts/{fact_id}")
+        return FactRetireResult.model_validate(payload)
+
+    def chat(
+        self,
+        user_id: str,
+        text: str,
+        *,
+        channel: str = "local",
+        conversation_id: str | None = None,
+        timeout: httpx.Timeout | float | None = None,
+    ) -> CompanionChatReply:
+        """POST /v1/companion/chat - one conversational turn with durable memory.
+
+        Not auto-retried: a network failure can mean the turn still executed.
+        """
+        if not text.strip():
+            raise ValueError("text must not be empty")
+        body: dict[str, Any] = {"user_id": user_id, "text": text, "channel": channel}
+        if conversation_id is not None:
+            body["conversation_id"] = conversation_id
+        payload = self._client._request_json(
+            "POST", "/v1/companion/chat", json_body=body,
+            timeout=timeout if timeout is not None else httpx.Timeout(300.0, connect=5.0),
+        )
+        return CompanionChatReply.model_validate(payload)
+
+    def list_conversations(self, user_id: str, *, limit: int = 50) -> list[CompanionConversation]:
+        payload = self._client._request_json(
+            "GET", f"/v1/companion/users/{user_id}/conversations", params={"limit": limit}
+        )
+        return [CompanionConversation.model_validate(item) for item in payload["conversations"]]
+
+    def messages(self, conversation_id: str, *, limit: int = 100) -> list[CompanionMessage]:
+        payload = self._client._request_json(
+            "GET", f"/v1/companion/conversations/{conversation_id}/messages", params={"limit": limit}
+        )
+        return [CompanionMessage.model_validate(item) for item in payload["messages"]]
+
+    def plan_checkin(self, user_id: str) -> CompanionCheckIn:
+        payload = self._client._request_json("POST", f"/v1/companion/users/{user_id}/checkins/plan")
+        return CompanionCheckIn.model_validate(payload)
+
+    def list_checkins(self, user_id: str, *, status: str | None = None, limit: int = 50) -> list[CompanionCheckIn]:
+        params: dict[str, Any] = {"limit": limit}
+        if status is not None:
+            params["status"] = status
+        payload = self._client._request_json("GET", f"/v1/companion/users/{user_id}/checkins", params=params)
+        return [CompanionCheckIn.model_validate(item) for item in payload["checkins"]]
+
+    def tick(self) -> CheckInTickResult:
+        """POST /v1/companion/checkins/tick (admin) - plan slots and deliver due check-ins now."""
+        payload = self._client._request_json("POST", "/v1/companion/checkins/tick")
+        return CheckInTickResult.model_validate(payload)

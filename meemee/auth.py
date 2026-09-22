@@ -118,7 +118,7 @@ class Authenticator:
             if credentials is not None and credentials.scheme.lower() == "bearer":
                 supplied = credentials.credentials
                 if self.bootstrap and hmac.compare_digest(supplied, self.bootstrap):
-                    principal = Principal("bootstrap", "bootstrap", frozenset({"admin", "runs:write", "jobs:read", "jobs:write"}))
+                    principal = Principal("bootstrap", "bootstrap", frozenset({"admin", "runs:write", "jobs:read", "jobs:write", "companion:read", "companion:write"}))
                 else:
                     principal = self.store.authenticate(supplied)
                     if principal is None and self.oidc is not None:

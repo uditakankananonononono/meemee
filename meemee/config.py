@@ -56,7 +56,16 @@ class Settings(BaseSettings):
     trusted_hosts: str = "localhost,127.0.0.1,testserver"
     hsts_enabled: bool = False
     hsts_max_age_seconds: int = 31_536_000
-    oidc_role_scopes: str = "admin=admin;operator=runs:write,jobs:read,jobs:write;viewer=jobs:read"
+    companion_history_limit: int = 40
+    companion_fact_limit: int = 12
+    companion_model_temperature: float = 0.7
+    companion_checkin_poll_seconds: float = 30.0
+    companion_webhook_secret: str | None = None
+    whatsapp_provider_url: str | None = None
+    whatsapp_provider_token: str | None = None
+    imessage_provider_url: str | None = None
+    imessage_provider_token: str | None = None
+    oidc_role_scopes: str = "admin=admin;operator=runs:write,jobs:read,jobs:write,companion:read,companion:write;viewer=jobs:read,companion:read"
 
     @property
     def database_path(self) -> Path:

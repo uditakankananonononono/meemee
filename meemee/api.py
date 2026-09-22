@@ -20,6 +20,8 @@ from . import __version__
 from .approvals import ApprovalStore
 from .audit import AuditLog
 from .auth import Authenticator, Principal, TokenStore
+from .companion.api import build_companion_router
+from .companion.runtime import build_companion
 from .config import Settings
 from .entitlements import EntitlementStore, public_catalog
 from .health import ReadinessChecker
@@ -96,6 +98,7 @@ tokens = TokenStore(settings.data_dir / "auth.sqlite3")
 audit = AuditLog(settings.data_dir / "audit.sqlite3")
 approvals = ApprovalStore(settings.data_dir / "approvals.sqlite3")
 webhooks = WebhookStore(settings.data_dir / "webhooks.sqlite3", settings.webhook_max_payload_bytes, settings.vault_key)
+companion = build_companion(settings)
 oidc = None
 if any((settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url)):
     if not all((settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url)):
@@ -116,6 +119,7 @@ jobs_write_auth = auth.dependency("jobs:write")
 jobs_write_dependency = Depends(jobs_write_auth)
 runs_write_dependency = Depends(auth.dependency("runs:write"))
 jobs_read_dependency = Depends(auth.dependency("jobs:read"))
+app.include_router(build_companion_router(companion.store, companion.engine, companion.channels, auth, audit))
 
 
 @app.middleware("http")
@@ -307,7 +311,7 @@ def get_job_events(request: Request, job_id: str, after: int = 0):
 
 @app.post("/v1/tokens", dependencies=[Depends(auth.dependency("admin"))])
 def create_token(request: TokenRequest):
-    allowed = {"admin", "runs:write", "jobs:read", "jobs:write"}
+    allowed = {"admin", "runs:write", "jobs:read", "jobs:write", "companion:read", "companion:write"}
     if not request.scopes <= allowed:
         raise HTTPException(422, f"unknown scopes: {sorted(request.scopes - allowed)}")
     ident, token = tokens.create(request.name, request.scopes, request.expires_at)

@@ -123,3 +123,9 @@ Alert when `meemee_webhook_success_rate` falls below 0.95 for 10 minutes, `meeme
 ## Account portability
 
 Export with `meemee account-export PRINCIPAL export.json`. The file contains only that principal's jobs, completed runs and explicit entitlement assignment plus a SHA-256 checksum; it does not contain tokens, vault values, webhook signing secrets or cross-principal rows. Verify and preview retargeting with `meemee account-import-inspect export.json --target-principal NEW_ID`. Import only into stopped, backed-up instances with `meemee account-import`; it preflights every ID/entitlement collision, uses safety copies and restores on failure.
+
+## Companion layer
+
+Companion state lives in `companion.sqlite3` inside the data directory (WAL, checksummed component schema). Manage users and personas with `meemee companion upsert-user` and `meemee companion set-persona`, facts with `meemee companion add-fact` / `facts`, and proactive check-ins with `meemee companion set-checkins`. Chat interactively with `meemee companion chat USER_ID`. Run one or more proactive delivery loops with `meemee companion checkin-worker`; each loop plans idempotent per-user slots and delivers due check-ins with bounded retries, and `POST /v1/companion/checkins/tick` (admin) runs the same pass on demand.
+
+Channel delivery: the `local` channel writes into the user's local conversation; the `webhook` channel POSTs signed JSON to a caller-owned HTTPS endpoint (set `MEEMEE_COMPANION_WEBHOOK_SECRET` to sign). The `whatsapp` and `imessage` channels deliver only when their provider settings (`MEEMEE_WHATSAPP_PROVIDER_URL`/`_TOKEN`, `MEEMEE_IMESSAGE_PROVIDER_URL`/`_TOKEN`) point at a real provider account; without them those channels fail closed with a configuration error. Companion API calls need the `companion:read` or `companion:write` scope; mint tokens with those scopes through `POST /v1/tokens`.

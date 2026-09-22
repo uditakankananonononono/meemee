@@ -84,5 +84,60 @@ class OpenAICompatibleModel:
                 raise ModelError(f"model returned an invalid decision payload: {exc}") from exc
         raise ModelError(f"model request failed after {attempts_used} attempts: {last_error}") from last_error
 
+    async def chat(
+        self,
+        messages: list[dict[str, str]],
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+    ) -> str:
+        """Free-text chat completion with the same bounded retry policy as decide()."""
+        last_error: Exception | None = None
+        attempts_used = 0
+        for attempt in range(1, self.max_attempts + 1):
+            attempts_used = attempt
+            try:
+                body: dict[str, Any] = {
+                    "model": self.model,
+                    "messages": messages,
+                    "temperature": temperature,
+                }
+                if max_tokens is not None:
+                    body["max_tokens"] = max_tokens
+                response = await self.client.post(
+                    f"{self.base_url}/chat/completions",
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    json=body,
+                )
+                if response.status_code in {408, 429, 500, 502, 503, 504}:
+                    raise httpx.HTTPStatusError(
+                        f"transient model HTTP {response.status_code}",
+                        request=response.request,
+                        response=response,
+                    )
+                response.raise_for_status()
+                payload: dict[str, Any] = response.json()
+                text = payload["choices"][0]["message"]["content"]
+                if not isinstance(text, str) or not text.strip():
+                    raise ModelError("model returned an empty chat completion")
+                return text.strip()
+            except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError) as exc:
+                last_error = exc
+                retryable = not isinstance(exc, httpx.HTTPStatusError) or exc.response.status_code in {
+                    408, 429, 500, 502, 503, 504
+                }
+                if not retryable or attempt == self.max_attempts:
+                    break
+                retry_after = exc.response.headers.get("retry-after") if isinstance(exc, httpx.HTTPStatusError) else None
+                try:
+                    delay = min(float(retry_after), 30.0) if retry_after else min(2 ** (attempt - 1), 8) + random.random() * 0.25
+                except ValueError:
+                    delay = min(2 ** (attempt - 1), 8)
+                await asyncio.sleep(delay)
+            except (KeyError, IndexError, TypeError, json.JSONDecodeError, ValueError) as exc:
+                if isinstance(exc, ModelError):
+                    raise
+                raise ModelError(f"model returned an invalid chat payload: {exc}") from exc
+        raise ModelError(f"model request failed after {attempts_used} attempts: {last_error}") from last_error
+
     async def aclose(self) -> None:
         await self.client.aclose()

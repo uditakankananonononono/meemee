@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.99.0 (123)
+## Verified in v0.100.0 (134)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -127,6 +127,17 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 121. SDK root exports are mechanically checked against every public typed model and error, closing missing-import failures such as `TokenMetadata` and preventing CI-only export drift.
 122. SDK contract parity preserves job quota snapshots, models real day-based quota responses, exposes readiness as a boolean while parsing 503 diagnostics, and safely retries transient keyed job POSTs.
 123. SDK job quota snapshots are typed, readiness identifies failing components, idempotency keys are locally bounded to 1-200 characters, and quota-exceeded 429 responses never retry even when keyed.
+124. Persistent per-user companion profiles bind a validated persona (name, tone, style rules, language, emoji and custom instructions) and a real IANA timezone to a durable identity.
+125. Durable per-user fact memory records category, confidence and provenance, scrubs pasted credentials, deduplicates exact repeats, supports full-text retrieval, and retires facts through supersession without deleting history.
+126. Per-user, per-channel conversation persistence replays bounded history into every model prompt and rejects cross-user conversation access.
+127. The conversational engine conditions free-text replies on persona and recalled facts, then extracts bounded durable facts from each exchange with conversation provenance, skipping malformed extraction payloads safely.
+128. Free-text model chat uses the same bounded retry policy as the agent decision loop, retries only transient failures, and rejects empty completions.
+129. Proactive check-ins plan idempotent per-user slots from cadence and timezone-aware quiet hours, including overnight windows, in a durable queue with atomic claims, bounded retries and cancel-on-disable.
+130. Check-in delivery generates a persona-conditioned message and delivers it through the channel registry, recording per-check-in message, status and error evidence.
+131. Channel adapters include a working local channel persisted to the user's conversation and a signed HTTPS webhook channel with SSRF defenses, HMAC signatures and payload ceilings.
+132. WhatsApp and iMessage provider adapters are real HTTP deliveries that stay config-gated: without provider endpoint and token they fail closed with an explicit configuration error naming the missing settings.
+133. The companion HTTP API (profiles, persona, facts, chat, conversations, check-in planning and an admin delivery tick) and the `meemee companion` CLI (user/persona/fact management, interactive chat, check-in worker) enforce dedicated companion:read and companion:write scopes with audit events.
+134. The typed SDK companion resource covers users, persona and check-in updates, fact CRUD and search, chat turns, conversations and message history, check-in planning and the admin delivery tick, with the new scopes included in client-side scope validation.
 
 ## Thin (0)
 
@@ -134,7 +145,7 @@ Nothing is classified as thin. A capability is either implemented and tested at 
 
 ## Missing, not claimed
 
-Live PostgreSQL integration is not verified in this environment; target deployments must run the unskipped PostgreSQL suite and preflight. Identity creation/deletion and password policy remain at the configured IdP, while Meemee plan, quota and permission administration is implemented. Browser challenges are detected and handed off, but an interactive live human-control channel is not built in. Async tools can be cancelled; blocking third-party native code that does not yield cannot be forcibly interrupted safely. Multi-region failover, online dual-write migration and logical replication remain deployment/infrastructure work and are not claimed.
+Live WhatsApp and iMessage delivery over real provider networks is unverified: the adapters and durable delivery queue are implemented and config-gated, but no provider account exists yet, and the console has no companion screens yet (HTTP API and CLI only). Live PostgreSQL integration is not verified in this environment; target deployments must run the unskipped PostgreSQL suite and preflight. Identity creation/deletion and password policy remain at the configured IdP, while Meemee plan, quota and permission administration is implemented. Browser challenges are detected and handed off, but an interactive live human-control channel is not built in. Async tools can be cancelled; blocking third-party native code that does not yield cannot be forcibly interrupted safely. Multi-region failover, online dual-write migration and logical replication remain deployment/infrastructure work and are not claimed.
 
 The SQLite single-host shape and PostgreSQL memory, owner-scoped jobs and shared rate limiting are stated at their tested boundaries. SSE and authenticated WebSocket job streams are implemented. No missing item is represented as shipped.
 
@@ -189,6 +200,7 @@ File writes are denied unless the caller opts in with `--approve-writes` or `app
 - `plan_store.py`: durable versioned DAG plans and edit history.
 - `jobs.py`: durable single-node scheduled queue and append-only event log.
 - `llm.py`: OpenAI-compatible transport.
+- `companion/`: per-user profiles and persona, durable fact memory, conversation persistence, proactive check-in scheduler and channel adapters.
 - `cli.py` and `api.py`: interfaces over the same runtime.
 
 A model statement is never treated as proof that work happened. Tool returns are stored separately, side effects require approval, and paths stay inside the configured workspace.

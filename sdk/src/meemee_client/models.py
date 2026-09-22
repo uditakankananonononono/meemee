@@ -145,7 +145,7 @@ class RevokedToken(BaseModel):
 
 
 #: The complete set of scopes the server accepts when minting tokens.
-KNOWN_SCOPES: frozenset[str] = frozenset({"admin", "runs:write", "jobs:read", "jobs:write"})
+KNOWN_SCOPES: frozenset[str] = frozenset({"admin", "runs:write", "jobs:read", "jobs:write", "companion:read", "companion:write"})
 
 
 class AuditEntry(BaseModel):
@@ -257,3 +257,105 @@ class TokenMetadata(BaseModel):
     last_used_at: datetime | None = None
     expires_at: datetime | None = None
     revoked_at: datetime | None = None
+
+
+class PersonaConfig(BaseModel):
+    """How the companion speaks for and to one user."""
+
+    display_name: str = "Meemee"
+    tone: str = "warm, direct and honest"
+    style_rules: list[str] = Field(default_factory=list)
+    language: str = "en"
+    use_emoji: bool = False
+    custom_instructions: str = ""
+
+
+class QuietHours(BaseModel):
+    """Local HH:MM window during which proactive check-ins stay silent."""
+
+    start: str
+    end: str
+
+
+class CheckInPreferences(BaseModel):
+    enabled: bool = False
+    cadence_minutes: int = 360
+    quiet_hours: QuietHours | None = None
+    channel: str = "local"
+    address: str | None = None
+
+
+class CompanionUser(BaseModel):
+    user_id: str
+    display_name: str
+    timezone: str
+    persona: PersonaConfig
+    checkins: CheckInPreferences
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class CompanionFact(BaseModel):
+    id: int
+    user_id: str
+    category: str
+    text: str
+    confidence: float
+    source: str
+    superseded_by: int | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class CompanionChatReply(BaseModel):
+    conversation_id: str
+    reply: str
+    facts_learned: int
+    persona: str
+
+
+class CompanionConversation(BaseModel):
+    id: str
+    user_id: str
+    channel: str
+    created_at: datetime | None = None
+    last_message_at: datetime | None = None
+
+
+class CompanionMessage(BaseModel):
+    id: int
+    conversation_id: str
+    role: str
+    content: str
+    created_at: datetime | None = None
+
+
+class CompanionCheckIn(BaseModel):
+    id: str
+    user_id: str
+    slot: str
+    due_at: datetime
+    status: str
+    attempts: int
+    max_attempts: int
+    channel: str
+    address: str | None = None
+    message: str | None = None
+    last_error: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class CheckInUpdateResult(BaseModel):
+    user: CompanionUser
+    cancelled_pending: int
+
+
+class FactRetireResult(BaseModel):
+    fact_id: int
+    active: bool
+
+
+class CheckInTickResult(BaseModel):
+    planned: int
+    deliveries: list[dict[str, Any]] = Field(default_factory=list)

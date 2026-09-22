@@ -2,6 +2,17 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.100.0
+
+- Added the companion layer: persistent per-user profiles with validated persona configuration and real IANA timezones.
+- Added durable per-user fact memory with provenance, confidence, credential scrubbing, supersession and full-text retrieval.
+- Added per-channel conversation persistence and a persona-conditioned conversational engine with bounded automatic fact extraction; free-text model chat shares the agent loop's bounded retry policy.
+- Added proactive check-ins: idempotent slot planning from cadence and timezone-aware quiet hours on a durable queue with atomic claims, bounded retries and cancel-on-disable.
+- Added channel adapters: a working local channel, a signed HTTPS webhook channel with SSRF defenses, and config-gated WhatsApp/iMessage provider adapters that fail closed with explicit configuration errors until real provider credentials exist.
+- Added the scoped companion HTTP API (`companion:read`/`companion:write`) and the `meemee companion` CLI with an interactive chat and a check-in worker.
+- Added the typed SDK companion resource covering profiles, persona, facts, chat, conversations and check-ins, with the new scopes in client-side validation.
+- Verification: 287 core and 144 SDK tests plus 3 PostgreSQL contract tests passed; Ruff, deprecation-free core/SDK wheel builds, package audit and explicit 0.100.0 release audit clean. Live PostgreSQL and live WhatsApp/iMessage provider delivery remain unrun here.
+
 ## 0.99.0
 
 - Typed SDK job quota snapshots and added readiness failing-component inspection.

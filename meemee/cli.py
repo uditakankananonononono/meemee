@@ -13,6 +13,7 @@ from .api_loadcheck import run_api_loadcheck
 from .audit import AuditLog
 from .audit_anchor import create_anchor, prune_to_anchor, verify_anchor
 from .backup import BackupManager
+from .companion.cli import companion_app
 from .config import Settings
 from .key_rotation import rotate_keys
 from .loadcheck import run_loadcheck
@@ -32,6 +33,7 @@ from .webhooks import WebhookStore, dispatch_forever
 from .worker import work_forever
 
 app = typer.Typer(no_args_is_help=True, help="Meemee local-first agent runtime")
+app.add_typer(companion_app, name="companion")
 DEFAULT_DATA_DIR = Path.home() / ".meemee"
 DEFAULT_ENV_FILE = Path(".env")
 DATA_DIR_OPTION = typer.Option(DEFAULT_DATA_DIR, "--data-dir")

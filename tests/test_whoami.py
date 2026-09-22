@@ -17,7 +17,7 @@ def test_whoami_returns_exact_identity_scopes_and_entitlement(monkeypatch, tmp_p
     assert response.status_code==200
     body=response.json()
     assert body["id"]=="bootstrap" and body["name"]=="bootstrap"
-    assert body["scopes"]==["admin","jobs:read","jobs:write","runs:write"]
+    assert body["scopes"]==["admin","companion:read","companion:write","jobs:read","jobs:write","runs:write"]
     assert body["entitlement"]["plan"]=="starter"
     assert body["entitlement"]["usage"]["daily_jobs"]==0
 

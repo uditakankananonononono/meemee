@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from meemee import __version__
 from meemee.release_audit import REQUIRED, audit_tree
 
 
@@ -59,6 +60,6 @@ def test_release_audit_rejects_stale_sdk_contract_label(tmp_path):
     for relative in ("README.md", "STATUS.md", "CHANGELOG.md", "OPERATIONS.md", "LICENSE", "pyproject.toml", "Dockerfile", ".dockerignore", ".env.example", ".github/workflows/ci.yml", "meemee/__init__.py", "sdk/pyproject.toml", "sdk/src/meemee_client/_version.py", "sdk/README.md"):
         source = root / relative; target = tmp_path / relative; target.parent.mkdir(parents=True, exist_ok=True); shutil.copy(source, target)
     target = tmp_path / "sdk/README.md"
-    target.write_text(target.read_text().replace("v0.99.0", "v0.1.0"))
-    report = audit_tree(tmp_path, "0.99.0")
+    target.write_text(target.read_text().replace(f"v{__version__}", "v0.1.0"))
+    report = audit_tree(tmp_path, __version__)
     assert "sdk_contract_version_drift" in {item["code"] for item in report["findings"]}

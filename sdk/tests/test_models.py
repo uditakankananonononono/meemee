@@ -127,4 +127,4 @@ def test_rate_limit_info_absent_on_exempt_paths() -> None:
 
 
 def test_known_scopes_matches_server_allowlist() -> None:
-    assert KNOWN_SCOPES == frozenset({"admin", "runs:write", "jobs:read", "jobs:write"})
+    assert KNOWN_SCOPES == frozenset({"admin", "runs:write", "jobs:read", "jobs:write", "companion:read", "companion:write"})

@@ -1,7 +1,7 @@
 # meemee-client
 
 Typed Python SDK for the [Meemee](../README.md) agent platform API. Targets the
-server **v0.99.0** HTTP contract: scoped API tokens and OIDC bearer auth,
+server **v0.100.0** HTTP contract: scoped API tokens and OIDC bearer auth,
 synchronous runs, durable queued jobs, resume-safe SSE progress, fixed-window
 rate limiting, and the tamper-evident audit chain.
 
@@ -115,8 +115,8 @@ are limiter-exempt server-side.
 
 ## Verified, Thin, Missing
 
-**Verified (107 tests: 96 against a mocked transport implementing the server
-v0.99.0 contract, plus 11 live integration tests that boot the real server
+**Verified (144 tests: 133 against a mocked transport implementing the server
+v0.100.0 contract, plus 11 live integration tests that boot the real server
 package and exercise it end to end):**
 
 1. Auth header attachment, 401/403 mapping including `WWW-Authenticate` and
@@ -143,6 +143,10 @@ package and exercise it end to end):**
    POST never auto-retried, permanent errors fail fast, network-error retries.
 10. Rate-limit and request-id metadata capture from the real limiter (live).
 11. `wait()` polling to terminal states with timeout.
+12. Companion: user upsert/get/list, persona and check-in updates, fact CRUD
+    and search, chat turns with local validation, conversations and message
+    history, check-in planning/listing and the admin delivery tick, all
+    parsed into typed models.
 
 The live suite lives in `tests/test_live_integration.py`; it boots uvicorn
 against the `meemee` package next to `sdk/` and skips cleanly when that
@@ -157,7 +161,6 @@ stated boundary.
 - A live test of `POST /v1/runs` - a real run needs a reachable model
   endpoint; runs are covered in the mocked suite only.
 - WebSocket streaming - the server offers resume-safe SSE only.
-- Idempotency keys for safe POST retries - the server does not support them.
 - Interactive OIDC browser login - owned by the server's `/auth/login`.
 - Token introspection/listing and job listing endpoints - the server does not
   expose them (token admin is create/revoke; jobs are addressed by id).
