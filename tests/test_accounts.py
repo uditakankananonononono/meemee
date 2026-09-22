@@ -45,3 +45,13 @@ def test_signup_rejects_weak_password_and_duplicate_email(tmp_path: Path):
         raise AssertionError("duplicate accepted")
     except ValueError as exc:
         assert "already exists" in str(exc)
+
+
+def test_login_locks_for_fifteen_minutes_after_five_failures(tmp_path: Path):
+    store = TokenStore(tmp_path / "accounts.db")
+    store.create_account("lock@example.com", "correct horse battery", "Lock")
+    for _ in range(5):
+        assert store.login_account("lock@example.com", "wrong password value") is None
+    assert store.login_account("lock@example.com", "correct horse battery") is None
+    row = store.db.execute("SELECT failed_logins,locked_until FROM accounts WHERE email='lock@example.com'").fetchone()
+    assert row["failed_logins"] == 5 and row["locked_until"]

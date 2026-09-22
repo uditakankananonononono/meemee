@@ -2,6 +2,13 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.106.0
+
+- Added one-time, 30-minute email verification with digest-only token persistence, atomic consumption, verified account status and a public verification endpoint.
+- Added Resend transactional delivery with a branded verification link, HTTPS public-URL requirement and fail-closed configuration. Signup reports whether verification mail was sent.
+- Added account lockout after five consecutive login failures with a 15-minute cooldown, plus a release rehearsal for auth, email, load and backup/restore.
+- Verification: 300 core tests, 133 SDK tests and 5 PostgreSQL contract tests passed; 15 live SDK and 2 live PostgreSQL tests skipped. Ruff, wheel package audit and explicit 0.106.0 release audit clean. Live Resend shared-domain send/receipt passed: provider send ID `01a0c8b7-b764-735f-849a-e73d5bfaf2a9`; Gmail INBOX message `1a0c8b7ba3f53eda` arrived about 15 seconds later with the body intact. The shared domain is limited to the provider account owner; a verified domain remains required before public delivery.
+
 ## 0.105.0
 
 - Added a packaged public product site at `/product/` with clear landing content, current plan limits, direct signup entry, customer quickstart docs and a capability ledger.

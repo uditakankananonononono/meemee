@@ -129,3 +129,19 @@ Export with `meemee account-export PRINCIPAL export.json`. The file contains onl
 Companion state lives in `companion.sqlite3` inside the data directory (WAL, checksummed component schema). Manage users and personas with `meemee companion upsert-user` and `meemee companion set-persona`, facts with `meemee companion add-fact` / `facts`, and proactive check-ins with `meemee companion set-checkins`. Chat interactively with `meemee companion chat USER_ID`. Run one or more proactive delivery loops with `meemee companion checkin-worker`; each loop plans idempotent per-user slots and delivers due check-ins with bounded retries, and `POST /v1/companion/checkins/tick` (admin) runs the same pass on demand.
 
 Channel delivery: the `local` channel writes into the user's local conversation; the `webhook` channel POSTs signed JSON to a caller-owned HTTPS endpoint (set `MEEMEE_COMPANION_WEBHOOK_SECRET` to sign). The `whatsapp` and `imessage` channels deliver only when their provider settings (`MEEMEE_WHATSAPP_PROVIDER_URL`/`_TOKEN`, `MEEMEE_IMESSAGE_PROVIDER_URL`/`_TOKEN`) point at a real provider account; without them those channels fail closed with a configuration error. Companion API calls need the `companion:read` or `companion:write` scope; mint tokens with those scopes through `POST /v1/tokens`.
+
+## Customer authentication and transactional email
+
+Built-in signup is controlled by `MEEMEE_SIGNUP_ENABLED`. Keep the global rate limiter enabled at the edge and in Meemee. Passwords are PBKDF2-HMAC-SHA256 hashes with independent salts. Five consecutive failed logins lock the account for 15 minutes; successful login clears the counter. Verification links expire after 30 minutes, are one-use, and are stored only as SHA-256 digests.
+
+For verification delivery set `MEEMEE_RESEND_API_KEY`, `MEEMEE_EMAIL_FROM_ADDRESS` and an HTTPS `MEEMEE_PUBLIC_URL`. On the Resend shared test domain, delivery is limited to the provider account owner's address. Use a verified sending domain before opening public signup.
+
+Release rehearsal:
+
+1. `meemee preflight --require-model`
+2. `meemee release-audit . --expected-version <version>`
+3. `meemee api-loadcheck --requests 200 --concurrency 20`
+4. Create a fresh built-in account, receive and consume the verification link, log in, onboard, chat, create/revoke an API key and log out.
+5. Run `meemee backup`, verify its manifest, restore into a separate empty directory, start that instance and inspect `/ready`.
+6. Run PostgreSQL preflight and every unskipped `tests_pg` test when PostgreSQL is the deployment backend.
+7. Record external provider IDs, test timestamps and delivery outcomes without storing message bodies or secrets in the release archive.

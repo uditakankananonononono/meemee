@@ -25,6 +25,7 @@ from .auth import Authenticator, Principal, TokenStore
 from .companion.api import build_companion_router
 from .companion.runtime import build_companion
 from .config import Settings
+from .email_verification import EmailVerificationStore, ResendMailer
 from .entitlements import EntitlementStore, public_catalog
 from .health import ReadinessChecker
 from .idempotency import IdempotencyConflict, IdempotencyStore
@@ -99,6 +100,8 @@ idempotency = IdempotencyStore(settings.data_dir / "idempotency.sqlite3")
 quotas = QuotaStore(settings.data_dir / "quotas.sqlite3", settings.default_daily_jobs)
 entitlements = EntitlementStore(settings.data_dir / "entitlements.sqlite3", settings.default_plan)
 tokens = TokenStore(settings.data_dir / "auth.sqlite3")
+email_verifications = EmailVerificationStore(settings.data_dir / "email-verifications.sqlite3")
+mailer = ResendMailer(settings.resend_api_key, settings.email_from_address, settings.public_url)
 audit = AuditLog(settings.data_dir / "audit.sqlite3")
 approvals = ApprovalStore(settings.data_dir / "approvals.sqlite3")
 webhooks = WebhookStore(settings.data_dir / "webhooks.sqlite3", settings.webhook_max_payload_bytes, settings.vault_key)
@@ -230,7 +233,25 @@ def account_signup(request: SignupRequest):
         raise HTTPException(409 if "already exists" in str(exc) else 422, str(exc)) from exc
     entitlements.get(account["id"])
     audit.append(account["id"], "account.signup", account["id"], "success")
-    return {"account": account, "token": token, "token_type": "bearer", "expires_in_days": 30}
+    raw = email_verifications.issue(account["id"])
+    email_delivery = "not_configured"
+    if mailer.configured:
+        mailer.send_verification(account["email"], account["id"], raw)
+        email_delivery = "sent"
+    return {"account": {**account, "email_verified": False}, "token": token, "token_type": "bearer", "expires_in_days": 30, "verification_email": email_delivery}
+
+
+class EmailVerifyRequest(BaseModel):
+    account_id: str = Field(min_length=8, max_length=80)
+    token: str = Field(min_length=20, max_length=200)
+
+
+@app.post("/v1/accounts/verify-email")
+def verify_account_email(request: EmailVerifyRequest):
+    if not email_verifications.verify(request.account_id, request.token):
+        raise HTTPException(400, "invalid or expired verification link")
+    audit.append(request.account_id, "account.email.verify", request.account_id, "success")
+    return {"account_id": request.account_id, "email_verified": True}
 
 
 @app.post("/v1/accounts/login")
@@ -248,7 +269,7 @@ def get_account(principal=jobs_read_dependency):
     account = tokens.get_account(principal.id)
     if account is None:
         return {"id": principal.id, "display_name": principal.name, "email": None, "external": True}
-    return {**account, "external": False}
+    return {**account, "external": False, "email_verified": email_verifications.status(principal.id)}
 
 
 @app.post("/v1/account/api-keys", status_code=201)

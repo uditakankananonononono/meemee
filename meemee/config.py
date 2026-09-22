@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     policy_file: Path | None = None
     api_token: str | None = None
     signup_enabled: bool = True
+    resend_api_key: str | None = None
+    email_from_address: str = "onboarding@resend.dev"
+    public_url: str = "http://localhost:8787"
     shell_allowlist: str = "python3,pytest,ruff,git,ls,find,cat,wc"
     worker_poll_seconds: float = 1.0
     vault_key: str | None = None

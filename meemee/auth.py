@@ -43,7 +43,8 @@ class TokenStore:
                 CREATE TABLE IF NOT EXISTS accounts (
                     id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, display_name TEXT NOT NULL,
                     password_hash BLOB NOT NULL, password_salt BLOB NOT NULL,
-                    created_at TEXT NOT NULL, disabled_at TEXT
+                    created_at TEXT NOT NULL, disabled_at TEXT,
+                    failed_logins INTEGER NOT NULL DEFAULT 0, locked_until TEXT
                 );
             """)
             columns = {row[1] for row in self.db.execute("PRAGMA table_info(api_tokens)")}
@@ -51,6 +52,11 @@ class TokenStore:
                 self.db.execute("ALTER TABLE api_tokens ADD COLUMN owner_id TEXT")
             if "token_kind" not in columns:
                 self.db.execute("ALTER TABLE api_tokens ADD COLUMN token_kind TEXT NOT NULL DEFAULT 'api'")
+            account_columns = {row[1] for row in self.db.execute("PRAGMA table_info(accounts)")}
+            if "failed_logins" not in account_columns:
+                self.db.execute("ALTER TABLE accounts ADD COLUMN failed_logins INTEGER NOT NULL DEFAULT 0")
+            if "locked_until" not in account_columns:
+                self.db.execute("ALTER TABLE accounts ADD COLUMN locked_until TEXT")
 
     @staticmethod
     def digest(token: str) -> bytes:
@@ -134,7 +140,7 @@ class TokenStore:
         try:
             with self.lock, self.db:
                 self.db.execute(
-                    "INSERT INTO accounts VALUES(?,?,?,?,?,?,NULL)",
+                    "INSERT INTO accounts(id,email,display_name,password_hash,password_salt,created_at,disabled_at) VALUES(?,?,?,?,?,?,NULL)",
                     (account_id, normalized, display_name.strip(), self._password(password, salt), salt, now),
                 )
         except sqlite3.IntegrityError as exc:
@@ -145,10 +151,20 @@ class TokenStore:
     def login_account(self, email: str, password: str) -> tuple[dict, str] | None:
         with self.lock:
             row = self.db.execute("SELECT * FROM accounts WHERE email=? AND disabled_at IS NULL", (email.strip().lower(),)).fetchone()
+        now = datetime.now(timezone.utc)
         candidate = self._password(password, row["password_salt"] if row else b"0" * 16)
         expected = row["password_hash"] if row else b"0" * 32
-        if row is None or not hmac.compare_digest(candidate, expected):
+        if row is not None and row["locked_until"] and row["locked_until"] > now.isoformat():
             return None
+        if row is None or not hmac.compare_digest(candidate, expected):
+            if row is not None:
+                failures = int(row["failed_logins"]) + 1
+                locked = (now + timedelta(minutes=15)).isoformat() if failures >= 5 else None
+                with self.lock, self.db:
+                    self.db.execute("UPDATE accounts SET failed_logins=?,locked_until=? WHERE id=?", (failures, locked, row["id"]))
+            return None
+        with self.lock, self.db:
+            self.db.execute("UPDATE accounts SET failed_logins=0,locked_until=NULL WHERE id=?", (row["id"],))
         _, token = self.create(row["display_name"], {"runs:write", "jobs:read", "jobs:write", "companion:read", "companion:write"}, (datetime.now(timezone.utc) + timedelta(days=30)).isoformat(), row["id"], "session")
         return {"id": row["id"], "email": row["email"], "display_name": row["display_name"], "created_at": row["created_at"]}, token
 
