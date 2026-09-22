@@ -108,6 +108,27 @@ class PersonalModelStore:
             ).fetchall()
         return [self.get(owner_id, row["id"]) for row in rows]
 
+    def correct(self, owner_id: str, ident: str, value: str) -> dict | None:
+        current = self.get(owner_id, ident)
+        if current is None or current["status"] != "active":
+            return None
+        return self.upsert(owner_id, PersonalItemInput(
+            kind=current["kind"], title=current["title"], value=value, confidence=1.0,
+            source_id="user", source_record_id=f"correction:{uuid.uuid4().hex}",
+            valid_from=current["valid_from"], valid_until=current["valid_until"],
+        ))
+
+    def decay(self, owner_id: str, before: str, factor: float = 0.9) -> int:
+        if not 0 <= factor <= 1:
+            raise ValueError("decay factor must be between zero and one")
+        now = datetime.now(timezone.utc).isoformat()
+        with self.lock, self.db:
+            return self.db.execute("""
+                UPDATE personal_items SET confidence=confidence*?,updated_at=?
+                WHERE owner_id=? AND status='active' AND updated_at<?
+                AND NOT EXISTS(SELECT 1 FROM personal_evidence e WHERE e.item_id=personal_items.id AND e.source_id='user')
+            """, (factor, now, owner_id, before)).rowcount
+
     def delete(self, owner_id: str, ident: str) -> bool:
         now = datetime.now(timezone.utc).isoformat()
         with self.lock, self.db:

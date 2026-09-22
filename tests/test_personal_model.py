@@ -87,3 +87,20 @@ def test_expiry_supersedes_stale_claims(tmp_path: Path):
     row=store.upsert('udita',PersonalItemInput(kind='routine',title='gym',value='Mondays',source_id='calendar',source_record_id='e1',valid_until='2026-01-01T00:00:00+00:00'))
     assert store.expire('udita',at='2026-09-22T00:00:00+00:00')==1
     assert store.get('udita',row['id'])['status']=='superseded'
+
+
+def test_user_correction_supersedes_inference_and_never_decays(tmp_path: Path):
+    store=PersonalModelStore(tmp_path/'personal.db');old=store.upsert('udita',item())
+    corrected=store.correct('udita',old['id'],'Prefers medium answers')
+    assert corrected['confidence']==1 and corrected['evidence'][0]['source_id']=='user'
+    store.db.execute("UPDATE personal_items SET updated_at='2020-01-01T00:00:00+00:00' WHERE id=?",(corrected['id'],))
+    assert store.decay('udita','2026-01-01T00:00:00+00:00',0.5)==0
+    assert store.get('udita',corrected['id'])['confidence']==1
+
+
+def test_decay_reduces_old_inference_but_rejects_invalid_factor(tmp_path: Path):
+    store=PersonalModelStore(tmp_path/'personal.db');row=store.upsert('udita',item())
+    store.db.execute("UPDATE personal_items SET updated_at='2020-01-01T00:00:00+00:00' WHERE id=?",(row['id'],))
+    assert store.decay('udita','2026-01-01T00:00:00+00:00',0.5)==1
+    assert store.get('udita',row['id'])['confidence']==0.4
+    with pytest.raises(ValueError): store.decay('udita','2026-01-01',1.1)

@@ -169,6 +169,10 @@ class PersonalModelRequest(PersonalItemInput):
     pass
 
 
+class PersonalModelCorrection(BaseModel):
+    value: str = Field(min_length=1, max_length=10_000)
+
+
 class EmailTaskRequest(BaseModel):
     subject: str = Field(min_length=1, max_length=200)
     body: str = Field(min_length=1, max_length=20_000)
@@ -370,6 +374,23 @@ def write_personal_model(request: PersonalModelRequest, principal=runs_write_dep
     result = personal_model.upsert(principal.id, PersonalItemInput(**request.model_dump()))
     audit.append(principal.id, "personal_model.upsert", result["id"], "success", {"kind": result["kind"]})
     return result
+
+
+@app.post("/v1/personal-model/{item_id}/correct")
+def correct_personal_model(item_id: str, request: PersonalModelCorrection, principal=runs_write_dependency):
+    result = personal_model.correct(principal.id, item_id, request.value)
+    if result is None:
+        raise HTTPException(404, "active personal-model item not found")
+    audit.append(principal.id, "personal_model.correct", result["id"], "success", {"supersedes": item_id})
+    return result
+
+
+@app.get("/v1/personal-model/{item_id}/evidence")
+def personal_model_evidence(item_id: str, principal=jobs_read_dependency):
+    result = personal_model.get(principal.id, item_id)
+    if result is None:
+        raise HTTPException(404, "personal-model item not found")
+    return {"item_id": item_id, "evidence": result["evidence"], "supersedes_id": result["supersedes_id"], "status": result["status"]}
 
 
 @app.delete("/v1/personal-model/{item_id}")

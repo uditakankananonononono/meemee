@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.117.0
+
+- Completed the personal-model v1 with user correction provenance, owner-scoped evidence inspection and confidence decay for stale inferred claims.
+- User corrections supersede inferred values at full confidence and are exempt from automated decay.
+- Added authenticated correction/evidence APIs, audit events and closeout regressions.
+
 ## 0.116.0
 
 - Added a source-grounded reflection worker that proposes typed personal-model claims and rejects any claim whose cited source record is absent from the owner's context ledger.
