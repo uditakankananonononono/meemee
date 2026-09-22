@@ -67,8 +67,11 @@ def audit_tree(root: Path, expected_version: str | None = None) -> dict:
             "runtime still uses SQLite",
             "remote Git push and pull-request operations",
             "Semantic/embedding memory and reranking",
+            "documented v0.46.0 HTTP surface",
+            "These do not exist in the documented v0.46.0 API",
         ),
         "STATUS.md": ("still instantiate SQLite stores",),
+        "OPERATIONS.md": ("full account administration remains external",),
     }
     for relative, phrases in stale_claims.items():
         target = root / relative

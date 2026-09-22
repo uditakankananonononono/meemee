@@ -1,6 +1,6 @@
 """meemee-client: typed Python SDK for the Meemee agent platform API.
 
-Targets the Meemee server v0.82.0 HTTP contract: scoped API tokens and OIDC
+Targets the Meemee server v0.83.0 HTTP contract: scoped API tokens and OIDC
 bearer auth, synchronous runs, durable queued jobs, resume-safe SSE progress,
 fixed-window rate limiting, and the tamper-evident audit chain.
 

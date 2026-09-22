@@ -27,7 +27,7 @@ spec:
       securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
       containers:
         - name: api
-          image: ghcr.io/uditakankananonononono/meemee:0.81.0
+          image: ghcr.io/uditakankananonononono/meemee:0.83.0
           args: ["meemee", "serve", "--host", "0.0.0.0", "--port", "8787"]
           ports: [{containerPort: 8787}]
           envFrom: [{secretRef: {name: meemee-secrets}}]
@@ -53,7 +53,7 @@ spec:
       securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
       containers:
         - name: worker
-          image: ghcr.io/uditakankananononono/meemee:0.81.0
+          image: ghcr.io/uditakankananononono/meemee:0.83.0
           args: ["meemee", "worker"]
           envFrom: [{secretRef: {name: meemee-secrets}}]
           volumeMounts: [{name: data, mountPath: /home/meemee/.meemee}]

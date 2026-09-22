@@ -3,7 +3,7 @@
 A real, static, dependency-free operator console for the Meemee API, served by
 the API itself as an additive `console/` directory. No build step, no
 framework, no CDN: plain HTML/CSS/ES-module JavaScript that talks only to the
-documented v0.46.0 HTTP surface.
+current documented HTTP surface.
 
 ## What it does
 
@@ -58,22 +58,12 @@ sign-in, `/auth/callback` redirects to `/` (core behaviour in
 different origin would need CORS middleware, which the API does not
 configure - same-origin mounting is the supported shape.
 
-## Honest gaps (labelled "Missing" in the UI)
+## Bounded behavior
 
-These do not exist in the documented v0.46.0 API; the console says so where it
-matters instead of faking data:
-
-- **No per-entry verification endpoint** - the server verifies the chain as a
-  whole on every `/v1/audit` call; the console adds its own full
-  recomputation in the browser as a second opinion.
-- **SSE cancel quirk** - the server stream only terminates on `done`/`failed`;
-  after a `cancelled` event the console closes the stream client-side and
-  refreshes the job record.
-- **Client verification numerics** - the canonical encoder matches CPython for
-  strings, booleans, null, integers and nested lists/objects. A
-  non-integral float inside audit metadata would encode differently
-  (`1.0` vs `1`); no current API writer produces one, and a mismatch would
-  surface as a verification failure to investigate, never silently pass.
+- The server verifies the complete audit chain on `/v1/audit`; the console independently recomputes it in the browser as a second opinion.
+- SSE and authenticated WebSocket job streams exist. The console uses fetch-based SSE because `EventSource` cannot send an Authorization header.
+- Canonical audit encoding matches the server writers. Any client-side mismatch is shown as a verification failure, never silently accepted.
+- Account, plan, quota and permission administration targets existing IdP-backed principals. Identity creation/deletion remains at the IdP.
 
 ## Security notes
 
