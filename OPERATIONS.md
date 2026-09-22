@@ -94,7 +94,7 @@ Before an upgrade, run `meemee backup /secure/backups/meemee-YYYYMMDD` and `meem
 
 ## Interactive login
 
-Configure the authorization endpoint, token endpoint, client ID/secret, exact HTTPS redirect URI and a random `MEEMEE_SESSION_KEY` of at least 32 characters. Register the same redirect URI at the identity provider. The flow uses Authorization Code with PKCE S256, signed 10-minute state, nonce, CSRF state comparison, and an 8-hour Secure/HttpOnly/SameSite=Lax session cookie. Keep the application behind HTTPS. Rotate the session key to invalidate all sessions. The console provides sign-in, logout, plan/quota and permission administration for existing principals; identity creation/deletion and password policy remain at the IdP.
+Configure the authorization endpoint, token endpoint, client ID/secret, exact HTTPS redirect URI and a random `MEEMEE_SESSION_KEY` of at least 32 characters. Register the same redirect URI at the identity provider. The flow uses Authorization Code with PKCE S256, signed 10-minute state, nonce, CSRF state comparison, and an 8-hour Secure/HttpOnly/SameSite=Lax session cookie. Keep the application behind HTTPS. Rotate the session key to invalidate all sessions. The customer app supports built-in email/password signup and login by default; disable it with `MEEMEE_SIGNUP_ENABLED=false`. Passwords use per-account random salts and PBKDF2-HMAC-SHA256. External OIDC remains optional. Email verification, password reset and account deletion are not implemented yet.
 
 ## Rate limits
 

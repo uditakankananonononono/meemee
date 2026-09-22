@@ -2,6 +2,14 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.104.0
+
+- Added built-in email/password self-serve signup and login with normalized unique email identities, PBKDF2-HMAC-SHA256 password hashing at 600,000 iterations, random per-account salts, constant-time verification and 30-day revocable bearer sessions.
+- Added owner-scoped API-key creation, safe inventory and revocation. Customer keys cannot request admin scope, session tokens are excluded from API-key inventory, and raw keys are shown only once.
+- Added customer account/signup/sign-in/API-key screens to `/app/`; external OIDC remains an optional deployment path.
+- Assumption: built-in signup is enabled by default for ChatGPT-style self-service; operators can disable it with `MEEMEE_SIGNUP_ENABLED=false`.
+- Verification: 294 core tests, 133 SDK tests and 5 PostgreSQL contract tests passed; 15 live SDK and 2 live PostgreSQL tests skipped because external services were unavailable. Ruff, wheel package audit and explicit 0.104.0 release audit clean.
+
 ## 0.103.0
 
 - Added a packaged customer web app at `/app/` with responsive conversation history, new chats, real companion API messaging, first-run profile onboarding, timezone selection and persona editing.

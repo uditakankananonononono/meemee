@@ -162,6 +162,23 @@ class JobRequest(BaseModel):
     run_at: str | None = None
 
 
+class SignupRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    password: str = Field(min_length=12, max_length=200)
+    display_name: str = Field(min_length=1, max_length=120)
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    password: str = Field(min_length=1, max_length=200)
+
+
+class AccountTokenRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    scopes: set[str] = Field(min_length=1)
+    expires_at: str | None = None
+
+
 class TokenRequest(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     scopes: set[str] = Field(min_length=1)
@@ -199,6 +216,64 @@ def whoami(principal=jobs_read_dependency):
         "scopes": sorted(principal.scopes),
         "entitlement": entitlement,
     }
+
+
+@app.post("/v1/accounts/signup", status_code=201)
+def account_signup(request: SignupRequest):
+    if not settings.signup_enabled:
+        raise HTTPException(404, "self-serve signup is disabled")
+    try:
+        account, token = tokens.create_account(request.email, request.password, request.display_name)
+    except ValueError as exc:
+        raise HTTPException(409 if "already exists" in str(exc) else 422, str(exc)) from exc
+    entitlements.get(account["id"])
+    audit.append(account["id"], "account.signup", account["id"], "success")
+    return {"account": account, "token": token, "token_type": "bearer", "expires_in_days": 30}
+
+
+@app.post("/v1/accounts/login")
+def account_login(request: LoginRequest):
+    result = tokens.login_account(request.email, request.password)
+    if result is None:
+        raise HTTPException(401, "invalid email or password")
+    account, token = result
+    audit.append(account["id"], "account.login", account["id"], "success")
+    return {"account": account, "token": token, "token_type": "bearer", "expires_in_days": 30}
+
+
+@app.get("/v1/account")
+def get_account(principal=jobs_read_dependency):
+    account = tokens.get_account(principal.id)
+    if account is None:
+        return {"id": principal.id, "display_name": principal.name, "email": None, "external": True}
+    return {**account, "external": False}
+
+
+@app.post("/v1/account/api-keys", status_code=201)
+def create_account_api_key(request: AccountTokenRequest, principal=jobs_read_dependency):
+    allowed = {"runs:write", "jobs:read", "jobs:write", "companion:read", "companion:write"}
+    if not request.scopes <= allowed:
+        raise HTTPException(422, f"unknown or privileged scopes: {sorted(request.scopes - allowed)}")
+    ident, token = tokens.create(request.name, request.scopes, request.expires_at, principal.id, "api")
+    audit.append(principal.id, "account.api_key.create", ident, "success", {"scopes": sorted(request.scopes)})
+    return {"id": ident, "token": token, "warning": "shown once; store it securely"}
+
+
+@app.get("/v1/account/api-keys")
+def list_account_api_keys(revoked: bool | None = False, limit: int = 100, cursor: str | None = None, principal=jobs_read_dependency):
+    try:
+        items, next_cursor = tokens.list_metadata(revoked=revoked, limit=limit, cursor=cursor, owner_id=principal.id, token_kind="api")
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return {"api_keys": items, "next_cursor": next_cursor}
+
+
+@app.delete("/v1/account/api-keys/{token_id}")
+def revoke_account_api_key(token_id: str, principal=jobs_read_dependency):
+    if not tokens.revoke(token_id, owner_id=principal.id):
+        raise HTTPException(404, "active API key not found")
+    audit.append(principal.id, "account.api_key.revoke", token_id, "success")
+    return {"id": token_id, "revoked": True}
 
 
 @app.post("/v1/runs")

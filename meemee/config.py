@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     model_max_attempts: int = 3
     policy_file: Path | None = None
     api_token: str | None = None
+    signup_enabled: bool = True
     shell_allowlist: str = "python3,pytest,ruff,git,ls,find,cat,wc"
     worker_poll_seconds: float = 1.0
     vault_key: str | None = None

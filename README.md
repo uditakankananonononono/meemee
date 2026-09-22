@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.103.0 (137)
+## Verified in v0.104.0 (139)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -143,13 +143,16 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 
 137. Packaged customer-facing web app at `/app/` with profile onboarding, responsive conversation history, companion chat and persona editing, separate from the operator console.
 
+138. Built-in email/password self-serve signup and login with salted PBKDF2 password storage, revocable expiring sessions and optional external OIDC.
+139. Customer-owned API-key creation, safe inventory and revocation with bounded non-admin scopes and one-time raw key reveal.
+
 ## Thin (0)
 
 Nothing is classified as thin. A capability is either implemented and tested at its stated boundary below, or listed as missing.
 
 ## Missing, not claimed
 
-Live WhatsApp and iMessage delivery over real provider networks is unverified: the adapters and durable delivery queue are implemented and config-gated, but no provider account exists yet. Live PostgreSQL integration is not verified in this environment; target deployments must run the unskipped PostgreSQL suite and preflight. Identity creation/deletion and password policy remain at the configured IdP, while Meemee plan, quota and permission administration is implemented. Browser challenges are detected and handed off, but an interactive live human-control channel is not built in. Async tools can be cancelled; blocking third-party native code that does not yield cannot be forcibly interrupted safely. Multi-region failover, online dual-write migration and logical replication remain deployment/infrastructure work and are not claimed.
+Live WhatsApp and iMessage delivery over real provider networks is unverified: the adapters and durable delivery queue are implemented and config-gated, but no provider account exists yet. Live PostgreSQL integration is not verified in this environment; target deployments must run the unskipped PostgreSQL suite and preflight. Built-in email/password signup and login are implemented; external OIDC remains optional. Email verification, password reset and account deletion are not yet implemented. Browser challenges are detected and handed off, but an interactive live human-control channel is not built in. Async tools can be cancelled; blocking third-party native code that does not yield cannot be forcibly interrupted safely. Multi-region failover, online dual-write migration and logical replication remain deployment/infrastructure work and are not claimed.
 
 The SQLite single-host shape and PostgreSQL memory, owner-scoped jobs and shared rate limiting are stated at their tested boundaries. SSE and authenticated WebSocket job streams are implemented. No missing item is represented as shipped.
 

@@ -1,9 +1,9 @@
 # Meemee status
 
-**Current core version:** 0.103.0  
-**Ledger:** 137 verified, 0 thin  
+**Current core version:** 0.104.0  
+**Ledger:** 139 verified, 0 thin  
 **Supported production shape:** SQLite/WAL single-host; PostgreSQL memory and owner-scoped jobs are selectable but require target-environment live verification  
-**Last core verification:** 291 passed; 133 SDK passed (15 live tests skipped); 5 PostgreSQL contract tests passed (2 live tests skipped); Ruff, wheel package audit and explicit 0.103.0 release audit clean
+**Last core verification:** 294 passed; 133 SDK passed (15 live skipped); 5 PostgreSQL contract tests passed (2 live skipped); Ruff, package audit and explicit 0.104.0 release audit clean
 
 ## What is production-usable now
 
@@ -39,7 +39,7 @@ Nothing is classified as thin. A capability is either verified at a stated bound
 
 - Live WhatsApp/iMessage delivery over real provider networks: adapters and the delivery queue are implemented and config-gated, but no provider account exists to verify against. Console screens for the companion layer are not built; the surface is HTTP API, CLI, SDK and the console companion view.
 - Live PostgreSQL test run in this environment. Checksummed SQLite-to-PostgreSQL copy/import tooling is implemented.
-- Identity-provider-side user lifecycle. Meemee plan, quota and permissions administration is implemented; identity creation/deletion and password policy remain at the IdP.
+- Email verification, password reset and self-serve account deletion for built-in accounts. External OIDC remains optional.
 - Interactive browser human takeover after explicit challenge detection/handoff.
 - Forced interruption inside blocking third-party native code; async tools are interruptible.
 - Multi-region failover, online dual-write database migration and logical replication.
