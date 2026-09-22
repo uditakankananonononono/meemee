@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.36.0
+
+- Added `meemee preflight` as a production/CI deployment gate with structured checks for required credentials, storage safety and integrity, model reachability and the supported deployment boundary.
+- Keeps optional local model downtime warning-only by default; `--require-model` makes it a hard failure.
+- Core verification: 123 tests passed; Ruff clean.
+
 ## 0.35.0
 
 - Encrypt webhook signing secrets at rest with the existing required vault key using per-record AES-256-GCM nonces and subscription-bound authenticated context.

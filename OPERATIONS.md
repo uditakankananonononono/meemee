@@ -29,6 +29,8 @@ curl -sS -X POST http://127.0.0.1:8787/v1/tokens \
 
 The raw token is returned once. Store it in a secret manager. Meemee stores only its digest. Revoke it with `DELETE /v1/tokens/{id}` using an admin token.
 
+Before starting API or worker traffic, run `meemee preflight --require-model`. Treat its JSON output as a deployment gate: exit 0 means all required checks passed; exit 1 identifies each failed check without exposing secret values. Omit `--require-model` only when temporary model downtime is acceptable.
+
 ## Backups and recovery
 
 Stop API/workers or use SQLite's online backup API before copying databases. Back up all files under `MEEMEE_DATA_DIR`, plus the vault key stored separately. Test restoration on a separate host. Never restore two active writers from the same copied SQLite state.

@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.35.0 (57)
+## Verified in v0.36.0 (58)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -61,6 +61,7 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 55. Webhook payload contract: `meemee.webhook.v1` envelope, configurable byte ceiling, per-subscription top-level data-field selection, and persisted SHA-256 body hash exposed without the body for receiver reconciliation.
 56. Receiver compatibility: HMAC/timestamp verification helper and vault-backed CLI, custom non-secret subscription headers with reserved/sensitive-name bans and size limits, plus a runnable verified FastAPI receiver fixture.
 57. Encrypted webhook signing secrets at rest with AES-256-GCM, per-record random nonces, subscription-bound authenticated context, automatic transactional plaintext upgrade, encrypted rotation, and fail-closed missing/wrong-key startup.
+58. Production preflight CLI with machine-readable pass/fail output for bootstrap-token strength, vault-key validity, data-directory writability/permissions/free space, SQLite quick integrity checks, model reachability and the supported single-host boundary.
 
 ## Thin (0)
 
@@ -129,6 +130,8 @@ A model statement is never treated as proof that work happened. Tool returns are
 ## Advanced operation
 
 Set `MEEMEE_API_TOKEN` in production-facing environments. Run one or more durable workers with `meemee worker`. Schedule work through `POST /v1/jobs` with an ISO 8601 `run_at`; workers atomically claim due jobs. Shell and local Git mutations are side effects and still require agent-run approval. Commands are direct argv calls, never `shell=True`, and only configured executables can run. Git commits name explicit paths and never push.
+
+Before serving production traffic, run `meemee preflight --require-model`; it exits nonzero on required failures and prints JSON suitable for CI/deployment gates. Model reachability is warning-only without `--require-model`.
 
 Browser setup: `pip install -e .[browser]` then `playwright install chromium`. Vault setup: run `meemee vault-key`, store the output as `MEEMEE_VAULT_KEY` outside the repo, and add secrets with `meemee vault-put NAME`. Kubernetes expects a separately managed `meemee-secrets` Secret; no plaintext secret manifest is committed.
 

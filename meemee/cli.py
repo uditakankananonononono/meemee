@@ -11,6 +11,7 @@ import uvicorn
 from .backup import BackupManager
 from .config import Settings
 from .migrations import CORE_MIGRATIONS, Migrator
+from .preflight import run_preflight
 from .retention import RetentionManager
 from .runtime import build_agent
 from .tools.github import GitHubRepoSearch, GitHubSearchArgs
@@ -113,6 +114,15 @@ def retention_run() -> None:
         audit_days=settings.retention_audit_days,
     )
     typer.echo(json.dumps(report.__dict__, indent=2))
+
+
+@app.command("preflight")
+def preflight(require_model: bool = typer.Option(False, "--require-model")) -> None:
+    """Validate production configuration, storage and dependencies as JSON."""
+    report = asyncio.run(run_preflight(Settings(), require_model=require_model))
+    typer.echo(json.dumps(report, indent=2))
+    if report["status"] != "pass":
+        raise typer.Exit(1)
 
 
 @app.command("webhook-worker")
