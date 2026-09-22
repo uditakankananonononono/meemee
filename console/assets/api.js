@@ -168,3 +168,10 @@ export const grantApproval = (principal, tool, expiresAt, constraints, opts) =>
   });
 export const revokeApproval = (principal, tool, opts) =>
   request(`/v1/approvals/${encodeURIComponent(principal)}/${encodeURIComponent(tool)}`, { method: "DELETE", ...opts });
+
+// --- Account administration (scope: admin) ---------------------------------
+export const getQuotaForCurrentPrincipal = (opts) => request("/v1/quota", opts);
+export const setPrincipalQuota = (principal, dailyJobs, opts) =>
+  request(`/v1/quota/${encodeURIComponent(principal)}`, { method: "PUT", body: { daily_jobs: dailyJobs }, ...opts });
+export const assignPrincipalPlan = (principal, plan, opts) =>
+  request(`/v1/entitlements/${encodeURIComponent(principal)}`, { method: "PUT", body: { plan }, ...opts });

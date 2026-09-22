@@ -8,6 +8,7 @@ import { renderJobs } from "./views/jobs.js";
 import { renderTokens } from "./views/tokens.js";
 import { renderAudit } from "./views/audit.js";
 import { renderPermissions } from "./views/permissions.js";
+import { renderAccounts } from "./views/accounts.js";
 
 const VIEWS = {
   status: { title: "Status", render: renderStatus },
@@ -16,6 +17,7 @@ const VIEWS = {
   tokens: { title: "Tokens", render: renderTokens },
   audit: { title: "Audit chain", render: renderAudit },
   permissions: { title: "Permissions", render: renderPermissions },
+  accounts: { title: "Accounts", render: renderAccounts },
 };
 
 const ctx = {
