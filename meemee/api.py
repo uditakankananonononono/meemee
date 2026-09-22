@@ -24,7 +24,10 @@ from .jobs import JobStore
 from .observability import (
     AGENT_RUNS,
     JOBS_CREATED,
+    WEBHOOK_OLDEST_QUEUED_SECONDS,
     WEBHOOK_OUTBOX,
+    WEBHOOK_SUCCESS_RATE,
+    WEBHOOK_SUSPENDED,
     MetricsMiddleware,
     configure_logging,
     metrics_response,
@@ -36,7 +39,13 @@ from .runtime import build_agent
 from .shutdown import RunGate
 from .streaming import job_event_stream
 from .web_login import WebLogin, WebLoginConfig
-from .webhooks import WebhookStore, delivery_metrics, list_deliveries, replay_delivery
+from .webhooks import (
+    WebhookStore,
+    delivery_metrics,
+    list_deliveries,
+    operational_metrics,
+    replay_delivery,
+)
 
 settings = Settings()
 settings.data_dir.mkdir(parents=True, exist_ok=True)
@@ -246,6 +255,10 @@ def list_audit(after: int = 0, limit: int = 100):
 def prometheus_metrics():
     for status, count in delivery_metrics(webhooks).items():
         WEBHOOK_OUTBOX.labels(status).set(count)
+    operations = operational_metrics(webhooks)
+    WEBHOOK_SUCCESS_RATE.set(operations["success_rate"])
+    WEBHOOK_OLDEST_QUEUED_SECONDS.set(operations["oldest_queued_seconds"])
+    WEBHOOK_SUSPENDED.set(operations["suspended"])
     return metrics_response()
 
 
@@ -427,7 +440,16 @@ def pause_webhook(webhook_id: str, principal=jobs_write_dependency):
 
 @app.post("/v1/webhooks/{webhook_id}/resume")
 def resume_webhook(webhook_id: str, principal=jobs_write_dependency):
-    if not webhooks.set_active(webhook_id, principal.id, True):
+    try:
+        resumed = webhooks.set_active(
+            webhook_id,
+            principal.id,
+            True,
+            settings.webhook_breaker_cooldown_seconds,
+        )
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    if not resumed:
         raise HTTPException(404, "webhook not found")
     audit.append(principal.id, "webhook.resume", webhook_id, "success")
     return {"id": webhook_id, "active": True}

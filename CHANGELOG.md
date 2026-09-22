@@ -2,6 +2,11 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.32.0
+
+- Added webhook breaker cooldown, success/queue/suspension metrics and alert guidance.
+- Core verification: 111 tests passed; Ruff clean.
+
 ## 0.31.0
 
 - Added webhook pause/resume, health summaries and attempt timelines.

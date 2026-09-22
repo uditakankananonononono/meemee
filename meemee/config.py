@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     retention_audit_days: int = 365
     shutdown_grace_seconds: float = 30.0
     webhook_poll_seconds: float = 1.0
+    webhook_breaker_cooldown_seconds: int = 300
     oidc_role_claim: str = "roles"
     oidc_client_id: str | None = None
     oidc_client_secret: str | None = None

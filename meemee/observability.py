@@ -15,6 +15,9 @@ HTTP_INFLIGHT = Gauge("meemee_http_requests_inflight", "In-flight HTTP requests"
 AGENT_RUNS = Counter("meemee_agent_runs_total", "Agent runs", ("outcome",))
 JOBS_CREATED = Counter("meemee_jobs_created_total", "Queued jobs created")
 WEBHOOK_OUTBOX = Gauge("meemee_webhook_deliveries", "Webhook outbox rows", ("status",))
+WEBHOOK_SUCCESS_RATE = Gauge("meemee_webhook_success_rate", "Terminal webhook delivery success fraction")
+WEBHOOK_OLDEST_QUEUED_SECONDS = Gauge("meemee_webhook_oldest_queued_seconds", "Age of oldest queued webhook delivery")
+WEBHOOK_SUSPENDED = Gauge("meemee_webhook_suspended_subscriptions", "Inactive webhook subscriptions")
 
 
 class MetricsMiddleware(BaseHTTPMiddleware):

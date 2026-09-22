@@ -153,8 +153,24 @@ class WebhookStore:
                 (time.time(), stale_before),
             ).rowcount
 
-    def set_active(self, ident: str, principal: str, active: bool) -> bool:
+    def set_active(
+        self,
+        ident: str,
+        principal: str,
+        active: bool,
+        cooldown_seconds: int = 0,
+    ) -> bool:
         with self.lock, self.db:
+            if active and cooldown_seconds > 0:
+                latest = self.db.execute(
+                    "SELECT created_at FROM webhook_deliveries WHERE subscription_id=? AND status='failed' ORDER BY created_at DESC LIMIT 1",
+                    (ident,),
+                ).fetchone()
+                if latest is not None:
+                    failed_at = datetime.fromisoformat(latest[0])
+                    age = (datetime.now(timezone.utc) - failed_at).total_seconds()
+                    if age < cooldown_seconds:
+                        raise ValueError(f"circuit breaker cooldown has {int(cooldown_seconds-age)} seconds remaining")
             return bool(self.db.execute(
                 "UPDATE webhook_subscriptions SET active=? WHERE id=? AND principal=?",
                 (int(active), ident, principal),
@@ -307,3 +323,17 @@ def cleanup_deliveries(store: WebhookStore, delivered_before: str, failed_before
             (failed_before,),
         ).rowcount
     return {"delivered": delivered, "failed": failed}
+
+
+def operational_metrics(store: WebhookStore) -> dict[str, float]:
+    with store.lock:
+        terminal = store.db.execute("SELECT status,count(*) FROM webhook_deliveries WHERE status IN ('delivered','failed') GROUP BY status").fetchall()
+        queued = store.db.execute("SELECT min(created_at) FROM webhook_deliveries WHERE status='queued'").fetchone()[0]
+        suspended = store.db.execute("SELECT count(*) FROM webhook_subscriptions WHERE active=0").fetchone()[0]
+    counts = {row[0]: int(row[1]) for row in terminal}
+    total = counts.get("delivered",0)+counts.get("failed",0)
+    success = counts.get("delivered",0)/total if total else 1.0
+    age = 0.0
+    if queued:
+        age = max((datetime.now(timezone.utc)-datetime.fromisoformat(queued)).total_seconds(),0.0)
+    return {"success_rate":success,"oldest_queued_seconds":age,"suspended":float(suspended)}

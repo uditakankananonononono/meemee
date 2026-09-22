@@ -95,3 +95,7 @@ Send a unique `Idempotency-Key` header when creating a job. Retries by the same 
 ## Data retention
 
 Run `meemee retention-run` from cron after backups. Defaults retain terminal jobs/events 30 days and memories 90 days; active jobs are never removed. Expired idempotency and rate-window records are cleaned. The tamper-evident audit chain is retained intact because deleting its prefix without externally signed anchors would break verification; archive/export with signed anchors is still missing. Always review legal and contractual retention duties before changing windows.
+
+## Webhook alerts and recovery
+
+Alert when `meemee_webhook_success_rate` falls below 0.95 for 10 minutes, `meemee_webhook_oldest_queued_seconds` exceeds 300, any `meemee_webhook_suspended_subscriptions` is nonzero, or failed outbox depth grows. The circuit breaker suspends a subscription after five terminal failures. Operators should inspect the attempt timeline, fix the endpoint, wait the configured cooldown (`MEEMEE_WEBHOOK_BREAKER_COOLDOWN_SECONDS`, default 300), send a test delivery, then resume. Do not bypass TLS or SSRF checks to clear an alert.

@@ -30,3 +30,13 @@ def test_circuit_breaker_suspends_after_five_terminal_failures(tmp_path: Path, m
         store.enqueue(f"e{i}","job.failed",{})
         delivery=store.claim(now=4102444800); store.retry(delivery["id"],"permanent",max_attempts=1)
     assert not store.health(sid,"u")["active"]
+
+
+def test_breaker_cooldown_blocks_early_resume(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(socket, "getaddrinfo", public_dns)
+    store=WebhookStore(tmp_path/"w.db"); sid,_=store.subscribe("u","https://hooks.example/a",{"*"})
+    store.enqueue("e","job.failed",{}); delivery=store.claim(now=4102444800); store.retry(delivery["id"],"bad",max_attempts=1)
+    store.set_active(sid,"u",False)
+    import pytest
+    with pytest.raises(ValueError, match="cooldown"):
+        store.set_active(sid,"u",True,cooldown_seconds=300)
