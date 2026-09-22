@@ -11,7 +11,7 @@ Set `MEEMEE_TRUSTED_HOSTS` to the comma-separated public/internal hostnames acce
 - `MEEMEE_VAULT_KEY`: output of `meemee vault-key`. Required at API and webhook-worker startup; it encrypts both vault records and webhook signing secrets. Loss of this key makes those records unrecoverable.
 - `MEEMEE_GITHUB_TOKEN`: optional, required for sustained GitHub search usage.
 
-Mount `MEEMEE_DATA_DIR` on persistent encrypted storage. The API and workers must share it only on one host. SQLite is a supported single-node deployment. Kubernetes replicas need a future shared database/queue and are listed as missing rather than claimed production support.
+For SQLite, mount `MEEMEE_DATA_DIR` on persistent encrypted storage and keep API/workers on one host. For replicated Kubernetes API/workers, set `MEEMEE_PERSISTENCE_BACKEND=postgresql` and a shared `MEEMEE_POSTGRES_DSN`; PostgreSQL backs memory, owner-scoped jobs and rate limits. The remaining commercial-state SQLite stores still require per-host coordination, so run one API replica until those stores are migrated.
 
 ## First start and scoped credentials
 
@@ -60,7 +60,7 @@ Recommended daily retention: 7 daily, 4 weekly, 6 monthly encrypted backups. Mon
 5. Start one API process, verify `/ready`, then start workers.
 6. Keep the prior image/package available for rollback.
 
-Schema creation is idempotent. There is not yet a formal migration framework, so cross-version destructive schema changes are not supported and remain missing.
+SQLite component schemas and PostgreSQL migrations are checksummed and forward-only. Back up before every upgrade; destructive downgrades are unsupported.
 
 ## Incident steps
 
@@ -84,7 +84,7 @@ The issuer and JWKS URL must be HTTPS on the same host. Meemee verifies the sign
 
 ## Supported database and scale boundary
 
-SQLite/WAL is the supported production database for a single host. Run multiple worker processes on that host if needed; atomic queue claims prevent duplicate claims. Do not mount the database over NFS and do not run multiple Kubernetes pods against one ReadWriteOnce SQLite volume. Meemee does not yet claim a supported PostgreSQL path or multi-node control plane.
+SQLite/WAL is supported on one host with multiple worker processes. PostgreSQL can back memory, owner-scoped queued jobs and distributed rate limits; run `meemee preflight --require-model` and the unskipped PostgreSQL suite against the target cluster before traffic. Do not mount SQLite over NFS. Until runs, entitlements, approvals, webhooks, tokens and audit also select PostgreSQL, keep one API replica even when PostgreSQL workers scale horizontally.
 
 Before an upgrade, run `meemee backup /secure/backups/meemee-YYYYMMDD` and `meemee backup-verify` on the result. `meemee db-migrate` applies forward-only checksummed migrations and refuses edited migration history. Backup manifests contain file size and SHA-256, and verification also runs SQLite integrity checks. Restore into a stopped instance, verify it, then start one API process before workers.
 
@@ -98,7 +98,7 @@ Configure the authorization endpoint, token endpoint, client ID/secret, exact HT
 
 ## Rate limits
 
-The limiter uses a dedicated SQLite/WAL database and atomic transactions, so all API processes on the supported single host share one limit. Authenticated callers are isolated by a non-reversible prefix of the bearer-token digest; unauthenticated callers use the directly connected client IP. Do not trust forwarded headers in Meemee itself: terminate TLS at a controlled proxy and enforce edge limits there too. Health/readiness checks are exempt. Responses include `RateLimit-Limit`, `RateLimit-Remaining`, and `RateLimit-Reset`; blocked requests also include `Retry-After`. Cross-host deployments still require a future distributed limiter.
+SQLite uses a dedicated WAL limiter shared on one host. PostgreSQL deployments use an atomic upsert limiter shared across hosts/pods. Authenticated callers are isolated by a non-reversible prefix of the bearer-token digest; unauthenticated callers use the directly connected client IP. Do not trust forwarded headers in Meemee itself: terminate TLS at a controlled proxy and enforce edge limits there too. Health/readiness checks are exempt. Responses include `RateLimit-Limit`, `RateLimit-Remaining`, and `RateLimit-Reset`; blocked requests also include `Retry-After`. 
 
 ## Live job progress
 
