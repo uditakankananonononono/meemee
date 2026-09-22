@@ -216,10 +216,11 @@ class MeemeeClient:
                 rate_limit=RateLimitInfo.from_headers(response.headers),
             )
             retryable_write = method.upper() == "POST" and bool(headers and headers.get("Idempotency-Key"))
+            keyed_status_retry = retryable_write and response.status_code != 429 and attempt < policy.max_attempts
             if (
                 response.status_code >= 400
                 and policy.is_retryable_status(response.status_code)
-                and (policy.can_retry(method, attempt) or (retryable_write and attempt < policy.max_attempts))
+                and (policy.can_retry(method, attempt) or keyed_status_retry)
             ):
                 retry_after = _parse_retry_after(response.headers.get("Retry-After"))
                 self._sleeper(policy.delay(attempt, retry_after))
@@ -399,6 +400,8 @@ class JobsResource:
         max_attempts (server default 3). Not auto-retried; see RunsResource.create.
         """
         _validate_goal(goal)
+        if idempotency_key is not None and (not isinstance(idempotency_key, str) or not 1 <= len(idempotency_key) <= 200):
+            raise ValueError("idempotency_key must contain 1-200 characters")
         body: dict[str, Any] = {"goal": goal}
         scheduled = _iso_or_none(run_at, "run_at")
         if scheduled is not None:

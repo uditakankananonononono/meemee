@@ -14,13 +14,22 @@ class HealthStatus(BaseModel):
     version: str
 
 
+class ReadinessComponent(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    ok: bool
+    error: str | None = None
+
+
 class ReadinessStatus(BaseModel):
     status: str
-    components: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    components: dict[str, ReadinessComponent] = Field(default_factory=dict)
 
     @property
     def is_ready(self) -> bool:
         return self.status == "ready"
+
+    def failing(self) -> list[str]:
+        return sorted(name for name, detail in self.components.items() if not detail.ok)
 
 
 class RunReport(BaseModel):
@@ -85,9 +94,16 @@ class Job(BaseModel):
         return json.loads(self.result)
 
 
+class JobQuotaSnapshot(BaseModel):
+    day: str
+    limit: int
+    used: int
+    remaining: int
+
+
 class CreatedJob(BaseModel):
     id: str
-    quota: dict[str, int | str] | None = None
+    quota: JobQuotaSnapshot | None = None
 
 
 class JobCancelResult(BaseModel):

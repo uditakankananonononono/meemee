@@ -1,6 +1,6 @@
 """meemee-client: typed Python SDK for the Meemee agent platform API.
 
-Targets the Meemee server v0.98.0 HTTP contract: scoped API tokens and OIDC
+Targets the Meemee server v0.99.0 HTTP contract: scoped API tokens and OIDC
 bearer auth, synchronous runs, durable queued jobs, resume-safe SSE progress,
 fixed-window rate limiting, and the tamper-evident audit chain.
 
@@ -45,9 +45,11 @@ from .models import (
     Job,
     JobCancelResult,
     JobEvent,
+    JobQuotaSnapshot,
     JobStatus,
     QuotaStatus,
     RateLimitInfo,
+    ReadinessComponent,
     ReadinessStatus,
     ResponseInfo,
     RevokedToken,
@@ -79,6 +81,7 @@ __all__ = [
     "Job",
     "JobCancelResult",
     "JobEvent",
+    "JobQuotaSnapshot",
     "JobStatus",
     "MeemeeClient",
     "MeemeeError",
@@ -89,6 +92,7 @@ __all__ = [
     "QuotaStatus",
     "RateLimitError",
     "RateLimitInfo",
+    "ReadinessComponent",
     "ReadinessStatus",
     "ResponseInfo",
     "RetryPolicy",

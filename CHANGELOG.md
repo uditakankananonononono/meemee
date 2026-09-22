@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.99.0
+
+- Typed SDK job quota snapshots and added readiness failing-component inspection.
+- Idempotency keys validate locally; keyed POSTs retry transient failures but never quota-exceeded 429 responses.
+- Verification: 225 core and 136 SDK tests plus 3 PostgreSQL contract tests passed; Ruff, deprecation-free core/SDK wheel builds, package audit and explicit 0.99.0 release audit clean. Live PostgreSQL remains unrun here.
+
 ## 0.98.0
 
 - Fixed SDK parity for CreatedJob quota snapshots, real quota status responses and readiness 503 diagnostics.

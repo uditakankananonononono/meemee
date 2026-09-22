@@ -258,3 +258,12 @@ def test_idempotent_job_post_retries_transient_status(sleeper: FakeSleeper):
         return httpx.Response(200, json={"id":"job1","quota":{"day":"2026-09-22","limit":10,"used":1,"remaining":9}})
     created=make_client(handler,sleeper=sleeper).jobs.create("goal ok",idempotency_key="once")
     assert created.id=="job1" and len(attempts)==3 and len(sleeper.calls)==2
+
+
+def test_keyed_job_post_does_not_retry_quota_429(sleeper: FakeSleeper):
+    attempts=[]
+    def handler(request: httpx.Request) -> httpx.Response:
+        attempts.append(1); return httpx.Response(429,json={"detail":"daily job quota exceeded"},headers={"Retry-After":"86400"})
+    with pytest.raises(RateLimitError):
+        make_client(handler,sleeper=sleeper).jobs.create("goal ok",idempotency_key="once")
+    assert len(attempts)==1 and sleeper.calls==[]
