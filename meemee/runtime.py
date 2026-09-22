@@ -1,5 +1,6 @@
 from .agent import Agent
 from .config import Settings
+from .context import ContextStore
 from .llm import OpenAICompatibleModel
 from .persistence import build_persistence
 from .policy import PolicyEngine
@@ -37,4 +38,5 @@ def build_agent(settings: Settings | None = None, include_delegation: bool = Tru
         settings.model_base_url, settings.model_name, settings.model_api_key, settings.request_timeout, settings.model_max_attempts
     )
     selected_memory = memory or build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn).memory
-    return Agent(model, registry, selected_memory, settings.max_steps, PolicyEngine.from_file(settings.policy_file))
+    context = ContextStore(settings.data_dir / "context.sqlite3")
+    return Agent(model, registry, selected_memory, settings.max_steps, PolicyEngine.from_file(settings.policy_file), context)

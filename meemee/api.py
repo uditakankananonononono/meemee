@@ -364,6 +364,7 @@ async def create_run(request: RunRequest, principal=runs_write_dependency):
                 or name in request.approved_tools
                 or approvals.allows(principal.id, name, arguments=_arguments)
             ),
+            owner_id=principal.id,
         )
         runs.add(principal.id, report)
         audit.append("api", "run.create", report.run_id, "success", {"steps": report.steps_used})

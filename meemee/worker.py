@@ -35,7 +35,7 @@ async def work_forever(settings: Settings | None = None) -> None:
         watcher = threading.Thread(target=cancellation_watcher, args=(jobs, job["id"], cancel, stop), daemon=True)
         watcher.start()
         try:
-            report = await build_agent(settings, memory=persistence.memory).run(job["goal"], cancel=cancel)
+            report = await build_agent(settings, memory=persistence.memory).run(job["goal"], cancel=cancel, owner_id=job.get("principal") or "default")
             if cancel.is_set():
                 jobs.cancel_running(job["id"])
                 webhooks.enqueue(f"job:{job['id']}:cancelled", "job.cancelled", {"job_id": job["id"], "status": "cancelled"})

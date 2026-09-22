@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.113.0
+
+- Wired the unified context assembler into companion chat: each turn retrieves only that user's permitted cross-source records and includes content plus provenance in the system grounding.
+- Wired unified context into autonomous agent runs so goals can use the shared event/document context alongside run memory.
+- Added regressions proving owner-scoped context reaches both model paths. Connector ingestion remains explicit; continuous polling is not claimed.
+
 ## 0.112.0
 
 - Added the Phase A context foundation: durable owner-scoped source/event ledger with provenance, content-hash deduplication, per-source cursors and explicit visibility permissions.

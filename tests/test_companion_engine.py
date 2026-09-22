@@ -103,3 +103,14 @@ async def test_checkin_message_uses_persona_and_facts(tmp_path: Path):
     assert "college essay" in model.calls[0]["messages"][0]["content"]
     with pytest.raises(ValueError):
         await engine.checkin_message("ghost")
+
+@pytest.mark.asyncio
+async def test_reply_injects_owner_scoped_unified_context(tmp_path: Path):
+    from meemee.context import ContextRecord, ContextStore
+    engine, _store, model = make_engine(tmp_path, ["answer", '{"facts": []}'])
+    context=ContextStore(tmp_path/'context.db');context.register_source('udita','calendar','ics',{})
+    context.ingest(ContextRecord('udita','calendar','e1','event','Atlas review','Review is Friday','2026-09-22T10:00:00Z',{'uid':'e1'},'private'))
+    engine.context=context
+    await engine.reply('udita','When is Atlas review?')
+    system=model.calls[0]['messages'][0]['content']
+    assert 'Review is Friday' in system and '"uid": "e1"' in system

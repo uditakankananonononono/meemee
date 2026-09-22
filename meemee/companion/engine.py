@@ -4,6 +4,7 @@ import json
 import logging
 from typing import Any, Protocol
 
+from ..context import ContextStore
 from ..sensitive import scrub_text
 from .models import ChatReply, FactInput, UserProfile
 from .store import CompanionStore
@@ -49,6 +50,7 @@ class CompanionEngine:
         fact_limit: int = 12,
         extract_limit: int = 5,
         temperature: float = 0.7,
+        context: ContextStore | None = None,
     ):
         self.model = model
         self.store = store
@@ -56,6 +58,7 @@ class CompanionEngine:
         self.fact_limit = fact_limit
         self.extract_limit = extract_limit
         self.temperature = temperature
+        self.context = context
 
     def ensure_profile(self, user_id: str, display_name: str | None = None) -> UserProfile:
         profile = self.store.profile(user_id)
@@ -111,8 +114,13 @@ class CompanionEngine:
         conversation = self._conversation(profile.user_id, channel, conversation_id)
         self.store.add_message(conversation["id"], "user", text)
         facts = self._recall(profile.user_id, text)
+        context = self.context.assemble(profile.user_id, text, self.fact_limit) if self.context else {"records": []}
         history = self.store.history(conversation["id"], limit=self.history_limit)
-        messages = [{"role": "system", "content": self._system_prompt(profile, facts)}]
+        system = self._system_prompt(profile, facts)
+        if context["records"]:
+            grounded = "\n".join(f"- [{row['source_id']}] {row['title']}: {row['content']} (provenance: {json.dumps(row['provenance'], sort_keys=True)})" for row in context["records"])
+            system += "\nUnified personal context from permitted sources:\n" + grounded
+        messages = [{"role": "system", "content": system}]
         messages.extend(
             {"role": row["role"], "content": row["content"]} for row in history
         )

@@ -99,3 +99,13 @@ def test_decision_requires_exactly_one_replan_tool_or_final():
     assert AgentDecision(replan=request).replan == request
     with pytest.raises(ValueError): AgentDecision(replan=request,final="no")
     with pytest.raises(ValueError): AgentDecision(replan=request,tool_call=ToolCall(name="x"))
+
+@pytest.mark.asyncio
+async def test_agent_receives_unified_context(tmp_path: Path):
+    from meemee.context import ContextRecord, ContextStore
+    class Capture(FakeModel):
+        async def decide(self,messages): self.messages=messages; return AgentDecision(final='done')
+    model=Capture([]);context=ContextStore(tmp_path/'context.db');context.register_source('default','feed','rss',{})
+    context.ingest(ContextRecord('default','feed','n1','document','Release','Meemee release Friday','2026-09-22T10:00:00Z',{'url':'https://example.com'}))
+    await Agent(model,ToolRegistry(),MemoryStore(tmp_path/'m.db'),context=context).run('When release?')
+    assert 'Meemee release Friday' in model.messages[1]['content']

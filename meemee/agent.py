@@ -5,6 +5,7 @@ import uuid
 from collections.abc import Callable
 from threading import Event
 
+from .context import ContextStore
 from .llm import Model
 from .memory import MemoryStore
 from .planner import TaskPlanner
@@ -25,19 +26,21 @@ Do not repeat a failed call unchanged. Stop when done or when blocked and name t
 
 
 class Agent:
-    def __init__(self, model: Model, tools: ToolRegistry, memory: MemoryStore, max_steps: int = 12, policy: PolicyEngine | None = None):
+    def __init__(self, model: Model, tools: ToolRegistry, memory: MemoryStore, max_steps: int = 12, policy: PolicyEngine | None = None, context: ContextStore | None = None):
         self.model = model
         self.tools = tools
         self.memory = memory
         self.max_steps = max_steps
         self.planner = TaskPlanner()
         self.policy = policy or PolicyEngine()
+        self.context = context
 
-    async def run(self, goal: str, approve: Approval | None = None, cancel: Event | None = None) -> RunReport:
+    async def run(self, goal: str, approve: Approval | None = None, cancel: Event | None = None, owner_id: str = "default") -> RunReport:
         run_id = uuid.uuid4().hex
         goal = scrub_text(goal)
         plan = self.planner.plan(goal)
         prior = self.memory.hybrid_search(goal, limit=5)
+        personal_context = self.context.assemble(owner_id, goal, 8) if self.context else {"records": []}
         messages = [
             {"role": "system", "content": SYSTEM},
             {"role": "user", "content": json.dumps({
@@ -45,6 +48,7 @@ class Agent:
                 "plan": plan.model_dump(),
                 "tools": self.tools.schemas(),
                 "relevant_memory": prior,
+                "unified_personal_context": personal_context["records"],
             }, default=str)},
         ]
         self.memory.add(run_id, "goal", goal, {"plan": plan.model_dump()})
