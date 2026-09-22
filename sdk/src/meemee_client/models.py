@@ -1,4 +1,4 @@
-"""Typed models for the Meemee API (server v0.16.0 contract)."""
+"""Typed models for the Meemee API (server v0.41.0 contract)."""
 from __future__ import annotations
 
 import json
@@ -157,7 +157,7 @@ class RateLimitInfo(BaseModel):
     reset: datetime | None = None
 
     @classmethod
-    def from_headers(cls, headers: Any) -> "RateLimitInfo | None":
+    def from_headers(cls, headers: Any) -> RateLimitInfo | None:
         raw_limit = headers.get("RateLimit-Limit")
         raw_remaining = headers.get("RateLimit-Remaining")
         raw_reset = headers.get("RateLimit-Reset")
@@ -178,3 +178,46 @@ class ResponseInfo(BaseModel):
 
     request_id: str | None = None
     rate_limit: RateLimitInfo | None = None
+
+class QuotaStatus(BaseModel):
+    principal: str
+    limit: int
+    used: int
+    remaining: int
+    resets_at: datetime
+
+
+class Approval(BaseModel):
+    principal: str
+    tool: str
+    granted_by: str
+    expires_at: datetime | None = None
+    created_at: datetime
+
+
+class WebhookSubscription(BaseModel):
+    id: str
+    url: str
+    events: str
+    active: int
+    created_at: datetime
+
+
+class CreatedWebhook(BaseModel):
+    id: str
+    secret: str
+    warning: str = ""
+
+
+class WebhookDelivery(BaseModel):
+    id: str
+    subscription_id: str
+    event_id: str
+    event_type: str
+    payload_sha256: str | None = None
+    status: str
+    attempts: int
+    next_attempt_at: float
+    response_status: int | None = None
+    last_error: str | None = None
+    created_at: datetime

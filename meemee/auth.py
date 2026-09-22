@@ -9,7 +9,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import Header, HTTPException, Request
+from fastapi import Depends, HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 
 @dataclass(frozen=True)
@@ -74,15 +75,22 @@ class TokenStore:
             ).rowcount)
 
 
+bearer_scheme = HTTPBearer(auto_error=False)
+bearer_dependency = Depends(bearer_scheme)
+
+
 class Authenticator:
     def __init__(self, store: TokenStore, bootstrap_token: str | None = None, oidc_validator=None, session_auth=None):
         self.store, self.bootstrap, self.oidc, self.session_auth = store, bootstrap_token, oidc_validator, session_auth
 
     def dependency(self, required: str):
-        def check(request: Request, authorization: str | None = Header(default=None)) -> Principal:
-            scheme, _, supplied = (authorization or "").partition(" ")
+        def check(
+            request: Request,
+            credentials: HTTPAuthorizationCredentials | None = bearer_dependency,
+        ) -> Principal:
             principal = None
-            if scheme.lower() == "bearer" and supplied:
+            if credentials is not None and credentials.scheme.lower() == "bearer":
+                supplied = credentials.credentials
                 if self.bootstrap and hmac.compare_digest(supplied, self.bootstrap):
                     principal = Principal("bootstrap", "bootstrap", frozenset({"admin", "runs:write", "jobs:read", "jobs:write"}))
                 else:

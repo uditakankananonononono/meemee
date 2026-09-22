@@ -1,6 +1,6 @@
 """Live integration tests: the SDK against a real Meemee server process.
 
-Boots the actual v0.16.0 server (the meemee package next to sdk/ in the repo
+Boots the actual v0.41.0 server (the meemee package next to sdk/ in the repo
 tree) on a throwaway port with a bootstrap token, then exercises the full
 contract. Skips cleanly when the server package or its dependencies are not
 installed - the mocked-transport suite above always runs.
@@ -16,7 +16,6 @@ from pathlib import Path
 
 import httpx
 import pytest
-
 from meemee_client import (
     AuthenticationError,
     JobStatus,
@@ -54,6 +53,7 @@ def live_server(tmp_path_factory: pytest.TempPathFactory):
         "PYTHONPATH": str(REPO_ROOT),
         "MEEMEE_API_TOKEN": "bootstrap-test-token",
         "MEEMEE_DATA_DIR": str(data_dir),
+        "MEEMEE_VAULT_KEY": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
     }
     proc = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "meemee.api:app", "--host", "127.0.0.1", "--port", str(port)],

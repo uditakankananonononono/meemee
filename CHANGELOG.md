@@ -2,6 +2,13 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.41.0
+
+- Corrected OpenAPI authentication to publish standard HTTP Bearer security requirements on protected operations.
+- Extended the typed Python SDK to current commercial quota, exact-tool approval and webhook administration/delivery operations, and aligned its release version with the server.
+- Updated live SDK integration startup for the required encrypted webhook-secret key.
+- Verification: 135 core and 109 SDK tests passed; core/SDK scoped Ruff and release audit clean.
+
 ## 0.40.0
 
 - Added trusted-host enforcement, restrictive CSP, permissions/referrer/frame/content-type controls and no-store API/auth caching policy.

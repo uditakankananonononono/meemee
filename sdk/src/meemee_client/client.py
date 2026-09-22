@@ -1,4 +1,4 @@
-"""MeemeeClient: typed, retry-aware access to the Meemee API (server v0.16.0).
+"""MeemeeClient: typed, retry-aware access to the Meemee API (server v0.41.0).
 
 Endpoint contract implemented here:
 - GET  /health, GET /ready                          (unauthenticated, rate-limit exempt)
@@ -18,6 +18,7 @@ from datetime import datetime
 from typing import Any
 
 import httpx
+from typing_extensions import Self
 
 from ._version import __version__
 from .auth import AuthProvider, TokenAuth
@@ -26,7 +27,6 @@ from .errors import (
     AuthenticationError,
     BadRequestError,
     ConflictError,
-    MeemeeError,
     NetworkError,
     NotFoundError,
     PermissionDeniedError,
@@ -37,21 +37,26 @@ from .errors import (
     WaitTimeoutError,
 )
 from .models import (
+    KNOWN_SCOPES,
+    TERMINAL_EVENT_KINDS,
+    Approval,
     AuditEntry,
     AuditPage,
     CreatedJob,
     CreatedToken,
+    CreatedWebhook,
     HealthStatus,
     Job,
     JobCancelResult,
     JobEvent,
-    KNOWN_SCOPES,
+    QuotaStatus,
     RateLimitInfo,
     ReadinessStatus,
     ResponseInfo,
     RevokedToken,
     RunReport,
-    TERMINAL_EVENT_KINDS,
+    WebhookDelivery,
+    WebhookSubscription,
 )
 from .retry import RetryPolicy
 from .sse import SSEMessage, SSEParser
@@ -138,13 +143,16 @@ class MeemeeClient:
         self.jobs = JobsResource(self)
         self.tokens = TokensResource(self)
         self.audit = AuditResource(self)
+        self.quota = QuotaResource(self)
+        self.approvals = ApprovalsResource(self)
+        self.webhooks = WebhooksResource(self)
 
     # ------------------------------------------------------------------ basics
 
     def close(self) -> None:
         self._http.close()
 
-    def __enter__(self) -> "MeemeeClient":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *exc_info: object) -> None:
@@ -593,3 +601,69 @@ class AuditResource:
             for entry in page.entries:
                 cursor = max(cursor, entry.sequence)
                 yield entry
+
+
+class QuotaResource:
+    def __init__(self, client: MeemeeClient) -> None:
+        self._client = client
+
+    def get(self) -> QuotaStatus:
+        return QuotaStatus.model_validate(self._client._request_json("GET", "/v1/quota"))
+
+    def set(self, principal_id: str, daily_jobs: int) -> QuotaStatus:
+        if not 1 <= daily_jobs <= 1_000_000:
+            raise ValueError("daily_jobs must be 1-1000000")
+        payload = self._client._request_json(
+            "PUT", f"/v1/quota/{principal_id}", json_body={"daily_jobs": daily_jobs}
+        )
+        return QuotaStatus.model_validate(payload)
+
+
+class ApprovalsResource:
+    def __init__(self, client: MeemeeClient) -> None:
+        self._client = client
+
+    def list(self, principal_id: str) -> list[Approval]:
+        payload = self._client._request_json("GET", f"/v1/approvals/{principal_id}")
+        return [Approval.model_validate(item) for item in payload["approvals"]]
+
+    def grant(self, principal_id: str, tool: str, expires_at: datetime | str | None = None) -> dict:
+        body = {"tool": tool, "expires_at": _iso_or_none(expires_at, "expires_at")}
+        return self._client._request_json("PUT", f"/v1/approvals/{principal_id}", json_body=body)
+
+    def revoke(self, principal_id: str, tool: str) -> dict:
+        return self._client._request_json("DELETE", f"/v1/approvals/{principal_id}/{tool}")
+
+
+class WebhooksResource:
+    def __init__(self, client: MeemeeClient) -> None:
+        self._client = client
+
+    def create(self, url: str, events: set[str], *, fields: set[str] | None = None, headers: dict[str,str] | None = None) -> CreatedWebhook:
+        if not events:
+            raise ValueError("at least one event is required")
+        payload = self._client._request_json("POST", "/v1/webhooks", json_body={
+            "url": url, "events": sorted(events), "fields": sorted(fields or ()), "headers": headers or {},
+        })
+        return CreatedWebhook.model_validate(payload)
+
+    def list(self) -> list[WebhookSubscription]:
+        payload = self._client._request_json("GET", "/v1/webhooks")
+        return [WebhookSubscription.model_validate(item) for item in payload["webhooks"]]
+
+    def delete(self, webhook_id: str) -> dict:
+        return self._client._request_json("DELETE", f"/v1/webhooks/{webhook_id}")
+
+    def rotate_secret(self, webhook_id: str) -> CreatedWebhook:
+        payload = self._client._request_json("POST", f"/v1/webhooks/{webhook_id}/rotate-secret")
+        return CreatedWebhook.model_validate(payload)
+
+    def deliveries(self, *, status: str | None = None, after: str | None = None, limit: int = 100) -> list[WebhookDelivery]:
+        params = {"limit": limit}
+        if status is not None: params["status"] = status
+        if after is not None: params["after"] = after
+        payload = self._client._request_json("GET", "/v1/webhook-deliveries", params=params)
+        return [WebhookDelivery.model_validate(item) for item in payload["deliveries"]]
+
+    def replay(self, delivery_id: str) -> dict:
+        return self._client._request_json("POST", f"/v1/webhook-deliveries/{delivery_id}/replay")

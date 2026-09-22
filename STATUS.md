@@ -1,13 +1,13 @@
 # Meemee status
 
-**Current core version:** 0.40.0  
-**Ledger:** 62 verified, 0 thin  
+**Current core version:** 0.41.0  
+**Ledger:** 64 verified, 0 thin  
 **Supported production shape:** one host, one or more API/worker processes, SQLite/WAL on local persistent storage  
-**Last core verification:** 133 passed; Ruff and release audit clean
+**Last core verification:** 135 core + 109 SDK passed; core/SDK scoped Ruff and release audit clean
 
 ## What is production-usable now
 
-The authoritative detailed list is the 62-item "Verified" section in [README.md](README.md). The main product surfaces are:
+The authoritative detailed list is the 64-item "Verified" section in [README.md](README.md). The main product surfaces are:
 
 - Bounded agent loop, typed tools, per-run and persistent exact-tool approvals, deterministic policy, secret scrubbing and safe provenance.
 - Local and scheduled jobs, atomic claims, retries, cooperative cancellation, resumable SSE and idempotent submission.
@@ -21,9 +21,9 @@ The authoritative detailed list is the 62-item "Verified" section in [README.md]
 
 | Surface | Latest evidence in this tree | Result |
 |---|---|---|
-| Core server/runtime | `pytest -q` after v0.40.0 | 133 passed |
-| Core lint | `ruff check meemee tests examples/webhook_receiver` after v0.40.0 | clean |
-| SDK | last combined run at v0.22.0 | 107 passed, including 11 against a booted server |
+| Core server/runtime | `pytest -q` after v0.41.0 | 135 passed |
+| Core lint | `ruff check meemee tests examples/webhook_receiver` after v0.41.0 | clean |
+| SDK | v0.41.0 full run | 109 passed, including 11 against a booted server |
 | PostgreSQL package | last combined run at v0.22.0 | 3 contract tests passed; 2 live tests skipped without `MEEMEE_TEST_DATABASE_URL` |
 | Console | core mount test plus console worker's headless live test | passed at merge |
 | Concurrency regression | `tests/test_concurrency.py` | 2,000 parallel token auths and 1,000 parallel audit appends passed |

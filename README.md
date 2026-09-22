@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.40.0 (62)
+## Verified in v0.41.0 (64)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -66,6 +66,8 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 60. Deterministic commercial release audit CLI that fails on missing required assets, version-source/document drift, and explicit stub markers across shipped text/code, with structured findings suitable for CI and a complete proprietary license file.
 61. Distribution packaging verification: wheel now includes the full operator console and PEP 561 type marker; `meemee package-audit` validates version metadata, CLI entry point and required wheel contents; release evidence includes isolated wheel installation, CLI help/init execution and installed console import.
 62. HTTP security baseline across API and packaged console: configurable trusted-host rejection, restrictive CSP, frame/content/referrer/permissions controls, no-store for API/auth responses, and operator-enabled HSTS with configurable max age.
+63. OpenAPI authentication correctness: protected operations now declare a standard HTTP Bearer security scheme instead of exposing Authorization as an ordinary optional header, with current-version and commercial-endpoint schema regression coverage.
+64. Commercial Python SDK parity for quota get/set, exact-tool approval list/grant/revoke, and webhook create/list/delete/rotate/delivery/replay operations, with typed models and live-server regression updated for required encrypted-secret startup.
 
 ## Thin (0)
 
