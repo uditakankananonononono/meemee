@@ -1,6 +1,6 @@
 """Authentication providers for the Meemee API.
 
-The server accepts two bearer-credential families (v0.81.0):
+The server accepts two bearer-credential families (v0.82.0):
 
 1. Meemee API tokens (``mee_...``) minted via POST /v1/tokens, or the bootstrap
    token from MEEMEE_API_TOKEN - static bearer strings, handled by ``TokenAuth``.

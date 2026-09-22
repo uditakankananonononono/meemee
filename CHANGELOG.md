@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.82.0
+
+- Fixed stale README verified-count, PostgreSQL evidence and signed-audit retention guidance.
+- Release audit now proves the verified heading count equals the numbered capability ledger.
+- Verification: 213 core and 112 SDK tests plus 3 PostgreSQL contract tests passed; Ruff, core/SDK wheel builds and explicit 0.82.0 release audit clean. Live PostgreSQL remains unrun here.
+
 ## 0.81.0
 
 - Updated deployment assets and operator guidance for the current SQLite/PostgreSQL boundaries, distributed limiter and checksummed migrations.
@@ -88,7 +94,7 @@ All entries describe shipped repository behavior. Missing work is never presente
 
 ## 0.67.0
 
-- Aligned the Python SDK package/import version with core at 0.81.0 and removed stale v0.41 contract labels from SDK docs and metadata.
+- Aligned the Python SDK package/import version with core at 0.82.0 and removed stale v0.41 contract labels from SDK docs and metadata.
 - Added an explicit parity regression check.
 - Verification: 191 core and 112 SDK tests passed; Ruff and explicit 0.67.0 release audit clean.
 

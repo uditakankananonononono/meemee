@@ -110,7 +110,7 @@ Send a unique `Idempotency-Key` header when creating a job. Retries by the same 
 
 ## Data retention
 
-Run `meemee retention-run` from cron after backups. Defaults retain terminal jobs/events 30 days and memories 90 days; active jobs are never removed. Expired idempotency and rate-window records are cleaned. The tamper-evident audit chain is retained intact because deleting its prefix without externally signed anchors would break verification; archive/export with signed anchors is still missing. Always review legal and contractual retention duties before changing windows.
+Run `meemee retention-run` from cron after backups. Defaults retain terminal jobs/events 30 days and memories 90 days; active jobs are never removed. Expired idempotency and rate-window records are cleaned. The tamper-evident audit chain can be checkpointed with `meemee audit-anchor`, verified with `meemee audit-anchor-verify`, and pruned only through a valid checkpoint with `meemee audit-prune`. Store `MEEMEE_AUDIT_ANCHOR_KEY` and checkpoint files outside the instance. Always review legal and contractual retention duties before changing windows.
 
 ## Webhook alerts and recovery
 

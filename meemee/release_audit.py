@@ -54,6 +54,13 @@ def audit_tree(root: Path, expected_version: str | None = None) -> dict:
         versions = {_version(pyproject), _version(sdk_project), _version(sdk_package)}
         if None in versions or len(versions) != 1:
             findings.append({"code":"sdk_version_drift","path":"sdk/pyproject.toml"})
+    readme = root / "README.md"
+    if readme.exists() and pyproject.exists():
+        text = readme.read_text()
+        heading = re.search(r"^## Verified in v([^ ]+) \((\d+)\)$", text, re.MULTILINE)
+        numbered = [int(value) for value in re.findall(r"^(\d+)\. ", text, re.MULTILINE)]
+        if not heading or heading.group(1) != _version(pyproject) or not numbered or int(heading.group(2)) != max(numbered):
+            findings.append({"code":"verified_ledger_drift","path":"README.md"})
     stale_claims = {
         "README.md": (
             "WebSocket streaming (resume-safe SSE is implemented)",

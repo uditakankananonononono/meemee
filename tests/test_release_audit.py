@@ -9,6 +9,7 @@ def valid_tree(root: Path) -> None:
         path.write_text("0.37.0\n")
     package = root / "meemee" / "__init__.py"; package.parent.mkdir(); package.write_text('__version__ = "0.37.0"\n')
     (root / "pyproject.toml").write_text('[project]\nversion = "0.37.0"\n')
+    (root / "README.md").write_text("0.37.0\n## Verified in v0.37.0 (1)\n1. capability\n")
 
 
 def test_release_audit_accepts_complete_aligned_tree(tmp_path):
@@ -44,3 +45,9 @@ def test_release_audit_rejects_sdk_drift_and_stale_capability_claims(tmp_path):
     (tmp_path/"README.md").write_text((tmp_path/"README.md").read_text()+"\nWebSocket streaming (resume-safe SSE is implemented)")
     codes={item["code"] for item in audit_tree(tmp_path)["findings"]}
     assert {"sdk_version_drift","stale_capability_claim"} <= codes
+
+
+def test_release_audit_rejects_verified_heading_count_drift(tmp_path):
+    valid_tree(tmp_path)
+    (tmp_path/"README.md").write_text("0.37.0\n## Verified in v0.37.0 (2)\n1. one\n")
+    assert "verified_ledger_drift" in {item["code"] for item in audit_tree(tmp_path)["findings"]}
