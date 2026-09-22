@@ -19,6 +19,7 @@ from .preflight import run_preflight
 from .release_audit import audit_tree
 from .retention import RetentionManager
 from .runtime import build_agent
+from .schema_registry import schema_status
 from .tools.github import GitHubRepoSearch, GitHubSearchArgs
 from .vault import SecretVault
 from .webhook_verify import verify_signature
@@ -106,6 +107,24 @@ def vault_list() -> None:
         raise typer.BadParameter("MEEMEE_VAULT_KEY is required")
     for name in SecretVault(settings.data_dir / "vault.sqlite3", settings.vault_key).names():
         typer.echo(name)
+
+
+@app.command("schema-status")
+def schema_status_command() -> None:
+    """Report component schema versions/checksums across all SQLite databases."""
+    import sqlite3
+
+    settings = Settings()
+    databases = []
+    for path in sorted(settings.data_dir.glob("*.sqlite3")):
+        connection = sqlite3.connect(path)
+        try:
+            components = schema_status(connection)
+        finally:
+            connection.close()
+        if components:
+            databases.append({"database": path.name, "components": components})
+    typer.echo(json.dumps({"databases": databases}, indent=2))
 
 
 @app.command("db-migrate")

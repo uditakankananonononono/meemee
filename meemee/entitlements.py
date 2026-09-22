@@ -4,6 +4,8 @@ import sqlite3
 import threading
 from pathlib import Path
 
+from .schema_registry import register_schema
+
 PLANS = {
     "starter": {"daily_jobs": 100, "webhooks": 3, "persistent_approvals": 10},
     "team": {"daily_jobs": 1_000, "webhooks": 25, "persistent_approvals": 100},
@@ -24,6 +26,7 @@ class EntitlementStore:
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA busy_timeout=5000")
         self.db.execute("CREATE TABLE IF NOT EXISTS principal_plans(principal TEXT PRIMARY KEY, plan TEXT NOT NULL, updated_at TEXT NOT NULL)")
+        register_schema(self.db, "entitlements", 1, ["principal plan assignment"])
 
     def plan_name(self, principal: str) -> str:
         row = self.db.execute("SELECT plan FROM principal_plans WHERE principal=?", (principal,)).fetchone()

@@ -6,6 +6,7 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .schema_registry import register_schema
 from .types import RunReport
 
 
@@ -26,6 +27,7 @@ class RunStore:
             );
             CREATE INDEX IF NOT EXISTS runs_principal_created ON runs(principal,created_at DESC,run_id DESC);
         """)
+        register_schema(self.db, "runs", 1, ["principal owned completed run reports"])
 
     def add(self, principal: str, report: RunReport) -> None:
         with self.lock,self.db:

@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .schema_registry import register_schema
+
 
 class JobStore:
     """Durable SQLite queue with atomic claims and an append-only event stream."""
@@ -38,6 +40,9 @@ class JobStore:
         self.db.execute(
             "CREATE INDEX IF NOT EXISTS jobs_principal_updated ON jobs(principal,updated_at DESC,id DESC)"
         )
+        register_schema(self.db, "jobs", 2, [
+            "jobs principal ownership", "job events", "principal updated index"
+        ])
 
     def event(self, ident: str, kind: str, payload: dict[str, Any]) -> None:
         with self.lock, self.db:

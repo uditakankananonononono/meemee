@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 
 import httpx
 
+from .schema_registry import register_schema
 from .secret_cipher import SecretCipher
 
 
@@ -76,6 +77,11 @@ class WebhookStore:
             self.db.execute("ALTER TABLE webhook_subscriptions ADD COLUMN headers TEXT")
         if "sending_started_at" not in columns:
             self.db.execute("ALTER TABLE webhook_deliveries ADD COLUMN sending_started_at REAL")
+        register_schema(self.db, "webhooks", 4, [
+            "subscriptions encrypted secret events fields headers active",
+            "deliveries payload hash sending lease",
+            "attempt history and due indexes",
+        ])
         self._encrypt_legacy_secrets()
 
     def _secret_context(self, ident: str) -> str:
