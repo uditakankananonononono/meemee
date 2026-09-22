@@ -10,6 +10,8 @@ import uvicorn
 
 from .account_export import export_account, import_account, inspect_import
 from .api_loadcheck import run_api_loadcheck
+from .audit import AuditLog
+from .audit_anchor import create_anchor, verify_anchor
 from .backup import BackupManager
 from .config import Settings
 from .key_rotation import rotate_keys
@@ -155,6 +157,28 @@ def account_import_inspect(source: Path, target_principal: str | None = None) ->
     report = inspect_import(source, target_principal)
     report.pop("payload")
     typer.echo(json.dumps({**report, "dry_run":True}, indent=2))
+
+
+@app.command("audit-anchor")
+def audit_anchor(destination: Path) -> None:
+    """Write a signed tamper-evident audit checkpoint to external storage."""
+    settings = Settings()
+    if not settings.audit_anchor_key:
+        raise typer.BadParameter("MEEMEE_AUDIT_ANCHOR_KEY is required")
+    report = create_anchor(AuditLog(settings.data_dir / "audit.sqlite3"), destination, settings.audit_anchor_key)
+    typer.echo(json.dumps(report, indent=2))
+
+
+@app.command("audit-anchor-verify")
+def audit_anchor_verify(source: Path) -> None:
+    """Verify an external audit checkpoint against the current local chain."""
+    settings = Settings()
+    if not settings.audit_anchor_key:
+        raise typer.BadParameter("MEEMEE_AUDIT_ANCHOR_KEY is required")
+    report = verify_anchor(AuditLog(settings.data_dir / "audit.sqlite3"), source, settings.audit_anchor_key)
+    typer.echo(json.dumps(report, indent=2))
+    if report["status"] != "pass":
+        raise typer.Exit(1)
 
 
 @app.command("backup")

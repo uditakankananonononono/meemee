@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.55.0
+
+- Added externally storable HMAC-SHA256 audit-chain checkpoints with no-overwrite creation and verification against historical chain heads.
+- Added strict wrong-key, checkpoint-tamper and local-chain-tamper detection plus dedicated create/verify CLIs.
+- Verification: 170 core and 110 SDK tests passed; Ruff and explicit 0.55.0 release audit clean.
+
 ## 0.54.0
 
 - Added a full-ASGI parallel API load gate through the production middleware/auth/routing stack.
