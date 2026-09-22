@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.88.0
+
+- Hardened package audit against malformed/corrupt archives, path traversal and duplicate ZIP members.
+- Release validation now requires the correct distribution identity and wheel RECORD metadata.
+- Verification: 218 core and 112 SDK tests plus 3 PostgreSQL contract tests passed; Ruff, deprecation-free core/SDK wheel builds, hardened package audit and explicit 0.88.0 release audit clean. Live PostgreSQL remains unrun here.
+
 ## 0.87.0
 
 - Package audit now requires the proprietary license expression and one valid bundled license file.

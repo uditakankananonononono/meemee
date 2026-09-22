@@ -1,3 +1,4 @@
+import warnings
 import zipfile
 
 from meemee.package_audit import REQUIRED_WHEEL_PATHS, audit_wheel
@@ -11,6 +12,7 @@ def make_wheel(path, version="0.54.0", omit=None, license_expression="LicenseRef
         archive.writestr("meemee_agent-0.54.0.dist-info/METADATA", f"Name: meemee-agent\nVersion: {version}\nLicense-Expression: {license_expression}\n")
         archive.writestr("meemee_agent-0.54.0.dist-info/licenses/LICENSE", license_text)
         archive.writestr("meemee_agent-0.54.0.dist-info/entry_points.txt", "[console_scripts]\nmeemee = meemee.cli:app\n")
+        archive.writestr("meemee_agent-0.54.0.dist-info/RECORD", "")
 
 
 def test_package_audit_accepts_complete_wheel(tmp_path):
@@ -34,3 +36,17 @@ def test_package_audit_rejects_missing_or_invalid_commercial_license(tmp_path):
     make_wheel(invalid, license_text="empty")
     report = audit_wheel(invalid, "0.54.0")
     assert "wheel_license_invalid" in {item["code"] for item in report["findings"]}
+
+
+def test_package_audit_rejects_malformed_and_unsafe_archives(tmp_path):
+    malformed = tmp_path / "malformed.whl"; malformed.write_bytes(b"not a zip")
+    assert {item["code"] for item in audit_wheel(malformed, "0.54.0")["findings"]} == {"wheel_archive_invalid"}
+
+    unsafe = tmp_path / "unsafe.whl"; make_wheel(unsafe)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        with zipfile.ZipFile(unsafe, "a") as archive:
+            archive.writestr("../escape", "bad")
+            archive.writestr("console/index.html", "duplicate")
+    codes = {item["code"] for item in audit_wheel(unsafe, "0.54.0")["findings"]}
+    assert {"wheel_unsafe_path", "wheel_duplicate_member"} <= codes
