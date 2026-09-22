@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.116.0
+
+- Added a source-grounded reflection worker that proposes typed personal-model claims and rejects any claim whose cited source record is absent from the owner's context ledger.
+- Added explicit expiry handling for temporally stale claims and an authenticated audited reflection endpoint.
+- Reflection remains bounded to 20 claims per run and forbids unsupported sensitive inference in its model contract.
+
 ## 0.115.0
 
 - Added the evidence-backed personal-model foundation for goals, relationships, projects, preferences, routines and constraints.

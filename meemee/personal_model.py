@@ -119,3 +119,11 @@ class PersonalModelStore:
     def context(self, owner_id: str) -> str:
         rows = self.list(owner_id)
         return json.dumps([{key: row[key] for key in ("kind", "title", "value", "confidence", "valid_from", "valid_until")} for row in rows])
+
+    def expire(self, owner_id: str, at: str | None = None) -> int:
+        clock = at or datetime.now(timezone.utc).isoformat()
+        with self.lock, self.db:
+            return self.db.execute(
+                "UPDATE personal_items SET status='superseded',updated_at=? WHERE owner_id=? AND status='active' AND valid_until IS NOT NULL AND valid_until<=?",
+                (clock, owner_id, clock),
+            ).rowcount

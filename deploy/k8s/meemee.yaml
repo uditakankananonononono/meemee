@@ -28,7 +28,7 @@ spec:
       securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
       containers:
         - name: api
-          image: ghcr.io/uditakankananonononono/meemee:0.115.0
+          image: ghcr.io/uditakankananonononono/meemee:0.116.0
           args: ["meemee", "serve", "--host", "0.0.0.0", "--port", "8787"]
           ports: [{containerPort: 8787}]
           envFrom: [{secretRef: {name: meemee-secrets}}]
@@ -40,7 +40,7 @@ spec:
             requests: {cpu: 100m, memory: 128Mi}
             limits: {cpu: "1", memory: 1Gi}
         - name: worker
-          image: ghcr.io/uditakankananonononono/meemee:0.115.0
+          image: ghcr.io/uditakankananonononono/meemee:0.116.0
           args: ["meemee", "worker"]
           envFrom: [{secretRef: {name: meemee-secrets}}]
           volumeMounts: [{name: data, mountPath: /home/meemee/.meemee}]
@@ -49,7 +49,7 @@ spec:
             requests: {cpu: 100m, memory: 128Mi}
             limits: {cpu: "1", memory: 1Gi}
         - name: webhook-worker
-          image: ghcr.io/uditakankananonononono/meemee:0.115.0
+          image: ghcr.io/uditakankananonononono/meemee:0.116.0
           args: ["meemee", "webhook-worker"]
           envFrom: [{secretRef: {name: meemee-secrets}}]
           volumeMounts: [{name: data, mountPath: /home/meemee/.meemee}]

@@ -45,6 +45,7 @@ from .persistence import build_persistence
 from .personal_model import PersonalItemInput, PersonalModelStore
 from .quotas import QuotaExceeded, QuotaStore
 from .rate_limit import RateLimitMiddleware, SQLiteRateLimiter
+from .reflection import PersonalModelReflector
 from .runs import RunStore
 from .runtime import build_agent
 from .shutdown import RunGate
@@ -343,6 +344,17 @@ def create_account_api_key(request: AccountTokenRequest, principal=jobs_read_dep
     ident, token = tokens.create(request.name, request.scopes, request.expires_at, principal.id, "api")
     audit.append(principal.id, "account.api_key.create", ident, "success", {"scopes": sorted(request.scopes)})
     return {"id": ident, "token": token, "warning": "shown once; store it securely"}
+
+
+@app.post("/v1/personal-model/reflect")
+async def reflect_personal_model(principal=runs_write_dependency):
+    context_store = agent.context
+    if context_store is None:
+        raise HTTPException(503, "unified context is not configured")
+    reflector = PersonalModelReflector(context_store, personal_model, agent.model)
+    result = await reflector.reflect(principal.id)
+    audit.append(principal.id, "personal_model.reflect", principal.id, "success", {"accepted": result["accepted"], "rejected": result["rejected"]})
+    return result
 
 
 @app.get("/v1/personal-model")
