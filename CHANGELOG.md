@@ -2,6 +2,11 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.56.0
+
+- Added bounded structured model-driven replanning when evidence invalidates the active plan, with validated replacement DAGs, a three-revision ceiling, feedback and durable provenance.
+- Verification: 172 core tests passed; Ruff and explicit 0.56.0 release audit clean. SDK remains 110 passed from v0.55.0; no SDK surface changed.
+
 ## 0.55.0
 
 - Added externally storable HMAC-SHA256 audit-chain checkpoints with no-overwrite creation and verification against historical chain heads.

@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.55.0 (78)
+## Verified in v0.56.0 (78)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -83,6 +83,7 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 77. Release-blocking shared-store contention harness spanning token authentication, tamper-evident audit appends, owner-bound job writes and entitlement reads, with configurable concurrency, exact lane/write counts, error capture, audit-chain verification and nonzero CLI exit on any mismatch.
 78. Full-ASGI API parallel load gate that drives health, authenticated whoami and owner job-list requests through trusted-host, metrics, rate-limit, auth, request-context and routing middleware, requiring complete responses, request IDs and zero unexpected 5xx/network errors.
 79. Externally storable HMAC-SHA256 audit-chain head checkpoints with no-overwrite creation, pre-anchor chain validation, historical-head verification and tamper/wrong-key detection.
+80. Bounded model-driven replanning after evidence invalidates the active plan, with strict structured requests, validated replacement DAGs, a three-revision ceiling, model feedback and durable run-memory provenance.
 
 ## Thin (0)
 
@@ -90,7 +91,7 @@ Nothing is classified as thin. A capability is either implemented and tested at 
 
 ## Missing, not claimed
 
-Automated model-driven replanning policies; semantic/embedding memory and reranking; core runtime selection for the additive PostgreSQL stores and an automated SQLite-to-PostgreSQL data-copy CLI; end-user account administration UI (interactive OIDC login/session/logout, bearer auth and scoped API tokens are implemented); browser human takeover, managed downloads, challenge handoff and per-site policy; remote Git push and pull-request operations; a permissions UI; cross-host/cross-pod rate limiting (single-host multi-process limiting is implemented); WebSocket streaming (resume-safe SSE is implemented); forced mid-tool cancellation (cooperative between-step cancellation is implemented); and a core-wired shared database/queue suitable for Kubernetes replicas (the additive PostgreSQL package exists, but the runtime still uses SQLite).
+Semantic/embedding memory and reranking; core runtime selection for the additive PostgreSQL stores and an automated SQLite-to-PostgreSQL data-copy CLI; end-user account administration UI (interactive OIDC login/session/logout, bearer auth and scoped API tokens are implemented); browser human takeover, managed downloads, challenge handoff and per-site policy; remote Git push and pull-request operations; a permissions UI; cross-host/cross-pod rate limiting (single-host multi-process limiting is implemented); WebSocket streaming (resume-safe SSE is implemented); forced mid-tool cancellation (cooperative between-step cancellation is implemented); and a core-wired shared database/queue suitable for Kubernetes replicas (the additive PostgreSQL package exists, but the runtime still uses SQLite).
 
 The existing deterministic goal decomposition, lexical FTS, scoped/revocable API token system, browser automation, single-host shared limiter, SQLite queue, and cursor event API and SSE stream remain useful internal or single-node features, but they are not presented as completed versions of the advanced capabilities above.
 

@@ -23,3 +23,15 @@ class TaskPlanner:
                 depends_on=[f"step-{index - 1}"] if index > 1 else [],
             ))
         return Plan(goal=goal, steps=steps)
+
+
+    def revise(self, current: Plan, descriptions: list[str]) -> Plan:
+        """Replace pending work with a bounded, validated sequential plan."""
+        cleaned = [item.strip() for item in descriptions if item.strip()][:8]
+        if not cleaned:
+            raise ValueError("replan must contain at least one non-empty step")
+        return Plan(goal=current.goal, steps=[
+            PlanStep(id=f"revision-step-{index}", description=description,
+                     depends_on=[f"revision-step-{index - 1}"] if index > 1 else [])
+            for index, description in enumerate(cleaned, 1)
+        ])

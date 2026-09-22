@@ -78,3 +78,24 @@ async def test_agent_step_limit(tmp_path: Path):
     decisions = [AgentDecision(tool_call=ToolCall(name="missing")) for _ in range(2)]
     report = await Agent(FakeModel(decisions), ToolRegistry(), MemoryStore(tmp_path / "m.db"), max_steps=2).run("loop")
     assert "Stopped after 2" in report.final
+
+@pytest.mark.asyncio
+async def test_agent_model_driven_replan_is_bounded_and_recorded(tmp_path: Path):
+    from meemee.types import ReplanRequest
+    model = FakeModel([
+        AgentDecision(replan=ReplanRequest(reason="search disproved premise", steps=["try source B", "summarize"])),
+        AgentDecision(final="adapted"),
+    ])
+    memory = MemoryStore(tmp_path / "m.db")
+    report = await Agent(model, ToolRegistry(), memory).run("research premise")
+    assert report.final == "adapted" and report.tool_results[0]["replan"]
+    assert report.tool_results[0]["plan"]["steps"][1]["depends_on"] == ["revision-step-1"]
+    assert any(row["kind"] == "replan" for row in memory.recent())
+
+
+def test_decision_requires_exactly_one_replan_tool_or_final():
+    from meemee.types import ReplanRequest
+    request=ReplanRequest(reason="blocked",steps=["alternate"])
+    assert AgentDecision(replan=request).replan == request
+    with pytest.raises(ValueError): AgentDecision(replan=request,final="no")
+    with pytest.raises(ValueError): AgentDecision(replan=request,tool_call=ToolCall(name="x"))

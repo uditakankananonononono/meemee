@@ -18,8 +18,9 @@ Approval = Callable[[str, dict, Risk], bool]
 
 SYSTEM = """You are Meemee, an honest autonomous agent. Work toward the user's goal with the
 available tools. Never claim an action succeeded unless a tool result proves it. Respond only as
-JSON: {"thought":"brief reason","tool_call":{"name":"...","arguments":{...}},"final":null}
-or {"thought":"brief reason","tool_call":null,"final":"answer"}. Use one tool per turn.
+JSON with exactly one action: {"thought":"brief reason","tool_call":{"name":"...","arguments":{...}}},
+{"thought":"brief reason","replan":{"reason":"why the current plan cannot succeed","steps":["new step"]}},
+or {"thought":"brief reason","final":"answer"}. Use one action per turn. Replan only after evidence invalidates the plan.
 Do not repeat a failed call unchanged. Stop when done or when blocked and name the blocker."""
 
 
@@ -48,6 +49,7 @@ class Agent:
         ]
         self.memory.add(run_id, "goal", goal, {"plan": plan.model_dump()})
         events: list[dict] = []
+        revisions = 0
         for step_number in range(1, self.max_steps + 1):
             if cancel is not None and cancel.is_set():
                 final = "Cancelled before the next agent step."
@@ -59,6 +61,17 @@ class Agent:
                 self.memory.add(run_id, "final", decision.final)
                 return RunReport(run_id=run_id, goal=goal, final=decision.final,
                                  steps_used=step_number, tool_results=events)
+            if decision.replan is not None:
+                revisions += 1
+                if revisions > 3:
+                    event = {"replan": False, "error": "replan limit exceeded"}
+                else:
+                    plan = self.planner.revise(plan, decision.replan.steps)
+                    event = {"replan": True, "revision": revisions, "reason": scrub_text(decision.replan.reason), "plan": plan.model_dump()}
+                events.append(event)
+                self.memory.add(run_id, "replan", json.dumps(event, default=str))
+                messages.append({"role": "tool", "content": json.dumps(event, default=str)})
+                continue
             call = decision.tool_call
             assert call is not None
             try:

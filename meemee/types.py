@@ -17,17 +17,23 @@ class ToolCall(BaseModel):
     arguments: dict[str, Any] = Field(default_factory=dict)
 
 
+class ReplanRequest(BaseModel):
+    reason: str = Field(min_length=1, max_length=500)
+    steps: list[str] = Field(min_length=1, max_length=8)
+
+
 class AgentDecision(BaseModel):
     """Strict model response. Exactly one of final or tool_call is allowed."""
 
     thought: str = ""
     tool_call: ToolCall | None = None
     final: str | None = None
+    replan: ReplanRequest | None = None
 
     @model_validator(mode="after")
     def one_action(self) -> AgentDecision:
-        if (self.tool_call is None) == (self.final is None):
-            raise ValueError("provide exactly one of tool_call or final")
+        if sum(value is not None for value in (self.tool_call, self.final, self.replan)) != 1:
+            raise ValueError("provide exactly one of tool_call, replan or final")
         return self
 
 
