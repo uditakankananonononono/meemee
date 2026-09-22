@@ -20,6 +20,13 @@
       <p>Talk naturally. Meemee keeps useful facts with their source, follows your persona, and can check in when you ask.</p>
       <div class="prompts"><button>What do you remember about me?</button><button>Help me plan my week</button><button>Let’s set how you should talk to me</button></div>
     </section>
+    <section id="control-plane" aria-label="Intelligence workspace">
+      <div class="workspace-tabs" role="tablist">
+        <button data-view="timeline" class="active">Timeline / Inbox</button><button data-view="monitor">Monitor Center</button><button data-view="health">Source Health</button><button data-view="context">Context Controls</button>
+      </div>
+      <div id="workspace-content"></div>
+    </section>
+    <dialog id="provenance"><form method="dialog"><button class="close" value="cancel" aria-label="Close">×</button><span class="eyebrow">WHY THIS IS HERE</span><h2 id="provenance-title">Source receipt</h2><div id="provenance-content"></div></form></dialog>
     <section id="messages" aria-live="polite"></section>
     <form id="composer"><textarea id="message" rows="1" maxlength="8000" placeholder="Message Meemee" aria-label="Message"></textarea><button aria-label="Send">↑</button><small>Meemee can make mistakes. Check important information.</small></form>
   </main>
@@ -30,3 +37,4 @@
 <dialog id="account"><form method="dialog"><button class="close" value="cancel" aria-label="Close">×</button><span class="eyebrow">ACCOUNT</span><h2>Account & API keys</h2><p id="account-email"></p><div id="keys"></div><label>Key name<input id="key-name" maxlength="100" placeholder="My integration"></label><fieldset><legend>Scopes</legend><label class="check"><input type="checkbox" name="scope" value="companion:read" checked> Read companion</label><label class="check"><input type="checkbox" name="scope" value="companion:write" checked> Chat and update companion</label><label class="check"><input type="checkbox" name="scope" value="jobs:read"> Read jobs</label><label class="check"><input type="checkbox" name="scope" value="jobs:write"> Create jobs</label></fieldset><button id="create-key" type="button" class="primary">Create API key</button><output id="new-key"></output></form></dialog>
 <div id="toast" role="status"></div><script src="/app/assets/app.js" type="module"></script>
 </body></html>
+
