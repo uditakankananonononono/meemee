@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.62.0
+
+- Added a complete operator-console permissions view for listing, granting, constraining, expiring and revoking persistent tool approvals.
+- Mutations require explicit browser confirmation and use the admin-scoped approval API.
+- Verification: 184 core tests passed; Ruff and explicit 0.62.0 release audit clean. SDK remains 110 passed from v0.55.0; no SDK surface changed.
+
 ## 0.61.0
 
 - Added argument-scoped persistent tool approvals with exact constraint-subset matching and API/runtime enforcement.

@@ -158,3 +158,13 @@ export const loginUrl = () => apiUrl("/auth/login");
 export async function logout() {
   await request("/auth/logout", { method: "POST" }).catch(() => null);
 }
+
+// --- Persistent tool approvals (scope: admin) -------------------------------
+export const listApprovals = (principal, opts) =>
+  request(`/v1/approvals/${encodeURIComponent(principal)}`, opts);
+export const grantApproval = (principal, tool, expiresAt, constraints, opts) =>
+  request(`/v1/approvals/${encodeURIComponent(principal)}`, {
+    method: "PUT", body: { tool, expires_at: expiresAt || null, argument_constraints: constraints || null }, ...opts,
+  });
+export const revokeApproval = (principal, tool, opts) =>
+  request(`/v1/approvals/${encodeURIComponent(principal)}/${encodeURIComponent(tool)}`, { method: "DELETE", ...opts });
