@@ -15,6 +15,18 @@ class Persistence:
     jobs: Any
     close: Any
 
+    def check_memory(self) -> bool:
+        if self.backend == "sqlite":
+            return self.memory.connection.execute("SELECT 1").fetchone() is not None
+        with self.memory.db.transaction() as connection:
+            return connection.execute("SELECT 1").fetchone() is not None
+
+    def check_jobs(self) -> bool:
+        if self.backend == "sqlite":
+            return self.jobs.db.execute("SELECT 1").fetchone() is not None
+        with self.jobs.db.transaction() as connection:
+            return connection.execute("SELECT 1").fetchone() is not None
+
 
 def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = None) -> Persistence:
     """Select and initialize the supported persistence composition root."""

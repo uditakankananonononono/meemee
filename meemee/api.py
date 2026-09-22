@@ -69,6 +69,7 @@ async def lifespan(_app: FastAPI):
     close = getattr(agent.model, "aclose", None)
     if close is not None:
         await close()
+    persistence.close()
 
 app = FastAPI(title="Meemee", version=__version__, lifespan=lifespan)
 trusted_hosts = [host.strip() for host in settings.trusted_hosts.split(",") if host.strip()]
@@ -78,9 +79,9 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=trusted_hosts)
 mount_console(app)
 app.add_middleware(MetricsMiddleware)
 app.add_middleware(RateLimitMiddleware, limiter=SQLiteRateLimiter(settings.data_dir / "rate-limits.sqlite3", settings.rate_limit_requests, settings.rate_limit_window_seconds))
-agent = build_agent(settings, memory=build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn).memory)
-run_gate = RunGate()
 persistence = build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn)
+agent = build_agent(settings, memory=persistence.memory)
+run_gate = RunGate()
 jobs = persistence.jobs
 runs = RunStore(settings.data_dir / "runs.sqlite3")
 idempotency = IdempotencyStore(settings.data_dir / "idempotency.sqlite3")
@@ -105,7 +106,7 @@ if any(web_values):
         raise RuntimeError("interactive login requires complete OIDC and web-login configuration")
     web_login = WebLogin(WebLoginConfig(*web_values), oidc)
 auth = Authenticator(tokens, settings.api_token, oidc, web_login.authenticate_session if web_login else None)
-readiness = ReadinessChecker(settings.data_dir, {"memory": lambda: agent.memory.connection.execute("SELECT 1").fetchone(), "jobs": lambda: jobs.db.execute("SELECT 1").fetchone(), "runs": lambda: runs.db.execute("SELECT 1").fetchone(), "tokens": lambda: tokens.db.execute("SELECT 1").fetchone(), "entitlements": lambda: entitlements.db.execute("SELECT 1").fetchone()}, settings.model_base_url, settings.readiness_min_free_bytes, require_model=settings.readiness_require_model)
+readiness = ReadinessChecker(settings.data_dir, {"memory": persistence.check_memory, "jobs": persistence.check_jobs, "runs": lambda: runs.db.execute("SELECT 1").fetchone(), "tokens": lambda: tokens.db.execute("SELECT 1").fetchone(), "entitlements": lambda: entitlements.db.execute("SELECT 1").fetchone()}, settings.model_base_url, settings.readiness_min_free_bytes, require_model=settings.readiness_require_model)
 jobs_write_auth = auth.dependency("jobs:write")
 jobs_write_dependency = Depends(jobs_write_auth)
 runs_write_dependency = Depends(auth.dependency("runs:write"))

@@ -19,7 +19,8 @@ def cancellation_watcher(jobs, job_id: str, event: threading.Event, stop: thread
 
 async def work_forever(settings: Settings | None = None) -> None:
     settings = settings or Settings()
-    jobs = build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn).jobs
+    persistence = build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn)
+    jobs = persistence.jobs
     webhooks = WebhookStore(settings.data_dir / "webhooks.sqlite3")
     while True:
         job = jobs.claim()
@@ -30,7 +31,7 @@ async def work_forever(settings: Settings | None = None) -> None:
         watcher = threading.Thread(target=cancellation_watcher, args=(jobs, job["id"], cancel, stop), daemon=True)
         watcher.start()
         try:
-            report = await build_agent(settings).run(job["goal"], cancel=cancel)
+            report = await build_agent(settings, memory=persistence.memory).run(job["goal"], cancel=cancel)
             if cancel.is_set():
                 jobs.cancel_running(job["id"])
                 webhooks.enqueue(f"job:{job['id']}:cancelled", "job.cancelled", {"job_id": job["id"], "status": "cancelled"})

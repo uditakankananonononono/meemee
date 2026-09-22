@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.71.0
+
+- Added backend-neutral persistence lifecycle: one shared API/worker composition, SQLite/PostgreSQL readiness checks, shared worker memory and pooled shutdown.
+- Removed duplicate PostgreSQL pools created by independent memory/job composition calls.
+- Verification: 197 core and 112 SDK tests plus 3 PostgreSQL contract tests passed; Ruff and explicit 0.71.0 release audit clean. Live PostgreSQL remains unrun here.
+
 ## 0.70.0
 
 - Added PostgreSQL job-list opaque keyset cursor parity with stable updated-at/UUID ordering and next-cursor envelopes.
@@ -22,7 +28,7 @@ All entries describe shipped repository behavior. Missing work is never presente
 
 ## 0.67.0
 
-- Aligned the Python SDK package/import version with core at 0.70.0 and removed stale v0.41 contract labels from SDK docs and metadata.
+- Aligned the Python SDK package/import version with core at 0.71.0 and removed stale v0.41 contract labels from SDK docs and metadata.
 - Added an explicit parity regression check.
 - Verification: 191 core and 112 SDK tests passed; Ruff and explicit 0.67.0 release audit clean.
 
