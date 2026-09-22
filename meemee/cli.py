@@ -8,6 +8,7 @@ from pathlib import Path
 import typer
 import uvicorn
 
+from .account_export import export_account, import_account, inspect_import
 from .backup import BackupManager
 from .config import Settings
 from .key_rotation import rotate_keys
@@ -113,6 +114,26 @@ def db_migrate() -> None:
     settings = Settings()
     applied = Migrator(settings.data_dir / "operations.sqlite3", CORE_MIGRATIONS).migrate()
     typer.echo(json.dumps({"applied": applied}))
+
+
+@app.command("account-export")
+def account_export(principal: str, destination: Path) -> None:
+    """Export account-owned jobs, runs and entitlement metadata with checksum."""
+    typer.echo(json.dumps(export_account(Settings().data_dir, principal, destination), indent=2))
+
+
+@app.command("account-import")
+def account_import(source: Path, target_principal: str | None = None) -> None:
+    """Import a verified account export after collision preflight."""
+    typer.echo(json.dumps(import_account(Settings().data_dir, source, target_principal), indent=2))
+
+
+@app.command("account-import-inspect")
+def account_import_inspect(source: Path, target_principal: str | None = None) -> None:
+    """Verify an account export and print a no-write import plan."""
+    report = inspect_import(source, target_principal)
+    report.pop("payload")
+    typer.echo(json.dumps({**report, "dry_run":True}, indent=2))
 
 
 @app.command("backup")

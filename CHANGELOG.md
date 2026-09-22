@@ -2,6 +2,13 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.49.0
+
+- Added checksummed owner-scoped account export for jobs, completed runs and entitlement assignment.
+- Added no-write checksum inspection and target-principal remapping.
+- Added collision-preflighted import with safety copies, rollback restoration and overwrite refusal.
+- Core verification: 157 tests passed; Ruff and release audit clean.
+
 ## 0.48.0
 
 - Added hidden-input operator encryption-key rotation across vault records and webhook signing secrets.

@@ -119,3 +119,7 @@ Alert when `meemee_webhook_success_rate` falls below 0.95 for 10 minutes, `meeme
 ## Product plans and billing boundary
 
 `GET /v1/product/plans` is the authoritative machine-readable catalog. Starter, team and business plans currently enforce daily queued-job and active-webhook limits; admin assignment through `PUT /v1/entitlements/{principal}` updates the atomic job quota and records an audit event. Meemee does not process payments, publish prices or infer billing state. Connect a licensed external billing system to the admin entitlement endpoint only after verifying its signed events.
+
+## Account portability
+
+Export with `meemee account-export PRINCIPAL export.json`. The file contains only that principal's jobs, completed runs and explicit entitlement assignment plus a SHA-256 checksum; it does not contain tokens, vault values, webhook signing secrets or cross-principal rows. Verify and preview retargeting with `meemee account-import-inspect export.json --target-principal NEW_ID`. Import only into stopped, backed-up instances with `meemee account-import`; it preflights every ID/entitlement collision, uses safety copies and restores on failure.
