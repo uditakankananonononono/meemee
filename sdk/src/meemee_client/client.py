@@ -27,6 +27,7 @@ from .errors import (
     AuthenticationError,
     BadRequestError,
     ConflictError,
+    IdempotencyConflictError,
     NetworkError,
     NotFoundError,
     PermissionDeniedError,
@@ -315,7 +316,8 @@ def _map_error(response: httpx.Response) -> ApiError:
     if status == 404:
         return NotFoundError(message, status_code=status, request_id=rid, detail=detail)
     if status == 409:
-        return ConflictError(message, status_code=status, request_id=rid, detail=detail)
+        error_type = IdempotencyConflictError if isinstance(detail, str) and "idempotency" in detail.lower() else ConflictError
+        return error_type(message, status_code=status, request_id=rid, detail=detail)
     if status == 422:
         issues = detail if isinstance(detail, list) else None
         return ValidationError(message, status_code=status, request_id=rid, detail=detail, issues=issues)
@@ -387,7 +389,7 @@ class JobsResource:
     def __init__(self, client: MeemeeClient) -> None:
         self._client = client
 
-    def create(self, goal: str, *, run_at: datetime | str | None = None) -> CreatedJob:
+    def create(self, goal: str, *, run_at: datetime | str | None = None, idempotency_key: str | None = None) -> CreatedJob:
         """POST /v1/jobs - enqueue a goal, optionally scheduled for a future run_at.
 
         Workers claim due jobs atomically and retry failures up to the job's
@@ -398,7 +400,8 @@ class JobsResource:
         scheduled = _iso_or_none(run_at, "run_at")
         if scheduled is not None:
             body["run_at"] = scheduled
-        payload = self._client._request_json("POST", "/v1/jobs", json_body=body)
+        headers = {"Idempotency-Key": idempotency_key} if idempotency_key else None
+        payload = self._client._request_json("POST", "/v1/jobs", json_body=body, headers=headers)
         return CreatedJob.model_validate(payload)
 
     def page(self, *, status: str | None = None, cursor: str | None = None, before: str | None = None, limit: int = 100) -> tuple[list[Job], str | None]:

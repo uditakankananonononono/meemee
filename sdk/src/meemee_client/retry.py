@@ -4,7 +4,7 @@ The platform's own transport contract (current server model transport): bounded
 retries for transient network/408/429/5xx failures, Retry-After support, jittered
 exponential backoff, fail-fast permanent errors. The SDK applies the same rules to
 API calls, with one addition: only idempotent methods are retried automatically,
-because the server has no idempotency keys - retrying POST /v1/runs or /v1/jobs
+because synchronous runs are not idempotent and queued jobs require an explicit idempotency key - retrying POST /v1/runs or an unkeyed /v1/jobs
 could run the same goal twice.
 """
 from __future__ import annotations
@@ -29,7 +29,7 @@ class RetryPolicy:
     #: Status codes considered transient (server semantics: 408/429/5xx).
     retry_statuses: frozenset[int] = field(default=frozenset({408, 429, 500, 502, 503, 504}))
     #: Methods retried automatically. POST is excluded on purpose: the server has
-    #: no idempotency keys, so a retried POST may duplicate a run or job.
+    #: unsafe POSTs are not retried; keyed job creation can be retried explicitly by the caller.
     retry_methods: frozenset[str] = field(default=frozenset({"GET", "HEAD", "DELETE"}))
     #: Honour the server's Retry-After header on 429 (and 503) responses.
     respect_retry_after: bool = True

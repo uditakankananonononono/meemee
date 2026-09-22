@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.96.0
+
+- Exported the missing SDK `IdempotencyConflictError` and mapped idempotency-specific HTTP 409 responses to it.
+- Added typed queued-job idempotency-key support and regression coverage for the public import/header behavior.
+- Verification: 225 core and 114 SDK tests plus 3 PostgreSQL contract tests passed; Ruff, deprecation-free core/SDK wheel builds, package audit and explicit 0.96.0 release audit clean. Live PostgreSQL remains unrun here.
+
 ## 0.95.0
 
 - Synchronized all SDK public/live-integration contract labels to the core version.

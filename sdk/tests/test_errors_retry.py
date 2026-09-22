@@ -9,6 +9,7 @@ from meemee_client import (
     AuthenticationError,
     BadRequestError,
     ConflictError,
+    IdempotencyConflictError,
     NetworkError,
     NotFoundError,
     PermissionDeniedError,
@@ -238,3 +239,12 @@ def test_rate_limit_headers_captured_on_success() -> None:
     assert info.request_id == "rid9"
     assert info.rate_limit is not None
     assert info.rate_limit.remaining == 58
+
+
+def test_idempotency_conflict_has_specific_exported_error():
+    from meemee_client import IdempotencyConflictError as Exported
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(409, json={"detail":"idempotency key reused with different payload"})
+    with pytest.raises(Exported) as caught:
+        make_client(handler).jobs.create("goal ok", idempotency_key="same-key")
+    assert isinstance(caught.value, ConflictError)

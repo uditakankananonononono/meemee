@@ -1,6 +1,6 @@
 """Error hierarchy mapping the Meemee API's failure surface to typed exceptions.
 
-Server contract (meemee v0.16.0):
+Server contract (current Meemee API):
 - Error bodies are JSON with a ``detail`` key: a string for HTTPException, or a
   list of ``{loc, msg, type}`` objects for FastAPI request-validation failures.
 - Every response carries ``X-Request-ID``; 500 responses add ``request_id`` in the body.
@@ -65,6 +65,10 @@ class NotFoundError(ApiError):
 
 class ConflictError(ApiError):
     """HTTP 409 - state conflict, e.g. cancelling a job that is already finished."""
+
+
+class IdempotencyConflictError(ConflictError):
+    """HTTP 409 - an idempotency key was reused with a different request payload."""
 
 
 class ValidationError(ApiError):

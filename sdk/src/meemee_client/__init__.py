@@ -1,6 +1,6 @@
 """meemee-client: typed Python SDK for the Meemee agent platform API.
 
-Targets the Meemee server v0.95.0 HTTP contract: scoped API tokens and OIDC
+Targets the Meemee server v0.96.0 HTTP contract: scoped API tokens and OIDC
 bearer auth, synchronous runs, durable queued jobs, resume-safe SSE progress,
 fixed-window rate limiting, and the tamper-evident audit chain.
 
@@ -20,6 +20,7 @@ from .errors import (
     AuthenticationError,
     BadRequestError,
     ConflictError,
+    IdempotencyConflictError,
     MeemeeError,
     NetworkError,
     NotFoundError,
@@ -69,6 +70,7 @@ __all__ = [
     "AuthenticationError",
     "BadRequestError",
     "ConflictError",
+    "IdempotencyConflictError",
     "CreatedJob",
     "CreatedToken",
     "CreatedWebhook",

@@ -269,3 +269,12 @@ def test_jobs_list_uses_owner_scoped_endpoint() -> None:
         return httpx.Response(200, json={"jobs":[job_payload("queued")]})
     jobs = make_client(handler).jobs.list(status="queued", limit=20)
     assert jobs[0].status is JobStatus.QUEUED
+
+
+def test_jobs_create_sends_idempotency_key():
+    import json
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers["Idempotency-Key"] == "job-once-123"
+        assert json.loads(request.content) == {"goal": "goal ok"}
+        return httpx.Response(200, json={"id": JOB_ID})
+    assert make_client(handler).jobs.create("goal ok", idempotency_key="job-once-123").id == JOB_ID
