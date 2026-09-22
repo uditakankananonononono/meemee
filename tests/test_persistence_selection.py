@@ -35,3 +35,9 @@ def test_postgres_selection_migrates_and_builds_stores(monkeypatch,tmp_path):
     selected=build_persistence("postgresql",tmp_path,"postgresql://test")
     assert selected.backend=="postgresql" and ("migrate",) in events
     selected.close(); assert events[-1]==("close",)
+
+
+def test_postgres_job_store_declares_owner_scoped_api_contract():
+    source=(__import__("pathlib").Path(__file__).parents[1]/"meemee_persist_pg/jobs.py").read_text()
+    migration=(__import__("pathlib").Path(__file__).parents[1]/"meemee_persist_pg/sql/002_job_ownership.sql").read_text()
+    assert "def list_for_principal" in source and "def get_owned" in source and "principal" in migration

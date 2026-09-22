@@ -1,13 +1,13 @@
 # Meemee status
 
-**Current core version:** 0.68.0  
-**Ledger:** 92 verified, 0 thin  
-**Supported production shape:** one host, one or more API/worker processes, SQLite/WAL on local persistent storage  
-**Last core verification:** 193 passed; 112 SDK passed; Ruff and explicit 0.68.0 release audit clean
+**Current core version:** 0.69.0  
+**Ledger:** 93 verified, 0 thin  
+**Supported production shape:** SQLite/WAL single-host; PostgreSQL memory and owner-scoped jobs are selectable but require target-environment live verification  
+**Last core verification:** 194 passed; 112 SDK passed; Ruff and explicit 0.69.0 release audit clean
 
 ## What is production-usable now
 
-The authoritative detailed list is the 92-item "Verified" section in [README.md](README.md). The main product surfaces are:
+The authoritative detailed list is the 93-item "Verified" section in [README.md](README.md). The main product surfaces are:
 
 - Bounded agent loop, typed tools, per-run and persistent exact-tool approvals, deterministic policy, secret scrubbing and safe provenance.
 - Local and scheduled jobs, atomic claims, retries, cooperative cancellation, resumable SSE and idempotent submission.
@@ -21,9 +21,9 @@ The authoritative detailed list is the 92-item "Verified" section in [README.md]
 
 | Surface | Latest evidence in this tree | Result |
 |---|---|---|
-| Core server/runtime | `pytest -q` after v0.68.0 | 193 passed |
-| Core lint | `ruff check meemee tests examples/webhook_receiver` after v0.68.0 | clean |
-| SDK | v0.68.0 full run | 112 passed, including 11 against a booted server |
+| Core server/runtime | `pytest -q` after v0.69.0 | 194 passed |
+| Core lint | `ruff check meemee tests examples/webhook_receiver` after v0.69.0 | clean |
+| SDK | v0.69.0 full run | 112 passed, including 11 against a booted server |
 | PostgreSQL package | last combined run at v0.22.0 | 3 contract tests passed; 2 live tests skipped without `MEEMEE_TEST_DATABASE_URL` |
 | Console | core mount test plus console worker's headless live test | passed at merge |
 | Concurrency regression | `tests/test_concurrency.py` | 2,000 parallel token auths and 1,000 parallel audit appends passed |
@@ -36,7 +36,7 @@ Nothing is classified as thin. A capability is either verified at a stated bound
 
 ## Missing, not claimed
 
-- Full queued-job/API composition-root selection of the additive PostgreSQL stores. Agent-memory selection is wired; the API and worker job surfaces still instantiate SQLite stores.
+- Opaque PostgreSQL job cursor parity. API/worker memory and owner-scoped queued jobs select PostgreSQL; PostgreSQL listing currently rejects opaque cursors rather than misapplying them.
 - Live PostgreSQL test run in this environment. Checksummed SQLite-to-PostgreSQL copy/import tooling is implemented.
 - Account administration UI. Authentication, sessions and scoped tokens exist; identity lifecycle remains at the IdP.
 - Interactive browser human takeover after explicit challenge detection/handoff.

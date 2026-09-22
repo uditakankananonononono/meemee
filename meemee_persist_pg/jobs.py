@@ -1,8 +1,11 @@
 from __future__ import annotations
+
 import uuid
-from datetime import datetime,timedelta
+from datetime import datetime
 from typing import Any
+
 from ._db import Database
+
 
 class LeaseLostError(RuntimeError): pass
 class JobStore:
@@ -14,11 +17,11 @@ class JobStore:
         result=dict(row); result["id"]=str(result["id"]); result["lease_token"]=str(result["lease_token"]) if result.get("lease_token") else None
         return result
     def _event(self,c,ident,kind,payload): c.execute("INSERT INTO meemee_job_events(job_id,kind,payload) VALUES(%s,%s,%s)",(ident,kind,payload))
-    def enqueue(self,goal:str,run_at:datetime|None=None,max_attempts:int=3)->str:
+    def enqueue(self,goal:str,run_at:datetime|None=None,max_attempts:int=3,principal:str|None=None)->str:
         if not goal.strip() or max_attempts<1: raise ValueError("goal and positive max_attempts required")
         ident=uuid.uuid4()
         with self.db.transaction() as c:
-            c.execute("INSERT INTO meemee_jobs(id,goal,run_at,status,max_attempts) VALUES(%s,%s,COALESCE(%s,clock_timestamp()),'queued',%s)",(ident,goal,run_at,max_attempts)); self._event(c,ident,"queued",{"run_at":run_at.isoformat() if run_at else None})
+            c.execute("INSERT INTO meemee_jobs(id,goal,run_at,status,max_attempts,principal) VALUES(%s,%s,COALESCE(%s,clock_timestamp()),'queued',%s,%s)",(ident,goal,run_at,max_attempts,principal)); self._event(c,ident,"queued",{"run_at":run_at.isoformat() if run_at else None})
         return str(ident)
     def _reap(self,c):
         rows=c.execute("""UPDATE meemee_jobs SET status=CASE WHEN attempts<max_attempts THEN 'queued' ELSE 'failed' END,
@@ -72,3 +75,15 @@ class JobStore:
         with self.db.transaction() as c:return self._row(c.execute("SELECT * FROM meemee_jobs WHERE id=%s",(ident,)).fetchone())
     def events(self,ident:str,after:int=0):
         with self.db.transaction() as c:return list(c.execute("SELECT * FROM meemee_job_events WHERE job_id=%s AND sequence>%s ORDER BY sequence",(ident,after)).fetchall())
+
+    def list_for_principal(self,principal:str,status:str|None=None,before:str|None=None,limit:int=100,cursor:str|None=None):
+        if cursor is not None: raise ValueError("PostgreSQL job cursors are not yet supported")
+        clauses=["principal=%s"]; params:list[Any]=[principal]
+        if status is not None: clauses.append("status=%s"); params.append(status)
+        if before is not None: clauses.append("updated_at<%s"); params.append(before)
+        page_size=max(1,min(limit,500)); params.append(page_size+1)
+        with self.db.transaction() as c: rows=c.execute(f"SELECT * FROM meemee_jobs WHERE {' AND '.join(clauses)} ORDER BY updated_at DESC,id DESC LIMIT %s",tuple(params)).fetchall()
+        items=[self._row(row) for row in rows[:page_size]]
+        return items, None
+    def get_owned(self,ident:str,principal:str):
+        with self.db.transaction() as c:return self._row(c.execute("SELECT * FROM meemee_jobs WHERE id=%s AND principal=%s",(ident,principal)).fetchone())

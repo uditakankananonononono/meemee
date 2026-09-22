@@ -16,7 +16,8 @@ def test_docs_versions_and_ledger_are_current():
     assert "## Missing, not claimed" in readme and "## Missing, not claimed" in status
 
 
-def test_docs_do_not_claim_pg_core_wiring():
+def test_docs_bound_postgres_wiring_to_verified_contract():
     status = (ROOT / "STATUS.md").read_text()
-    assert "still instantiate SQLite stores" in status
+    assert "Opaque PostgreSQL job cursor parity" in status
+    assert "Live PostgreSQL test run" in status
     assert "MEEMEE_TEST_DATABASE_URL" in status

@@ -24,7 +24,6 @@ from .config import Settings
 from .entitlements import EntitlementStore, public_catalog
 from .health import ReadinessChecker
 from .idempotency import IdempotencyConflict, IdempotencyStore
-from .jobs import JobStore
 from .observability import (
     AGENT_RUNS,
     JOBS_CREATED,
@@ -37,6 +36,7 @@ from .observability import (
     metrics_response,
 )
 from .oidc import OIDCConfig, OIDCValidator
+from .persistence import build_persistence
 from .quotas import QuotaExceeded, QuotaStore
 from .rate_limit import RateLimitMiddleware, SQLiteRateLimiter
 from .runs import RunStore
@@ -78,9 +78,10 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=trusted_hosts)
 mount_console(app)
 app.add_middleware(MetricsMiddleware)
 app.add_middleware(RateLimitMiddleware, limiter=SQLiteRateLimiter(settings.data_dir / "rate-limits.sqlite3", settings.rate_limit_requests, settings.rate_limit_window_seconds))
-agent = build_agent(settings)
+agent = build_agent(settings, memory=build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn).memory)
 run_gate = RunGate()
-jobs = JobStore(settings.data_dir / "jobs.sqlite3")
+persistence = build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn)
+jobs = persistence.jobs
 runs = RunStore(settings.data_dir / "runs.sqlite3")
 idempotency = IdempotencyStore(settings.data_dir / "idempotency.sqlite3")
 quotas = QuotaStore(settings.data_dir / "quotas.sqlite3", settings.default_daily_jobs)

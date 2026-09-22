@@ -4,12 +4,12 @@ import asyncio
 import threading
 
 from .config import Settings
-from .jobs import JobStore
+from .persistence import build_persistence
 from .runtime import build_agent
 from .webhooks import WebhookStore
 
 
-def cancellation_watcher(jobs: JobStore, job_id: str, event: threading.Event, stop: threading.Event) -> None:
+def cancellation_watcher(jobs, job_id: str, event: threading.Event, stop: threading.Event) -> None:
     while not stop.wait(0.25):
         job = jobs.get(job_id)
         if job and job["status"] == "cancel_requested":
@@ -19,7 +19,7 @@ def cancellation_watcher(jobs: JobStore, job_id: str, event: threading.Event, st
 
 async def work_forever(settings: Settings | None = None) -> None:
     settings = settings or Settings()
-    jobs = JobStore(settings.data_dir / "jobs.sqlite3")
+    jobs = build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn).jobs
     webhooks = WebhookStore(settings.data_dir / "webhooks.sqlite3")
     while True:
         job = jobs.claim()
