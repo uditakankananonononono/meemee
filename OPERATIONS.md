@@ -66,7 +66,7 @@ Schema creation is idempotent. There is not yet a formal migration framework, so
 
 - Leaked API token: revoke its ID, inspect `last_used_at`, issue a replacement.
 - Leaked bootstrap token: replace the environment secret and restart all API processes.
-- Leaked vault key: rotate vault records and webhook signing secrets on an offline trusted host, then rotate receiver secrets through the API; treat all stored values as exposed. A built-in all-record key-rotation command remains missing.
+- Leaked vault key: stop all API/workers, create and verify a backup, export the current key, run `meemee rotate-encryption-key` and enter a newly generated key twice, replace `MEEMEE_VAULT_KEY`, then restart and run preflight. Rotate receiver secrets through the API too and treat all prior values as exposed. The command validates all old ciphertext first, uses verified safety backups, and restores them on failure; never run it concurrently with Meemee processes.
 - Stuck queued work: inspect `/v1/jobs/{id}` and `/events`, cancel queued work, then check worker/model logs.
 - Repeated browser challenge: stop automation for that site. Meemee does not claim challenge bypass.
 

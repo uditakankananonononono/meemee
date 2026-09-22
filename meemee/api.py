@@ -52,6 +52,8 @@ from .webhooks import (
 
 settings = Settings()
 settings.data_dir.mkdir(parents=True, exist_ok=True)
+if (settings.data_dir / ".key-rotation-in-progress").exists():
+    raise RuntimeError("incomplete encryption-key rotation; restore the pre-rotation backup")
 configure_logging(settings.log_level, settings.log_json)
 log = logging.getLogger("meemee.api")
 

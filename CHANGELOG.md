@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.48.0
+
+- Added hidden-input operator encryption-key rotation across vault records and webhook signing secrets.
+- Validates every old-key decryption before writes, makes verified safety backups, blocks startup during interruption and restores all databases on failure.
+- Core verification: 154 tests passed; Ruff and release audit clean.
+
 ## 0.47.0
 
 - Extended readiness to the durable run and entitlement stores.

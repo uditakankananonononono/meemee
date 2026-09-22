@@ -10,6 +10,7 @@ import uvicorn
 
 from .backup import BackupManager
 from .config import Settings
+from .key_rotation import rotate_keys
 from .migrations import CORE_MIGRATIONS, Migrator
 from .onboarding import initialize
 from .package_audit import audit_wheel
@@ -80,6 +81,20 @@ def vault_put(name: str) -> None:
         raise typer.BadParameter("MEEMEE_VAULT_KEY is required")
     SecretVault(settings.data_dir / "vault.sqlite3", settings.vault_key).put(name, getpass.getpass("Secret: "))
     typer.echo(f"stored {name}")
+
+
+@app.command("rotate-encryption-key")
+def rotate_encryption_key() -> None:
+    """Re-encrypt vault and webhook secrets using a new key read without echo."""
+    settings = Settings()
+    if not settings.vault_key:
+        raise typer.BadParameter("MEEMEE_VAULT_KEY with the current key is required")
+    new_key = getpass.getpass("New MEEMEE_VAULT_KEY: ")
+    confirmation = getpass.getpass("Confirm new key: ")
+    if not new_key or new_key != confirmation:
+        raise typer.BadParameter("new key confirmation does not match")
+    report = rotate_keys(settings.data_dir, settings.vault_key, new_key)
+    typer.echo(json.dumps({**report, "status":"rotated", "next":"replace MEEMEE_VAULT_KEY and restart all processes"}))
 
 
 @app.command("vault-list")
