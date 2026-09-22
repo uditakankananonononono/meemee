@@ -40,8 +40,12 @@ class ReadinessChecker:
                 components[name] = {"ok": True}
             except (OSError, RuntimeError, ValueError) as exc:
                 components[name] = {"ok": False, "error": type(exc).__name__}
-        usage = shutil.disk_usage(self.data_dir)
-        components["disk"] = {"ok": usage.free >= self.min_free_bytes, "free_bytes": usage.free, "minimum_bytes": self.min_free_bytes}
+        try:
+            probe = self.data_dir if self.data_dir.exists() else self.data_dir.parent
+            usage = shutil.disk_usage(probe)
+            components["disk"] = {"ok": usage.free >= self.min_free_bytes, "free_bytes": usage.free, "minimum_bytes": self.min_free_bytes}
+        except OSError as exc:
+            components["disk"] = {"ok": False, "error": type(exc).__name__}
         owns_client = client is None
         client = client or httpx.AsyncClient(timeout=httpx.Timeout(3, connect=2))
         try:

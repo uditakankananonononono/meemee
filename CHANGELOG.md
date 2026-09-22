@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.75.0
+
+- Hardened readiness disk probing for not-yet-created data directories and disk-stat failures.
+- Readiness now returns a structured not-ready component instead of crashing on disk inspection errors.
+- Verification: 203 core and 112 SDK tests plus 3 PostgreSQL contract tests passed; Ruff and explicit 0.75.0 release audit clean. Live PostgreSQL remains unrun here.
+
 ## 0.74.0
 
 - Added PostgreSQL agent-memory contract parity for scrubbed writes and hybrid/semantic retrieval calls.
@@ -46,7 +52,7 @@ All entries describe shipped repository behavior. Missing work is never presente
 
 ## 0.67.0
 
-- Aligned the Python SDK package/import version with core at 0.74.0 and removed stale v0.41 contract labels from SDK docs and metadata.
+- Aligned the Python SDK package/import version with core at 0.75.0 and removed stale v0.41 contract labels from SDK docs and metadata.
 - Added an explicit parity regression check.
 - Verification: 191 core and 112 SDK tests passed; Ruff and explicit 0.67.0 release audit clean.
 

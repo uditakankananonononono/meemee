@@ -24,3 +24,14 @@ async def test_readiness_fails_closed_without_leaking_error(tmp_path: Path):
     assert result["status"] == "not_ready"
     assert result["components"]["db"]["error"] == "RuntimeError"
     assert "secret" not in str(result)
+
+@pytest.mark.asyncio
+async def test_readiness_handles_missing_data_directory_and_disk_errors(monkeypatch,tmp_path):
+    missing=tmp_path/"missing"
+    checker=ReadinessChecker(missing,{"db":lambda: True},"http://model",min_free_bytes=1,cache_seconds=0)
+    client=httpx.AsyncClient(transport=httpx.MockTransport(lambda r:httpx.Response(200)))
+    assert (await checker.check(client))["components"]["disk"]["ok"]
+    monkeypatch.setattr("shutil.disk_usage",lambda path: (_ for _ in ()).throw(OSError("disk unavailable")))
+    result=await checker.check(client)
+    assert result["status"]=="not_ready" and result["components"]["disk"]["error"]=="OSError"
+    await client.aclose()
