@@ -217,6 +217,12 @@ def backup(destination: Path) -> None:
     typer.echo(json.dumps(BackupManager(Settings().data_dir).create(destination), indent=2))
 
 
+@app.command("backup-restore")
+def backup_restore(directory: Path, destination: Path) -> None:
+    """Verify and restore a backup into a new empty data directory."""
+    typer.echo(json.dumps(BackupManager.restore(directory, destination), indent=2))
+
+
 @app.command("backup-verify")
 def backup_verify(directory: Path) -> None:
     """Verify backup checksums and SQLite integrity."""

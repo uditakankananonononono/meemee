@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.84.0
+
+- Added verified backup restore rehearsal into a new empty data directory.
+- Restore verifies source, SQLite integrity and checksums, refuses overwrites and cleans partial writes on failure.
+- Verification: 215 core and 112 SDK tests plus 3 PostgreSQL contract tests passed; Ruff, core/SDK wheel builds and explicit 0.84.0 release audit clean. Live PostgreSQL remains unrun here.
+
 ## 0.83.0
 
 - Synchronized console/operator documentation to current stream, account-admin and deployment-image behavior.
@@ -100,7 +106,7 @@ All entries describe shipped repository behavior. Missing work is never presente
 
 ## 0.67.0
 
-- Aligned the Python SDK package/import version with core at 0.83.0 and removed stale v0.41 contract labels from SDK docs and metadata.
+- Aligned the Python SDK package/import version with core at 0.84.0 and removed stale v0.41 contract labels from SDK docs and metadata.
 - Added an explicit parity regression check.
 - Verification: 191 core and 112 SDK tests passed; Ruff and explicit 0.67.0 release audit clean.
 

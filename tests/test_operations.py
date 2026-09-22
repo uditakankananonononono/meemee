@@ -58,3 +58,20 @@ def test_backup_captures_all_commercial_state_databases(tmp_path: Path):
         restored=sqlite3.connect(tmp_path/"commercial-backup"/row["name"])
         assert restored.execute("SELECT value FROM state").fetchone()[0]=="kept"
         restored.close()
+
+
+def test_backup_restore_rehearsal_refuses_overwrite_and_preserves_checksums(tmp_path: Path):
+    data=tmp_path/"data"; data.mkdir()
+    db=sqlite3.connect(data/"state.sqlite3"); db.execute("CREATE TABLE state(value TEXT)"); db.execute("INSERT INTO state VALUES('real')"); db.commit(); db.close()
+    backup=tmp_path/"backup"; BackupManager(data).create(backup)
+    restored=tmp_path/"restored"; report=BackupManager.restore(backup,restored)
+    assert report["status"]=="restored" and report["files"]==["state.sqlite3"]
+    check=sqlite3.connect(restored/"state.sqlite3"); assert check.execute("SELECT value FROM state").fetchone()[0]=="real"; check.close()
+    with pytest.raises(FileExistsError): BackupManager.restore(backup,restored)
+
+
+def test_backup_restore_refuses_tampered_source_before_destination(tmp_path: Path):
+    data=tmp_path/"data"; data.mkdir(); db=sqlite3.connect(data/"x.sqlite3"); db.execute("CREATE TABLE x(id INT)"); db.close()
+    backup=tmp_path/"backup"; BackupManager(data).create(backup); (backup/"x.sqlite3").write_bytes(b"bad")
+    with pytest.raises(RuntimeError): BackupManager.restore(backup,tmp_path/"restored")
+    assert not (tmp_path/"restored").exists()

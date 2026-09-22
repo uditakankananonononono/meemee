@@ -55,3 +55,30 @@ class BackupManager:
             finally:
                 db.close()
         return manifest
+
+    @staticmethod
+    def restore(directory: Path, destination: Path) -> dict[str, object]:
+        """Verify and restore a complete backup into a new, empty directory."""
+        manifest = BackupManager.verify(directory)
+        if destination.exists():
+            if any(destination.iterdir()):
+                raise FileExistsError(f"restore destination is not empty: {destination}")
+        else:
+            destination.mkdir(parents=True)
+        restored=[]
+        try:
+            for expected in manifest["files"]:
+                source=directory/expected["name"]; target=destination/expected["name"]
+                source_db=sqlite3.connect(f"file:{source}?mode=ro",uri=True); target_db=sqlite3.connect(target)
+                try:
+                    source_db.backup(target_db)
+                    if target_db.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+                        raise RuntimeError(f"restored database corrupt: {expected['name']}")
+                finally: source_db.close(); target_db.close()
+                if hashlib.sha256(target.read_bytes()).hexdigest()!=expected["sha256"]:
+                    raise RuntimeError(f"restored checksum mismatch: {expected['name']}")
+                restored.append(expected["name"])
+        except Exception:
+            for name in restored: (destination/name).unlink(missing_ok=True)
+            raise
+        return {"status":"restored","files":restored,"source_created_at":manifest["created_at"]}
