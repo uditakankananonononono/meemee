@@ -18,6 +18,6 @@ def test_docs_versions_and_ledger_are_current():
 
 def test_docs_bound_postgres_wiring_to_verified_contract():
     status = (ROOT / "STATUS.md").read_text()
-    assert "Opaque PostgreSQL job cursor parity" in status
+    assert "Live PostgreSQL test run" in status
     assert "Live PostgreSQL test run" in status
     assert "MEEMEE_TEST_DATABASE_URL" in status

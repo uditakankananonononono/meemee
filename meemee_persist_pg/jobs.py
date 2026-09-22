@@ -77,13 +77,18 @@ class JobStore:
         with self.db.transaction() as c:return list(c.execute("SELECT * FROM meemee_job_events WHERE job_id=%s AND sequence>%s ORDER BY sequence",(ident,after)).fetchall())
 
     def list_for_principal(self,principal:str,status:str|None=None,before:str|None=None,limit:int=100,cursor:str|None=None):
-        if cursor is not None: raise ValueError("PostgreSQL job cursors are not yet supported")
+        from meemee.cursors import decode_cursor, encode_cursor
         clauses=["principal=%s"]; params:list[Any]=[principal]
         if status is not None: clauses.append("status=%s"); params.append(status)
         if before is not None: clauses.append("updated_at<%s"); params.append(before)
+        if cursor is not None:
+            cursor_time,cursor_id=decode_cursor(cursor)
+            clauses.append("(updated_at<%s OR (updated_at=%s AND id<%s))")
+            params.extend((cursor_time,cursor_time,cursor_id))
         page_size=max(1,min(limit,500)); params.append(page_size+1)
         with self.db.transaction() as c: rows=c.execute(f"SELECT * FROM meemee_jobs WHERE {' AND '.join(clauses)} ORDER BY updated_at DESC,id DESC LIMIT %s",tuple(params)).fetchall()
         items=[self._row(row) for row in rows[:page_size]]
-        return items, None
+        next_cursor=encode_cursor(str(items[-1]["updated_at"]),items[-1]["id"]) if len(rows)>page_size else None
+        return items,next_cursor
     def get_owned(self,ident:str,principal:str):
         with self.db.transaction() as c:return self._row(c.execute("SELECT * FROM meemee_jobs WHERE id=%s AND principal=%s",(ident,principal)).fetchone())

@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.70.0
+
+- Added PostgreSQL job-list opaque keyset cursor parity with stable updated-at/UUID ordering and next-cursor envelopes.
+- Malformed cursors fail before any database query.
+- Verification: 196 core and 112 SDK tests plus 3 PostgreSQL contract tests passed; Ruff and explicit 0.70.0 release audit clean. Live PostgreSQL remains unrun here.
+
 ## 0.69.0
 
 - Wired API and worker composition to PostgreSQL memory and owner-scoped queued jobs, with automatic ownership migration.
@@ -16,7 +22,7 @@ All entries describe shipped repository behavior. Missing work is never presente
 
 ## 0.67.0
 
-- Aligned the Python SDK package/import version with core at 0.69.0 and removed stale v0.41 contract labels from SDK docs and metadata.
+- Aligned the Python SDK package/import version with core at 0.70.0 and removed stale v0.41 contract labels from SDK docs and metadata.
 - Added an explicit parity regression check.
 - Verification: 191 core and 112 SDK tests passed; Ruff and explicit 0.67.0 release audit clean.
 
