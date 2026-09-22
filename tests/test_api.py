@@ -13,7 +13,7 @@ headers = {"Authorization": "Bearer test-bootstrap-token"}
 def test_health_and_security_headers():
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json()["version"] == "0.111.0"
+    assert response.json()["version"] == "0.112.0"
     assert response.headers["x-content-type-options"] == "nosniff"
     assert response.headers["x-request-id"]
 

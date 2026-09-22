@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.111.0 (147)
+## Verified in v0.112.0 (148)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -160,6 +160,8 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 146. Explicit psycopg JSONB adaptation for PostgreSQL memory metadata, job event/result payloads and audit metadata, guarded across all runtime write sites.
 
 147. Explicit PostgreSQL enum casts for both expired-lease reaper status branches, removing the final live type mismatch from the Neon gate.
+
+148. Owner-scoped unified source/event ledger with provenance, cursoring, content dedupe, visibility permissions, ranked context assembly and working signed-webhook/RSS/Atom/ICS connector normalization.
 
 ## Thin (0)
 

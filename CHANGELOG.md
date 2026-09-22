@@ -2,6 +2,13 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.112.0
+
+- Added the Phase A context foundation: durable owner-scoped source/event ledger with provenance, content-hash deduplication, per-source cursors and explicit visibility permissions.
+- Added canonical context records and an assembler combining ranked full-text matches with recent cross-source records.
+- Added a connector protocol and working signed-webhook, RSS/Atom and ICS normalizers with timestamp/signature validation and live-ready HTTP seams.
+- Verification: 308 core, 133 SDK, PostgreSQL 8 passed/2 live skipped; Ruff, wheel/package/release audits clean. Cross-source injection into companion/agent arrives in the next reviewable drop; this release does not claim OAuth connectors or continuous polling.
+
 ## 0.111.0
 
 - Fixed PostgreSQL expired-lease reaping by explicitly casting both `CASE` branches to the `meemee_job_status` enum.
