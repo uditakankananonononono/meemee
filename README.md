@@ -187,6 +187,8 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 
 163. Companion console screens (branch pb4): profile editor, persona editor, facts with retire, conversations browser across channels with timestamped paged history, check-in queue with status filter and admin delivery run, verified by a headless Chromium test against a live server.
 
+164. End-to-end run path, verified live (branch pb7, unreleased): `tests/test_live_runs_e2e.py` boots the real server and worker in SQLite and PostgreSQL modes against a local OpenAI-compatible provider with a fixed script, and checks `POST /v1/runs` (model call, real `workspace.read_file` tool, tool result fed back, final answer), run storage and owner scoping, `run.create` in a verified audit chain, a queued job streamed over SSE from `queued` to `done` and replayed, routed-profile fallback, and a 502 on model outage. It found and fixed a bug where every rate-limited request returned 500 in PostgreSQL mode.
+
 ## Thin (0)
 
 Nothing is classified as thin. A capability is either implemented and tested at its stated boundary below, or listed as missing.

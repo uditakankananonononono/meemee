@@ -161,8 +161,10 @@ stated boundary.
 **Missing, not claimed:**
 
 - An async (`asyncio`) client - the SDK is synchronous only.
-- A live test of `POST /v1/runs` - a real run needs a reachable model
-  endpoint; runs are covered in the mocked suite only.
+- A live `POST /v1/runs` test through this SDK against a real hosted model.
+  The server-side run path is verified live in `tests/test_live_runs_e2e.py`
+  (repo root) with a local scripted OpenAI-compatible provider; SDK run
+  parsing is covered in the mocked suite.
 - WebSocket streaming - the server offers resume-safe SSE only.
 - Interactive OIDC browser login - owned by the server's `/auth/login`.
 - Token introspection/listing and job listing endpoints - the server does not

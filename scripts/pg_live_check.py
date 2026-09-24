@@ -60,7 +60,8 @@ def main() -> int:
         print(f"PostgreSQL {version}, TimeZone={tz}", flush=True)
         command = [sys.executable, "-m", "pytest", "-q", "-rs", "-p", "no:cacheprovider", "tests_pg",
                    "tests/test_pg_job_cursor.py", "tests/test_pg_memory_contract.py",
-                   "tests/test_pg_rate_limit.py", "tests/test_postgres_copy.py", *args.pytest_args]
+                   "tests/test_pg_rate_limit.py", "tests/test_postgres_copy.py",
+                   "tests/test_live_runs_e2e.py", "tests/test_rate_limit_backends.py", *args.pytest_args]
         result = subprocess.run(command, cwd=ROOT, env=env, capture_output=True, text=True, check=False)
         sys.stdout.write(result.stdout)
         sys.stderr.write(result.stderr)
