@@ -229,13 +229,13 @@ def build_account_purger(settings: Any, persistence: Any) -> AccountPurger:
         idempotency=persistence.idempotency or IdempotencyStore(root / "idempotency.sqlite3"),
         quotas=persistence.quotas or QuotaStore(root / "quotas.sqlite3", settings.default_daily_jobs),
         entitlements=persistence.entitlements or EntitlementStore(root / "entitlements.sqlite3", settings.default_plan),
-        approvals=persistence.approvals or ApprovalStore(root / "approvals.sqlite3"), monitors=MonitorStore(root / "monitors.sqlite3"),
+        approvals=persistence.approvals or ApprovalStore(root / "approvals.sqlite3"), monitors=persistence.monitors or MonitorStore(root / "monitors.sqlite3"),
         personal_model=persistence.personal_model or PersonalModelStore(root / "personal-model.sqlite3"),
         context=persistence.context or ContextStore(root / "context.sqlite3"),
         webhooks=persistence.webhooks or WebhookStore(root / "webhooks.sqlite3", settings.webhook_max_payload_bytes, settings.vault_key),
         companion=persistence.companion or CompanionStore(root / "companion.sqlite3"),
         browser_sessions=BrowserSessionStore(root / "browser-sessions.sqlite3"),
         browser_notices=TakeoverNoticeQueue(root / "browser-notices.sqlite3"),
-        reflection_schedule=ReflectionSchedule(root / "reflection-schedule.sqlite3"),
+        reflection_schedule=persistence.reflection_schedule or ReflectionSchedule(root / "reflection-schedule.sqlite3"),
     )
     return AccountPurger(targets, DeletionLedger(root / "account-deletions.sqlite3"))
