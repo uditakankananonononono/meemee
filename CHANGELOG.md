@@ -2,6 +2,13 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## Unreleased (branch pb7)
+
+- Added `tests/test_live_runs_e2e.py`: live end-to-end run tests against a booted server and worker, in SQLite and PostgreSQL modes, using a local scripted OpenAI-compatible provider (sync runs, SSE job stream to completion, audit, owner scoping, routed fallback, model outage).
+- Fixed PostgreSQL mode: the rate-limit middleware called `limiter.identity()`, which only the SQLite limiter had, so every non-exempt request returned 500 when `MEEMEE_PERSISTENCE_BACKEND=postgresql`. The key function is now shared (`meemee.rate_limit.request_identity`). Regression test: `tests/test_rate_limit_backends.py`.
+- `scripts/pg_live_check.py` now also runs the end-to-end and rate-limit backend tests.
+- Removed a duplicated, stale PostgreSQL line from STATUS "Missing".
+
 ## 0.122.0
 
 Integrates pb4 console companion screens and pb7 live PostgreSQL verification onto 0.121.0.

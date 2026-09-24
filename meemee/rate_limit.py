@@ -11,6 +11,14 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
 
+def request_identity(request) -> str:
+    """Rate-limit key: a hash of the bearer token, else the client IP. Backend-independent."""
+    authorization = request.headers.get("authorization", "")
+    if authorization.lower().startswith("bearer "):
+        return "token:" + hashlib.sha256(authorization[7:].encode()).hexdigest()[:24]
+    return "ip:" + (request.client.host if request.client else "unknown")
+
+
 class SQLiteRateLimiter:
     """Atomic fixed-window limiter shared by all processes on one host."""
 
@@ -55,10 +63,7 @@ class SQLiteRateLimiter:
 
     @staticmethod
     def identity(request) -> str:
-        authorization = request.headers.get("authorization", "")
-        if authorization.lower().startswith("bearer "):
-            return "token:" + hashlib.sha256(authorization[7:].encode()).hexdigest()[:24]
-        return "ip:" + (request.client.host if request.client else "unknown")
+        return request_identity(request)
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -74,7 +79,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.requests += 1
         if self.requests % 1000 == 0:
             self.limiter.cleanup()
-        allowed, remaining, reset = self.limiter.hit(self.limiter.identity(request))
+        # Every limiter backend (SQLite, PostgreSQL) only needs hit/cleanup/limit; the key is shared.
+        allowed, remaining, reset = self.limiter.hit(request_identity(request))
         headers = {
             "RateLimit-Limit": str(self.limiter.limit),
             "RateLimit-Remaining": str(remaining),
