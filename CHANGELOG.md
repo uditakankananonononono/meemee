@@ -5,6 +5,7 @@ All entries describe shipped repository behavior. Missing work is never presente
 ## Unreleased (branch pb1)
 
 - Added interactive browser human takeover: durable live browser sessions, challenge-triggered or requested takeovers with one-time expiring links, a WebSocket live view that relays clicks, typing, keys, scrolls and in-policy navigation, and hand-back that resumes the agent on the same page.
+- Takeover view relays drag gestures (press-move-release) so slider challenges can be solved.
 - Added agent tools `browser.session_open`, `browser.session_act`, `browser.session_request_human`, `browser.session_wait_human`, `browser.session_snapshot`, `browser.session_close` (registered in the API server process).
 - Added `/v1/browser/sessions` open/list/detail/takeover/close endpoints, `/v1/browser/takeover/release`, the `/v1/browser/takeover/ws` socket and the `/browser/takeover` viewer.
 - Fixed: `websockets` is now a core dependency. Plain `pip install .` (as in the Dockerfile) previously had no WebSocket support in uvicorn, so WebSocket endpoints could not accept connections.
