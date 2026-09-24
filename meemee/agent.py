@@ -14,7 +14,7 @@ from .policy import PolicyEngine
 from .sensitive import scrub_text
 from .tool_audit import redact
 from .tools.base import ToolRegistry
-from .types import Risk, RunReport
+from .types import ApprovalRefusal, Risk, RunReport
 
 Approval = Callable[[str, dict, Risk], bool]
 
@@ -24,6 +24,24 @@ JSON with exactly one action: {"thought":"brief reason","tool_call":{"name":"...
 {"thought":"brief reason","replan":{"reason":"why the current plan cannot succeed","steps":["new step"]}},
 or {"thought":"brief reason","final":"answer"}. Use one action per turn. Replan only after evidence invalidates the plan.
 Do not repeat a failed call unchanged. Stop when done or when blocked and name the blocker."""
+
+
+def _constraint_arguments(arguments: dict) -> dict:
+    """Arguments safe and meaningful to pin in a grant: short scalars that were not redacted."""
+    safe = redact(arguments)
+    return {key: value for key, value in safe.items()
+            if value == arguments.get(key) and isinstance(value, (str, int, float, bool)) and len(str(value)) <= 500}
+
+
+def refusal(step: int, name: str, risk: Risk, reason: str, detail: str, arguments: dict) -> ApprovalRefusal:
+    """Machine-readable record of a refused tool call, with the approval that would have allowed it."""
+    grantable = reason == "approval_required"
+    return ApprovalRefusal(
+        step=step, tool=name, risk=risk.value, reason=reason, detail=detail, arguments=redact(arguments),
+        grantable=grantable,
+        per_run={"approved_tools": [name]} if grantable else None,
+        persistent_grant={"tool": name, "argument_constraints": _constraint_arguments(arguments)} if grantable else None,
+    )
 
 
 class Agent:
@@ -57,18 +75,19 @@ class Agent:
         ]
         self.memory.add(run_id, "goal", goal, {"plan": plan.model_dump()})
         events: list[dict] = []
+        refusals: list[ApprovalRefusal] = []
         revisions = 0
         for step_number in range(1, self.max_steps + 1):
             if cancel is not None and cancel.is_set():
                 final = "Cancelled before the next agent step."
                 self.memory.add(run_id, "cancelled", final)
-                return RunReport(run_id=run_id, goal=goal, final=final, steps_used=step_number - 1, tool_results=events)
+                return RunReport(run_id=run_id, goal=goal, final=final, steps_used=step_number - 1, tool_results=events, approvals_required=refusals)
             decision = await self.model.decide(messages)
             messages.append({"role": "assistant", "content": decision.model_dump_json()})
             if decision.final is not None:
                 self.memory.add(run_id, "final", decision.final)
                 return RunReport(run_id=run_id, goal=goal, final=decision.final,
-                                 steps_used=step_number, tool_results=events)
+                                 steps_used=step_number, tool_results=events, approvals_required=refusals)
             if decision.replan is not None:
                 revisions += 1
                 if revisions > 3:
@@ -90,8 +109,10 @@ class Agent:
                 policy = self.policy.evaluate(call.name, call.arguments, tool.risk)
                 if not policy.allowed:
                     result = {"ok": False, "error": f"policy denied: {policy.reason}"}
+                    refusals.append(refusal(step_number, call.name, tool.risk, "policy_denied", result["error"], call.arguments))
                 elif policy.require_approval and (approve is None or not approve(call.name, call.arguments, tool.risk)):
                     result = {"ok": False, "error": f"approval denied for {tool.risk.value} tool"}
+                    refusals.append(refusal(step_number, call.name, tool.risk, "approval_required", result["error"], call.arguments))
                 else:
                     result = (await self.tools.execute(call.name, call.arguments, cancel=cancel)).model_dump()
             event = {"tool": call.name, "arguments": redact(call.arguments), "result": redact(result)}
@@ -100,4 +121,4 @@ class Agent:
             messages.append({"role": "tool", "content": json.dumps(event, default=str)})
         final = f"Stopped after {self.max_steps} steps without a final answer. Last tool event: {events[-1] if events else 'none'}"
         self.memory.add(run_id, "limit", final)
-        return RunReport(run_id=run_id, goal=goal, final=final, steps_used=self.max_steps, tool_results=events)
+        return RunReport(run_id=run_id, goal=goal, final=final, steps_used=self.max_steps, tool_results=events, approvals_required=refusals)

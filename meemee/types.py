@@ -86,9 +86,25 @@ class Plan(BaseModel):
         return self
 
 
+class ApprovalRefusal(BaseModel):
+    """A tool call the run was not allowed to make. Present means the goal may be incomplete."""
+
+    step: int
+    tool: str
+    risk: str
+    reason: Literal["approval_required", "policy_denied"]
+    detail: str
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    grantable: bool
+    # Exact bodies that would have allowed this call; None when policy forbids it outright.
+    per_run: dict[str, Any] | None = None
+    persistent_grant: dict[str, Any] | None = None
+
+
 class RunReport(BaseModel):
     run_id: str
     goal: str
     final: str
     steps_used: int
     tool_results: list[dict[str, Any]]
+    approvals_required: list[ApprovalRefusal] = Field(default_factory=list)

@@ -191,6 +191,8 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 
 165. Write-approval gate verified live (branch pb7, unreleased): in SQLite and PostgreSQL modes, a write tool is refused without approval (nothing written, the model sees the denial), per-run `approved_tools` / `approve_writes` allow it, persistent grants honor argument constraints, principal scoping, expiry and revocation, unknown tools cannot be granted, and `approval.grant` / `approval.revoke` / `run.create` land in order in a verified audit chain. Fixed: queued jobs ignored persistent grants (the worker passed no approval callback), so a job could never use an approval-gated tool; jobs now apply the owner's grants exactly as runs do.
 
+166. Structured refusals (branch pb7, unreleased): every run report, stored run and finished job result carries `approvals_required`, a list of refused tool calls with `step`, `tool`, `risk`, `reason` (`approval_required` or `policy_denied`), redacted `arguments`, `grantable`, and the exact `per_run` body or `persistent_grant` (`PUT /v1/approvals/{principal}`) that would have allowed the call. An empty list means nothing was refused; clients must not present a run with refusals as done, whatever the model's `final` text says. The SDK exposes `RunReport.approvals_required`, `RunReport.is_blocked`, `Job.approvals_required` and `ApprovalRefusal`. Live tests submit the suggested bodies unchanged and the retried run or job succeeds.
+
 ## Thin (0)
 
 Nothing is classified as thin. A capability is either implemented and tested at its stated boundary below, or listed as missing.
@@ -242,7 +244,7 @@ curl -X POST http://127.0.0.1:8787/v1/runs -H 'content-type: application/json' \
   -d '{"goal":"Find the best current Python repository for local agents"}'
 ```
 
-File writes are denied unless the caller opts in with `--approve-writes` or `approve_writes: true`. Queued jobs (`POST /v1/jobs`) have no per-request approval; they may use an approval-gated tool only through the owner's persistent grant (`PUT /v1/approvals/{principal}`). This coarse v1 switch is not a substitute for user-scoped production authorization.
+File writes are denied unless the caller opts in with `--approve-writes` or `approve_writes: true`. Refused calls are listed in the result's `approvals_required` with the approval body that would allow them. Queued jobs (`POST /v1/jobs`) have no per-request approval; they may use an approval-gated tool only through the owner's persistent grant (`PUT /v1/approvals/{principal}`). This coarse v1 switch is not a substitute for user-scoped production authorization.
 
 ## Architecture
 

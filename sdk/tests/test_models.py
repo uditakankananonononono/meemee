@@ -128,3 +128,39 @@ def test_rate_limit_info_absent_on_exempt_paths() -> None:
 
 def test_known_scopes_matches_server_allowlist() -> None:
     assert KNOWN_SCOPES == frozenset({"admin", "runs:write", "jobs:read", "jobs:write", "companion:read", "companion:write"})
+
+
+REFUSAL = {
+    "step": 1, "tool": "workspace.write_file", "risk": "write", "reason": "approval_required",
+    "detail": "approval denied for write tool", "arguments": {"path": "out.txt", "content": "x"},
+    "grantable": True, "per_run": {"approved_tools": ["workspace.write_file"]},
+    "persistent_grant": {"tool": "workspace.write_file", "argument_constraints": {"path": "out.txt", "content": "x"}},
+}
+
+
+def test_run_report_exposes_refusals_and_blocked_flag() -> None:
+    report = RunReport.model_validate({"run_id": "r", "goal": "g", "final": "Done!", "steps_used": 2,
+                                       "tool_results": [], "approvals_required": [REFUSAL]})
+    assert report.is_blocked is True
+    [refusal] = report.approvals_required
+    assert refusal.reason == "approval_required" and refusal.grantable
+    assert refusal.persistent_grant == {"tool": "workspace.write_file",
+                                        "argument_constraints": {"path": "out.txt", "content": "x"}}
+    clean = RunReport.model_validate({"run_id": "r", "goal": "g", "final": "ok", "steps_used": 1})
+    assert clean.approvals_required == [] and clean.is_blocked is False
+
+
+def test_policy_refusal_is_not_grantable() -> None:
+    from meemee_client import ApprovalRefusal
+
+    refusal = ApprovalRefusal.model_validate({**REFUSAL, "reason": "policy_denied", "grantable": False,
+                                              "per_run": None, "persistent_grant": None})
+    assert refusal.grantable is False and refusal.persistent_grant is None
+    with pytest.raises(ValueError):
+        ApprovalRefusal.model_validate({**REFUSAL, "reason": "because"})
+
+
+def test_job_exposes_refusals_from_result() -> None:
+    job = Job.model_validate(job_payload("done", result={"final": "Done", "approvals_required": [REFUSAL]}))
+    assert [item.tool for item in job.approvals_required] == ["workspace.write_file"]
+    assert Job.model_validate(job_payload("queued")).approvals_required == []

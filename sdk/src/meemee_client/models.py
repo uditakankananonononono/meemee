@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -32,6 +32,24 @@ class ReadinessStatus(BaseModel):
         return sorted(name for name, detail in self.components.items() if not detail.ok)
 
 
+class ApprovalRefusal(BaseModel):
+    """A tool call the run was refused. Any refusal means the goal may not be done."""
+
+    model_config = ConfigDict(extra="allow")
+
+    step: int
+    tool: str
+    risk: str
+    reason: Literal["approval_required", "policy_denied"]
+    detail: str
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    grantable: bool
+    per_run: dict[str, Any] | None = None
+    """Body fields for a retried POST /v1/runs that would allow this call."""
+    persistent_grant: dict[str, Any] | None = None
+    """Body for PUT /v1/approvals/{principal} that would allow this call."""
+
+
 class RunReport(BaseModel):
     """Result of a synchronous POST /v1/runs agent execution."""
 
@@ -40,7 +58,13 @@ class RunReport(BaseModel):
     final: str
     steps_used: int
     tool_results: list[dict[str, Any]] = Field(default_factory=list)
+    approvals_required: list[ApprovalRefusal] = Field(default_factory=list)
     created_at: datetime | None = None
+
+    @property
+    def is_blocked(self) -> bool:
+        """True when any tool call was refused; do not present such a run as done."""
+        return bool(self.approvals_required)
 
 
 class JobStatus(str, Enum):
@@ -92,6 +116,14 @@ class Job(BaseModel):
         if self.result is None:
             return None
         return json.loads(self.result)
+
+    @property
+    def approvals_required(self) -> list[ApprovalRefusal]:
+        """Refused tool calls recorded in a finished job's run report ([] when none or no result)."""
+        data = self.result_data
+        if not isinstance(data, dict):
+            return []
+        return [ApprovalRefusal.model_validate(item) for item in data.get("approvals_required", [])]
 
 
 class JobQuotaSnapshot(BaseModel):

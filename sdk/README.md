@@ -155,6 +155,13 @@ The live suite lives in `tests/test_live_integration.py`; it boots uvicorn
 against the `meemee` package next to `sdk/` and skips cleanly when that
 package or its dependencies are absent.
 
+14. Refusals: `RunReport.approvals_required` / `RunReport.is_blocked` and
+    `Job.approvals_required` parse the server's refused-tool list
+    (`ApprovalRefusal`: tool, reason, grantable, and the exact `per_run` or
+    `persistent_grant` body that would allow the call). Verified in the model
+    suite and live against a booted server in the repo's
+    `tests/test_live_runs_e2e.py`. Treat `is_blocked` runs as not done.
+
 **Thin:** nothing. Every SDK behaviour above is implemented and tested at its
 stated boundary.
 
