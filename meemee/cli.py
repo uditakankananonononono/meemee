@@ -167,6 +167,40 @@ def account_export(principal: str, destination: Path) -> None:
     typer.echo(json.dumps(export_account(Settings().data_dir, principal, destination), indent=2))
 
 
+@app.command("account-delete")
+def account_delete(principal: str, yes: bool = typer.Option(False, "--yes", help="Confirm irreversible deletion")) -> None:
+    """Permanently delete every record Meemee stores for a principal (audit log retained)."""
+    if not yes:
+        raise typer.BadParameter("account deletion is irreversible; pass --yes to confirm")
+    from .account_deletion import build_account_purger
+    from .persistence import build_persistence
+    settings = Settings()
+    persistence = build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn)
+    try:
+        from .auth import TokenStore
+        TokenStore(settings.data_dir / "auth.sqlite3").disable_account(principal)
+        result = build_account_purger(settings, persistence).purge(principal, requested_by="cli")
+        AuditLog(settings.data_dir / "audit.sqlite3").append("cli", "account.purge", principal, "success", {"deletion_id": result["deletion_id"], "deleted": result["deleted"]})
+    finally:
+        persistence.close()
+    typer.echo(json.dumps(result, indent=2))
+
+
+@app.command("account-delete-resume")
+def account_delete_resume() -> None:
+    """Finish account deletions interrupted by a crash, and sweep abandoned job tombstones."""
+    from .account_deletion import build_account_purger
+    from .persistence import build_persistence
+    settings = Settings()
+    persistence = build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn)
+    try:
+        resumed = build_account_purger(settings, persistence).resume_incomplete()
+        swept = persistence.jobs.sweep_purges()
+    finally:
+        persistence.close()
+    typer.echo(json.dumps({"resumed": resumed, "tombstones_swept": swept}, indent=2))
+
+
 @app.command("account-import")
 def account_import(source: Path, target_principal: str | None = None) -> None:
     """Import a verified account export after collision preflight."""

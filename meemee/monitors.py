@@ -68,3 +68,11 @@ class MonitorStore:
     def events(self,owner_id,ident):
         with self.lock:rows=self.db.execute('SELECT sequence,kind,payload,created_at FROM monitor_events WHERE owner_id=? AND monitor_id=? ORDER BY sequence',(owner_id,ident)).fetchall()
         return [{**dict(row),'payload':json.loads(row['payload'])} for row in rows]
+
+    def delete_owner(self, owner_id: str) -> dict[str, int]:
+        """Hard-delete every monitor and monitor event owned by an account."""
+        if not owner_id: raise ValueError('owner is required')
+        with self.lock, self.db:
+            events = self.db.execute('DELETE FROM monitor_events WHERE owner_id=?', (owner_id,)).rowcount
+            monitors = self.db.execute('DELETE FROM monitors WHERE owner_id=?', (owner_id,)).rowcount
+        return {"monitors": monitors, "monitor_events": events}

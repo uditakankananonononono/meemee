@@ -62,3 +62,10 @@ class QuotaStore:
         row = self.db.execute("SELECT jobs FROM quota_usage WHERE principal=? AND day=?", (principal, day)).fetchone()
         used = int(row[0]) if row else 0
         return {"day": day, "used": used, "limit": maximum, "remaining": max(maximum-used, 0)}
+
+    def delete_principal(self, principal: str) -> dict[str, int]:
+        with self.lock, self.db:
+            usage = self.db.execute("DELETE FROM quota_usage WHERE principal=?", (principal,)).rowcount
+            limits = self.db.execute("DELETE FROM quota_limits WHERE principal=?", (principal,)).rowcount
+        return {"quota_usage": usage, "quota_limits": limits}
+

@@ -39,7 +39,7 @@ Nothing is classified as thin. A capability is either verified at a stated bound
 
 - Live WhatsApp/iMessage delivery over real provider networks: adapters and the delivery queue are implemented and config-gated, but no provider account exists to verify against. Console screens for the companion layer are not built; the surface is HTTP API, CLI, SDK and the console companion view.
 - Live PostgreSQL test run in this environment. Checksummed SQLite-to-PostgreSQL copy/import tooling is implemented.
-- Built-in account deletion covers customer identity and companion content; product-wide jobs/runs remain covered by the existing portable export and retention tools rather than immediate destructive deletion. External OIDC remains optional.
+- External OIDC remains optional.
 - Interactive browser human takeover after explicit challenge detection/handoff.
 - Forced interruption inside blocking third-party native code; async tools are interruptible.
 - Multi-region failover, online dual-write database migration and logical replication.
@@ -59,3 +59,7 @@ Before calling a release ready:
 - Email bridge: outbound task delivery is implemented through verified Resend configuration. Gmail reply ingestion is implemented but blocked on OAuth connection and has no live-read evidence yet.
 
 - Phase B personal-model v1 is complete: typed claims, evidence, conflicts/supersession, temporal expiry, bounded reflection, user correction, evidence view and confidence decay are implemented and tested.
+
+- Account deletion (branch pb4, unreleased): product-wide and resumable. Covers jobs/events, runs, agent memory, personal model, context, monitors, webhooks, quotas, plans, idempotency, tool approvals and companion content for built-in accounts (`DELETE /v1/account`), external principals (admin `DELETE /v1/admin/principals/{id}/data`) and operators (`meemee account-delete`). Evidence: `tests/test_account_deletion.py` 10 passed; `tests_pg/test_account_purge_pg.py` 2 passed against a live PostgreSQL 16 server; full core suite 354 passed including both wheel builds. Audit log retained by design.
+- Live PostgreSQL run (pb4, 2026-09-24): all 12 `tests_pg` tests pass with `MEEMEE_TEST_POSTGRES_DSN` set, after fixing `AuditLog.verify` to hash `occurred_at` in UTC (it failed on any server whose timezone is not UTC).
+
