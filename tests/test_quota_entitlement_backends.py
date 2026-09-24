@@ -95,15 +95,18 @@ def test_account_purger_uses_the_shared_stores(persistence, tmp_path):  # noqa: 
     assert purger.targets.quotas is persistence.quotas and purger.targets.entitlements is persistence.entitlements
 
 
-def test_account_export_and_import_refuse_postgresql_mode(monkeypatch, tmp_path):
+def test_account_export_and_import_in_postgresql_mode_never_touch_local_files(monkeypatch, tmp_path):
+    """PostgreSQL mode exports/imports the shared rows (tests_pg/test_operator_tools_pg.py and
+    tests/test_operator_tools_multihost_e2e.py); without a DSN it stops before any local read or write."""
     from typer.testing import CliRunner
 
     from meemee.cli import app
 
     monkeypatch.setenv("MEEMEE_PERSISTENCE_BACKEND", "postgresql")
     monkeypatch.setenv("MEEMEE_DATA_DIR", str(tmp_path))
+    monkeypatch.delenv("MEEMEE_POSTGRES_DSN", raising=False)
     runner = CliRunner()
     for args in (["account-export", "p", str(tmp_path / "out.json")], ["account-import", str(tmp_path / "in.json")]):
         result = runner.invoke(app, args)
-        assert result.exit_code == 2 and "SQLite data directories only" in result.output
-    assert not (tmp_path / "out.json").exists()
+        assert result.exit_code == 2 and "MEEMEE_POSTGRES_DSN" in result.output
+    assert sorted(p.name for p in tmp_path.iterdir()) == []
