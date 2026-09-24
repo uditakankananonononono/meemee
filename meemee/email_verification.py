@@ -65,6 +65,10 @@ class EmailVerificationStore:
             )
         return raw
 
+    def ping(self) -> bool:
+        with self.lock:
+            return self.db.execute("SELECT 1").fetchone() is not None
+
     def consume_password_reset(self, account_id: str, raw: str) -> bool:
         now = datetime.now(timezone.utc).isoformat()
         digest = hashlib.sha256(raw.encode()).digest()
@@ -77,8 +81,9 @@ class EmailVerificationStore:
 
 
 class ResendMailer:
-    def __init__(self, api_key: str | None, from_address: str, public_url: str):
+    def __init__(self, api_key: str | None, from_address: str, public_url: str, api_url: str = "https://api.resend.com"):
         self.api_key, self.from_address, self.public_url = api_key, from_address, public_url.rstrip("/")
+        self.api_url = api_url.rstrip("/")
 
     @property
     def configured(self) -> bool:
@@ -88,7 +93,7 @@ class ResendMailer:
         if not self.configured:
             raise RuntimeError("transactional email is not configured")
         response = httpx.post(
-            "https://api.resend.com/emails",
+            f"{self.api_url}/emails",
             headers={"Authorization": f"Bearer {self.api_key}"},
             json={k: v for k, v in {"from": self.from_address, "to": [recipient], "subject": subject, "html": html, "reply_to": reply_to}.items() if v},
             timeout=15,

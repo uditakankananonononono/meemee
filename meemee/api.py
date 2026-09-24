@@ -28,7 +28,7 @@ from .companion.api import build_companion_router
 from .companion.runtime import build_companion
 from .config import Settings
 from .context import ContextStore
-from .email_verification import EmailVerificationStore, ResendMailer
+from .email_verification import ResendMailer
 from .entitlements import EntitlementStore, public_catalog
 from .health import ReadinessChecker
 from .idempotency import IdempotencyConflict, IdempotencyStore
@@ -122,8 +122,8 @@ idempotency = IdempotencyStore(settings.data_dir / "idempotency.sqlite3")
 quotas = QuotaStore(settings.data_dir / "quotas.sqlite3", settings.default_daily_jobs)
 entitlements = EntitlementStore(settings.data_dir / "entitlements.sqlite3", settings.default_plan)
 tokens = persistence.tokens  # PostgreSQL mode: shared by every API host
-email_verifications = EmailVerificationStore(settings.data_dir / "email-verifications.sqlite3")
-mailer = ResendMailer(settings.resend_api_key, settings.email_from_address, settings.public_url)
+email_verifications = persistence.email_verifications  # PostgreSQL mode: links work on every host
+mailer = ResendMailer(settings.resend_api_key, settings.email_from_address, settings.public_url, settings.resend_api_url)
 personal_model = PersonalModelStore(settings.data_dir / "personal-model.sqlite3")
 monitors = MonitorStore(settings.data_dir / "monitors.sqlite3")
 audit = persistence.audit  # PostgreSQL mode: one global chain for every host
