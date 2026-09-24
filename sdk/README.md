@@ -204,6 +204,12 @@ package and exercise it end to end):**
     budget and backoff, connection refused, and socket close when the consumer
     stops early (scripted server); replay, resume, following a job while it is
     cancelled, and 4401/4403/4404 rejections over real sockets (live).
+16. Token introspection, `tokens.introspect(raw_token)` (sync and async):
+    the secret is sent only in the POST body, never the URL; active, revoked,
+    expired, unknown and bootstrap states parse into `TokenIntrospection`;
+    introspection leaves `last_used_at` untouched while real use updates it;
+    non-admin callers get `PermissionDeniedError(missing_scope="admin")`; the
+    audit chain records the call without the secret (mocked + live).
 
 The live suite lives in `tests/test_live_integration.py`; it boots uvicorn
 against the `meemee` package next to `sdk/` and skips cleanly when that
@@ -223,6 +229,5 @@ stated boundary.
 - Interactive OIDC browser login - owned by the server's `/auth/login`.
 - An asyncio-native OIDC client-credentials provider - async clients run the
   existing provider in a worker thread instead.
-- Token introspection (inspecting an arbitrary token's claims) - the server
-  does not expose it. Token and job listing are implemented
-  (`tokens.list`/`iter_all`, `jobs.list`/`iter_all`).
+- Self-service introspection for non-admin callers - `/v1/tokens/introspect`
+  is admin-only. Customers see their own tokens through the account token list.
