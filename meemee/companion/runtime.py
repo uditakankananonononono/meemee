@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from ..config import Settings
 from ..context import ContextStore
 from ..llm import OpenAICompatibleModel
+from ..model_profiles import RoutedModel, build_role_model
 from ..personal_model import PersonalModelStore
 from .channels import build_channels
 from .engine import CompanionEngine
@@ -16,7 +17,7 @@ class Companion:
     store: CompanionStore
     engine: CompanionEngine
     channels: dict
-    model: OpenAICompatibleModel
+    model: OpenAICompatibleModel | RoutedModel
 
 
 def build_companion(settings: Settings | None = None, store: CompanionStore | None = None) -> Companion:
@@ -25,13 +26,7 @@ def build_companion(settings: Settings | None = None, store: CompanionStore | No
     companion_store = store or CompanionStore(settings.data_dir / "companion.sqlite3")
     context_store = ContextStore(settings.data_dir / "context.sqlite3")
     personal_model = PersonalModelStore(settings.data_dir / "personal-model.sqlite3")
-    model = OpenAICompatibleModel(
-        settings.model_base_url,
-        settings.model_name,
-        settings.model_api_key,
-        settings.request_timeout,
-        settings.model_max_attempts,
-    )
+    model = build_role_model(settings, "chat")
     engine = CompanionEngine(
         model,
         companion_store,

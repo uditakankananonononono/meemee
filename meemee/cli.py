@@ -34,6 +34,97 @@ from .worker import work_forever
 
 app = typer.Typer(no_args_is_help=True, help="Meemee local-first agent runtime")
 app.add_typer(companion_app, name="companion")
+models_app = typer.Typer(no_args_is_help=True, help="Model profiles and routing (local, Inkling, Fugu, custom)")
+app.add_typer(models_app, name="models")
+
+
+@models_app.command("list")
+def models_list() -> None:
+    """Show every model profile, whether it is usable, and the active routes."""
+    from .model_profiles import ModelCatalog
+
+    catalog = ModelCatalog.from_settings(Settings())
+    typer.echo(json.dumps({
+        "allow_paid_models": catalog.allow_paid,
+        "routes": catalog.routes,
+        "profiles": [p.public_dict(catalog.allow_paid) for p in catalog.profiles.values()],
+    }, indent=2))
+
+
+@models_app.command("check")
+def models_check(name: list[str] = typer.Argument(None)) -> None:  # noqa: B008
+    """Probe each profile's /models endpoint without spending tokens."""
+    from .model_profiles import ModelCatalog, probe_profile
+
+    catalog = ModelCatalog.from_settings(Settings())
+    targets = name or list(catalog.profiles)
+    unknown = [n for n in targets if n not in catalog.profiles]
+    if unknown:
+        raise typer.BadParameter(f"unknown profiles: {', '.join(unknown)}")
+
+    async def _probe() -> list[dict]:
+        out = []
+        for n in targets:
+            profile = catalog.profiles[n]
+            reason = profile.unavailable_reason(catalog.allow_paid)
+            out.append({"name": n, "reachable": False, "skipped": reason} if reason else await probe_profile(profile))
+        return out
+
+    results = asyncio.run(_probe())
+    typer.echo(json.dumps(results, indent=2))
+    if not any(r.get("reachable") for r in results):
+        raise typer.Exit(1)
+
+
+@models_app.command("inkling-local")
+def models_inkling_local(
+    plan: str = typer.Option("auto", help="auto or one of: vllm-nvfp4, vllm-bf16, llamacpp-q4, llamacpp-q3, llamacpp-q2"),
+    model_dir: Path = typer.Option(Path("models/inkling-small"), help="Where GGUF weights live"),  # noqa: B008
+    port: int = 8000,
+    run: bool = typer.Option(False, "--run", help="Download weights if needed and start the server"),
+    force: bool = typer.Option(False, "--force", help="Start even if this machine is below the floor"),
+) -> None:
+    """Check this machine against Inkling-Small's hardware floor and print or run the exact server command."""
+    import os
+    import subprocess
+
+    from .inkling_local import (
+        PLANS,
+        VLLM_ENV,
+        assess,
+        detect_hardware,
+        download_command,
+        gaps,
+        launch_command,
+    )
+
+    hw = detect_hardware(model_dir)
+    report = assess(hw)
+    chosen = report["recommended"] if plan == "auto" else plan
+    if chosen is not None and chosen not in PLANS:
+        raise typer.BadParameter(f"unknown plan {plan!r}")
+    if chosen is None and plan == "auto":
+        chosen = "llamacpp-q2" if force else None
+    if chosen:
+        report["plan"] = chosen
+        report["plan_gaps"] = gaps(PLANS[chosen], hw)
+        report["download"] = download_command(chosen, str(model_dir))
+        report["launch"] = launch_command(chosen, hw, port, str(model_dir))
+        report["meemee_env"] = {
+            "MEEMEE_INKLING_BASE_URL": f"http://127.0.0.1:{port}/v1",
+            "MEEMEE_MODEL_ROUTES": "agent=inkling-vllm,inkling,local;chat=inkling-vllm,inkling,local",
+        }
+    typer.echo(json.dumps(report, indent=2))
+    if not run:
+        return
+    if not chosen or (report["plan_gaps"] and not force):
+        typer.echo("Refusing to start: this machine is below the floor for that plan (use --force to try anyway).", err=True)
+        raise typer.Exit(2)
+    env = {**os.environ, **(VLLM_ENV if PLANS[chosen].engine == "vllm" else {})}
+    if report["download"] and not any(model_dir.glob("**/*.gguf")):
+        subprocess.run(report["download"], check=True, env=env)
+    raise typer.Exit(subprocess.run(report["launch"], env=env, check=False).returncode)
+# end models commands
 DEFAULT_DATA_DIR = Path.home() / ".meemee"
 DEFAULT_ENV_FILE = Path(".env")
 DATA_DIR_OPTION = typer.Option(DEFAULT_DATA_DIR, "--data-dir")

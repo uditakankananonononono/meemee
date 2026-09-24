@@ -2,6 +2,13 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.118.0
+
+- Added named model profiles and per-role routing (`MEEMEE_MODEL_ROUTES`, `MEEMEE_MODEL_PROFILES`) with ordered fallback and per-attempt records. The agent, companion chat and personal-model reflection each resolve their own role. With no routing config, behavior is unchanged (local only).
+- Added Inkling via the Hugging Face router (`inkling`, `inkling-large`; `MEEMEE_HF_TOKEN`) and self-hosted Inkling-Small (`inkling-vllm`) with `meemee models inkling-local` hardware checks, exact vLLM/llama.cpp commands and `deploy/inkling/serve-inkling.sh`.
+- Added optional Sakana Fugu (paid; requires key and `MEEMEE_ALLOW_PAID_MODELS=true`). "Ultron" is not built in: no single model by that name exists; custom profiles cover any specific checkpoint.
+- Added `meemee models list|check`, docs/models.md and deploy/inkling/README.md.
+
 ## 0.117.0
 
 - Completed the personal-model v1 with user correction provenance, owner-scoped evidence inspection and confidence decay for stale inferred claims.
