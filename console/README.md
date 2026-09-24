@@ -24,12 +24,19 @@ current documented HTTP surface.
   in-browser recomputation** of the whole SHA-256 chain (genesis `0`*64,
   `\x1f`-joined fields, canonical `json.dumps(sort_keys, separators)` metadata)
   using WebCrypto. Filters and JSON export.
-- **Companion** - companion user creation and selection, full persona editing
+- **Companion** - companion user creation and selection, a profile editor
+  (display name and IANA timezone, resending persona and check-in settings so a
+  save never resets them), full persona editing
   (name, tone, language, emoji, style rules, custom instructions), durable fact
-  search/add/retire with provenance shown, a working chat box on the local
-  channel (history rendered, Enter to send, learned-fact notice), and proactive
-  check-in settings (enable, cadence, quiet hours, channel, address) with
-  on-demand planning and a recent-delivery table. Mutations confirm first.
+  search/add/retire with provenance shown, a conversations browser (every
+  conversation across local/WhatsApp/iMessage/webhook channels, timestamped
+  history, "show older" paging, chat on the local channel with Enter to send and
+  a learned-fact notice), and proactive check-in settings (enable, cadence,
+  quiet hours, channel, address) with on-demand planning, a check-in queue with
+  status filter and per-status counts, and an admin "Deliver due now" run over
+  `POST /v1/companion/checkins/tick`. Mutations confirm first. Covered by a
+  headless Chromium test against a live server
+  (`tests/test_console_companion_browser.py`).
 - **Session** - OIDC interactive login (`GET /auth/login`), logout
   (`POST /auth/logout`), or a pasted bearer token (bootstrap, `mee_…` scoped,
   or OIDC access token) kept in sessionStorage by default.

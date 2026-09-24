@@ -64,7 +64,31 @@ export async function renderCompanion(root) {
       reportError(error, "could not load user");
       return;
     }
-    detail.append(personaCard(user), factsCard(user), chatCard(user), checkinsCard(user));
+    detail.append(profileCard(user), personaCard(user), factsCard(user), conversationsCard(user), checkinsCard(user));
+  }
+
+  function profileCard(user) {
+    const card = h("section", { class: "card", "data-testid": "companion-profile" }, h("h2", null, "Profile"));
+    const name = h("input", { class: "input", name: "profile-display-name", value: user.display_name, maxlength: 120 });
+    const tz = h("input", { class: "input", name: "profile-timezone", value: user.timezone || "UTC", maxlength: 60 });
+    const meta = h("p", { class: "muted small" }, `created ${fullTime(user.created_at)} · updated ${fullTime(user.updated_at)}`);
+    card.append(
+      field("Display name", name), field("Timezone (IANA)", tz), meta,
+      h("button", { class: "button", type: "button", "data-testid": "save-profile", onclick: async () => {
+        const displayName = name.value.trim();
+        const timezone = tz.value.trim() || "UTC";
+        if (!displayName) { toast("Display name is required.", "warn"); return; }
+        if (!window.confirm(`Save profile for ${user.user_id}? Quiet hours and check-in times follow the timezone.`)) return;
+        try {
+          // PUT /users/{id} replaces the whole profile, so resend the current persona and check-ins unchanged.
+          await api.upsertCompanionUser(user.user_id, {
+            display_name: displayName, timezone, persona: user.persona, checkins: user.checkins,
+          });
+          toast("Profile saved.", "ok");
+          await selectUser(user.user_id);
+        } catch (error) { reportError(error, "profile save failed"); }
+      } }, "Save profile"));
+    return card;
   }
 
   function personaCard(user) {
@@ -149,38 +173,75 @@ export async function renderCompanion(root) {
     return card;
   }
 
-  function chatCard(user) {
-    const card = h("section", { class: "card" }, h("h2", null, "Chat (local channel)"));
-    const logBox = h("div", { class: "chat-log" });
-    const input = h("input", { class: "input", placeholder: `message ${user.display_name}'s companion…`, maxlength: 8000 });
+  function conversationsCard(user) {
+    const card = h("section", { class: "card", "data-testid": "companion-conversations" }, h("h2", null, "Conversations"));
+    const listBox = h("div", { class: "row", style: "flex-wrap:wrap;gap:0.4rem" });
+    const header = h("p", { class: "muted small" });
+    const logBox = h("div", { class: "chat-log", "data-testid": "conversation-log" });
+    const input = h("input", { class: "input", name: "chat-input", placeholder: `message ${user.display_name}'s companion…`, maxlength: 8000 });
+    let conversations = [];
+    let limit = 100;
+    async function reloadList() {
+      clear(listBox);
+      try {
+        conversations = (await api.listCompanionConversations(user.user_id)).conversations;
+      } catch (error) { reportError(error, "conversation listing failed"); return; }
+      if (!conversations.length) {
+        listBox.append(h("p", { class: "muted" }, "No conversations yet. Send the first message below."));
+        state.conversationId = null;
+        clear(logBox); header.textContent = "";
+        return;
+      }
+      if (!conversations.some((c) => c.id === state.conversationId)) state.conversationId = conversations[0].id;
+      for (const conversation of conversations) {
+        listBox.append(h("button", {
+          class: `button ${conversation.id === state.conversationId ? "" : "button-quiet"}`,
+          type: "button", "data-conversation-id": conversation.id,
+          onclick: () => { state.conversationId = conversation.id; limit = 100; reloadList(); },
+        }, `${conversation.channel} · ${fullTime(conversation.last_message_at)}`));
+      }
+      await reloadLog();
+    }
     async function reloadLog() {
       clear(logBox);
+      const current = conversations.find((c) => c.id === state.conversationId);
+      if (!current) return;
+      header.textContent = `${current.channel} conversation ${current.id} · started ${fullTime(current.created_at)}`;
+      let messages;
       try {
-        const conversations = (await api.listCompanionConversations(user.user_id)).conversations;
-        if (!conversations.length) { logBox.append(h("p", { class: "muted" }, "No conversation yet. Send the first message.")); return; }
-        state.conversationId = conversations[0].id;
-        const messages = (await api.getCompanionMessages(state.conversationId)).messages;
-        for (const message of messages) {
-          logBox.append(h("p", { class: message.role === "user" ? "chat-user" : "chat-assistant" },
-            h("strong", null, `${message.role}: `), message.content));
-        }
-      } catch (error) { reportError(error, "history load failed"); }
+        messages = (await api.getCompanionMessages(current.id, limit)).messages;
+      } catch (error) { reportError(error, "history load failed"); return; }
+      if (messages.length >= limit) {
+        logBox.append(h("button", { class: "button button-quiet", type: "button", "data-testid": "load-older", onclick: () => {
+          limit = Math.min(limit * 2, 2000); reloadLog();
+        } }, "Show older messages"));
+      }
+      if (!messages.length) logBox.append(h("p", { class: "muted" }, "No messages in this conversation."));
+      for (const message of messages) {
+        logBox.append(h("p", { class: message.role === "user" ? "chat-user" : "chat-assistant", "data-role": message.role },
+          h("span", { class: "muted small" }, `${fullTime(message.created_at)} `),
+          h("strong", null, `${message.role}: `), message.content));
+      }
     }
     async function send() {
       const text = input.value.trim();
       if (!text) return;
+      const current = conversations.find((c) => c.id === state.conversationId);
+      // The console speaks on the local channel only; replies to other channels stay with their adapters.
+      const target = current && current.channel === "local" ? current.id : null;
       input.value = "";
       try {
-        const reply = await api.companionChat(user.user_id, text, state.conversationId);
+        const reply = await api.companionChat(user.user_id, text, target);
         state.conversationId = reply.conversation_id;
-        await reloadLog();
+        await reloadList();
         if (reply.facts_learned > 0) toast(`Learned ${reply.facts_learned} new fact(s).`, "info");
       } catch (error) { reportError(error, "chat failed"); }
     }
     input.addEventListener("keydown", (event) => { if (event.key === "Enter") send(); });
-    card.append(logBox, h("div", { class: "row" }, input,
-      h("button", { class: "button", type: "button", onclick: send }, "Send")));
-    reloadLog();
+    card.append(listBox, header, logBox,
+      h("p", { class: "muted small" }, "Messages you send here go on the local channel. A WhatsApp, iMessage or webhook conversation opens as history only."),
+      h("div", { class: "row" }, input, h("button", { class: "button", type: "button", onclick: send }, "Send")));
+    reloadList();
     return card;
   }
 
@@ -195,15 +256,22 @@ export async function renderCompanion(root) {
       ...["local", "webhook", "whatsapp", "imessage"].map((value) =>
         h("option", { value, selected: value === prefs.channel }, value)));
     const address = h("input", { class: "input", placeholder: "delivery address (webhook URL / phone); empty = local conversation", value: prefs.address || "" });
-    const listBox = h("div");
+    const listBox = h("div", { "data-testid": "checkin-queue" });
+    const statusFilter = h("select", { class: "input", name: "checkin-status", onchange: () => reloadCheckins() },
+      ...["", "queued", "running", "done", "failed", "cancelled"].map((value) =>
+        h("option", { value }, value || "all statuses")));
     async function reloadCheckins() {
       clear(listBox);
       try {
-        const rows = (await api.listCompanionCheckins(user.user_id)).checkins;
+        const rows = (await api.listCompanionCheckins(user.user_id, statusFilter.value || null)).checkins;
+        const counts = {};
+        for (const row of rows) counts[row.status] = (counts[row.status] || 0) + 1;
+        listBox.append(h("p", { class: "muted small", "data-testid": "checkin-counts" },
+          rows.length ? Object.entries(counts).map(([k, v]) => `${k}: ${v}`).join(" · ") : ""));
         if (!rows.length) { listBox.append(h("p", { class: "muted" }, "No check-ins recorded.")); return; }
         const table = h("table", { class: "table" },
           h("tr", null, h("th", null, "due"), h("th", null, "status"), h("th", null, "channel"), h("th", null, "detail")));
-        for (const row of rows.slice(0, 10)) {
+        for (const row of rows) {
           table.append(h("tr", null,
             h("td", null, fullTime(row.due_at)),
             h("td", null, badge(row.status, row.status === "done" ? "ok" : row.status === "failed" ? "bad" : "muted")),
@@ -247,7 +315,18 @@ export async function renderCompanion(root) {
             toast(`Next check-in queued for ${fullTime(planned.due_at)}.`, "ok");
             reloadCheckins();
           } catch (error) { reportError(error, "planning failed"); }
-        } }, "Plan next now")),
+        } }, "Plan next now"),
+        h("button", { class: "button button-quiet", type: "button", "data-testid": "deliver-due", onclick: async () => {
+          if (!window.confirm("Deliver every due check-in for all users now? This needs the admin scope and sends on each user's configured channel.")) return;
+          try {
+            const result = await api.tickCompanionCheckins();
+            const sent = result.deliveries.filter((d) => d.delivered).length;
+            toast(`Planned ${result.planned}; processed ${result.deliveries.length} due check-in(s), ${sent} delivered.`, "ok");
+            reloadCheckins();
+          } catch (error) { reportError(error, "delivery run failed (admin scope required)"); }
+        } }, "Deliver due now")),
+      h("h3", null, "Queue"),
+      field("Filter", statusFilter),
       listBox);
     reloadCheckins();
     return card;
