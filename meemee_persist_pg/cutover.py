@@ -50,18 +50,21 @@ SPECS={
              TableSpec("personal_evidence","meemee_personal_evidence",("id","item_id","owner_id","source_id","source_record_id","observed_value","confidence","observed_at"),("id",))),
  "context":(TableSpec("context_sources","meemee_context_sources",("owner_id","source_id","connector","config","permission","cursor","created_at","updated_at"),("owner_id","source_id")),
             TableSpec("context_records","meemee_context_records",("id","owner_id","source_id","external_id","content_hash","kind","title","content","occurred_at","provenance","visibility","cursor","metadata","ingested_at"),("id",))),
+ "monitors":(TableSpec("monitors","meemee_monitors",("id","owner_id","name","source_id","predicate","deadline","max_fires","fire_count","status","created_at","updated_at"),("id",)),
+             TableSpec("monitor_events","meemee_monitor_events",("sequence","monitor_id","owner_id","kind","payload","created_at"),("sequence",))),
+ "reflection":(TableSpec("reflection_runs","meemee_reflection_runs",("owner_id","watermark","last_attempt_at","last_success_at","last_status","last_result"),("owner_id",)),),
  "approvals":(TableSpec("tool_approvals","meemee_tool_approvals",("principal","tool","granted_at","expires_at","revoked_at","granted_by","argument_constraints"),("principal","tool")),),
 }
 # Groups an operator may leave out of a cutover. approvals.sqlite3 only exists once a grant was made,
 # and older cutover invocations predate it; when given, it is copied and verified like every other group.
-OPTIONAL_GROUPS=frozenset({"approvals","email","quotas","entitlements","runs","idempotency","webhooks","companion","personal","context"})
+OPTIONAL_GROUPS=frozenset({"approvals","email","quotas","entitlements","runs","idempotency","webhooks","companion","personal","context","monitors","reflection"})
 NOT_NULL_JSON={"response"}
 JSON_COLUMNS={"metadata","document","result","payload","argument_constraints","tool_results","approvals_required","response"}
 UUID_COLUMNS={"id","plan_id","job_id"}
 _DATE_ONLY=re.compile(r"\d{4}-\d{2}-\d{2}")
-IDENTITY_TARGETS={"meemee_memories","meemee_job_events","meemee_audit_log","meemee_webhook_attempts","meemee_companion_facts","meemee_companion_messages","meemee_personal_evidence","meemee_context_records"}
+IDENTITY_TARGETS={"meemee_memories","meemee_job_events","meemee_audit_log","meemee_webhook_attempts","meemee_companion_facts","meemee_companion_messages","meemee_personal_evidence","meemee_context_records","meemee_monitor_events"}
 # Webhook payloads are signed byte-for-byte, so they stay text; SQLite 0/1 flags become booleans.
-TEXT_PAYLOAD_TARGETS={"meemee_webhook_deliveries","meemee_context_records"}
+TEXT_PAYLOAD_TARGETS={"meemee_webhook_deliveries","meemee_context_records","meemee_monitor_events"}
 BOOL_COLUMNS={("meemee_webhook_subscriptions","active")}
 
 @contextmanager
@@ -154,7 +157,7 @@ class Cutover:
                 changed=[name for name,conn in src.items() if conn.execute("PRAGMA data_version").fetchone()[0] != versions[name]]
                 if changed: raise RuntimeError(f"SQLite writers were active during copy: {changed}; PostgreSQL copy rolled back")
                 for table in IDENTITY_TARGETS:
-                    column="sequence" if table in {"meemee_job_events","meemee_audit_log"} else "id"
+                    column="sequence" if table in {"meemee_job_events","meemee_audit_log","meemee_monitor_events"} else "id"
                     target.execute("SELECT setval(pg_get_serial_sequence(%s,%s),COALESCE((SELECT max("+column+") FROM "+table+"),1),EXISTS(SELECT 1 FROM "+table+"))",(table,column))
         return copied
 

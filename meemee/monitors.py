@@ -24,6 +24,8 @@ class MonitorStore:
     def __init__(self,path:Path):
         path.parent.mkdir(parents=True,exist_ok=True);self.db=sqlite3.connect(path,check_same_thread=False);self.db.row_factory=sqlite3.Row;self.lock=threading.RLock()
         with self.lock,self.db:self.db.executescript('''PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS monitors(id TEXT PRIMARY KEY,owner_id TEXT NOT NULL,name TEXT NOT NULL,source_id TEXT NOT NULL,predicate TEXT NOT NULL,deadline TEXT,max_fires INTEGER NOT NULL,fire_count INTEGER NOT NULL DEFAULT 0,status TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL); CREATE INDEX IF NOT EXISTS monitors_owner_status ON monitors(owner_id,status,deadline); CREATE TABLE IF NOT EXISTS monitor_events(sequence INTEGER PRIMARY KEY AUTOINCREMENT,monitor_id TEXT NOT NULL,owner_id TEXT NOT NULL,kind TEXT NOT NULL,payload TEXT NOT NULL,created_at TEXT NOT NULL); CREATE INDEX IF NOT EXISTS monitor_events_item ON monitor_events(owner_id,monitor_id,sequence);''')
+    def ping(self)->bool:
+        with self.lock:return self.db.execute('SELECT 1').fetchone() is not None
     def create(self,owner_id:str,item:MonitorInput)->dict:
         if not owner_id:raise ValueError('owner is required')
         ident=uuid.uuid4().hex;now=datetime.now(timezone.utc).isoformat();predicate={'field':item.field,'operator':item.operator,'expected':item.expected}
