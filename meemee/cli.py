@@ -486,7 +486,10 @@ def webhook_worker() -> None:
     """Run the durable signed-webhook dispatcher."""
     settings = Settings()
     check_private_hosts_override("webhook-worker")  # raises when MEEMEE_ENV=production
-    store = WebhookStore(
+    from .persistence import persistence_from_settings
+
+    persistence = persistence_from_settings(settings)  # PostgreSQL mode: dispatch the shared outbox
+    store = persistence.webhooks or WebhookStore(
         settings.data_dir / "webhooks.sqlite3",
         settings.webhook_max_payload_bytes,
         settings.vault_key,
