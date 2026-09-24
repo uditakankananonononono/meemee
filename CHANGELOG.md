@@ -16,6 +16,14 @@ All entries describe shipped repository behavior. Missing work is never presente
 - Cutover: optional `approvals` group (`--approvals approvals.sqlite3`) copies and verifies existing grants. Fixed `copy` for non-empty stores: psycopg 3 has no `Connection.executemany` (now a cursor), and decoded JSON columns are inserted as jsonb.
 - Tests: `tests/test_approvals.py` on both backends, `tests/test_approvals_multihost_e2e.py` (two API servers + worker with separate data directories), `tests_pg/test_approvals_cutover_pg.py`.
 
+## Unreleased (branch pg-quotas-entitlements)
+
+- `meemee_persist_pg.QuotaStore` and `EntitlementStore` (migration `007_quotas_entitlements.sql`), same contracts as SQLite plus `ping`; `build_persistence` returns `quotas` and `entitlements` and the API, `account-delete` and readiness use them.
+- `persistence_from_settings(settings)` passes `default_daily_jobs` and `default_plan`; the API, worker, CLI and reflection worker use it.
+- Cutover: optional `quotas` and `entitlements` groups; calendar-date columns are compared as dates (a `YYYY-MM-DD` string used to be parsed as local midnight and shifted).
+- `meemee account-export` and `account-import` exit 2 in PostgreSQL mode (they read SQLite files directly).
+- `QuotaStoreInterface` and `EntitlementStoreInterface` added.
+
 ## Unreleased (branch pg-email-verification)
 
 - `meemee_persist_pg.EmailVerificationStore` (same contract as the SQLite store, plus `ping`) on the existing migration-003 tables; `build_persistence` returns `email_verifications` and the API uses it, so verification and reset links work on every host in PostgreSQL mode.

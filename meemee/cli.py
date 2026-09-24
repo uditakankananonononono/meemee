@@ -280,9 +280,18 @@ def db_migrate() -> None:
     typer.echo(json.dumps({"applied": applied}))
 
 
+def _refuse_in_postgresql_mode(command: str) -> None:
+    """Export/import read and write the local SQLite files directly. In PostgreSQL mode jobs, plans
+    (and, as they move, runs) live in the database, so the local files are stale or empty."""
+    if Settings().persistence_backend.strip().lower() == "postgresql":
+        typer.echo(f"{command} works on SQLite data directories only; in PostgreSQL mode it would read stale local files", err=True)
+        raise typer.Exit(2)
+
+
 @app.command("account-export")
 def account_export(principal: str, destination: Path) -> None:
     """Export account-owned jobs, runs and entitlement metadata with checksum."""
+    _refuse_in_postgresql_mode("account-export")
     typer.echo(json.dumps(export_account(Settings().data_dir, principal, destination), indent=2))
 
 
@@ -292,9 +301,9 @@ def account_delete(principal: str, yes: bool = typer.Option(False, "--yes", help
     if not yes:
         raise typer.BadParameter("account deletion is irreversible; pass --yes to confirm")
     from .account_deletion import build_account_purger
-    from .persistence import build_persistence
+    from .persistence import persistence_from_settings
     settings = Settings()
-    persistence = build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn)
+    persistence = persistence_from_settings(settings)
     try:
         persistence.tokens.disable_account(principal)
         result = build_account_purger(settings, persistence).purge(principal, requested_by="cli")
@@ -308,9 +317,9 @@ def account_delete(principal: str, yes: bool = typer.Option(False, "--yes", help
 def account_delete_resume() -> None:
     """Finish account deletions interrupted by a crash, and sweep abandoned job tombstones."""
     from .account_deletion import build_account_purger
-    from .persistence import build_persistence
+    from .persistence import persistence_from_settings
     settings = Settings()
-    persistence = build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn)
+    persistence = persistence_from_settings(settings)
     try:
         resumed = build_account_purger(settings, persistence).resume_incomplete()
         swept = persistence.jobs.sweep_purges()
@@ -322,6 +331,7 @@ def account_delete_resume() -> None:
 @app.command("account-import")
 def account_import(source: Path, target_principal: str | None = None) -> None:
     """Import a verified account export after collision preflight."""
+    _refuse_in_postgresql_mode("account-import")
     typer.echo(json.dumps(import_account(Settings().data_dir, source, target_principal), indent=2))
 
 

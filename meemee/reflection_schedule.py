@@ -121,7 +121,7 @@ async def reflect_due_once(
 async def reflection_forever(settings: Any | None = None) -> None:
     from .config import Settings
     from .model_profiles import build_role_model
-    from .persistence import build_persistence
+    from .persistence import persistence_from_settings
 
     settings = settings or Settings()
     if settings.reflection_interval_minutes <= 0:
@@ -129,7 +129,7 @@ async def reflection_forever(settings: Any | None = None) -> None:
     context = ContextStore(settings.data_dir / "context.sqlite3")
     personal = PersonalModelStore(settings.data_dir / "personal-model.sqlite3")
     schedule = ReflectionSchedule(settings.data_dir / "reflection-schedule.sqlite3")
-    persistence = build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn)
+    persistence = persistence_from_settings(settings)
     audit = persistence.audit  # PostgreSQL mode: the shared global chain
     model = build_role_model(settings, "reflection")
     interval = timedelta(minutes=settings.reflection_interval_minutes)
