@@ -31,7 +31,7 @@ from .entitlements import public_catalog
 from .health import ReadinessChecker
 from .idempotency import IdempotencyConflict
 from .model_profiles import ModelCatalog, build_role_model, probe_profile, uses_routing
-from .monitors import MonitorInput, MonitorStore
+from .monitors import MonitorInput
 from .observability import (
     AGENT_RUNS,
     JOBS_CREATED,
@@ -49,7 +49,6 @@ from .personal_model import PersonalItemInput
 from .quotas import QuotaExceeded
 from .rate_limit import RateLimitMiddleware, SQLiteRateLimiter
 from .reflection import PersonalModelReflector
-from .reflection_schedule import ReflectionSchedule
 from .runtime import build_agent
 from .shutdown import RunGate
 from .streaming import job_event_stream
@@ -122,7 +121,7 @@ tokens = persistence.tokens  # PostgreSQL mode: shared by every API host
 email_verifications = persistence.email_verifications  # PostgreSQL mode: links work on every host
 mailer = ResendMailer(settings.resend_api_key, settings.email_from_address, settings.public_url, settings.resend_api_url)
 personal_model = persistence.personal_model  # PostgreSQL mode: shared personal model
-monitors = MonitorStore(settings.data_dir / "monitors.sqlite3")
+monitors = persistence.monitors  # PostgreSQL mode: shared by every host
 audit = persistence.audit  # PostgreSQL mode: one global chain for every host
 approvals = persistence.approvals  # PostgreSQL mode: shared with every worker, not local disk
 check_private_hosts_override("api")  # raises when MEEMEE_ENV=production
@@ -134,7 +133,7 @@ account_purger = AccountPurger(PurgeTargets(
     entitlements=entitlements, approvals=approvals, monitors=monitors, personal_model=personal_model,
     context=persistence.context, webhooks=webhooks, companion=companion.store,
     browser_sessions=browser_sessions.store, browser_notices=browser_sessions.notices,
-    reflection_schedule=ReflectionSchedule(settings.data_dir / "reflection-schedule.sqlite3"),
+    reflection_schedule=persistence.reflection_schedule,
 ), deletion_ledger)
 for _resumed in account_purger.resume_incomplete():
     log.warning("resumed interrupted account deletion", extra={"deletion_id": _resumed["deletion_id"]})
@@ -153,7 +152,7 @@ if any(web_values):
         raise RuntimeError("interactive login requires complete OIDC and web-login configuration")
     web_login = WebLogin(WebLoginConfig(*web_values), oidc)
 auth = Authenticator(tokens, settings.api_token, oidc, web_login.authenticate_session if web_login else None)
-readiness = ReadinessChecker(settings.data_dir, {"memory": persistence.check_memory, "jobs": persistence.check_jobs, "runs": runs.ping, "tokens": tokens.ping, "entitlements": entitlements.ping, "webhooks": webhooks.ping, "companion": companion.store.ping, "personal_model": personal_model.ping, "context": persistence.context.ping}, settings.model_base_url, settings.readiness_min_free_bytes, require_model=settings.readiness_require_model)
+readiness = ReadinessChecker(settings.data_dir, {"memory": persistence.check_memory, "jobs": persistence.check_jobs, "runs": runs.ping, "tokens": tokens.ping, "entitlements": entitlements.ping, "webhooks": webhooks.ping, "companion": companion.store.ping, "personal_model": personal_model.ping, "context": persistence.context.ping, "monitors": monitors.ping, "reflection_schedule": persistence.reflection_schedule.ping}, settings.model_base_url, settings.readiness_min_free_bytes, require_model=settings.readiness_require_model)
 jobs_write_auth = auth.dependency("jobs:write")
 jobs_write_dependency = Depends(jobs_write_auth)
 runs_write_dependency = Depends(auth.dependency("runs:write"))
