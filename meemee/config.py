@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     inkling_api_key: str | None = None
     fugu_api_key: str | None = None
     fugu_model: str = "fugu-ultra"  # Sakana alias that tracks the latest Fugu Ultra (v1.1 as of 2026-09-24)
+    # Shared model layer (instinct_models, shared with Atlas and Sugarcode). See docs/models.md.
+    shared_ornith_url: str | None = None
+    shared_ornith_model: str | None = None
+    shared_inkling_url: str | None = None
+    shared_inkling_model: str = "inkling-small"
+    shared_needle_weights: str | None = None
+    shared_allow_hosted: bool = False  # Meemee data is personal: never the hosted HF router unless opted in
     reflection_interval_minutes: int = 360
     reflection_poll_seconds: float = 60.0
     github_token: str | None = None
