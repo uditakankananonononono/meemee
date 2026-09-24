@@ -410,7 +410,7 @@ wheels = [
 
 [[package]]
 name = "meemee-agent"
-version = "0.117.0"
+version = "0.118.0"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },

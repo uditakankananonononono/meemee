@@ -1,7 +1,7 @@
 from .agent import Agent
 from .config import Settings
 from .context import ContextStore
-from .llm import OpenAICompatibleModel
+from .model_profiles import build_role_model
 from .persistence import build_persistence
 from .personal_model import PersonalModelStore
 from .policy import PolicyEngine
@@ -35,9 +35,7 @@ def build_agent(settings: Settings | None = None, include_delegation: bool = Tru
     registry.register(BrowserNavigate(settings.workspace, settings.browser_headless, settings.data_dir / "browser-profiles"))
     if include_delegation:
         registry.register(DelegateTasks(lambda: AgentTeam(lambda: build_agent(settings, False))))
-    model = OpenAICompatibleModel(
-        settings.model_base_url, settings.model_name, settings.model_api_key, settings.request_timeout, settings.model_max_attempts
-    )
+    model = build_role_model(settings, "agent")
     selected_memory = memory or build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn).memory
     context = ContextStore(settings.data_dir / "context.sqlite3")
     personal_model = PersonalModelStore(settings.data_dir / "personal-model.sqlite3")

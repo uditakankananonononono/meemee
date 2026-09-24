@@ -12,6 +12,17 @@ class Settings(BaseSettings):
     model_base_url: str = "http://127.0.0.1:11434/v1"
     model_name: str = "qwen2.5-coder:14b"
     model_api_key: str = "local"
+    model_routes: str | None = None
+    model_profiles: str | None = None
+    allow_paid_models: bool = False
+    hf_token: str | None = None
+    hf_router_base_url: str = "https://router.huggingface.co/v1"
+    hf_inkling_model: str = "thinkingmachines/Inkling-Small"
+    inkling_base_url: str = "http://127.0.0.1:8000/v1"
+    inkling_self_hosted_model: str = "thinkingmachines/Inkling-Small"
+    inkling_api_key: str | None = None
+    fugu_api_key: str | None = None
+    fugu_model: str = "fugu-ultra-v2.0"
     github_token: str | None = None
     data_dir: Path = Field(default_factory=lambda: Path.home() / ".meemee")
     persistence_backend: str = "sqlite"
