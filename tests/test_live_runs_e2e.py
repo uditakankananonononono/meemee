@@ -428,3 +428,42 @@ def test_queued_jobs_honor_persistent_grants_like_runs(stack):
     assert _job(base, minted["token"], "WRITE jobs/elsewhere.txt y")["final"].startswith("BLOCKED")
     assert _job(base, _scoped_token(base), "WRITE jobs/granted.txt stranger")["final"].startswith("BLOCKED")
     assert (workspace / "jobs" / "granted.txt").read_text() == "from-job"
+
+
+def test_refusals_are_machine_readable_on_runs_jobs_and_sdk(stack):
+    """A refused write is in approvals_required everywhere a client can read the result, and the
+    suggested grant body actually works when submitted as-is."""
+    base, workspace = stack["base"], stack["workspace"]
+    minted = _minted(base)
+    token = minted["token"]
+
+    report = _run(base, token, "WRITE refusals/a.txt hello")
+    [refusal] = report["approvals_required"]
+    assert refusal["tool"] == WRITE_TOOL and refusal["reason"] == "approval_required"
+    assert refusal["grantable"] is True and refusal["step"] == 1
+    assert refusal["per_run"] == {"approved_tools": [WRITE_TOOL]}
+    assert refusal["persistent_grant"]["argument_constraints"] == {"path": "refusals/a.txt", "content": "hello"}
+    stored = httpx.get(f"{base}/v1/runs/{report['run_id']}", headers=_headers(token), timeout=10).json()
+    assert stored["approvals_required"] == report["approvals_required"]
+    listed = httpx.get(f"{base}/v1/runs", headers=_headers(token), timeout=10).json()["runs"]
+    assert next(r for r in listed if r["run_id"] == report["run_id"])["approvals_required"] == [refusal]
+
+    # retry with the per-run body from the refusal: allowed, and nothing refused this time
+    retried = _run(base, token, "WRITE refusals/a.txt hello", **refusal["per_run"])
+    assert retried["approvals_required"] == [] and (workspace / "refusals" / "a.txt").read_text() == "hello"
+
+    job_result = _job(base, token, "WRITE refusals/job.txt later")
+    assert [item["tool"] for item in job_result["approvals_required"]] == [WRITE_TOOL]
+    grant = job_result["approvals_required"][0]["persistent_grant"]
+    assert httpx.put(f"{base}/v1/approvals/{minted['id']}", headers=_headers(), json=grant, timeout=10).status_code == 200
+    job_result = _job(base, token, "WRITE refusals/job.txt later")
+    assert job_result["approvals_required"] == [] and (workspace / "refusals" / "job.txt").read_text() == "later"
+
+    clean = _run(base, token, "Read note.txt")
+    assert clean["approvals_required"] == []
+
+    sdk = pytest.importorskip("meemee_client")
+    with sdk.MeemeeClient(base, auth=token) as client:
+        parsed = client.runs.get(report["run_id"])
+        assert parsed.is_blocked and parsed.approvals_required[0].persistent_grant["tool"] == WRITE_TOOL
+        assert client.runs.get(retried["run_id"]).is_blocked is False

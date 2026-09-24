@@ -27,6 +27,7 @@ The authoritative detailed list is the 123-item "Verified" section in [README.md
 | SDK | v0.103.0 local run | 133 passed; 15 live-server tests skipped |
 | PostgreSQL package | contract run at v0.103.0 | 5 contract tests passed; 2 live tests skipped without `MEEMEE_TEST_DATABASE_URL` |
 | Console | core mount test plus console worker's headless live test | passed at merge |
+| Structured refusals (pb7) | `tests/test_approval_refusals.py`, SDK `tests/test_models.py`, live refusal test in `tests/test_live_runs_e2e.py` | 5 unit + 3 SDK model tests; live SQLite and PostgreSQL 16.2: runs, stored runs, run list, jobs and SDK parse `approvals_required`; suggested bodies work unchanged |
 | Write-approval gate (pb7) | `tests/test_live_runs_e2e.py` approval tests, booted server + worker | SQLite and PostgreSQL 16.2: 10 passed (deny, per-run allow, grant constraints/scope/expiry/revoke with audit order, unknown-tool grant rejected, jobs honor grants) |
 | End-to-end run path (pb7) | `tests/test_live_runs_e2e.py` against booted uvicorn + `meemee worker`, local scripted OpenAI-compatible provider | SQLite and PostgreSQL 16.2 modes: 10 passed (sync run, owner scoping, queued job over SSE to done, replay, routed fallback, 502 on model outage) |
 | Live PostgreSQL (pb7) | `python scripts/pg_live_check.py` on local PostgreSQL 16.2 | UTC server: 31 passed, 0 skipped. Asia/Kolkata server: 29 passed, 2 failed (audit verify timezone bug; fixed on branch pb4, 31 passed with that fix applied) |
@@ -51,7 +52,7 @@ Nothing is classified as thin. A capability is either verified at a stated bound
 - Forced interruption for tools that are not marked for process isolation or cannot be pickled; those still rely on cooperative cancellation. Opt-in isolated tools are force-killable (branch pb7, `meemee/isolation.py`).
 - Multi-region failover, online dual-write database migration and logical replication.
 
-- Approval is decided up front only. There is no pause-for-approval and resume: an unapproved write tool is refused and the run continues or ends. Callers must read `tool_results` to see a refusal, since the run itself still returns 200.
+- Approval is decided up front only. There is no pause-for-approval and resume: an unapproved write tool is refused and the run continues or ends. Refusals are reported in `approvals_required` with the body that would allow them, but acting on one means re-running the goal.
 - Queued jobs cannot carry per-request approvals, and granting requires the admin scope, so a non-admin user cannot approve a write for their own job.
 - Persistent approvals live in `approvals.sqlite3` on the host even in PostgreSQL mode, so API and workers on different hosts do not share grants.
 

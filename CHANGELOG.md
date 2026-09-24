@@ -10,6 +10,8 @@ All entries describe shipped repository behavior. Missing work is never presente
 - Removed a duplicated, stale PostgreSQL line from STATUS "Missing".
 - Fixed queued jobs ignoring persistent tool approvals: the worker now passes the owner's grants (`ApprovalStore.allows`, argument constraints included) to the agent, the same as `POST /v1/runs`. Before, write tools in jobs were always refused.
 - Added 10 live approval-gate tests (5 scenarios x SQLite/PostgreSQL) to `tests/test_live_runs_e2e.py`.
+- Added `approvals_required` to run reports, stored runs (additive `runs` schema v2 column, old rows read as `[]`) and job results: each refused tool call with step, tool, risk, reason, redacted arguments, whether it is grantable, and the exact per-run body or persistent grant that would allow it. Long (>500 chars) or secret-shaped arguments are never pinned in the suggested grant.
+- SDK: `ApprovalRefusal`, `RunReport.approvals_required`, `RunReport.is_blocked`, `Job.approvals_required`.
 - STATUS now lists the remaining approval gaps (no pause/resume, no per-job approval for non-admins, grants not shared across hosts in PostgreSQL mode).
 
 ## 0.122.0

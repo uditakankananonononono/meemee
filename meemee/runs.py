@@ -28,13 +28,19 @@ class RunStore:
             );
             CREATE INDEX IF NOT EXISTS runs_principal_created ON runs(principal,created_at DESC,run_id DESC);
         """)
-        register_schema(self.db, "runs", 1, ["principal owned completed run reports"])
+        columns = {row["name"] for row in self.db.execute("PRAGMA table_info(runs)")}
+        if "approvals_required" not in columns:  # additive v2 column; older rows read as []
+            with self.db:
+                self.db.execute("ALTER TABLE runs ADD COLUMN approvals_required TEXT NOT NULL DEFAULT '[]'")
+        register_schema(self.db, "runs", 2, ["principal owned completed run reports",
+                                             "approvals_required refusal list per run"])
 
     def add(self, principal: str, report: RunReport) -> None:
         with self.lock,self.db:
             self.db.execute(
-                "INSERT INTO runs VALUES(?,?,?,?,?,?,?)",
-                (report.run_id,principal,report.goal,report.final,report.steps_used,json.dumps(report.tool_results),datetime.now(timezone.utc).isoformat()),
+                "INSERT INTO runs(run_id,principal,goal,final,steps_used,tool_results,created_at,approvals_required) VALUES(?,?,?,?,?,?,?,?)",
+                (report.run_id,principal,report.goal,report.final,report.steps_used,json.dumps(report.tool_results),datetime.now(timezone.utc).isoformat(),
+                 json.dumps([item.model_dump() for item in report.approvals_required])),
             )
 
     def get(self, principal: str, run_id: str) -> dict | None:
@@ -62,7 +68,8 @@ class RunStore:
 
     @staticmethod
     def _row(row: sqlite3.Row) -> dict:
-        result=dict(row); result["tool_results"]=json.loads(result["tool_results"]); return result
+        result=dict(row); result["tool_results"]=json.loads(result["tool_results"])
+        result["approvals_required"]=json.loads(result.get("approvals_required") or "[]"); return result
 
     def run_ids(self, principal: str) -> list[str]:
         with self.lock:
