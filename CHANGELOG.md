@@ -16,6 +16,14 @@ All entries describe shipped repository behavior. Missing work is never presente
 - Cutover: optional `approvals` group (`--approvals approvals.sqlite3`) copies and verifies existing grants. Fixed `copy` for non-empty stores: psycopg 3 has no `Connection.executemany` (now a cursor), and decoded JSON columns are inserted as jsonb.
 - Tests: `tests/test_approvals.py` on both backends, `tests/test_approvals_multihost_e2e.py` (two API servers + worker with separate data directories), `tests_pg/test_approvals_cutover_pg.py`.
 
+## Unreleased (branch pg-runs)
+
+- `meemee_persist_pg.RunStore` and `IdempotencyStore` (migration `008_runs_idempotency.sql`), same contracts as SQLite plus `ping`; `build_persistence` returns `runs` and `idempotency`, and the API, readiness and account deletion use them.
+- Idempotency keys are claimed atomically (`claim`/`release`) on both backends before a job is created. Fixes duplicate jobs from concurrent same-key requests; in-flight duplicates get 409 "still in progress". `put` never overwrites a finished record.
+- Cutover: optional `runs` and `idempotency` groups.
+- `meemee retention-run` exits 2 in PostgreSQL mode.
+- `RunStoreInterface` and `IdempotencyStoreInterface` (with `claim`/`release`) added.
+
 ## Unreleased (branch pg-quotas-entitlements)
 
 - `meemee_persist_pg.QuotaStore` and `EntitlementStore` (migration `007_quotas_entitlements.sql`), same contracts as SQLite plus `ping`; `build_persistence` returns `quotas` and `entitlements` and the API, `account-delete` and readiness use them.
