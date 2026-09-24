@@ -6,7 +6,8 @@ def test_every_runtime_jsonb_write_uses_psycopg_jsonb_adapter():
     memory=(root/'memory.py').read_text(); jobs=(root/'jobs.py').read_text(); audit=(root/'audit.py').read_text()
     assert 'Jsonb(metadata or {})' in memory
     assert 'Jsonb(payload)' in jobs and 'Jsonb(result)' in jobs
-    assert 'Jsonb(metadata or {})' in audit
+    # audit stores the JSON round-trip of the hashed text so the jsonb re-encodes identically
+    assert 'Jsonb(stored)' in audit
 
 
 def test_every_enum_case_branch_is_explicitly_cast():

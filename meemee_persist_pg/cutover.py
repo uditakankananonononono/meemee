@@ -25,8 +25,10 @@ SPECS={
  "memory":(TableSpec("memories","meemee_memories",("id","run_id","kind","content","metadata","created_at"),("id",)),),
  "plans":(TableSpec("plans","meemee_plans",("id","goal","version","document","created_at","updated_at"),("id",)),TableSpec("plan_history","meemee_plan_history",("plan_id","version","document","reason","created_at"),("plan_id","version"))),
  "jobs":(TableSpec("jobs","meemee_jobs",("id","goal","run_at","status","attempts","max_attempts","result","error","created_at","updated_at"),("id",)),TableSpec("job_events","meemee_job_events",("sequence","job_id","kind","payload","created_at"),("sequence",))),
- "tokens":(TableSpec("api_tokens","meemee_api_tokens",("id","name","digest","scopes","created_at","last_used_at","expires_at","revoked_at"),("id",)),),
- "audit":(TableSpec("audit_log","meemee_audit_log",("sequence","occurred_at","actor_id","action","resource","outcome","metadata","previous_hash","entry_hash"),("sequence",)),),
+ "tokens":(TableSpec("api_tokens","meemee_api_tokens",("id","name","digest","scopes","created_at","last_used_at","expires_at","revoked_at","owner_id","token_kind"),("id",)),
+           TableSpec("accounts","meemee_accounts",("id","email","display_name","password_hash","password_salt","created_at","disabled_at","failed_logins","locked_until"),("id",))),
+ "audit":(TableSpec("audit_log","meemee_audit_log",("sequence","occurred_at","actor_id","action","resource","outcome","metadata","previous_hash","entry_hash"),("sequence",)),
+          TableSpec("audit_chain_base","meemee_audit_chain_base",("singleton","sequence","entry_hash"),("singleton",))),
  "approvals":(TableSpec("tool_approvals","meemee_tool_approvals",("principal","tool","granted_at","expires_at","revoked_at","granted_by","argument_constraints"),("principal","tool")),),
 }
 # Groups an operator may leave out of a cutover. approvals.sqlite3 only exists once a grant was made,

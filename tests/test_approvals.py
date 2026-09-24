@@ -99,7 +99,7 @@ def test_list_shape_is_identical_across_backends(store):
     assert [r["tool"] for r in rows] == ["a.tool", "b.tool"]
     assert set(rows[0]) == {"principal", "tool", "granted_at", "expires_at", "revoked_at", "granted_by", "argument_constraints"}
     for row in rows:
-        assert isinstance(row["granted_at"], str) and datetime.fromisoformat(row["granted_at"]).tzinfo is not None
+        assert isinstance(row["granted_at"], str) and row["granted_at"].endswith("+00:00")
     assert rows[0]["revoked_at"] is not None and rows[0]["argument_constraints"] is None
     assert datetime.fromisoformat(rows[1]["expires_at"]) == datetime(2031, 2, 3, 4, 5, 6, tzinfo=timezone.utc)
     assert rows[1]["argument_constraints"] == {"path": "x"} and rows[1]["granted_by"] == "admin"

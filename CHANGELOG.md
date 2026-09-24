@@ -4,6 +4,12 @@ All entries describe shipped repository behavior. Missing work is never presente
 
 ## Unreleased (main)
 
+- PostgreSQL-backed API tokens, accounts and audit chain: `build_persistence` returns `tokens` and `audit`; the API, `meemee account-delete` and `meemee reflection-worker` use them, so in PostgreSQL mode every host shares tokens, accounts and one global audit chain.
+- `meemee_persist_pg.TokenStore` reaches parity with the SQLite store: `owner_id`/`token_kind` on create, session tokens authenticate as their account (previously the token id), `list_metadata` with cursors, owner-scoped `revoke`, `create_account`, `login_account`, `account_by_email`, `get_account`, `reset_password`, `disable_account`, `ping`. Timestamps are returned in UTC.
+- `meemee_persist_pg.AuditLog`: appends run at READ COMMITTED under the advisory lock (SERIALIZABLE made concurrent appends fail), `list_page`, `ping`, and chain-base support via migration `006_audit_chain_base.sql`.
+- Token `expires_at` must be ISO 8601 on both backends; `POST /v1/tokens` returns 422 otherwise.
+- Cutover: `tokens` group now copies `owner_id`/`token_kind` and `accounts`; `audit` group copies `audit_chain_base`.
+- `meemee audit-anchor`, `audit-prune` and `audit-anchor-verify` refuse to run in PostgreSQL mode instead of anchoring the stale local SQLite chain.
 - PostgreSQL-backed tool-approval grants: `meemee_persist_pg.ApprovalStore` and migration `005_tool_approvals.sql` (`meemee_tool_approvals`). `build_persistence` now returns `approvals`; the API, `meemee worker` and the account purger use it, so in PostgreSQL mode grants are shared by every host on the database instead of living in each host's `approvals.sqlite3`. SQLite mode is unchanged.
 - `ApprovalStoreInterface` added to `meemee_persist_pg.interfaces`.
 - Grant expiry is normalized to UTC on both backends; offset timestamps are now compared as instants in SQLite. `PUT /v1/approvals/{principal}` returns 422 for a non-ISO `expires_at`.

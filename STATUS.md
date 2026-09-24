@@ -3,7 +3,7 @@
 **Current core version:** 0.122.0  
 **Ledger:** 163 verified, 0 thin  
 **Supported production shape:** SQLite/WAL single-host; PostgreSQL memory and owner-scoped jobs are selectable but require target-environment live verification  
-**Last core verification (main, PostgreSQL-backed grants):** 496 core + `tests_pg` passed against live PostgreSQL 16.2 (1 skipped: opt-in live HF router check); 266 SDK passed including live PostgreSQL SDK runs; core Ruff clean  
+**Last core verification (main, PostgreSQL-backed tokens, accounts and audit chain):** 514 core + `tests_pg` passed against live PostgreSQL 16.2 (1 skipped: opt-in live HF router check); 266 SDK passed including live PostgreSQL SDK runs; core Ruff clean  
 
 ## What is production-usable now
 
@@ -55,7 +55,8 @@ Nothing is classified as thin. A capability is either verified at a stated bound
 
 - Approval is decided up front only. There is no pause-for-approval and resume: an unapproved write tool is refused and the run continues or ends. Refusals are reported in `approvals_required` with the body that would allow them, but acting on one means re-running the goal.
 - Queued jobs cannot carry per-request approvals, and granting requires the admin scope, so a non-admin user cannot approve a write for their own job.
-- In PostgreSQL mode, API tokens, the audit chain, runs, quotas, entitlements and the other product stores are still per-host SQLite files; only memory, jobs, rate limits and tool-approval grants are shared through PostgreSQL. Multi-host setups must use the bootstrap token or OIDC until tokens move too.
+- In PostgreSQL mode, runs, quotas, entitlements, email-verification and password-reset challenges, webhooks and the companion/personal-model stores are still per-host SQLite files; memory, jobs, rate limits, tool-approval grants, API tokens, accounts and the audit chain are shared through PostgreSQL. A verification or reset link must be opened on the host that issued it, and runs listed on one host are not visible on another.
+- Audit anchors and `meemee audit-prune` are SQLite-only; they refuse to run in PostgreSQL mode.
 
 ## Release gate
 

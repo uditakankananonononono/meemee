@@ -20,8 +20,7 @@ from webapp.mount import mount_webapp
 
 from . import __version__
 from .account_deletion import AccountPurger, DeletionLedger, PurgeTargets
-from .audit import AuditLog
-from .auth import Authenticator, Principal, TokenStore
+from .auth import Authenticator, Principal
 from .browser_api import build_browser_router
 from .browser_notices import TakeoverNoticeQueue
 from .browser_sessions import BrowserSessionManager, BrowserSessionStore
@@ -121,12 +120,12 @@ runs = RunStore(settings.data_dir / "runs.sqlite3")
 idempotency = IdempotencyStore(settings.data_dir / "idempotency.sqlite3")
 quotas = QuotaStore(settings.data_dir / "quotas.sqlite3", settings.default_daily_jobs)
 entitlements = EntitlementStore(settings.data_dir / "entitlements.sqlite3", settings.default_plan)
-tokens = TokenStore(settings.data_dir / "auth.sqlite3")
+tokens = persistence.tokens  # PostgreSQL mode: shared by every API host
 email_verifications = EmailVerificationStore(settings.data_dir / "email-verifications.sqlite3")
 mailer = ResendMailer(settings.resend_api_key, settings.email_from_address, settings.public_url)
 personal_model = PersonalModelStore(settings.data_dir / "personal-model.sqlite3")
 monitors = MonitorStore(settings.data_dir / "monitors.sqlite3")
-audit = AuditLog(settings.data_dir / "audit.sqlite3")
+audit = persistence.audit  # PostgreSQL mode: one global chain for every host
 approvals = persistence.approvals  # PostgreSQL mode: shared with every worker, not local disk
 webhooks = WebhookStore(settings.data_dir / "webhooks.sqlite3", settings.webhook_max_payload_bytes, settings.vault_key)
 companion = build_companion(settings)
@@ -155,7 +154,7 @@ if any(web_values):
         raise RuntimeError("interactive login requires complete OIDC and web-login configuration")
     web_login = WebLogin(WebLoginConfig(*web_values), oidc)
 auth = Authenticator(tokens, settings.api_token, oidc, web_login.authenticate_session if web_login else None)
-readiness = ReadinessChecker(settings.data_dir, {"memory": persistence.check_memory, "jobs": persistence.check_jobs, "runs": lambda: runs.db.execute("SELECT 1").fetchone(), "tokens": lambda: tokens.db.execute("SELECT 1").fetchone(), "entitlements": lambda: entitlements.db.execute("SELECT 1").fetchone()}, settings.model_base_url, settings.readiness_min_free_bytes, require_model=settings.readiness_require_model)
+readiness = ReadinessChecker(settings.data_dir, {"memory": persistence.check_memory, "jobs": persistence.check_jobs, "runs": lambda: runs.db.execute("SELECT 1").fetchone(), "tokens": tokens.ping, "entitlements": lambda: entitlements.db.execute("SELECT 1").fetchone()}, settings.model_base_url, settings.readiness_min_free_bytes, require_model=settings.readiness_require_model)
 jobs_write_auth = auth.dependency("jobs:write")
 jobs_write_dependency = Depends(jobs_write_auth)
 runs_write_dependency = Depends(auth.dependency("runs:write"))
@@ -696,7 +695,10 @@ def create_token(request: TokenRequest):
     allowed = {"admin", "runs:write", "jobs:read", "jobs:write", "companion:read", "companion:write"}
     if not request.scopes <= allowed:
         raise HTTPException(422, f"unknown scopes: {sorted(request.scopes - allowed)}")
-    ident, token = tokens.create(request.name, request.scopes, request.expires_at)
+    try:
+        ident, token = tokens.create(request.name, request.scopes, request.expires_at)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
     audit.append("api", "token.create", ident, "success", {"name": request.name, "scopes": sorted(request.scopes)})
     return {"id": ident, "token": token, "warning": "shown once; store it securely"}
 
