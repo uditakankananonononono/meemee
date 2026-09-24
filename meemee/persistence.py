@@ -8,11 +8,13 @@ from .approvals import ApprovalStore as SQLiteApprovalStore
 from .audit import AuditLog as SQLiteAuditLog
 from .auth import TokenStore as SQLiteTokenStore
 from .companion.store import CompanionStore as SQLiteCompanionStore
+from .context import ContextStore as SQLiteContextStore
 from .email_verification import EmailVerificationStore as SQLiteEmailVerificationStore
 from .entitlements import EntitlementStore as SQLiteEntitlementStore
 from .idempotency import IdempotencyStore as SQLiteIdempotencyStore
 from .jobs import JobStore as SQLiteJobStore
 from .memory import MemoryStore as SQLiteMemoryStore
+from .personal_model import PersonalModelStore as SQLitePersonalModelStore
 from .quotas import QuotaStore as SQLiteQuotaStore
 from .runs import RunStore as SQLiteRunStore
 from .webhooks import WebhookStore as SQLiteWebhookStore
@@ -49,6 +51,11 @@ class Persistence:
     #: Companion profiles, facts, conversations and check-ins. SQLite: companion.sqlite3.
     #: PostgreSQL: shared by every API host and companion worker.
     companion: Any = None
+    #: Personal model claims/evidence and connected-context sources/records. SQLite:
+    #: personal-model.sqlite3 / context.sqlite3. PostgreSQL: shared by every API host, agent worker
+    #: and reflection scheduler.
+    personal_model: Any = None
+    context: Any = None
 
     def check_memory(self) -> bool:
         if self.backend == "sqlite":
@@ -77,7 +84,9 @@ def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = N
                            entitlements=SQLiteEntitlementStore(data_dir / "entitlements.sqlite3", default_plan),
                            runs=SQLiteRunStore(data_dir / "runs.sqlite3"), idempotency=SQLiteIdempotencyStore(data_dir / "idempotency.sqlite3"),
                            webhooks=SQLiteWebhookStore(data_dir / "webhooks.sqlite3", webhook_max_payload_bytes, vault_key) if vault_key else None,
-                           companion=SQLiteCompanionStore(data_dir / "companion.sqlite3"))
+                           companion=SQLiteCompanionStore(data_dir / "companion.sqlite3"),
+                           personal_model=SQLitePersonalModelStore(data_dir / "personal-model.sqlite3"),
+                           context=SQLiteContextStore(data_dir / "context.sqlite3"))
     if normalized != "postgresql":
         raise ValueError("MEEMEE_PERSISTENCE_BACKEND must be sqlite or postgresql")
     if not postgres_dsn:
@@ -86,6 +95,7 @@ def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = N
         ApprovalStore,
         AuditLog,
         CompanionStore,
+        ContextStore,
         Database,
         EmailVerificationStore,
         EntitlementStore,
@@ -93,6 +103,7 @@ def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = N
         JobStore,
         MemoryStore,
         MigrationStore,
+        PersonalModelStore,
         QuotaStore,
         RunStore,
         TokenStore,
@@ -106,7 +117,8 @@ def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = N
                        quotas=QuotaStore(database, default_daily_jobs), entitlements=EntitlementStore(database, default_plan),
                        runs=RunStore(database), idempotency=IdempotencyStore(database),
                        webhooks=WebhookStore(database, webhook_max_payload_bytes, vault_key) if vault_key else None,
-                       companion=CompanionStore(database))
+                       companion=CompanionStore(database), personal_model=PersonalModelStore(database),
+                       context=ContextStore(database))
 
 
 def persistence_from_settings(settings: Any) -> Persistence:

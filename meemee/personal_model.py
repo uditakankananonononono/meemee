@@ -33,6 +33,7 @@ class PersonalModelStore:
         self.db.row_factory = sqlite3.Row
         self.lock = threading.RLock()
         with self.lock, self.db:
+            self._drop_status_unique()
             self.db.executescript("""
                 PRAGMA journal_mode=WAL;
                 PRAGMA busy_timeout=5000;
@@ -41,9 +42,9 @@ class PersonalModelStore:
                   title TEXT NOT NULL, value TEXT NOT NULL, confidence REAL NOT NULL,
                   status TEXT NOT NULL CHECK(status IN ('active','superseded','deleted')),
                   valid_from TEXT, valid_until TEXT, supersedes_id TEXT,
-                  created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
-                  UNIQUE(owner_id,kind,title,status)
+                  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
                 );
+                CREATE UNIQUE INDEX IF NOT EXISTS personal_items_active ON personal_items(owner_id,kind,title) WHERE status='active';
                 CREATE INDEX IF NOT EXISTS personal_owner_kind ON personal_items(owner_id,kind,status,updated_at DESC);
                 CREATE TABLE IF NOT EXISTS personal_evidence(
                   id INTEGER PRIMARY KEY, item_id TEXT NOT NULL, owner_id TEXT NOT NULL,
@@ -55,6 +56,30 @@ class PersonalModelStore:
                 );
                 CREATE INDEX IF NOT EXISTS personal_evidence_item ON personal_evidence(owner_id,item_id,observed_at DESC);
             """)
+
+    def _drop_status_unique(self) -> None:
+        """Older files declared UNIQUE(owner_id,kind,title,status), which allowed only one superseded or
+        deleted row per claim, so a second correction of the same claim failed. Rebuild without it; the
+        invariant that matters (one active claim) is a partial unique index."""
+        row = self.db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='personal_items'").fetchone()
+        if not row or "UNIQUE(owner_id,kind,title,status)" not in row[0]:
+            return
+        self.db.execute("PRAGMA foreign_keys=OFF")
+        self.db.executescript("""
+            CREATE TABLE personal_items_new(
+              id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, kind TEXT NOT NULL,
+              title TEXT NOT NULL, value TEXT NOT NULL, confidence REAL NOT NULL,
+              status TEXT NOT NULL CHECK(status IN ('active','superseded','deleted')),
+              valid_from TEXT, valid_until TEXT, supersedes_id TEXT,
+              created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+            INSERT INTO personal_items_new SELECT id,owner_id,kind,title,value,confidence,status,valid_from,valid_until,supersedes_id,created_at,updated_at FROM personal_items;
+            DROP TABLE personal_items;
+            ALTER TABLE personal_items_new RENAME TO personal_items;
+        """)
+
+    def ping(self) -> bool:
+        with self.lock:
+            return self.db.execute("SELECT 1").fetchone() is not None
 
     def upsert(self, owner_id: str, item: PersonalItemInput) -> dict:
         if not owner_id:

@@ -9,6 +9,7 @@ from .idempotency import IdempotencyStore
 from .jobs import JobStore, LeaseLostError
 from .memory import MemoryStore
 from .migrations import Migration, MigrationStore
+from .personal import ContextStore, PersonalModelStore
 from .plans import PlanStore
 from .quotas import QuotaStore
 from .runs import RunStore
@@ -23,6 +24,8 @@ __all__ = [
     "AuditStoreInterface",
     "CompanionStore",
     "CompanionStoreInterface",
+    "ContextStore",
+    "ContextStoreInterface",
     "Database",
     "EmailVerificationStore",
     "EmailVerificationStoreInterface",
@@ -38,6 +41,8 @@ __all__ = [
     "Migration",
     "MigrationStore",
     "MigrationStoreInterface",
+    "PersonalModelStore",
+    "PersonalModelStoreInterface",
     "PlanStore",
     "PlanStoreInterface",
     "QuotaStore",
@@ -55,12 +60,14 @@ from .interfaces import (
     ApprovalStoreInterface,
     AuditStoreInterface,
     CompanionStoreInterface,
+    ContextStoreInterface,
     EmailVerificationStoreInterface,
     EntitlementStoreInterface,
     IdempotencyStoreInterface,
     JobStoreInterface,
     MemoryStoreInterface,
     MigrationStoreInterface,
+    PersonalModelStoreInterface,
     PlanStoreInterface,
     QuotaStoreInterface,
     RunStoreInterface,
