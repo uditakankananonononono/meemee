@@ -21,12 +21,16 @@ CHALLENGE_PAGE = b"""<!doctype html><html><head><title>Gate</title></head><body>
 <button id="solve" style="position:absolute;left:100px;top:300px;width:200px;height:60px"
  onclick="document.getElementById('msg').textContent='Welcome inside, '+document.getElementById('name').value">I am here</button>
 </body></html>"""
+SLIDER_PAGE = b"""<!doctype html><html><body><p id="out">locked</p>
+<input id="slide" type="range" min="0" max="100" value="0" style="position:absolute;left:100px;top:100px;width:400px;margin:0"
+ oninput="document.getElementById('out').textContent = this.value >= 90 ? 'unlocked' : 'locked'">
+</body></html>"""
 PLAIN_PAGE = b"<!doctype html><html><head><title>Plain</title></head><body><p id='p'>hello plain</p><a id='next' href='/challenge'>next</a></body></html>"
 
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        body = CHALLENGE_PAGE if self.path.startswith("/challenge") else PLAIN_PAGE
+        body = CHALLENGE_PAGE if self.path.startswith("/challenge") else SLIDER_PAGE if self.path.startswith("/slider") else PLAIN_PAGE
         self.send_response(200)
         self.send_header("content-type", "text/html")
         self.send_header("content-length", str(len(body)))
@@ -241,3 +245,16 @@ def test_api_websocket_takeover_end_to_end(site):
         assert client.delete(f"/v1/browser/sessions/{sid}", headers=headers).json()["state"] == "closed"
     finally:
         manager.allow_private_hosts = original
+
+
+def test_human_drag_moves_slider(manager, site):
+    state = run(manager.open(site + "/slider"))
+    t = run(manager.request_takeover(state["session_id"], "slide to unlock"))
+    run(manager.claim(t["takeover_id"], t["token"]))
+    with pytest.raises(BrowserSessionError, match="outside viewport"):
+        run(manager.human_input(t["takeover_id"], t["token"], {"type": "drag", "from": [105, 108], "to": [9000, 108]}))
+    run(manager.human_input(t["takeover_id"], t["token"], {"type": "drag", "from": [105, 108], "to": [499, 108]}))
+    run(manager.release(t["takeover_id"], t["token"]))
+    assert "unlocked" in run(manager.wait_for_human(state["session_id"], 5))["text"]
+    drags = [e for e in manager.store.events(state["session_id"]) if e["kind"] == "human_drag"]
+    assert drags and drags[0]["detail"]["to"] == [499, 108]

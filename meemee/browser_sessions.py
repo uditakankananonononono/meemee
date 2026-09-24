@@ -610,6 +610,19 @@ class BrowserSessionManager:
                     raise BrowserSessionError("invalid mouse button")
                 await page.mouse.click(x, y, button=button, click_count=1 if event.get("double") is not True else 2)
                 detail = {"x": round(x), "y": round(y)}
+            elif kind == "drag":
+                start, end = event.get("from"), event.get("to")
+                if not (isinstance(start, list) and isinstance(end, list) and len(start) == 2 and len(end) == 2):
+                    raise BrowserSessionError("drag needs from=[x,y] and to=[x,y]")
+                (x1, y1), (x2, y2) = (float(v) for v in start), (float(v) for v in end)
+                if not all(0 <= x <= width for x in (x1, x2)) or not all(0 <= y <= height for y in (y1, y2)):
+                    raise BrowserSessionError("drag outside viewport")
+                steps = max(2, min(int(event.get("steps", 20)), 100))
+                await page.mouse.move(x1, y1)
+                await page.mouse.down()
+                await page.mouse.move(x2, y2, steps=steps)
+                await page.mouse.up()
+                detail = {"from": [round(x1), round(y1)], "to": [round(x2), round(y2)]}
             elif kind == "type":
                 text = str(event.get("text", ""))
                 if not 0 < len(text) <= 2000:

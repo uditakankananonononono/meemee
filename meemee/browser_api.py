@@ -64,7 +64,11 @@ button.primary{background:#2d6cdf;border-color:#2d6cdf}
     else if(d.type==='error'){st.textContent=d.error;}};
   ws.onclose=()=>{if(!st.textContent.startsWith('handed'))st.textContent='disconnected';};
   function pt(e){const r=img.getBoundingClientRect();return{x:(e.clientX-r.left)*vw/r.width,y:(e.clientY-r.top)*vh/r.height};}
-  img.addEventListener('click',e=>{const p=pt(e);send({type:'click',x:p.x,y:p.y});img.focus();});
+  let down=null;
+  img.addEventListener('dragstart',e=>e.preventDefault());
+  img.addEventListener('mousedown',e=>{if(e.button===0)down=pt(e);});
+  img.addEventListener('mouseup',e=>{if(e.button!==0||!down)return;const p=pt(e);const d=Math.hypot(p.x-down.x,p.y-down.y);
+    if(d>6)send({type:'drag',from:[down.x,down.y],to:[p.x,p.y],steps:25});else send({type:'click',x:p.x,y:p.y});down=null;img.focus();});
   img.addEventListener('dblclick',e=>{const p=pt(e);send({type:'click',x:p.x,y:p.y,double:true});});
   img.addEventListener('wheel',e=>{e.preventDefault();send({type:'scroll',dx:e.deltaX,dy:e.deltaY});},{passive:false});
   img.addEventListener('keydown',e=>{e.preventDefault();let k=e.key===' '?'Space':e.key;const m=[];
