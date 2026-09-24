@@ -312,6 +312,7 @@ class CompanionChatReply(BaseModel):
     reply: str
     facts_learned: int
     persona: str
+    model_trace: dict[str, Any] | None = None
 
 
 class CompanionConversation(BaseModel):

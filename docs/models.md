@@ -65,6 +65,14 @@ Unknown roles or profile names fail at startup. Roles not listed default to `loc
 `kind` is one of `local`, `self_hosted`, `hosted_free`, `hosted_paid`. Hosted kinds require a key
 by default; `api_key_env` reads it from the environment so it never sits in the file.
 
+## HTTP
+
+`GET /v1/models/status` (token scope `jobs:read`) returns every profile with `available` and
+`unavailable_reason`, the active routes and `allow_paid_models`. Keys are never returned, only
+`key_configured`. Add `?probe=true` to check each routed profile's `/models` endpoint (3s timeout,
+no tokens spent). The response then includes `probes` and `serving`, which is the first reachable
+profile for each role.
+
 ## CLI
 
 ```

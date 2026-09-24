@@ -42,6 +42,7 @@ class PurgeTargets:
     companion: Any = None
     browser_sessions: Any = None
     browser_notices: Any = None
+    reflection_schedule: Any = None
 
 
 class DeletionLedger:
@@ -164,6 +165,7 @@ class AccountPurger:
             ("companion", t.companion, "delete_user_data", "companion_records"),
             ("browser_sessions", t.browser_sessions, "delete_owner", "browser_sessions"),
             ("browser_notices", t.browser_notices, "delete_user", "browser_notices"),
+            ("reflection_schedule", t.reflection_schedule, "delete_owner", "reflection_runs"),
         ]
         for name, store, method, key in optional:
             if store is not None:
@@ -217,6 +219,7 @@ def build_account_purger(settings: Any, persistence: Any) -> AccountPurger:
     from .monitors import MonitorStore
     from .personal_model import PersonalModelStore
     from .quotas import QuotaStore
+    from .reflection_schedule import ReflectionSchedule
     from .runs import RunStore
     from .webhooks import WebhookStore
 
@@ -232,5 +235,6 @@ def build_account_purger(settings: Any, persistence: Any) -> AccountPurger:
         companion=CompanionStore(root / "companion.sqlite3"),
         browser_sessions=BrowserSessionStore(root / "browser-sessions.sqlite3"),
         browser_notices=TakeoverNoticeQueue(root / "browser-notices.sqlite3"),
+        reflection_schedule=ReflectionSchedule(root / "reflection-schedule.sqlite3"),
     )
     return AccountPurger(targets, DeletionLedger(root / "account-deletions.sqlite3"))
