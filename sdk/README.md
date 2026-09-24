@@ -2,8 +2,9 @@
 
 Typed Python SDK for the [Meemee](../README.md) agent platform API. Targets the
 server **v0.122.0** HTTP contract: scoped API tokens and OIDC bearer auth,
-synchronous runs, durable queued jobs, resume-safe SSE progress, fixed-window
-rate limiting, and the tamper-evident audit chain.
+synchronous runs, durable queued jobs, resume-safe SSE and WebSocket progress,
+fixed-window rate limiting, and the tamper-evident audit chain. Every call is
+available synchronously (`MeemeeClient`) and on asyncio (`AsyncMeemeeClient`).
 
 Python 3.10+. Dependencies: `httpx`, `pydantic` v2. WebSocket streaming needs
 the optional `ws` extra (`websockets`); nothing else.
@@ -178,9 +179,12 @@ are limiter-exempt server-side.
 
 ## Verified, Thin, Missing
 
-**Verified (148 tests: 133 against a mocked transport implementing the server
-v0.122.0 contract, plus 15 live integration tests that boot the real server
-package and exercise it end to end):**
+**Verified (247 tests: 133 sync tests against a mocked transport implementing
+the server v0.122.0 contract, 27 async, 4 introspection, 18 async-OIDC and 12
+401-refresh tests against mocked transports, 23 WebSocket tests against a
+scripted loopback WebSocket server, plus 30 live integration tests that boot
+the real server package and exercise it end to end, 5 of them against a local
+HTTPS OIDC issuer):**
 
 1. Auth header attachment, 401/403 mapping including `WWW-Authenticate` and
    `missing_scope` extraction (mocked + live).
@@ -262,12 +266,10 @@ stated boundary.
 
 **Missing, not claimed:**
 
-- An async (`asyncio`) client - the SDK is synchronous only.
 - A live `POST /v1/runs` test through this SDK against a real hosted model.
   The server-side run path is verified live in `tests/test_live_runs_e2e.py`
   (repo root) with a local scripted OpenAI-compatible provider; SDK run
   parsing is covered in the mocked suite.
-- WebSocket streaming - the server offers resume-safe SSE only.
 - Interactive OIDC browser login - owned by the server's `/auth/login`.
 - Self-service introspection for non-admin callers - `/v1/tokens/introspect`
   is admin-only. Customers see their own tokens through the account token list.
