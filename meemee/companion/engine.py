@@ -5,6 +5,7 @@ import logging
 from typing import Any, Protocol
 
 from ..context import ContextStore
+from ..model_profiles import last_model_trace
 from ..personal_model import PersonalModelStore
 from ..sensitive import scrub_text
 from .models import ChatReply, FactInput, UserProfile
@@ -132,13 +133,16 @@ class CompanionEngine:
             {"role": row["role"], "content": row["content"]} for row in history
         )
         reply_text = await self.model.chat(messages, temperature=self.temperature)
-        self.store.add_message(conversation["id"], "assistant", reply_text)
+        trace = last_model_trace(self.model)
+        stored = self.store.add_message(conversation["id"], "assistant", reply_text)
+        self.store.record_model_trace(stored["id"], conversation["id"], trace)
         learned = await self._extract_facts(profile.user_id, text, reply_text, conversation["id"])
         return ChatReply(
             conversation_id=conversation["id"],
             reply=reply_text,
             facts_learned=learned,
             persona=profile.persona.display_name,
+            model_trace=trace,
         )
 
     def _conversation(

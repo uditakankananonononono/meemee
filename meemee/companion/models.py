@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import Literal
+from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field, field_validator
@@ -97,6 +97,7 @@ class ChatReply(BaseModel):
     reply: str
     facts_learned: int
     persona: str
+    model_trace: dict[str, Any] | None = None
 
 
 class CheckInPlanRequest(BaseModel):

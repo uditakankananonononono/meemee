@@ -125,6 +125,14 @@ def models_inkling_local(
         subprocess.run(report["download"], check=True, env=env)
     raise typer.Exit(subprocess.run(report["launch"], env=env, check=False).returncode)
 # end models commands
+
+
+@app.command("reflection-worker")
+def reflection_worker() -> None:
+    """Run scheduled personal-model reflection on the reflection model route."""
+    from .reflection_schedule import reflection_forever
+
+    asyncio.run(reflection_forever())
 DEFAULT_DATA_DIR = Path.home() / ".meemee"
 DEFAULT_ENV_FILE = Path(".env")
 DATA_DIR_OPTION = typer.Option(DEFAULT_DATA_DIR, "--data-dir")

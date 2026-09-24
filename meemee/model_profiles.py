@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -22,6 +23,7 @@ from .types import AgentDecision
 
 ProfileKind = Literal["local", "self_hosted", "hosted_paid", "hosted_free"]
 ROLES = ("agent", "chat", "reflection")
+_last_trace: ContextVar[dict[str, Any] | None] = ContextVar("meemee_model_trace", default=None)
 
 
 @dataclass(frozen=True)
@@ -246,7 +248,10 @@ class RoutedModel:
 
     async def _run(self, op: str, *args: Any, **kwargs: Any) -> Any:
         usable, skipped = self.catalog.chain(self.role)
-        self.attempts = [{"profile": n, "outcome": f"skipped: {r}"} for n, r in skipped.items()]
+        attempts = [{"profile": n, "outcome": f"skipped: {r}"} for n, r in skipped.items()]
+        self.attempts = attempts
+        trace: dict[str, Any] = {"role": self.role, "profile": None, "model": None, "attempts": attempts}
+        _last_trace.set(trace)
         if not usable:
             raise ModelError(f"no usable model profile for role {self.role!r}: {skipped}")
         errors: list[str] = []
@@ -255,10 +260,11 @@ class RoutedModel:
                 result = await getattr(self._model_for(profile), op)(*args, **kwargs)
             except ModelError as exc:
                 errors.append(f"{profile.name}: {exc}")
-                self.attempts.append({"profile": profile.name, "outcome": f"failed: {exc}"})
+                attempts.append({"profile": profile.name, "outcome": f"failed: {str(exc)[:300]}"})
                 continue
             self.last_profile = profile.name
-            self.attempts.append({"profile": profile.name, "outcome": "ok"})
+            attempts.append({"profile": profile.name, "outcome": "ok"})
+            trace.update(profile=profile.name, model=profile.model)
             return result
         raise ModelError(f"all model profiles failed for role {self.role!r}: " + " | ".join(errors))
 
@@ -312,3 +318,16 @@ def build_role_model(settings: Any, role: str) -> OpenAICompatibleModel | Routed
         settings.request_timeout,
         settings.model_max_attempts,
     )
+
+
+def last_model_trace(model: Any) -> dict[str, Any]:
+    """Which profile and model answered the most recent call made in this task.
+
+    Routed models record a per-task trace (safe under concurrent requests). A plain client
+    has no routing, so it reports its configured model as the single ``default`` profile.
+    """
+    if isinstance(model, RoutedModel):
+        trace = _last_trace.get()
+        return dict(trace) if trace else {"role": model.role, "profile": None, "model": None, "attempts": []}
+    name = getattr(model, "model", None)
+    return {"role": None, "profile": "default", "model": name, "attempts": [{"profile": "default", "outcome": "ok"}]}

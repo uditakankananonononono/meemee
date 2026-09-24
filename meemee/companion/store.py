@@ -84,6 +84,17 @@ class CompanionStore:
             );
             CREATE INDEX IF NOT EXISTS companion_messages_conversation
                 ON companion_messages(conversation_id, id);
+            CREATE TABLE IF NOT EXISTS companion_message_models (
+                message_id INTEGER PRIMARY KEY,
+                conversation_id TEXT NOT NULL,
+                role TEXT,
+                profile TEXT,
+                model TEXT,
+                attempts TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS companion_message_models_conversation
+                ON companion_message_models(conversation_id, message_id);
             CREATE TABLE IF NOT EXISTS companion_checkins (
                 id TEXT PRIMARY KEY,
                 user_id TEXT NOT NULL,
@@ -376,6 +387,24 @@ class CompanionStore:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def record_model_trace(self, message_id: int, conversation_id: str, trace: dict[str, Any]) -> None:
+        """Durably record which model profile produced an assistant message."""
+        with self.lock, self.db:
+            self.db.execute(
+                "INSERT OR REPLACE INTO companion_message_models(message_id,conversation_id,role,profile,model,attempts,created_at)"
+                " VALUES(?,?,?,?,?,?,?)",
+                (message_id, conversation_id, trace.get("role"), trace.get("profile"), trace.get("model"),
+                 json.dumps(trace.get("attempts", []), sort_keys=True), _now()),
+            )
+
+    def model_traces(self, conversation_id: str, limit: int = 100) -> list[dict[str, Any]]:
+        with self.lock:
+            rows = self.db.execute(
+                "SELECT * FROM companion_message_models WHERE conversation_id=? ORDER BY message_id DESC LIMIT ?",
+                (conversation_id, limit),
+            ).fetchall()
+        return [{**dict(r), "attempts": json.loads(r["attempts"])} for r in rows]
+
     def export_user_data(self, user_id: str) -> dict[str, Any]:
         """Return one user's complete companion state as JSON-safe records."""
         with self.lock:
@@ -384,20 +413,25 @@ class CompanionStore:
             conversations = self.db.execute("SELECT * FROM companion_conversations WHERE user_id=? ORDER BY created_at", (user_id,)).fetchall()
             ids = [row["id"] for row in conversations]
             messages = []
+            traces = []
             for conversation_id in ids:
                 messages.extend(self.db.execute("SELECT * FROM companion_messages WHERE conversation_id=? ORDER BY id", (conversation_id,)).fetchall())
+                traces.extend(self.db.execute("SELECT * FROM companion_message_models WHERE conversation_id=? ORDER BY message_id", (conversation_id,)).fetchall())
             checkins = self.db.execute("SELECT * FROM companion_checkins WHERE user_id=? ORDER BY created_at", (user_id,)).fetchall()
-        return {"profile": dict(user) if user else None, "facts": [dict(x) for x in facts], "conversations": [dict(x) for x in conversations], "messages": [dict(x) for x in messages], "checkins": [dict(x) for x in checkins]}
+        return {"profile": dict(user) if user else None, "facts": [dict(x) for x in facts], "conversations": [dict(x) for x in conversations], "messages": [dict(x) for x in messages], "checkins": [dict(x) for x in checkins], "model_traces": [dict(x) for x in traces]}
 
     def delete_user_data(self, user_id: str) -> dict[str, int]:
         """Delete customer companion content transactionally; audit lives elsewhere."""
         with self.lock, self.db:
             conversation_ids = [row[0] for row in self.db.execute("SELECT id FROM companion_conversations WHERE user_id=?", (user_id,))]
             messages = 0
+            traces = 0
             for conversation_id in conversation_ids:
                 messages += self.db.execute("DELETE FROM companion_messages WHERE conversation_id=?", (conversation_id,)).rowcount
+                traces += self.db.execute("DELETE FROM companion_message_models WHERE conversation_id=?", (conversation_id,)).rowcount
             counts = {
                 "messages": messages,
+                "model_traces": traces,
                 "conversations": self.db.execute("DELETE FROM companion_conversations WHERE user_id=?", (user_id,)).rowcount,
                 "facts": self.db.execute("DELETE FROM companion_facts WHERE user_id=?", (user_id,)).rowcount,
                 "checkins": self.db.execute("DELETE FROM companion_checkins WHERE user_id=?", (user_id,)).rowcount,

@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     inkling_api_key: str | None = None
     fugu_api_key: str | None = None
     fugu_model: str = "fugu-ultra-v2.0"
+    reflection_interval_minutes: int = 360
+    reflection_poll_seconds: float = 60.0
     github_token: str | None = None
     data_dir: Path = Field(default_factory=lambda: Path.home() / ".meemee")
     persistence_backend: str = "sqlite"
