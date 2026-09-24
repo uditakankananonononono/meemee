@@ -135,6 +135,7 @@ account_purger = AccountPurger(PurgeTargets(
     jobs=jobs, runs=runs, memory=persistence.memory, idempotency=idempotency, quotas=quotas,
     entitlements=entitlements, approvals=approvals, monitors=monitors, personal_model=personal_model,
     context=ContextStore(settings.data_dir / "context.sqlite3"), webhooks=webhooks, companion=companion.store,
+    browser_sessions=browser_sessions.store, browser_notices=browser_sessions.notices,
 ), deletion_ledger)
 for _resumed in account_purger.resume_incomplete():
     log.warning("resumed interrupted account deletion", extra={"deletion_id": _resumed["deletion_id"]})

@@ -304,3 +304,20 @@ def test_takeover_notice_queued_delivered_locally_and_link_erased(tmp_path, site
         assert other["takeover"]["notice_queued_for"] == "nobody"
     finally:
         m.shutdown()
+
+
+def test_account_deletion_purges_browser_stores(tmp_path):
+    from datetime import datetime, timedelta, timezone
+
+    from meemee.browser_notices import TakeoverNoticeQueue
+    store = BrowserSessionStore(tmp_path / "bs.sqlite3")
+    queue = TakeoverNoticeQueue(tmp_path / "n.sqlite3")
+    for owner in ("gone", "stays"):
+        store.create_session(f"bs_{owner}", owner, None, [])
+        store.event(f"bs_{owner}", owner, "opened")
+        store.create_takeover(f"bt_{owner}", f"bs_{owner}", "tok" * 10, "r", owner, datetime.now(timezone.utc) + timedelta(minutes=5))
+        queue.enqueue({"takeover_id": f"bt_{owner}", "expires_at": "2026-09-24T10:00:00+00:00", "reason": "r", "url": "u"}, f"bs_{owner}", owner)
+    assert store.delete_owner("gone") == {"browser_sessions": 1, "browser_takeovers": 1, "browser_events": 1}
+    assert queue.delete_user("gone") == {"browser_notices": 1}
+    assert store.get_session("bs_gone") is None and store.get_session("bs_stays") is not None
+    assert [n["user_id"] for n in queue.list()] == ["stays"]

@@ -2,7 +2,9 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
-## Unreleased (branch pb1)
+## 0.119.0
+
+Integrates pb1 (browser human takeover), pb4 (product-wide account deletion, now also purging browser sessions and takeover notices) and pb7 (process-isolated tool kill).
 
 - Added interactive browser human takeover: durable live browser sessions, challenge-triggered or requested takeovers with one-time expiring links, a WebSocket live view that relays clicks, typing, keys, scrolls and in-policy navigation, and hand-back that resumes the agent on the same page.
 - Takeover view relays drag gestures (press-move-release) so slider challenges can be solved.
