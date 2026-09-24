@@ -16,6 +16,14 @@ All entries describe shipped repository behavior. Missing work is never presente
 - Cutover: optional `approvals` group (`--approvals approvals.sqlite3`) copies and verifies existing grants. Fixed `copy` for non-empty stores: psycopg 3 has no `Connection.executemany` (now a cursor), and decoded JSON columns are inserted as jsonb.
 - Tests: `tests/test_approvals.py` on both backends, `tests/test_approvals_multihost_e2e.py` (two API servers + worker with separate data directories), `tests_pg/test_approvals_cutover_pg.py`.
 
+## Unreleased (branch pg-email-verification)
+
+- `meemee_persist_pg.EmailVerificationStore` (same contract as the SQLite store, plus `ping`) on the existing migration-003 tables; `build_persistence` returns `email_verifications` and the API uses it, so verification and reset links work on every host in PostgreSQL mode.
+- Challenge consumption row-locks in PostgreSQL: concurrent clicks of one link succeed once.
+- Cutover: optional `email` group (`--email email-verifications.sqlite3`).
+- `ResendMailer` takes an API base (`MEEMEE_RESEND_API_URL`, default `https://api.resend.com`), used by the multi-host tests to capture mail.
+- `EmailVerificationStoreInterface` added.
+
 ## Unreleased (branch model-layer)
 
 - Model profiles have a `transport`: `openai` (HTTP, unchanged) or `transformers` (in-process). `transport` appears in `meemee models list` and `GET /v1/models/status`.
