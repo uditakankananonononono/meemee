@@ -47,7 +47,8 @@ async def work_forever(settings: Settings | None = None) -> None:
     )
     # Same persistent, argument-scoped grants the API applies to POST /v1/runs. Queued jobs have no
     # per-request approval fields, so a grant is the only way a job may use an approval-gated tool.
-    approvals = ApprovalStore(settings.data_dir / "approvals.sqlite3")
+    # PostgreSQL mode reads them from the shared database, so a grant made on the API host applies here.
+    approvals = persistence.approvals
     while True:
         job = jobs.claim()
         if job is None:

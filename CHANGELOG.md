@@ -2,6 +2,14 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## Unreleased (main)
+
+- PostgreSQL-backed tool-approval grants: `meemee_persist_pg.ApprovalStore` and migration `005_tool_approvals.sql` (`meemee_tool_approvals`). `build_persistence` now returns `approvals`; the API, `meemee worker` and the account purger use it, so in PostgreSQL mode grants are shared by every host on the database instead of living in each host's `approvals.sqlite3`. SQLite mode is unchanged.
+- `ApprovalStoreInterface` added to `meemee_persist_pg.interfaces`.
+- Grant expiry is normalized to UTC on both backends; offset timestamps are now compared as instants in SQLite. `PUT /v1/approvals/{principal}` returns 422 for a non-ISO `expires_at`.
+- Cutover: optional `approvals` group (`--approvals approvals.sqlite3`) copies and verifies existing grants. Fixed `copy` for non-empty stores: psycopg 3 has no `Connection.executemany` (now a cursor), and decoded JSON columns are inserted as jsonb.
+- Tests: `tests/test_approvals.py` on both backends, `tests/test_approvals_multihost_e2e.py` (two API servers + worker with separate data directories), `tests_pg/test_approvals_cutover_pg.py`.
+
 ## Unreleased (branch pb4)
 
 - SDK: `AsyncMeemeeClient`, an asyncio client covering every resource with the same models, errors and retry policy, including async SSE with `Last-Event-ID` resume.
