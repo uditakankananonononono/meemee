@@ -22,6 +22,7 @@ All entries describe shipped repository behavior. Missing work is never presente
 - New built-in `local-transformers` profile (`MEEMEE_TRANSFORMERS_MODEL`, `MEEMEE_TRANSFORMERS_DEVICE`, `MEEMEE_TRANSFORMERS_MAX_NEW_TOKENS`) backed by `meemee.providers.TransformersModel`; optional extra `meemee[transformers]`.
 - `meemee models pull <profile>` downloads a transformers profile's weights; runtime loads use `local_files_only=True`. `meemee models check` reports installed/on-disk for transformers profiles without network access.
 - Default route: `local`, then `inkling` on the HF router when `MEEMEE_HF_TOKEN` is set (`MEEMEE_HF_FALLBACK=false` disables). Previously a token alone did nothing until routes were configured.
+- Fixed the `fugu` profile's default model: `fugu-ultra-v2.0` does not exist on the Sakana API (requests would fail with 4xx); the default is now the `fugu-ultra` alias. The profile also reads Sakana's standard `SAKANA_API_KEY` when `MEEMEE_FUGU_API_KEY` is unset (still gated by `MEEMEE_ALLOW_PAID_MODELS=true`).
 - Custom profiles accept `transport`; `transformers` profiles need no `base_url`; unknown transports are rejected at startup.
 
 ## Unreleased (branch pb4)

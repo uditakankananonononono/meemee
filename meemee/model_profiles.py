@@ -125,7 +125,7 @@ def builtin_profiles(settings: Any) -> dict[str, ModelProfile]:
             base_url="https://api.sakana.ai/v1",
             model=settings.fugu_model,
             kind="hosted_paid",
-            api_key=settings.fugu_api_key,
+            api_key=settings.fugu_api_key or os.environ.get("SAKANA_API_KEY"),
             requires_key=True,
             description=(
                 "Sakana AI Fugu, a closed multi-model orchestrator sold through the paid Sakana API "

@@ -26,7 +26,7 @@ Meemee process). Both give the same `decide`/`chat` interface, so they mix freel
 | `inkling-large` | Full **Inkling** (975B MoE / 41B active) via the HF router | Same credits; about $1.00 in / $4.05 out per 1M | `MEEMEE_HF_TOKEN` |
 | `inkling-vllm` | Your own Inkling server (vLLM or SGLang) | Free weights, needs GPU server hardware | `MEEMEE_INKLING_BASE_URL`, optional `MEEMEE_INKLING_SELF_HOSTED_MODEL` |
 | `local-transformers` | Any open-weight chat model run in-process with Hugging Face `transformers` (`MEEMEE_TRANSFORMERS_MODEL`, default `Qwen/Qwen2.5-0.5B-Instruct`) on CPU, CUDA or MPS. No model server | Free | `pip install 'meemee[transformers]'`, then `meemee models pull local-transformers` |
-| `fugu` | Sakana AI **Fugu**, a closed orchestrator that routes across frontier models. Not open weights | Paid Sakana API | `MEEMEE_FUGU_API_KEY`, `MEEMEE_ALLOW_PAID_MODELS=true`, optional `MEEMEE_FUGU_MODEL` (default `fugu-ultra-v2.0`) |
+| `fugu` | Sakana AI **Fugu**, a closed orchestrator that routes across frontier models. Not open weights | Paid Sakana API | `MEEMEE_FUGU_API_KEY` (or Sakana's `SAKANA_API_KEY`), `MEEMEE_ALLOW_PAID_MODELS=true`, optional `MEEMEE_FUGU_MODEL` (default `fugu-ultra`, Sakana's alias for the latest Fugu Ultra; pinned ids: `fugu`, `fugu-ultra-v1.0`, `fugu-ultra-v1.1`, `fugu-cyber-v1.0`) |
 
 Sources: https://huggingface.co/thinkingmachines/Inkling ,
 https://huggingface.co/thinkingmachines/Inkling-Small , https://github.com/SakanaAI/fugu ,
