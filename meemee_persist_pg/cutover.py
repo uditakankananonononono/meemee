@@ -55,16 +55,20 @@ SPECS={
  "reflection":(TableSpec("reflection_runs","meemee_reflection_runs",("owner_id","watermark","last_attempt_at","last_success_at","last_status","last_result"),("owner_id",)),),
  "deletions":(TableSpec("account_deletions","meemee_account_deletions",("id","principal","requested_by","status","started_at","completed_at"),("id",)),
               TableSpec("account_deletion_steps","meemee_account_deletion_steps",("deletion_id","step","counts","finished_at"),("deletion_id","step"))),
+ "browser":(TableSpec("browser_sessions","meemee_browser_sessions",("id","owner_id","state","profile","allowed_domains","url","title","created_at","updated_at","closed_at","close_reason","host_id"),("id",)),
+            TableSpec("browser_takeovers","meemee_browser_takeovers",("id","session_id","token_digest","reason","requested_by","created_at","expires_at","claimed_at","finished_at","outcome","note"),("id",)),
+            TableSpec("browser_session_events","meemee_browser_session_events",("id","session_id","ts","actor","kind","detail"),("id",))),
+ "notices":(TableSpec("browser_takeover_notices","meemee_browser_takeover_notices",("id","takeover_id","session_id","user_id","text","status","attempts","channel","detail","created_at","updated_at"),("id",)),),
  "approvals":(TableSpec("tool_approvals","meemee_tool_approvals",("principal","tool","granted_at","expires_at","revoked_at","granted_by","argument_constraints"),("principal","tool")),),
 }
 # Groups an operator may leave out of a cutover. approvals.sqlite3 only exists once a grant was made,
 # and older cutover invocations predate it; when given, it is copied and verified like every other group.
-OPTIONAL_GROUPS=frozenset({"approvals","email","quotas","entitlements","runs","idempotency","webhooks","companion","personal","context","monitors","reflection","deletions"})
+OPTIONAL_GROUPS=frozenset({"approvals","email","quotas","entitlements","runs","idempotency","webhooks","companion","personal","context","monitors","reflection","deletions","browser","notices"})
 NOT_NULL_JSON={"response"}
 JSON_COLUMNS={"metadata","document","result","payload","argument_constraints","tool_results","approvals_required","response"}
 UUID_COLUMNS={"id","plan_id","job_id"}
 _DATE_ONLY=re.compile(r"\d{4}-\d{2}-\d{2}")
-IDENTITY_TARGETS={"meemee_memories","meemee_job_events","meemee_audit_log","meemee_webhook_attempts","meemee_companion_facts","meemee_companion_messages","meemee_personal_evidence","meemee_context_records","meemee_monitor_events"}
+IDENTITY_TARGETS={"meemee_memories","meemee_job_events","meemee_audit_log","meemee_webhook_attempts","meemee_companion_facts","meemee_companion_messages","meemee_personal_evidence","meemee_context_records","meemee_monitor_events","meemee_browser_session_events"}
 # Webhook payloads are signed byte-for-byte, so they stay text; SQLite 0/1 flags become booleans.
 TEXT_PAYLOAD_TARGETS={"meemee_webhook_deliveries","meemee_context_records","meemee_monitor_events"}
 BOOL_COLUMNS={("meemee_webhook_subscriptions","active")}

@@ -3,6 +3,7 @@ from ._db import Database
 from .account_deletion import DeletionLedger
 from .approvals import ApprovalStore
 from .audit import AuditLog
+from .browser import BrowserSessionStore, TakeoverNoticeQueue
 from .companion import CompanionStore
 from .email_verification import EmailVerificationStore
 from .entitlements import EntitlementStore
@@ -24,6 +25,7 @@ __all__ = [
     "ApprovalStoreInterface",
     "AuditLog",
     "AuditStoreInterface",
+    "BrowserSessionStore",
     "CompanionStore",
     "CompanionStoreInterface",
     "ContextStore",
@@ -57,6 +59,7 @@ __all__ = [
     "ReflectionScheduleInterface",
     "RunStore",
     "RunStoreInterface",
+    "TakeoverNoticeQueue",
     "TokenStore",
     "TokenStoreInterface",
     "WebhookStore",

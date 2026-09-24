@@ -43,6 +43,10 @@ class TakeoverNoticeQueue:
                 CREATE INDEX IF NOT EXISTS browser_notices_status ON browser_takeover_notices(status, created_at);
             """)
 
+    def ping(self) -> bool:
+        with self.lock:
+            return self.db.execute("SELECT 1").fetchone() is not None
+
     def enqueue(self, takeover: dict[str, Any], session_id: str, user_id: str) -> str:
         expires = takeover["expires_at"][:16].replace("T", " ")
         text = (f"Meemee needs a hand in the browser: {takeover['reason']}\n"
@@ -79,42 +83,52 @@ class TakeoverNoticeQueue:
             rows = self.db.execute(query + " ORDER BY created_at DESC LIMIT ?", (*params, max(1, min(limit, 500)))).fetchall()
         return [dict(r) for r in rows]
 
-    async def deliver_pending(self, sessions_store, companion_store, channels: dict, limit: int = 20) -> list[dict[str, Any]]:
+    def _claim(self, limit: int) -> list[dict[str, Any]]:
         with self.lock:
-            rows = [dict(r) for r in self.db.execute(
+            return [dict(r) for r in self.db.execute(
                 "SELECT * FROM browser_takeover_notices WHERE status='queued' ORDER BY created_at LIMIT ?", (limit,)).fetchall()]
-        results = []
-        for notice in rows:
-            takeover = sessions_store.get_takeover(notice["takeover_id"])
-            if takeover is None or takeover["finished_at"] is not None or datetime.fromisoformat(takeover["expires_at"]) < datetime.now(timezone.utc):
-                self._finish(notice["id"], "cancelled", "takeover already ended")
-                results.append({"id": notice["id"], "status": "cancelled"})
-                continue
-            profile = companion_store.profile(notice["user_id"])
-            if profile is None:
-                self._finish(notice["id"], "failed", f"unknown companion user: {notice['user_id']}")
-                results.append({"id": notice["id"], "status": "failed"})
-                continue
-            channel_name = profile.checkins.channel
-            adapter = channels.get(channel_name)
-            try:
-                if adapter is None:
-                    raise ChannelError(f"unknown companion channel: {channel_name}")
-                address = profile.checkins.address
-                if not address:
-                    if channel_name != "local":
-                        raise ChannelError(f"no delivery address for channel {channel_name}")
-                    conversation = companion_store.latest_conversation(notice["user_id"], "local") or companion_store.start_conversation(notice["user_id"], "local")
-                    address = conversation["id"]
-                result = await adapter.send(address, notice["text"])
-                self._finish(notice["id"], "delivered", result.detail, channel_name)
-                results.append({"id": notice["id"], "status": "delivered", "channel": channel_name})
-            except (ChannelError, ValueError, RuntimeError) as exc:
-                with self.lock, self.db:
-                    self.db.execute("UPDATE browser_takeover_notices SET attempts=attempts+1, detail=?, channel=?, updated_at=? WHERE id=?",
-                                    (str(exc)[:500], channel_name, _now(), notice["id"]))
-                    attempts = self.db.execute("SELECT attempts FROM browser_takeover_notices WHERE id=?", (notice["id"],)).fetchone()[0]
-                if attempts >= self.max_attempts:
-                    self._finish(notice["id"], "failed", str(exc))
-                results.append({"id": notice["id"], "status": "failed" if attempts >= self.max_attempts else "queued", "error": str(exc)[:200]})
-        return results
+
+    def _record_failure(self, notice_id: str, detail: str, channel: str | None) -> int:
+        with self.lock, self.db:
+            self.db.execute("UPDATE browser_takeover_notices SET attempts=attempts+1, detail=?, channel=?, updated_at=? WHERE id=?",
+                            (detail[:500], channel, _now(), notice_id))
+            return self.db.execute("SELECT attempts FROM browser_takeover_notices WHERE id=?", (notice_id,)).fetchone()[0]
+
+    async def deliver_pending(self, sessions_store, companion_store, channels: dict, limit: int = 20) -> list[dict[str, Any]]:
+        return await deliver_notices(self, sessions_store, companion_store, channels, limit)
+
+
+async def deliver_notices(queue, sessions_store, companion_store, channels: dict, limit: int = 20) -> list[dict[str, Any]]:
+    """Deliver queued notices; shared by the SQLite and PostgreSQL queues (``_claim``/``_finish``/``_record_failure``)."""
+    results = []
+    for notice in queue._claim(limit):
+        takeover = sessions_store.get_takeover(notice["takeover_id"])
+        if takeover is None or takeover["finished_at"] is not None or datetime.fromisoformat(takeover["expires_at"]) < datetime.now(timezone.utc):
+            queue._finish(notice["id"], "cancelled", "takeover already ended")
+            results.append({"id": notice["id"], "status": "cancelled"})
+            continue
+        profile = companion_store.profile(notice["user_id"])
+        if profile is None:
+            queue._finish(notice["id"], "failed", f"unknown companion user: {notice['user_id']}")
+            results.append({"id": notice["id"], "status": "failed"})
+            continue
+        channel_name = profile.checkins.channel
+        adapter = channels.get(channel_name)
+        try:
+            if adapter is None:
+                raise ChannelError(f"unknown companion channel: {channel_name}")
+            address = profile.checkins.address
+            if not address:
+                if channel_name != "local":
+                    raise ChannelError(f"no delivery address for channel {channel_name}")
+                conversation = companion_store.latest_conversation(notice["user_id"], "local") or companion_store.start_conversation(notice["user_id"], "local")
+                address = conversation["id"]
+            result = await adapter.send(address, notice["text"])
+            queue._finish(notice["id"], "delivered", result.detail, channel_name)
+            results.append({"id": notice["id"], "status": "delivered", "channel": channel_name})
+        except (ChannelError, ValueError, RuntimeError) as exc:
+            attempts = queue._record_failure(notice["id"], str(exc), channel_name)
+            if attempts >= queue.max_attempts:
+                queue._finish(notice["id"], "failed", str(exc))
+            results.append({"id": notice["id"], "status": "failed" if attempts >= queue.max_attempts else "queued", "error": str(exc)[:200]})
+    return results
