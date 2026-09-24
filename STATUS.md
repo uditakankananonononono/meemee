@@ -27,6 +27,7 @@ The authoritative detailed list is the 123-item "Verified" section in [README.md
 | SDK | v0.103.0 local run | 133 passed; 15 live-server tests skipped |
 | PostgreSQL package | contract run at v0.103.0 | 5 contract tests passed; 2 live tests skipped without `MEEMEE_TEST_DATABASE_URL` |
 | Console | core mount test plus console worker's headless live test | passed at merge |
+| Forced tool interruption (pb7) | `pytest -q` on branch pb7 | 358 passed (12 new in `tests/test_isolation.py`); ruff clean |
 | Concurrency regression | `tests/test_concurrency.py` | 2,000 parallel token auths and 1,000 parallel audit appends passed |
 
 Counts are evidence from the named run, not a promise that unrun optional infrastructure works. Run every relevant suite in your target environment before release.
@@ -41,7 +42,7 @@ Nothing is classified as thin. A capability is either verified at a stated bound
 - Live PostgreSQL test run in this environment. Checksummed SQLite-to-PostgreSQL copy/import tooling is implemented.
 - Built-in account deletion covers customer identity and companion content; product-wide jobs/runs remain covered by the existing portable export and retention tools rather than immediate destructive deletion. External OIDC remains optional.
 - Interactive browser human takeover after explicit challenge detection/handoff.
-- Forced interruption inside blocking third-party native code; async tools are interruptible.
+- Forced interruption for tools that are not marked for process isolation or cannot be pickled; those still rely on cooperative cancellation. Opt-in isolated tools are force-killable (branch pb7, `meemee/isolation.py`).
 - Multi-region failover, online dual-write database migration and logical replication.
 
 ## Release gate

@@ -2,6 +2,12 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## Unreleased (branch pb7)
+
+- Added `meemee/isolation.py`: opt-in process-isolated tool execution. Cancellation and a per-tool hard timeout terminate, then kill, the child process, so tools blocked in native code can be stopped.
+- `ToolRegistry.execute` honors a new `Tool.isolation` policy; existing tools are unchanged.
+- Added 12 regression tests covering results, errors, crashes, timeouts, cancellation, SIGKILL escalation and event-loop responsiveness.
+
 ## 0.117.0
 
 - Completed the personal-model v1 with user correction provenance, owner-scoped evidence inspection and confidence decay for stale inferred claims.
