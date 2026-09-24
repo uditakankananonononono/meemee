@@ -7,6 +7,10 @@ All entries describe shipped repository behavior. Missing work is never presente
 - Added `meemee/isolation.py`: opt-in process-isolated tool execution. Cancellation and a per-tool hard timeout terminate, then kill, the child process, so tools blocked in native code can be stopped.
 - `ToolRegistry.execute` honors a new `Tool.isolation` policy; existing tools are unchanged.
 - Added 12 regression tests covering results, errors, crashes, timeouts, cancellation, SIGKILL escalation and event-loop responsiveness.
+- Added `scripts/pg_live_check.py` and `tests_pg/test_live_stores.py` (15 live tests); PostgreSQL suites now run for real, with skips treated as failures.
+- Fixed `meemee_persist_pg.PlanStore`: plan documents are now sent as JSONB (before, every create/replace failed on real PostgreSQL).
+- Fixed `meemee_persist_pg.JobStore`: a `cancel_requested` job whose worker lease expires is now reaped to `cancelled`, and a worker can keep heartbeating while it winds down a cancel.
+- `tests_pg/test_postgres_integration.py` accepts `MEEMEE_TEST_DATABASE_URL` as well as `MEEMEE_TEST_POSTGRES_DSN`.
 
 ## 0.118.0
 

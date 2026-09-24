@@ -27,6 +27,7 @@ The authoritative detailed list is the 123-item "Verified" section in [README.md
 | SDK | v0.103.0 local run | 133 passed; 15 live-server tests skipped |
 | PostgreSQL package | contract run at v0.103.0 | 5 contract tests passed; 2 live tests skipped without `MEEMEE_TEST_DATABASE_URL` |
 | Console | core mount test plus console worker's headless live test | passed at merge |
+| Live PostgreSQL (pb7) | `python scripts/pg_live_check.py` on local PostgreSQL 16.2 | UTC server: 31 passed, 0 skipped. Asia/Kolkata server: 29 passed, 2 failed (audit verify timezone bug; fixed on branch pb4, 31 passed with that fix applied) |
 | Forced tool interruption (pb7) | `pytest -q` on branch pb7 | 358 passed (12 new in `tests/test_isolation.py`); ruff clean |
 | Concurrency regression | `tests/test_concurrency.py` | 2,000 parallel token auths and 1,000 parallel audit appends passed |
 
@@ -39,7 +40,7 @@ Nothing is classified as thin. A capability is either verified at a stated bound
 ## Missing, not claimed
 
 - Live WhatsApp/iMessage delivery over real provider networks: adapters and the delivery queue are implemented and config-gated, but no provider account exists to verify against. Console screens for the companion layer are not built; the surface is HTTP API, CLI, SDK and the console companion view.
-- Live PostgreSQL test run in this environment. Checksummed SQLite-to-PostgreSQL copy/import tooling is implemented.
+- Live PostgreSQL test run against a managed or HA production server (network TLS, replicas). A live run on local PostgreSQL 16.2 is verified on branch pb7 (see evidence table). Checksummed SQLite-to-PostgreSQL copy/import tooling is implemented.
 - Built-in account deletion covers customer identity and companion content; product-wide jobs/runs remain covered by the existing portable export and retention tools rather than immediate destructive deletion. External OIDC remains optional.
 - Interactive browser human takeover after explicit challenge detection/handoff.
 - Forced interruption for tools that are not marked for process isolation or cannot be pickled; those still rely on cooperative cancellation. Opt-in isolated tools are force-killable (branch pb7, `meemee/isolation.py`).
