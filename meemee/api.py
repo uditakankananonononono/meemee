@@ -22,6 +22,8 @@ from . import __version__
 from .approvals import ApprovalStore
 from .audit import AuditLog
 from .auth import Authenticator, Principal, TokenStore
+from .browser_api import build_browser_router
+from .browser_sessions import BrowserSessionManager, BrowserSessionStore
 from .companion.api import build_companion_router
 from .companion.runtime import build_companion
 from .config import Settings
@@ -77,6 +79,7 @@ async def lifespan(_app: FastAPI):
     close = getattr(agent.model, "aclose", None)
     if close is not None:
         await close()
+    browser_sessions.shutdown()
     persistence.close()
 
 app = FastAPI(title="Meemee", version=__version__, lifespan=lifespan)
@@ -89,7 +92,17 @@ mount_webapp(app)
 mount_site(app)
 app.add_middleware(MetricsMiddleware)
 persistence = build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn)
-agent = build_agent(settings, memory=persistence.memory)
+browser_sessions = BrowserSessionManager(
+    BrowserSessionStore(settings.data_dir / "browser-sessions.sqlite3"),
+    headless=settings.browser_headless,
+    profiles_dir=settings.data_dir / "browser-profiles",
+    public_url=settings.public_url,
+    allow_private_hosts=settings.browser_allow_private_hosts,
+    max_sessions=settings.browser_max_sessions,
+    idle_timeout_seconds=settings.browser_idle_timeout_seconds,
+    takeover_ttl_seconds=settings.browser_takeover_ttl_seconds,
+)
+agent = build_agent(settings, memory=persistence.memory, browser_sessions=browser_sessions)
 run_gate = RunGate()
 jobs = persistence.jobs
 if persistence.backend == "postgresql":
@@ -132,6 +145,7 @@ jobs_write_dependency = Depends(jobs_write_auth)
 runs_write_dependency = Depends(auth.dependency("runs:write"))
 jobs_read_dependency = Depends(auth.dependency("jobs:read"))
 app.include_router(build_companion_router(companion.store, companion.engine, companion.channels, auth, audit))
+app.include_router(build_browser_router(browser_sessions, auth, audit))
 
 
 @app.middleware("http")
@@ -147,10 +161,10 @@ async def request_context(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-    response.headers["Content-Security-Policy"] = (
+    response.headers.setdefault("Content-Security-Policy", (
         "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; "
         "form-action 'self'; object-src 'none'; connect-src 'self'"
-    )
+    ))
     if request.url.path.startswith(("/v1/", "/auth/")):
         response.headers["Cache-Control"] = "no-store"
         response.headers["Pragma"] = "no-cache"
