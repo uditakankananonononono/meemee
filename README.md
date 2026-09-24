@@ -189,6 +189,8 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 
 164. End-to-end run path, verified live (branch pb7, unreleased): `tests/test_live_runs_e2e.py` boots the real server and worker in SQLite and PostgreSQL modes against a local OpenAI-compatible provider with a fixed script, and checks `POST /v1/runs` (model call, real `workspace.read_file` tool, tool result fed back, final answer), run storage and owner scoping, `run.create` in a verified audit chain, a queued job streamed over SSE from `queued` to `done` and replayed, routed-profile fallback, and a 502 on model outage. It found and fixed a bug where every rate-limited request returned 500 in PostgreSQL mode.
 
+156. SDK asyncio client and WebSocket job streaming (branch pb4): `AsyncMeemeeClient` mirrors the full synchronous SDK surface with the same models, errors and retry policy, async SSE resume and thread-offloaded blocking auth; `jobs.stream_ws` (sync and async) follows `/v1/jobs/{id}/ws` with `?after` resume, ping/pong dead-peer detection and typed 44xx errors, verified against a scripted WebSocket server and a booted server. Fixed the WebSocket handler to accept before rejecting, so 4400/4401/4403/4404 close codes reach real network clients instead of a bare HTTP 403.
+
 ## Thin (0)
 
 Nothing is classified as thin. A capability is either implemented and tested at its stated boundary below, or listed as missing.

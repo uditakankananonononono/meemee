@@ -5,13 +5,15 @@ server **v0.122.0** HTTP contract: scoped API tokens and OIDC bearer auth,
 synchronous runs, durable queued jobs, resume-safe SSE progress, fixed-window
 rate limiting, and the tamper-evident audit chain.
 
-Python 3.10+. Dependencies: `httpx`, `pydantic` v2. Nothing else.
+Python 3.10+. Dependencies: `httpx`, `pydantic` v2. WebSocket streaming needs
+the optional `ws` extra (`websockets`); nothing else.
 
 ## Install
 
 ```bash
 pip install -e ./sdk          # from the repository root
-pip install -e './sdk[dev]'   # with pytest for the test-suite
+pip install -e './sdk[ws]'    # adds WebSocket job streaming
+pip install -e './sdk[dev]'   # with pytest, pytest-asyncio and websockets for the test-suite
 pytest sdk/tests              # full mocked and live-server suite
 ```
 
@@ -30,6 +32,44 @@ with MeemeeClient("http://127.0.0.1:8787", auth="mee_...") as client:
     finished = client.jobs.get(job.id)
     print(finished.status, finished.result_data)
 ```
+
+### asyncio
+
+```python
+import asyncio
+from meemee_client import AsyncMeemeeClient
+
+async def main() -> None:
+    async with AsyncMeemeeClient("http://127.0.0.1:8787", auth="mee_...") as client:
+        job = await client.jobs.create("Summarise today's arXiv cs.AI highlights")
+        async for event in client.jobs.stream_ws(job.id):     # or stream_events (SSE)
+            print(event.kind, event.payload)
+        async for past in client.jobs.iter_all(status="done"):
+            print(past.id)
+
+asyncio.run(main())
+```
+
+`AsyncMeemeeClient` has the same resources, arguments, models, errors and retry
+policy as `MeemeeClient`; methods are coroutines and iterators are async
+iterators. `TokenAuth` is used directly; a provider with an
+`async authorization_header_async()` method is awaited; any other provider (such
+as `OIDCClientCredentialsAuth`, whose refresh does blocking HTTP) runs in a
+worker thread so a token refresh never blocks the event loop.
+
+### WebSocket streaming
+
+`client.jobs.stream_ws(job_id, after=0)` (sync and async) follows
+`/v1/jobs/{id}/ws`. It sends the bearer token in the handshake, yields each
+JobEvent once in order, and returns after a terminal event or the server's
+1000 close. A dropped connection reconnects with `?after=<last sequence>` under
+the same budget and backoff as SSE (`max_reconnects`, default 6). The server
+sends no idle frames, so dead peers are caught by WebSocket ping/pong
+(`ping_interval`/`ping_timeout`, 20s each). Rejections raise typed errors
+without reconnecting: 4401 `AuthenticationError`, 4403 `PermissionDeniedError`
+(`missing_scope="jobs:read"`), 4404 `NotFoundError`, 4400 `BadRequestError`.
+A proxy or older server that refuses the handshake with a plain HTTP status is
+mapped the same way; an HTTP 5xx handshake is retried.
 
 More in [../examples](../examples/README.md): quickstart, job watching, manual
 SSE resume across process restarts, OIDC machine auth, admin token + audit work.
@@ -150,6 +190,20 @@ package and exercise it end to end):**
 13. Companion live: the same companion surface exercised against a booted
     server, including chat turns with server-side fact extraction, idempotent
     check-in planning and companion scope enforcement (live).
+14. `AsyncMeemeeClient`: every resource (runs, jobs, tokens, audit, quota,
+    approvals, webhooks, companion) with identical request shapes and path
+    encoding, error mapping for every status, Retry-After-honouring GET
+    retries, POST never retried unless keyed, async cursor pagination, async
+    SSE with `Last-Event-ID` resume, heartbeats and client-side close on
+    `cancelled`, `wait()` timeouts, native async and thread-offloaded auth
+    providers, and 20 concurrent requests on one client (mocked + live).
+15. WebSocket job streaming (sync and async): bearer handshake, ordered
+    delivery, resume with `?after` after an abrupt TCP drop or a 1011 close,
+    duplicate suppression, 44xx and HTTP handshake rejections as typed errors
+    without reconnect, 5xx handshake retry, malformed-frame errors, reconnect
+    budget and backoff, connection refused, and socket close when the consumer
+    stops early (scripted server); replay, resume, following a job while it is
+    cancelled, and 4401/4403/4404 rejections over real sockets (live).
 
 The live suite lives in `tests/test_live_integration.py`; it boots uvicorn
 against the `meemee` package next to `sdk/` and skips cleanly when that
@@ -167,5 +221,8 @@ stated boundary.
   parsing is covered in the mocked suite.
 - WebSocket streaming - the server offers resume-safe SSE only.
 - Interactive OIDC browser login - owned by the server's `/auth/login`.
-- Token introspection/listing and job listing endpoints - the server does not
-  expose them (token admin is create/revoke; jobs are addressed by id).
+- An asyncio-native OIDC client-credentials provider - async clients run the
+  existing provider in a worker thread instead.
+- Token introspection (inspecting an arbitrary token's claims) - the server
+  does not expose it. Token and job listing are implemented
+  (`tokens.list`/`iter_all`, `jobs.list`/`iter_all`).

@@ -4,8 +4,9 @@ Endpoint contract implemented here:
 - GET  /health, GET /ready                          (unauthenticated, rate-limit exempt)
 - POST /v1/runs                                     (scope runs:write)
 - POST /v1/jobs, GET /v1/jobs/{id}, DELETE /v1/jobs/{id},
-  GET /v1/jobs/{id}/events, GET /v1/jobs/{id}/stream (scopes jobs:write / jobs:read)
-- POST /v1/tokens, DELETE /v1/tokens/{id}           (scope admin)
+  GET /v1/jobs/{id}/events, GET /v1/jobs/{id}/stream,
+  GET /v1/jobs (list), WS /v1/jobs/{id}/ws           (scopes jobs:write / jobs:read)
+- POST/GET /v1/tokens, DELETE /v1/tokens/{id}       (scope admin)
 - GET  /v1/audit                                    (scope admin)
 - GET  /metrics                                     (scope admin, Prometheus text)
 """
@@ -20,6 +21,7 @@ from typing import Any
 import httpx
 from typing_extensions import Self
 
+from . import _ws
 from ._version import __version__
 from .auth import AuthProvider, TokenAuth
 from .errors import (
@@ -536,6 +538,87 @@ class JobsResource:
                 reconnects_left -= 1
                 self._client._sleeper(min(backoff, 30.0))
                 backoff *= 2.0
+
+    def stream_ws(
+        self,
+        job_id: str,
+        *,
+        after: int = 0,
+        reconnect: bool = True,
+        max_reconnects: int = 6,
+        open_timeout: float = 10.0,
+        ping_interval: float | None = 20.0,
+        ping_timeout: float | None = 20.0,
+    ) -> Iterator[JobEvent]:
+        """GET /v1/jobs/{id}/ws - follow live progress over WebSocket with resume.
+
+        Yields JobEvents in sequence order and returns after a terminal event
+        (done, failed or cancelled) or the server's normal 1000 close. A dropped
+        connection reconnects with ``?after=<last delivered sequence>``, so no
+        event is repeated or skipped; the server sends no idle frames, so dead
+        peers are detected by WebSocket ping/pong (``ping_interval``/``ping_timeout``).
+
+        Raises AuthenticationError (4401), PermissionDeniedError (4403 or a
+        pre-handshake HTTP 403), NotFoundError (4404), BadRequestError (4400),
+        StreamError for a malformed frame, and NetworkError once the reconnect
+        budget is spent. Needs the ``ws`` extra (``websockets``).
+        """
+        websockets = _ws.require_websockets()
+        from websockets.exceptions import ConnectionClosed, InvalidStatus
+        from websockets.sync.client import connect
+
+        cursor = max(after, 0)
+        reconnects_left = max_reconnects
+        backoff = 1.0
+        base = str(self._client._http.base_url)
+        while True:
+            failure: BaseException | None = None
+            try:
+                with connect(
+                    _ws.ws_url(base, job_id, cursor),
+                    additional_headers=self._client._headers(None),
+                    user_agent_header=self._client._http.headers.get("User-Agent"),
+                    open_timeout=open_timeout,
+                    ping_interval=ping_interval,
+                    ping_timeout=ping_timeout,
+                    proxy=None,
+                ) as connection:
+                    while True:
+                        try:
+                            frame = connection.recv()
+                        except ConnectionClosed as closed:
+                            code = closed.rcvd.code if closed.rcvd is not None else None
+                            reason = closed.rcvd.reason if closed.rcvd is not None else ""
+                            rejection = _ws.rejection_error(code, reason, job_id)
+                            if rejection is not None:
+                                raise rejection from None
+                            if code == _ws.NORMAL_CLOSE:
+                                return
+                            failure = closed
+                            break
+                        event, is_terminal = _ws.parse_frame(frame, job_id)
+                        if event.sequence <= cursor:
+                            continue
+                        cursor = event.sequence
+                        yield event
+                        if is_terminal:
+                            return
+            except InvalidStatus as exc:
+                status = exc.response.status_code
+                mapped = _ws.handshake_error(status, job_id)
+                if mapped is not None:
+                    raise mapped from exc
+                failure = exc
+            except (OSError, TimeoutError, websockets.exceptions.InvalidHandshake) as exc:
+                failure = exc
+            if not reconnect or reconnects_left <= 0:
+                raise NetworkError(
+                    f"job WebSocket for {job_id} interrupted and the reconnect budget is "
+                    f"exhausted (last delivered event id {cursor}): {failure}"
+                ) from failure
+            reconnects_left -= 1
+            self._client._sleeper(min(backoff, 30.0))
+            backoff *= 2.0
 
     @staticmethod
     def _handle_stream_message(

@@ -761,7 +761,13 @@ def stream_job_events(request: Request, job_id: str, after: int = 0):
 
 @app.websocket("/v1/jobs/{job_id}/ws")
 async def websocket_job_events(websocket: WebSocket, job_id: str):
-    """Stream owner-scoped durable job events over an authenticated WebSocket."""
+    """Stream owner-scoped durable job events over an authenticated WebSocket.
+
+    The handshake is accepted before authorization so a rejection reaches real
+    network clients as a 44xx close code; closing before accept makes ASGI
+    servers answer a bare HTTP 403 that hides the reason.
+    """
+    await websocket.accept()
     authorization = websocket.headers.get("authorization", "")
     principal = None
     if authorization.lower().startswith("bearer "):
@@ -783,7 +789,6 @@ async def websocket_job_events(websocket: WebSocket, job_id: str):
     try: after = int(websocket.query_params.get("after", "0"))
     except ValueError:
         await websocket.close(code=4400, reason="after must be an integer"); return
-    await websocket.accept()
     try:
         while True:
             events = jobs.events(job_id, after)
