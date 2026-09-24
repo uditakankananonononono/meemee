@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     api_token: str | None = None
     signup_enabled: bool = True
     resend_api_key: str | None = None
+    #: Resend API base. Only for pointing tests or a self-hosted relay at another endpoint.
+    resend_api_url: str = "https://api.resend.com"
     email_from_address: str = "onboarding@resend.dev"
     email_reply_to: str | None = None
     gmail_access_token: str | None = None
