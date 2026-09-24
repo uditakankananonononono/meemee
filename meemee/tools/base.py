@@ -8,6 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
+from ..isolation import IsolationPolicy, run_isolated
 from ..types import Risk, ToolResult
 
 
@@ -16,6 +17,10 @@ class Tool(ABC):
     description: str
     risk: Risk = Risk.READ
     arguments_model: type[BaseModel]
+    # Set to an IsolationPolicy to run this tool in a killable child process. Use it for
+    # tools that can block inside synchronous or native code, where cooperative
+    # cancellation cannot interrupt them. The tool, its arguments and result must pickle.
+    isolation: IsolationPolicy | None = None
 
     def schema(self) -> dict[str, Any]:
         return {
@@ -52,6 +57,12 @@ class ToolRegistry:
         try:
             tool = self.get(name)
             parsed = tool.arguments_model.model_validate(arguments)
+            if tool.isolation is not None:
+                outcome = await run_isolated(tool, parsed, tool.isolation, cancel)
+                elapsed = round((time.perf_counter() - started) * 1000)
+                if outcome.ok:
+                    return ToolResult(ok=True, content=outcome.value, elapsed_ms=elapsed)
+                return ToolResult(ok=False, error=outcome.error, elapsed_ms=elapsed)
             try:
                 parameters = inspect.signature(tool.run).parameters
                 value = tool.run(parsed, cancel=cancel) if "cancel" in parameters else tool.run(parsed)
@@ -81,3 +92,4 @@ class ToolRegistry:
                 error=str(exc),
                 elapsed_ms=round((time.perf_counter() - started) * 1000),
             )
+

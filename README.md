@@ -180,13 +180,15 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 
 154. Product-wide account deletion (branch pb4): `DELETE /v1/account`, admin `DELETE /v1/admin/principals/{id}/data` and `meemee account-delete PRINCIPAL --yes` hard-delete the principal's jobs and job events, run reports, agent memories (with embeddings and full-text rows), personal model including soft-deleted history, connected-context sources and records, monitors, webhook subscriptions/deliveries/attempts, quotas, plan assignment, idempotency records, standing tool approvals and companion content. Running jobs are tombstoned (goal/owner wiped, cancellation requested) and deleted when the worker settles, including memories written after the purge; synchronous runs that finish after deletion are discarded with 410. Every step is recorded in a durable deletion ledger and resumed after a crash (`meemee account-delete-resume`, also on API start). SQLite and PostgreSQL job backends are covered; the PostgreSQL path passed a live run. The tamper-evident audit log is retained by design.
 
+154. Forced interruption of blocking tools (branch pb7, unreleased): a tool that sets `isolation = IsolationPolicy(...)` runs in a spawned child process; cancellation or its hard timeout sends SIGTERM, then SIGKILL after a grace period, and the child is always reaped. Covered by `tests/test_isolation.py` (12 tests, including a SIGTERM-ignoring child and an event loop that stays responsive while the tool blocks).
+
 ## Thin (0)
 
 Nothing is classified as thin. A capability is either implemented and tested at its stated boundary below, or listed as missing.
 
 ## Missing, not claimed
 
-Live WhatsApp and iMessage delivery over real provider networks is unverified: the adapters and durable delivery queue are implemented and config-gated, but no provider account exists yet. Live PostgreSQL integration is not verified in this environment; target deployments must run the unskipped PostgreSQL suite and preflight. Built-in email/password signup and login are implemented; external OIDC remains optional. Email verification, password reset, customer data export and product-wide account deletion are implemented. Browser challenges are detected and handed to a person through the live takeover view; live sessions are held in the API process and do not survive a restart. Async tools can be cancelled; blocking third-party native code that does not yield cannot be forcibly interrupted safely. Multi-region failover, online dual-write migration and logical replication remain deployment/infrastructure work and are not claimed.
+Live WhatsApp and iMessage delivery over real provider networks is unverified: the adapters and durable delivery queue are implemented and config-gated, but no provider account exists yet. Live PostgreSQL integration is not verified in this environment; target deployments must run the unskipped PostgreSQL suite and preflight. Built-in email/password signup and login are implemented; external OIDC remains optional. Email verification, password reset, customer data export and product-wide account deletion are implemented. Browser challenges are detected and handed to a person through the live takeover view; live sessions are held in the API process and do not survive a restart. Tools that opt into process isolation can also be forcibly killed on cancel or timeout; tools that are not picklable, or that are not marked for isolation, still rely on cooperative cancellation. Multi-region failover, online dual-write migration and logical replication remain deployment/infrastructure work and are not claimed.
 
 The SQLite single-host shape and PostgreSQL memory, owner-scoped jobs and shared rate limiting are stated at their tested boundaries. SSE and authenticated WebSocket job streams are implemented. No missing item is represented as shipped.
 
@@ -248,6 +250,23 @@ A model statement is never treated as proof that work happened. Tool returns are
 
 
 ## Advanced operation
+
+### Forced interruption for blocking tools
+
+Cooperative cancellation cannot stop a tool stuck in blocking or native code. Mark such a tool for process isolation:
+
+```python
+from meemee.isolation import IsolationPolicy
+from meemee.tools.base import Tool
+
+class OcrTool(Tool):
+    name = "ocr.page"
+    isolation = IsolationPolicy(timeout_s=120, grace_s=2)
+    ...
+```
+
+`ToolRegistry.execute` then runs the call in a spawned child. Cancelling the job or passing `timeout_s` sends SIGTERM, then SIGKILL after `grace_s`; the call returns `ToolResult(ok=False, error="tool cancelled")` or a hard-timeout error. The tool class must be importable at module level, the tool instance, its arguments and its return value must be picklable, and each call pays a fresh interpreter start (about 0.3 s per call measured in the pb7 sandbox). `run_isolated` / `run_isolated_sync` in `meemee/isolation.py` can also be used directly.
+
 
 Set `MEEMEE_API_TOKEN` in production-facing environments. Run one or more durable workers with `meemee worker`. Schedule work through `POST /v1/jobs` with an ISO 8601 `run_at`; workers atomically claim due jobs. Shell and local Git mutations are side effects and still require agent-run approval. Commands are direct argv calls, never `shell=True`, and only configured executables can run. Git commits name explicit paths and never push.
 
