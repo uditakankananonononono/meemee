@@ -23,6 +23,11 @@ class Companion:
 def build_companion(settings: Settings | None = None, store: CompanionStore | None = None) -> Companion:
     """Compose the companion layer from runtime settings."""
     settings = settings or Settings()
+    if store is None and settings.persistence_backend.strip().lower() == "postgresql":
+        # Standalone callers (companion worker, CLI): the shared companion tables, not a local file.
+        from ..persistence import persistence_from_settings
+
+        store = persistence_from_settings(settings).companion
     companion_store = store or CompanionStore(settings.data_dir / "companion.sqlite3")
     context_store = ContextStore(settings.data_dir / "context.sqlite3")
     personal_model = PersonalModelStore(settings.data_dir / "personal-model.sqlite3")

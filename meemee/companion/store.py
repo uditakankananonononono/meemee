@@ -118,6 +118,10 @@ class CompanionStore:
         """)
         register_schema(self.db, "companion", 1, SCHEMA)
 
+    def ping(self) -> bool:
+        with self.lock:
+            return self.db.execute("SELECT 1 FROM companion_users LIMIT 1").fetchall() is not None
+
     # profiles ---------------------------------------------------------
     def upsert_user(self, profile: UserProfile) -> dict[str, Any]:
         now = _now()
