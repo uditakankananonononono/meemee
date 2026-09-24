@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class HealthStatus(BaseModel):
@@ -59,12 +59,14 @@ class RunReport(BaseModel):
     steps_used: int
     tool_results: list[dict[str, Any]] = Field(default_factory=list)
     approvals_required: list[ApprovalRefusal] = Field(default_factory=list)
+    #: Server-computed: true when any tool call was refused. Defaults to False for older servers.
+    blocked: bool = False
     created_at: datetime | None = None
 
     @property
     def is_blocked(self) -> bool:
         """True when any tool call was refused; do not present such a run as done."""
-        return bool(self.approvals_required)
+        return self.blocked or bool(self.approvals_required)
 
 
 class JobStatus(str, Enum):
@@ -101,6 +103,15 @@ class Job(BaseModel):
     error: str | None = None
     created_at: datetime
     updated_at: datetime
+    @field_validator("result", mode="before")
+    @classmethod
+    def _encode_decoded_result(cls, value: Any) -> Any:
+        """Older PostgreSQL-backed servers returned the result as decoded JSON; keep it a string."""
+        return value if value is None or isinstance(value, str) else json.dumps(value)
+
+    #: Server-computed: true when the job's run refused any tool call. A "done"
+    #: job with blocked=True finished its run but did not do everything asked.
+    blocked: bool = False
 
     @property
     def is_terminal(self) -> bool:
@@ -124,6 +135,11 @@ class Job(BaseModel):
         if not isinstance(data, dict):
             return []
         return [ApprovalRefusal.model_validate(item) for item in data.get("approvals_required", [])]
+
+    @property
+    def is_blocked(self) -> bool:
+        """True when the job's run refused any tool call (works against older servers too)."""
+        return self.blocked or bool(self.approvals_required)
 
 
 class JobQuotaSnapshot(BaseModel):

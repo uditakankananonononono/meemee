@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 
 class Risk(str, Enum):
@@ -108,3 +108,9 @@ class RunReport(BaseModel):
     steps_used: int
     tool_results: list[dict[str, Any]]
     approvals_required: list[ApprovalRefusal] = Field(default_factory=list)
+
+    @computed_field  # serialized, so every stored or returned report carries it
+    @property
+    def blocked(self) -> bool:
+        """True when any tool call was refused: the goal may not be done, whatever `final` says."""
+        return bool(self.approvals_required)
