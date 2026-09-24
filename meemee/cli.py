@@ -29,7 +29,7 @@ from .schema_registry import schema_status
 from .tools.github import GitHubRepoSearch, GitHubSearchArgs
 from .vault import SecretVault
 from .webhook_verify import verify_signature
-from .webhooks import WebhookStore, dispatch_forever
+from .webhooks import WebhookStore, check_private_hosts_override, dispatch_forever
 from .worker import work_forever
 
 app = typer.Typer(no_args_is_help=True, help="Meemee local-first agent runtime")
@@ -454,6 +454,7 @@ def preflight(require_model: bool = typer.Option(False, "--require-model")) -> N
 def webhook_worker() -> None:
     """Run the durable signed-webhook dispatcher."""
     settings = Settings()
+    check_private_hosts_override("webhook-worker")  # raises when MEEMEE_ENV=production
     store = WebhookStore(
         settings.data_dir / "webhooks.sqlite3",
         settings.webhook_max_payload_bytes,

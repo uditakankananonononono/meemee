@@ -30,5 +30,5 @@ def test_terminal_event_enqueue_is_idempotent(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(socket, "getaddrinfo", public_dns)
     store.subscribe("u", "https://hooks.example/mee", {"job.done"})
     payload = {"job_id":"j1","status":"done"}
-    assert store.enqueue("job:j1:done", "job.done", payload) == 1
-    assert store.enqueue("job:j1:done", "job.done", payload) == 0
+    assert store.enqueue("job:j1:done", "job.done", payload, principal="u") == 1
+    assert store.enqueue("job:j1:done", "job.done", payload, principal="u") == 0

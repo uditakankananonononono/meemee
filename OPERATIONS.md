@@ -114,7 +114,7 @@ Run `meemee retention-run` from cron after backups. Defaults retain terminal job
 
 ## Webhook alerts and recovery
 
-Alert when `meemee_webhook_success_rate` falls below 0.95 for 10 minutes, `meemee_webhook_oldest_queued_seconds` exceeds 300, any `meemee_webhook_suspended_subscriptions` is nonzero, or failed outbox depth grows. The circuit breaker suspends a subscription after five terminal failures. Operators should inspect the attempt timeline, fix the endpoint, wait the configured cooldown (`MEEMEE_WEBHOOK_BREAKER_COOLDOWN_SECONDS`, default 300), send a test delivery, then resume. Do not bypass TLS or SSRF checks to clear an alert.
+Alert when `meemee_webhook_success_rate` falls below 0.95 for 10 minutes, `meemee_webhook_oldest_queued_seconds` exceeds 300, any `meemee_webhook_suspended_subscriptions` is nonzero, or failed outbox depth grows. The circuit breaker suspends a subscription after five terminal failures. Operators should inspect the attempt timeline, fix the endpoint, wait the configured cooldown (`MEEMEE_WEBHOOK_BREAKER_COOLDOWN_SECONDS`, default 300), send a test delivery, then resume. Do not bypass TLS or SSRF checks to clear an alert. `MEEMEE_WEBHOOK_ALLOW_PRIVATE_HOSTS=1` exists only for local tests (it lets webhook URLs resolve to loopback/private hosts); never set it on a deployed instance. Set `MEEMEE_ENV=production` in production: the API and `webhook-worker` then refuse to start if that override is present.
 
 ## Product plans and billing boundary
 
