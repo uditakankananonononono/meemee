@@ -57,3 +57,21 @@ def test_prune_rejects_bad_anchor_without_deleting(tmp_path):
     doc=json.loads(anchor.read_text()); doc["entry_hash"]="f"*64; anchor.write_text(json.dumps(doc))
     with pytest.raises(ValueError): prune_to_anchor(log,anchor,KEY)
     assert len(log.list()) == 1
+
+
+def test_anchor_commands_in_postgresql_mode_never_use_the_local_chain(monkeypatch, tmp_path):
+    """PostgreSQL mode anchors the shared chain (tests_pg/test_operator_tools_pg.py); without a DSN
+    the commands stop before opening (and creating) a local audit.sqlite3."""
+    from typer.testing import CliRunner
+
+    from meemee.cli import app
+
+    monkeypatch.setenv("MEEMEE_PERSISTENCE_BACKEND", "postgresql")
+    monkeypatch.setenv("MEEMEE_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("MEEMEE_AUDIT_ANCHOR_KEY", "k" * 40)
+    monkeypatch.delenv("MEEMEE_POSTGRES_DSN", raising=False)
+    for args in (["audit-anchor", str(tmp_path / "a.json")], ["audit-anchor-verify", str(tmp_path / "a.json")],
+                 ["audit-prune", str(tmp_path / "a.json")]):
+        result = CliRunner().invoke(app, args)
+        assert result.exit_code == 2 and "MEEMEE_POSTGRES_DSN" in result.output
+    assert not (tmp_path / "data" / "audit.sqlite3").exists() and not (tmp_path / "a.json").exists()

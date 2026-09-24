@@ -291,19 +291,33 @@ def db_migrate() -> None:
     typer.echo(json.dumps({"applied": applied}))
 
 
-def _refuse_in_postgresql_mode(command: str) -> None:
-    """Export/import read and write the local SQLite files directly. In PostgreSQL mode jobs, plans
-    (and, as they move, runs) live in the database, so the local files are stale or empty."""
-    if Settings().persistence_backend.strip().lower() == "postgresql":
-        typer.echo(f"{command} works on SQLite data directories only; in PostgreSQL mode it would read stale local files", err=True)
-        raise typer.Exit(2)
+def _postgres_database(settings: Settings):
+    """The shared database for operator commands in PostgreSQL mode, or None in SQLite mode.
+
+    Export/import, retention and audit anchors act on the rows every host shares, never on the
+    (stale or empty) local SQLite files of whichever host the operator happens to be on."""
+    if settings.persistence_backend.strip().lower() != "postgresql":
+        return None
+    if not settings.postgres_dsn:
+        raise typer.BadParameter("MEEMEE_POSTGRES_DSN is required for the postgresql backend")
+    from meemee_persist_pg import Database, MigrationStore
+
+    database = Database(settings.postgres_dsn)
+    MigrationStore(database).apply()
+    return database
 
 
 @app.command("account-export")
 def account_export(principal: str, destination: Path) -> None:
     """Export account-owned jobs, runs and entitlement metadata with checksum."""
-    _refuse_in_postgresql_mode("account-export")
-    typer.echo(json.dumps(export_account(Settings().data_dir, principal, destination), indent=2))
+    settings = Settings(); database = _postgres_database(settings)
+    if database is None:
+        report = export_account(settings.data_dir, principal, destination)
+    else:
+        from meemee_persist_pg.operator_tools import export_account as export_pg
+        try: report = export_pg(database, principal, destination)
+        finally: database.close()
+    typer.echo(json.dumps(report, indent=2))
 
 
 @app.command("account-delete")
@@ -342,8 +356,14 @@ def account_delete_resume() -> None:
 @app.command("account-import")
 def account_import(source: Path, target_principal: str | None = None) -> None:
     """Import a verified account export after collision preflight."""
-    _refuse_in_postgresql_mode("account-import")
-    typer.echo(json.dumps(import_account(Settings().data_dir, source, target_principal), indent=2))
+    settings = Settings(); database = _postgres_database(settings)
+    if database is None:
+        report = import_account(settings.data_dir, source, target_principal)
+    else:
+        from meemee_persist_pg.operator_tools import import_account as import_pg
+        try: report = import_pg(database, source, target_principal)
+        finally: database.close()
+    typer.echo(json.dumps(report, indent=2))
 
 
 @app.command("account-import-inspect")
@@ -354,41 +374,41 @@ def account_import_inspect(source: Path, target_principal: str | None = None) ->
     typer.echo(json.dumps({**report, "dry_run":True}, indent=2))
 
 
-def _anchor_audit(settings: Settings) -> AuditLog:
-    """Anchors and pruning operate on the SQLite chain. In PostgreSQL mode the chain lives in the
-    database, and anchoring the stale local audit.sqlite3 would certify the wrong chain."""
-    if settings.persistence_backend.strip().lower() == "postgresql":
-        raise typer.BadParameter("audit anchors and pruning are SQLite-only; in PostgreSQL mode verify the shared chain with GET /v1/audit")
-    return AuditLog(settings.data_dir / "audit.sqlite3")
+def _anchor_call(settings: Settings, operation: str, path: Path):
+    """Run an anchor operation on the chain this deployment actually uses: the local audit.sqlite3
+    in SQLite mode, the one shared PostgreSQL chain (under its append lock for pruning) otherwise."""
+    if not settings.audit_anchor_key:
+        raise typer.BadParameter("MEEMEE_AUDIT_ANCHOR_KEY is required")
+    database = _postgres_database(settings)
+    if database is None:
+        function = {"create": create_anchor, "prune": prune_to_anchor, "verify": verify_anchor}[operation]
+        return function(AuditLog(settings.data_dir / "audit.sqlite3"), path, settings.audit_anchor_key)
+    from meemee_persist_pg import operator_tools
+
+    function = {"create": operator_tools.create_anchor, "prune": operator_tools.prune_to_anchor,
+                "verify": operator_tools.verify_anchor}[operation]
+    try:
+        return function(database, path, settings.audit_anchor_key)
+    finally:
+        database.close()
 
 
 @app.command("audit-anchor")
 def audit_anchor(destination: Path) -> None:
     """Write a signed tamper-evident audit checkpoint to external storage."""
-    settings = Settings()
-    if not settings.audit_anchor_key:
-        raise typer.BadParameter("MEEMEE_AUDIT_ANCHOR_KEY is required")
-    report = create_anchor(_anchor_audit(settings), destination, settings.audit_anchor_key)
-    typer.echo(json.dumps(report, indent=2))
+    typer.echo(json.dumps(_anchor_call(Settings(), "create", destination), indent=2))
 
 
 @app.command("audit-prune")
 def audit_prune(anchor: Path) -> None:
     """Prune only a prefix protected by a valid external signed checkpoint."""
-    settings = Settings()
-    if not settings.audit_anchor_key:
-        raise typer.BadParameter("MEEMEE_AUDIT_ANCHOR_KEY is required")
-    report = prune_to_anchor(_anchor_audit(settings), anchor, settings.audit_anchor_key)
-    typer.echo(json.dumps(report, indent=2))
+    typer.echo(json.dumps(_anchor_call(Settings(), "prune", anchor), indent=2))
 
 
 @app.command("audit-anchor-verify")
 def audit_anchor_verify(source: Path) -> None:
-    """Verify an external audit checkpoint against the current local chain."""
-    settings = Settings()
-    if not settings.audit_anchor_key:
-        raise typer.BadParameter("MEEMEE_AUDIT_ANCHOR_KEY is required")
-    report = verify_anchor(_anchor_audit(settings), source, settings.audit_anchor_key)
+    """Verify an external audit checkpoint against the deployment's current audit chain."""
+    report = _anchor_call(Settings(), "verify", source)
     typer.echo(json.dumps(report, indent=2))
     if report["status"] != "pass":
         raise typer.Exit(1)
@@ -415,14 +435,16 @@ def backup_verify(directory: Path) -> None:
 @app.command("retention-run")
 def retention_run() -> None:
     """Apply configured retention windows and print deletion counts."""
-    _refuse_in_postgresql_mode("retention-run")
     settings = Settings()
-    report = RetentionManager(settings.data_dir).run(
-        jobs_days=settings.retention_jobs_days,
-        memory_days=settings.retention_memory_days,
-        audit_days=settings.retention_audit_days,
-        runs_days=settings.retention_runs_days,
-    )
+    windows = {"jobs_days": settings.retention_jobs_days, "memory_days": settings.retention_memory_days,
+               "audit_days": settings.retention_audit_days, "runs_days": settings.retention_runs_days}
+    database = _postgres_database(settings)
+    if database is None:
+        report = RetentionManager(settings.data_dir).run(**windows)
+    else:
+        from meemee_persist_pg.operator_tools import run_retention
+        try: report = run_retention(database, **windows)
+        finally: database.close()
     typer.echo(json.dumps(report.__dict__, indent=2))
 
 
