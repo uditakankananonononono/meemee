@@ -72,6 +72,14 @@ async with AsyncMeemeeClient(base_url, auth=auth) as client:
 await auth.aclose()
 ```
 
+### Expired credentials
+
+When the auth provider has a `refresh()` method (both OIDC providers do), a
+401 makes the client call it once and retry the request once. SSE and
+WebSocket streams reopen from scratch with the new credential. A second 401
+raises `AuthenticationError`, so there is never a loop. Static `TokenAuth`
+tokens have no refresh and fail on the first 401, as before.
+
 ### WebSocket streaming
 
 `client.jobs.stream_ws(job_id, after=0)` (sync and async) follows
@@ -235,6 +243,15 @@ package and exercise it end to end):**
     validates via JWKS; concurrent requests share one fetch, a refreshed token
     is accepted and introspects as `oidc`, a wrong client secret, an unmapped
     role and a forged signature are all rejected.
+18. 401 refresh-and-retry-once (sync and async): with a provider exposing
+    `refresh()` (both OIDC providers; sync or async `refresh`), a 401 forces one
+    refresh and one retry of the same request, including POST bodies rebuilt
+    from their JSON and SSE/WebSocket streams reopened from scratch; a second
+    401 raises `AuthenticationError`; the refresh does not use a retry attempt
+    or the stream reconnect budget; providers without `refresh()` (such as
+    `TokenAuth`) keep the single attempt; a failing refresh propagates (mocked;
+    live with a revoked-then-valid token over HTTP, SSE and WebSocket, and with
+    OIDC providers whose cached token the server rejects).
 
 The live suite lives in `tests/test_live_integration.py`; it boots uvicorn
 against the `meemee` package next to `sdk/` and skips cleanly when that

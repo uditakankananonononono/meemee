@@ -234,3 +234,30 @@ async def test_live_server_rejects_a_forged_token(oidc_stack) -> None:
     async with AsyncMeemeeClient(base, auth=forged) as client:
         with pytest.raises(AuthenticationError):
             await client.jobs.list()
+
+
+async def test_live_rejected_cached_token_triggers_one_refetch(oidc_stack) -> None:
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from meemee_client import OIDCClientCredentialsAuth
+    base, issuer = oidc_stack
+    now = datetime.now(timezone.utc)
+    stale = jwt.encode({"iss": issuer.url, "aud": AUDIENCE, "sub": CLIENT_ID, "iat": now,
+                        "exp": now + timedelta(minutes=5), "roles": ["operator"]},
+                       rsa.generate_private_key(public_exponent=65537, key_size=2048),
+                       algorithm="RS256", headers={"kid": "live-key"})
+    # Async provider holding a cached token the server no longer accepts (e.g. after key rotation).
+    auth = _provider(issuer)
+    auth._access_token, auth._expires_at = stale, time.time() + 3600
+    before = issuer.token_requests
+    async with AsyncMeemeeClient(base, auth=auth) as client:
+        await client.jobs.list()
+    assert issuer.token_requests - before == 1 and await auth.access_token() != stale
+    await auth.aclose()
+    # Same for the sync provider on the sync client.
+    sync_auth = OIDCClientCredentialsAuth(issuer.url, client_id=CLIENT_ID, client_secret=CLIENT_SECRET, scope="operator",
+                                          http_client=httpx.Client(verify=ssl.create_default_context(cafile=str(issuer.cert))))
+    sync_auth._access_token, sync_auth._expires_at = stale, time.time() + 3600
+    before = issuer.token_requests
+    with MeemeeClient(base, auth=sync_auth) as client:
+        client.jobs.list()
+    assert issuer.token_requests - before == 1

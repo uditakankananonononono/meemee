@@ -153,3 +153,55 @@ async def test_live_token_introspection_async(live_server: str) -> None:  # noqa
         assert result.active and result.scopes == ["companion:read"] and result.id == minted.id
         await admin.tokens.revoke(minted.id)
         assert (await admin.tokens.introspect(minted.token)).state == "revoked"
+
+
+class _LiveRotating:
+    def __init__(self, *tokens: str) -> None:
+        self.tokens, self.index, self.refreshes, self.headers_served = list(tokens), 0, 0, 0
+
+    def authorization_header(self) -> str:
+        self.headers_served += 1
+        return f"Bearer {self.tokens[min(self.index, len(self.tokens) - 1)]}"
+
+    def refresh(self) -> None:
+        self.refreshes += 1
+        self.index += 1
+
+
+def test_live_401_refresh_retry_http_sse_and_ws(live_server: str) -> None:  # noqa: F811
+    with MeemeeClient(live_server, auth=BOOT) as admin:
+        stale = admin.tokens.create("live-stale", {"jobs:read", "jobs:write"})
+        fresh = admin.tokens.create("live-fresh", {"jobs:read", "jobs:write"})
+        admin.tokens.revoke(stale.id)
+    for method in ("http", "sse", "ws"):
+        auth = _LiveRotating(stale.token, fresh.token)
+        with MeemeeClient(live_server, auth=auth) as client:
+            if method == "http":
+                job = client.jobs.create("Refresh retry goal", run_at="2099-01-01T00:00:00Z")
+                client.jobs.cancel(job.id)
+            elif method == "sse":
+                assert [e.kind for e in client.jobs.stream_events(job.id)] == ["queued", "cancelled"]
+            else:
+                assert [e.kind for e in client.jobs.stream_ws(job.id, reconnect=False)] == ["queued", "cancelled"]
+        assert auth.refreshes == 1, method
+    stuck = _LiveRotating(stale.token, stale.token, stale.token)
+    with MeemeeClient(live_server, auth=stuck) as client, pytest.raises(AuthenticationError):
+        client.jobs.list()
+    assert stuck.refreshes == 1 and stuck.headers_served == 2
+
+
+async def test_live_401_refresh_retry_async(live_server: str) -> None:  # noqa: F811
+    async with AsyncMeemeeClient(live_server, auth=BOOT) as admin:
+        stale = await admin.tokens.create("live-stale-a", {"jobs:read", "jobs:write"})
+        fresh = await admin.tokens.create("live-fresh-a", {"jobs:read", "jobs:write"})
+        await admin.tokens.revoke(stale.id)
+    auth = _LiveRotating(stale.token, fresh.token)
+    async with AsyncMeemeeClient(live_server, auth=auth) as client:
+        job = await client.jobs.create("Async refresh goal", run_at="2099-01-01T00:00:00Z")
+        await client.jobs.cancel(job.id)
+    assert auth.refreshes == 1
+    for streamer in ("stream_events", "stream_ws"):
+        auth = _LiveRotating(stale.token, fresh.token)
+        async with AsyncMeemeeClient(live_server, auth=auth) as client:
+            kinds = [e.kind async for e in getattr(client.jobs, streamer)(job.id)]
+        assert kinds == ["queued", "cancelled"] and auth.refreshes == 1, streamer
