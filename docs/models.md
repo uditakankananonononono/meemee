@@ -120,3 +120,27 @@ For `transformers` profiles `check` makes no network call: it reports whether th
 installed and the weights are already on disk.
 
 `check` exits nonzero when no probed profile is reachable.
+
+## Shared model layer (instinct_models)
+
+Meemee, Atlas and Sugarcode share one model package, `instinct_models`
+(https://github.com/uditakankananonononono/shared-models). Meemee vendors it under
+`meemee/_vendor/instinct_models` at the commit recorded in `meemee/_vendor/INSTINCT_MODELS_PIN`.
+To move to a newer commit run `scripts/sync_instinct_models.sh <commit>`.
+
+Use it through the `shared` profile:
+
+    MEEMEE_SHARED_ORNITH_URL=http://localhost:11434/v1   # Ornith-1.5-9B GGUF in Ollama/llama.cpp
+    MEEMEE_SHARED_ORNITH_MODEL=<tag you pulled>
+    MEEMEE_SHARED_INKLING_URL=...                        # optional self-hosted Inkling
+    MEEMEE_SHARED_NEEDLE_WEIGHTS=models/meemee-tuned.cact  # optional Meemee-tuned Needle
+    MEEMEE_MODEL_ROUTES="chat=shared,local"
+
+The hosted Hugging Face router (metered past its free credit) is only used when
+`MEEMEE_SHARED_ALLOW_HOSTED=true`, because Meemee handles personal data.
+
+Training on Meemee data only: write owner-confirmed examples as JSONL
+(`query`, `tools`, `answers`, `confirmed`, `source_ref`) and call
+`meemee.shared_models.train_meemee_needle(examples, out_dir)`. It needs `pip install cactus-needle`.
+Unconfirmed rows and rows tagged for another product are dropped. Needle telemetry is
+turned off by the shared layer.

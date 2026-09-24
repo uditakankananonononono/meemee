@@ -23,7 +23,7 @@ from .types import AgentDecision
 
 ProfileKind = Literal["local", "self_hosted", "hosted_paid", "hosted_free"]
 ROLES = ("agent", "chat", "reflection")
-TRANSPORTS = ("openai", "transformers")
+TRANSPORTS = ("openai", "transformers", "instinct")
 _last_trace: ContextVar[dict[str, Any] | None] = ContextVar("meemee_model_trace", default=None)
 
 
@@ -37,7 +37,8 @@ class ModelProfile:
     requires_key: bool = False
     description: str = ""
     source_url: str = ""
-    transport: str = "openai"  # "openai" (any OpenAI-compatible HTTP API) or "transformers" (in-process)
+    transport: str = "openai"  # "openai" (HTTP API), "transformers" (in-process) or "instinct" (shared layer)
+    _instinct_reason: str | None = None
 
     @property
     def paid(self) -> bool:
@@ -48,6 +49,8 @@ class ModelProfile:
             from .providers import transformers_missing
 
             return transformers_missing()
+        if self.transport == "instinct":
+            return self._instinct_reason
         if self.requires_key and not self.api_key:
             return "no API key configured"
         if self.paid and not allow_paid:
@@ -146,8 +149,29 @@ def builtin_profiles(settings: Any) -> dict[str, ModelProfile]:
             ),
             source_url=f"https://huggingface.co/{settings.transformers_model}",
         ),
+        ModelProfile(
+            name="shared",
+            base_url="",
+            model="instinct_models",
+            kind="local",
+            description=(
+                "Shared model layer used by Meemee, Atlas and Sugarcode: Needle -> Ornith -> Inkling. "
+                "Private by default (never the hosted router unless MEEMEE_SHARED_ALLOW_HOSTED=true)."
+            ),
+            source_url="https://github.com/uditakankananonononono/shared-models",
+            transport="instinct",
+            _instinct_reason=_shared_reason(settings),
+        ),
     ]
     return {p.name: p for p in profiles}
+
+
+def _shared_reason(settings: Any) -> str | None:
+    try:
+        from .shared_models import generation_ready
+    except ImportError as exc:  # vendored package missing or broken
+        return f"shared model layer not importable: {exc}"
+    return generation_ready(settings)
 
 
 def _custom_profiles(raw: str | None) -> dict[str, ModelProfile]:
@@ -277,9 +301,15 @@ class RoutedModel:
     _clients: dict[str, Any] = field(default_factory=dict)
     transformers_device: str = "auto"
     transformers_max_new_tokens: int = 512
+    settings: Any = None
 
     def _model_for(self, profile: ModelProfile) -> Any:
         if profile.name in self._clients:
+            return self._clients[profile.name]
+        if profile.transport == "instinct":
+            from .shared_models import SharedLayerModel
+
+            self._clients[profile.name] = SharedLayerModel(self.settings)
             return self._clients[profile.name]
         if profile.transport == "transformers":
             from .providers import TransformersModel
@@ -382,6 +412,7 @@ def build_role_model(settings: Any, role: str) -> OpenAICompatibleModel | Routed
             settings.model_max_attempts,
             transformers_device=settings.transformers_device,
             transformers_max_new_tokens=settings.transformers_max_new_tokens,
+            settings=settings,
         )
     return OpenAICompatibleModel(
         settings.model_base_url,
