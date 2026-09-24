@@ -34,7 +34,8 @@ class ExampleRow:
 class DomainDataset(Protocol):
     product: str
 
-    def rows(self) -> Iterable[ExampleRow]: ...
+    def rows(self) -> Iterable[ExampleRow]:
+        """The product's own training rows (confirmed and tagged with the product)."""
 
 
 def _values(obj) -> list[str]:
