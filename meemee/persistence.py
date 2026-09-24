@@ -7,6 +7,9 @@ from typing import Any
 from .approvals import ApprovalStore as SQLiteApprovalStore
 from .audit import AuditLog as SQLiteAuditLog
 from .auth import TokenStore as SQLiteTokenStore
+from .browser_notices import TakeoverNoticeQueue as SQLiteTakeoverNoticeQueue
+from .browser_sessions import BrowserSessionStore as SQLiteBrowserSessionStore
+from .browser_sessions import default_host_id
 from .companion.store import CompanionStore as SQLiteCompanionStore
 from .context import ContextStore as SQLiteContextStore
 from .email_verification import EmailVerificationStore as SQLiteEmailVerificationStore
@@ -61,6 +64,14 @@ class Persistence:
     #: reflection-schedule.sqlite3. PostgreSQL: shared by every API host and reflection worker.
     monitors: Any = None
     reflection_schedule: Any = None
+    #: Account-deletion ledger. SQLite: account-deletions.sqlite3. PostgreSQL: shared, so any host
+    #: resumes an interrupted deletion and late runs are discarded on every host.
+    deletion_ledger: Any = None
+    #: Browser session/takeover/event records and the takeover-notice queue. SQLite:
+    #: browser-sessions.sqlite3 / browser-notices.sqlite3. PostgreSQL: shared records (each session
+    #: row names the host holding the live browser) and one notice queue for every host.
+    browser_sessions: Any = None
+    browser_notices: Any = None
 
     def check_memory(self) -> bool:
         if self.backend == "sqlite":
@@ -83,6 +94,14 @@ def _sqlite_reflection_schedule(data_dir: Path) -> Any:
     return ReflectionSchedule(data_dir / "reflection-schedule.sqlite3")
 
 
+def _sqlite_deletion_ledger(data_dir: Path) -> Any:
+    from .account_deletion import (
+        DeletionLedger,  # imported late: account_deletion imports many stores
+    )
+
+    return DeletionLedger(data_dir / "account-deletions.sqlite3")
+
+
 def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = None, *,
                       default_daily_jobs: int = 100, default_plan: str = "starter",
                       vault_key: str | None = None, webhook_max_payload_bytes: int = 256_000) -> Persistence:
@@ -101,7 +120,10 @@ def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = N
                            personal_model=SQLitePersonalModelStore(data_dir / "personal-model.sqlite3"),
                            context=SQLiteContextStore(data_dir / "context.sqlite3"),
                            monitors=SQLiteMonitorStore(data_dir / "monitors.sqlite3"),
-                           reflection_schedule=_sqlite_reflection_schedule(data_dir))
+                           reflection_schedule=_sqlite_reflection_schedule(data_dir),
+                           deletion_ledger=_sqlite_deletion_ledger(data_dir),
+                           browser_sessions=SQLiteBrowserSessionStore(data_dir / "browser-sessions.sqlite3"),
+                           browser_notices=SQLiteTakeoverNoticeQueue(data_dir / "browser-notices.sqlite3"))
     if normalized != "postgresql":
         raise ValueError("MEEMEE_PERSISTENCE_BACKEND must be sqlite or postgresql")
     if not postgres_dsn:
@@ -109,9 +131,11 @@ def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = N
     from meemee_persist_pg import (
         ApprovalStore,
         AuditLog,
+        BrowserSessionStore,
         CompanionStore,
         ContextStore,
         Database,
+        DeletionLedger,
         EmailVerificationStore,
         EntitlementStore,
         IdempotencyStore,
@@ -123,6 +147,7 @@ def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = N
         QuotaStore,
         ReflectionSchedule,
         RunStore,
+        TakeoverNoticeQueue,
         TokenStore,
         WebhookStore,
     )
@@ -136,7 +161,9 @@ def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = N
                        webhooks=WebhookStore(database, webhook_max_payload_bytes, vault_key) if vault_key else None,
                        companion=CompanionStore(database), personal_model=PersonalModelStore(database),
                        context=ContextStore(database), monitors=MonitorStore(database),
-                       reflection_schedule=ReflectionSchedule(database))
+                       reflection_schedule=ReflectionSchedule(database), deletion_ledger=DeletionLedger(database),
+                       browser_sessions=BrowserSessionStore(database, default_host_id(data_dir)),
+                       browser_notices=TakeoverNoticeQueue(database))
 
 
 def persistence_from_settings(settings: Any) -> Persistence:

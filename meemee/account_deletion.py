@@ -68,6 +68,10 @@ class DeletionLedger:
             );
         """)
 
+    def ping(self) -> bool:
+        with self.lock:
+            return self.db.execute("SELECT 1").fetchone() is not None
+
     def open(self, principal: str, requested_by: str) -> str:
         with self.lock:
             row = self.db.execute(
@@ -234,8 +238,8 @@ def build_account_purger(settings: Any, persistence: Any) -> AccountPurger:
         context=persistence.context or ContextStore(root / "context.sqlite3"),
         webhooks=persistence.webhooks or WebhookStore(root / "webhooks.sqlite3", settings.webhook_max_payload_bytes, settings.vault_key),
         companion=persistence.companion or CompanionStore(root / "companion.sqlite3"),
-        browser_sessions=BrowserSessionStore(root / "browser-sessions.sqlite3"),
-        browser_notices=TakeoverNoticeQueue(root / "browser-notices.sqlite3"),
+        browser_sessions=persistence.browser_sessions or BrowserSessionStore(root / "browser-sessions.sqlite3"),
+        browser_notices=persistence.browser_notices or TakeoverNoticeQueue(root / "browser-notices.sqlite3"),
         reflection_schedule=persistence.reflection_schedule or ReflectionSchedule(root / "reflection-schedule.sqlite3"),
     )
-    return AccountPurger(targets, DeletionLedger(root / "account-deletions.sqlite3"))
+    return AccountPurger(targets, persistence.deletion_ledger or DeletionLedger(root / "account-deletions.sqlite3"))
