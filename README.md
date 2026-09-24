@@ -189,6 +189,8 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 
 164. End-to-end run path, verified live (branch pb7, unreleased): `tests/test_live_runs_e2e.py` boots the real server and worker in SQLite and PostgreSQL modes against a local OpenAI-compatible provider with a fixed script, and checks `POST /v1/runs` (model call, real `workspace.read_file` tool, tool result fed back, final answer), run storage and owner scoping, `run.create` in a verified audit chain, a queued job streamed over SSE from `queued` to `done` and replayed, routed-profile fallback, and a 502 on model outage. It found and fixed a bug where every rate-limited request returned 500 in PostgreSQL mode.
 
+165. Write-approval gate verified live (branch pb7, unreleased): in SQLite and PostgreSQL modes, a write tool is refused without approval (nothing written, the model sees the denial), per-run `approved_tools` / `approve_writes` allow it, persistent grants honor argument constraints, principal scoping, expiry and revocation, unknown tools cannot be granted, and `approval.grant` / `approval.revoke` / `run.create` land in order in a verified audit chain. Fixed: queued jobs ignored persistent grants (the worker passed no approval callback), so a job could never use an approval-gated tool; jobs now apply the owner's grants exactly as runs do.
+
 ## Thin (0)
 
 Nothing is classified as thin. A capability is either implemented and tested at its stated boundary below, or listed as missing.
@@ -240,7 +242,7 @@ curl -X POST http://127.0.0.1:8787/v1/runs -H 'content-type: application/json' \
   -d '{"goal":"Find the best current Python repository for local agents"}'
 ```
 
-File writes are denied unless the caller opts in with `--approve-writes` or `approve_writes: true`. This coarse v1 switch is not a substitute for user-scoped production authorization.
+File writes are denied unless the caller opts in with `--approve-writes` or `approve_writes: true`. Queued jobs (`POST /v1/jobs`) have no per-request approval; they may use an approval-gated tool only through the owner's persistent grant (`PUT /v1/approvals/{principal}`). This coarse v1 switch is not a substitute for user-scoped production authorization.
 
 ## Architecture
 
