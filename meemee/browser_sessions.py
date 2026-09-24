@@ -143,6 +143,18 @@ class BrowserSessionStore:
                 CREATE INDEX IF NOT EXISTS browser_takeovers_session ON browser_takeovers(session_id);
             """)
 
+    def delete_owner(self, owner_id: str) -> dict[str, int]:
+        """Account deletion: remove every session, takeover and event owned by one principal."""
+        with self.lock, self.db:
+            ids = [r["id"] for r in self.db.execute("SELECT id FROM browser_sessions WHERE owner_id=?", (owner_id,))]
+            marks = ",".join("?" * len(ids))
+            events = takeovers = 0
+            if ids:
+                events = self.db.execute(f"DELETE FROM browser_session_events WHERE session_id IN ({marks})", ids).rowcount
+                takeovers = self.db.execute(f"DELETE FROM browser_takeovers WHERE session_id IN ({marks})", ids).rowcount
+            sessions = self.db.execute("DELETE FROM browser_sessions WHERE owner_id=?", (owner_id,)).rowcount
+        return {"browser_sessions": sessions, "browser_takeovers": takeovers, "browser_events": events}
+
     def mark_open_sessions_lost(self) -> int:
         now = _iso(_now())
         with self.lock, self.db:

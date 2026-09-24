@@ -63,6 +63,12 @@ class TakeoverNoticeQueue:
                 (status, detail[:500], channel, _now(), notice_id),
             )
 
+    def delete_user(self, user_id: str) -> dict[str, int]:
+        """Account deletion: remove every takeover notice addressed to one user."""
+        with self.lock, self.db:
+            count = self.db.execute("DELETE FROM browser_takeover_notices WHERE user_id=?", (user_id,)).rowcount
+        return {"browser_notices": count}
+
     def list(self, session_id: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
         query = "SELECT id, takeover_id, session_id, user_id, status, attempts, channel, detail, created_at, updated_at FROM browser_takeover_notices"
         params: tuple = ()
