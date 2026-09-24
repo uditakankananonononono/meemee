@@ -290,6 +290,27 @@ class WebhookStore:
             ).rowcount
         return secret if changed else None
 
+    def delete_principal(self, principal: str) -> dict[str, int]:
+        """Hard-delete a principal's subscriptions, queued/finished deliveries and attempt logs."""
+        if not principal:
+            raise ValueError("principal is required")
+        with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            try:
+                subscriptions = [row[0] for row in self.db.execute("SELECT id FROM webhook_subscriptions WHERE principal=?", (principal,))]
+                deliveries = attempts = 0
+                for subscription in subscriptions:
+                    delivery_ids = [row[0] for row in self.db.execute("SELECT id FROM webhook_deliveries WHERE subscription_id=?", (subscription,))]
+                    for delivery in delivery_ids:
+                        attempts += self.db.execute("DELETE FROM webhook_attempts WHERE delivery_id=?", (delivery,)).rowcount
+                    deliveries += self.db.execute("DELETE FROM webhook_deliveries WHERE subscription_id=?", (subscription,)).rowcount
+                removed = self.db.execute("DELETE FROM webhook_subscriptions WHERE principal=?", (principal,)).rowcount
+                self.db.execute("COMMIT")
+            except BaseException:
+                self.db.execute("ROLLBACK")
+                raise
+        return {"webhook_subscriptions": removed, "webhook_deliveries": deliveries, "webhook_attempts": attempts}
+
 
 class WebhookDispatcher:
     def __init__(self, store: WebhookStore, client: httpx.AsyncClient | None = None):

@@ -32,3 +32,9 @@ class MemoryStore:
     def hybrid_search(self, query: str, limit: int = 8) -> list[dict[str,Any]]:
         """Provide the agent retrieval contract on PostgreSQL without failing startup runs."""
         return self.search(query, limit)
+    def delete_runs(self, run_ids: list[str]) -> int:
+        """Hard-delete memories written by the given runs."""
+        ids = list(dict.fromkeys(run_ids))
+        if not ids: return 0
+        with self.db.transaction() as c:
+            return c.execute("DELETE FROM meemee_memories WHERE run_id=ANY(%s)", (ids,)).rowcount

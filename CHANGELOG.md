@@ -12,6 +12,13 @@ All entries describe shipped repository behavior. Missing work is never presente
 - Fixed: `websockets` is now a core dependency. Plain `pip install .` (as in the Dockerfile) previously had no WebSocket support in uvicorn, so WebSocket endpoints could not accept connections.
 - Security headers middleware keeps a route-specific Content-Security-Policy instead of overwriting it; all other responses keep the existing default policy.
 
+- Product-wide account deletion: jobs and job events, run reports, agent memories, personal model (including soft-deleted history), connected context, monitors, webhooks, quotas, plans, idempotency records, tool approvals and companion content are hard-deleted for the principal. Audit log retained.
+- Running jobs are tombstoned and removed when their worker settles; memories written by the in-flight run are removed too. Late synchronous runs are discarded with HTTP 410.
+- Durable deletion ledger with crash resume (`meemee account-delete-resume`, automatic on API start); admin erasure endpoint for external principals; `meemee account-delete PRINCIPAL --yes`.
+- PostgreSQL migration 004 adds job purge tombstones; expired tombstones are reaped on claim.
+- Fixed PostgreSQL `AuditLog.verify` failing on servers whose timezone is not UTC.
+- `Agent.run` accepts an optional caller-supplied `run_id`.
+
 ## 0.118.0
 
 - Added named model profiles and per-role routing (`MEEMEE_MODEL_ROUTES`, `MEEMEE_MODEL_PROFILES`) with ordered fallback and per-attempt records. The agent, companion chat and personal-model reflection each resolve their own role. With no routing config, behavior is unchanged (local only).

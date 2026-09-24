@@ -106,3 +106,15 @@ class MemoryStore:
                 "SELECT * FROM memories ORDER BY id DESC LIMIT ?", (limit,)
             ).fetchall()
         return [{**dict(row), "metadata": json.loads(row["metadata"])} for row in rows]
+
+    def delete_runs(self, run_ids: list[str]) -> int:
+        """Hard-delete memories (and embeddings/full-text rows) written by the given runs."""
+        deleted = 0
+        with self.lock, self.connection:
+            for run_id in dict.fromkeys(run_ids):
+                ids = [row[0] for row in self.connection.execute("SELECT id FROM memories WHERE run_id=?", (run_id,))]
+                for memory_id in ids:
+                    self.connection.execute("DELETE FROM memory_embeddings WHERE memory_id=?", (memory_id,))
+                deleted += self.connection.execute("DELETE FROM memories WHERE run_id=?", (run_id,)).rowcount
+        return deleted
+

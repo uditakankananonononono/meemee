@@ -107,6 +107,21 @@ class ContextStore:
             records += [row for row in self.recent(owner_id,limit*2) if row["id"] not in seen][:limit-len(records)]
         return {"owner_id":owner_id,"query":query,"records":records,"sources":sorted({row["source_id"] for row in records})}
 
+    def purge_owner(self, owner_id: str) -> dict[str, int]:
+        """Hard-delete an owner's connected sources and ingested records, including the FTS index."""
+        if not owner_id:
+            raise ValueError("owner is required")
+        with self.lock, self.db:
+            rows = self.db.execute("SELECT id,title,content FROM context_records WHERE owner_id=?", (owner_id,)).fetchall()
+            for row in rows:
+                self.db.execute(
+                    "INSERT INTO context_fts(context_fts,rowid,title,content) VALUES('delete',?,?,?)",
+                    (row["id"], row["title"], row["content"]),
+                )
+            records = self.db.execute("DELETE FROM context_records WHERE owner_id=?", (owner_id,)).rowcount
+            sources = self.db.execute("DELETE FROM context_sources WHERE owner_id=?", (owner_id,)).rowcount
+        return {"context_records": records, "context_sources": sources}
+
 
 def verify_webhook_signature(secret: str, body: bytes, timestamp: str, signature: str, now: int | None = None, tolerance: int = 300) -> None:
     clock=int(datetime.now(timezone.utc).timestamp()) if now is None else now
