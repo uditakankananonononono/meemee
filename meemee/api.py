@@ -575,7 +575,8 @@ async def create_run(request: RunRequest, principal=runs_write_dependency):
             audit.append("api", "run.discard", report.run_id, "success", {"reason": "account deleted during run"})
             raise HTTPException(410, "account was deleted while this run was in progress; its output was discarded")
         runs.add(principal.id, report)
-        audit.append("api", "run.create", report.run_id, "success", {"steps": report.steps_used})
+        audit.append("api", "run.create", report.run_id, "success",
+                     {"steps": report.steps_used, "blocked": report.blocked, "refusals": len(report.approvals_required)})
         AGENT_RUNS.labels("success").inc()
         return report
     except (OSError, ValueError, RuntimeError) as exc:
@@ -637,7 +638,24 @@ def list_jobs(request: Request, status: str | None = None, before: str | None = 
         raise HTTPException(422, "invalid job status")
     try: items, next_cursor = jobs.list_for_principal(request.state.principal.id, status, before, limit, cursor)
     except ValueError as exc: raise HTTPException(422, str(exc)) from exc
-    return {"jobs": items, "next_cursor": next_cursor}
+    return {"jobs": [with_blocked(item) for item in items], "next_cursor": next_cursor}
+
+
+def with_blocked(job: dict) -> dict:
+    """Add a top-level `blocked` flag (true when the job's run refused any tool call) and keep
+    `result` a JSON string on every backend: the PostgreSQL store hands back decoded JSONB, which
+    broke the SDK's Job model (result: str) for any finished job in PG mode."""
+    job = dict(job)
+    result = job.get("result")
+    if isinstance(result, str):
+        try:
+            result = json.loads(result)
+        except ValueError:
+            result = None
+    elif result is not None:
+        job["result"] = json.dumps(result)
+    job["blocked"] = bool(isinstance(result, dict) and result.get("approvals_required"))
+    return job
 
 
 @app.get("/v1/jobs/{job_id}", dependencies=[Depends(auth.dependency("jobs:read"))])
@@ -645,7 +663,7 @@ def get_job(request: Request, job_id: str):
     job = jobs.get_owned(job_id, request.state.principal.id)
     if job is None:
         raise HTTPException(404, "job not found")
-    return job
+    return with_blocked(job)
 
 
 @app.delete("/v1/jobs/{job_id}", dependencies=[Depends(auth.dependency("jobs:write"))])

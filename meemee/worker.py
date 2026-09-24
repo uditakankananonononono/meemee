@@ -68,7 +68,7 @@ async def work_forever(settings: Settings | None = None) -> None:
             else:
                 jobs.finish(job["id"], report.model_dump())
                 if not purge_if_deleted(jobs, persistence.memory, job["id"], run_id):
-                    webhooks.enqueue(f"job:{job['id']}:done", "job.done", {"job_id": job["id"], "status": "done", "result": report.model_dump()})
+                    webhooks.enqueue(f"job:{job['id']}:done", "job.done", {"job_id": job["id"], "status": "done", "blocked": report.blocked, "result": report.model_dump()})
         except (OSError, ValueError, RuntimeError) as exc:
             jobs.fail(job["id"], str(exc))
             if not purge_if_deleted(jobs, persistence.memory, job["id"], run_id):
