@@ -1,6 +1,0 @@
-httpx<1.0,>=0.27
-pydantic<3.0,>=2.5
-typing-extensions<5,>=4.7
-
-[dev]
-pytest>=8.0
