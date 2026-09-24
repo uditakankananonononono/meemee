@@ -18,6 +18,9 @@ All entries describe shipped repository behavior. Missing work is never presente
 - PostgreSQL migration 004 adds job purge tombstones; expired tombstones are reaped on claim.
 - Fixed PostgreSQL `AuditLog.verify` failing on servers whose timezone is not UTC.
 - `Agent.run` accepts an optional caller-supplied `run_id`.
+- Added `meemee/isolation.py`: opt-in process-isolated tool execution. Cancellation and a per-tool hard timeout terminate, then kill, the child process, so tools blocked in native code can be stopped.
+- `ToolRegistry.execute` honors a new `Tool.isolation` policy; existing tools are unchanged.
+- Added 12 regression tests covering results, errors, crashes, timeouts, cancellation, SIGKILL escalation and event-loop responsiveness.
 
 ## 0.118.0
 
