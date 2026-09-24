@@ -2,9 +2,9 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.122.0 (168)
+## Verified in v0.122.0 (169)
 
-Item 164 is pb7 work and items 165-168 are unreleased work on branch `pb4`, both verified in this tree; the rest shipped in v0.122.0.
+Item 164 is pb7 work and items 165-169 are unreleased work on branch `pb4`, both verified in this tree; the rest shipped in v0.122.0.
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -195,6 +195,7 @@ Item 164 is pb7 work and items 165-168 are unreleased work on branch `pb4`, both
 166. Token introspection (branch pb4): admin `POST /v1/tokens/introspect` takes a raw credential in the body and returns its state (active, revoked, expired or unknown), credential type (API token, bootstrap or OIDC), scopes, principal, created/last-used/expiry/revocation times and a redacted form showing only the first and last four characters; the secret and its digest are never returned or audited, unknown tokens answer `active: false` instead of 404, and introspection does not count as use. SQLite and PostgreSQL token stores share the same semantics (PostgreSQL verified live), and the SDK exposes `tokens.introspect` on both sync and async clients, verified against a booted server.
 167. asyncio-native OIDC client credentials in the SDK (branch pb4): `AsyncOIDCClientCredentialsAuth` discovers the token endpoint, fetches and caches tokens on `httpx.AsyncClient` with leeway refresh and a single shared fetch for concurrent callers, and is awaited by `AsyncMeemeeClient` without a worker thread; sync-style providers keep the thread-offload fallback. Verified with mocked issuers and live against a local HTTPS issuer whose RS256 tokens the booted server validates through JWKS.
 168. SDK 401 recovery (branch pb4): with a refresh-capable auth provider, sync and async clients answer a 401 with exactly one forced credential refresh and one retry of the same request (JSON bodies rebuilt, SSE and WebSocket streams reopened from scratch, reconnect and retry budgets untouched); a repeated 401 raises, and static tokens keep failing fast. Verified mocked and live, including revoked-then-valid tokens and OIDC tokens rejected after issuance.
+169. SDK live runs (branch pb4): `sdk/tests/test_live_runs.py` drives the sync and async SDK clients against a booted server and `meemee worker` with a local scripted OpenAI-protocol provider, in SQLite and PostgreSQL modes: `runs.create` parses the final answer, step count and real `workspace.read_file` tool result, `runs.get/list/iter_all` read the stored run with cursor paging, other owners get 404 and a token without `runs:write` gets 403, queued jobs are streamed live to `done` over SSE and WebSocket with the result parsed, and a model outage raises `ServerError` 502 without an automatic retry. It found and fixed two PostgreSQL-mode bugs: the job WebSocket dropped the connection on the first event (UUID and datetime values were not JSON-encodable), and the SDK rejected finished jobs because the PostgreSQL store returns `result` as an object instead of a JSON string.
 
 ## Thin (0)
 

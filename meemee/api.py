@@ -835,7 +835,8 @@ async def websocket_job_events(websocket: WebSocket, job_id: str):
             events = jobs.events(job_id, after)
             for event in events:
                 after = event["sequence"]
-                await websocket.send_json(event)
+                # Same encoding as the SSE stream: PostgreSQL rows carry UUID and datetime values.
+                await websocket.send_text(json.dumps(event, separators=(",", ":"), default=str))
             current = jobs.get_owned(job_id, principal.id)
             if current and current["status"] in {"done", "failed", "cancelled"} and not events:
                 await websocket.close(code=1000); return

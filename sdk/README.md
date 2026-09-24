@@ -179,12 +179,14 @@ are limiter-exempt server-side.
 
 ## Verified, Thin, Missing
 
-**Verified (247 tests: 133 sync tests against a mocked transport implementing
+**Verified (262 tests: 134 sync tests against a mocked transport implementing
 the server v0.122.0 contract, 27 async, 4 introspection, 18 async-OIDC and 12
 401-refresh tests against mocked transports, 23 WebSocket tests against a
-scripted loopback WebSocket server, plus 30 live integration tests that boot
-the real server package and exercise it end to end, 5 of them against a local
-HTTPS OIDC issuer):**
+scripted loopback WebSocket server, plus 44 live integration tests that boot
+the real server package and exercise it end to end: 5 of them against a local
+HTTPS OIDC issuer, and 14 agent-run tests (7 in SQLite mode, 7 in PostgreSQL
+mode, which skip without `MEEMEE_TEST_POSTGRES_DSN`) against a booted server,
+worker and scripted model provider):**
 
 1. Auth header attachment, 401/403 mapping including `WWW-Authenticate` and
    `missing_scope` extraction (mocked + live).
@@ -256,6 +258,17 @@ HTTPS OIDC issuer):**
     `TokenAuth`) keep the single attempt; a failing refresh propagates (mocked;
     live with a revoked-then-valid token over HTTP, SSE and WebSocket, and with
     OIDC providers whose cached token the server rejects).
+19. Live agent runs (sync and async, `tests/test_live_runs.py`): `runs.create`
+    against a booted server whose model is a local scripted OpenAI-protocol
+    provider parses the final answer, step count and the real
+    `workspace.read_file` tool result; `runs.get/list/iter_all` return the
+    stored run (created_at stamped by the store) with cursor paging; other
+    owners get `NotFoundError` and a token without `runs:write` gets
+    `PermissionDeniedError`; a queued job runs in `meemee worker` and streams
+    over SSE and WebSocket from `queued` to `done` with `result_data` parsed;
+    a dead model endpoint raises `ServerError` 502 with `agent run failed`
+    and no automatic retry. Runs in SQLite and PostgreSQL modes. `Job.result`
+    accepts the PostgreSQL store's decoded object as well as SQLite's string.
 
 The live suite lives in `tests/test_live_integration.py`; it boots uvicorn
 against the `meemee` package next to `sdk/` and skips cleanly when that
@@ -266,10 +279,9 @@ stated boundary.
 
 **Missing, not claimed:**
 
-- A live `POST /v1/runs` test through this SDK against a real hosted model.
-  The server-side run path is verified live in `tests/test_live_runs_e2e.py`
-  (repo root) with a local scripted OpenAI-compatible provider; SDK run
-  parsing is covered in the mocked suite.
+- A live `POST /v1/runs` test against a real hosted model. The SDK run path is
+  verified live in `tests/test_live_runs.py` against a booted server and worker
+  with a local scripted OpenAI-compatible provider, not a hosted model.
 - Interactive OIDC browser login - owned by the server's `/auth/login`.
 - Self-service introspection for non-admin callers - `/v1/tokens/introspect`
   is admin-only. Customers see their own tokens through the account token list.

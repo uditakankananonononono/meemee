@@ -3,7 +3,7 @@
 **Current core version:** 0.122.0  
 **Ledger:** 163 verified, 0 thin  
 **Supported production shape:** SQLite/WAL single-host; PostgreSQL memory and owner-scoped jobs are selectable but require target-environment live verification  
-**Last core verification (branch pb4):** 357 core passed; 200 SDK passed including 21 live-server tests; PostgreSQL contract 4 passed (live PG suite passed earlier on pb4); Ruff and 0.117.0 release audit clean  
+**Last core verification (branch pb4, on main 4d0cf89):** 425 core passed (1 skipped), including pb7's live run e2e in SQLite and PostgreSQL 16 modes; 262 SDK passed including 44 live-server tests; PostgreSQL suite 24 passed, 3 skipped; core Ruff clean; release-audit and docs-status tests pass  
 
 ## What is production-usable now
 
@@ -24,7 +24,7 @@ The authoritative detailed list is the 123-item "Verified" section in [README.md
 |---|---|---|
 | Core server/runtime | `pytest -q` at v0.103.0 | 291 passed |
 | Core lint | `ruff check meemee tests examples/webhook_receiver` after v0.100.0 | clean |
-| SDK | branch pb4 local run with `websockets` installed | 247 passed, including 30 live-server tests (async client, WebSocket streaming, token introspection, async OIDC against a local HTTPS issuer, 401 refresh-and-retry) |
+| SDK | branch pb4 local run with `websockets` installed | 262 passed, including 44 live-server tests (async client, WebSocket streaming, token introspection, async OIDC against a local HTTPS issuer, 401 refresh-and-retry, and 14 agent-run tests against a booted server + worker + scripted provider in SQLite and PostgreSQL modes) |
 | PostgreSQL package | contract run at v0.103.0 | 5 contract tests passed; 2 live tests skipped without `MEEMEE_TEST_DATABASE_URL` |
 | Console | core mount test plus console worker's headless live test | passed at merge |
 | End-to-end run path (pb7) | `tests/test_live_runs_e2e.py` against booted uvicorn + `meemee worker`, local scripted OpenAI-compatible provider | SQLite and PostgreSQL 16.2 modes: 10 passed (sync run, owner scoping, queued job over SSE to done, replay, routed fallback, 502 on model outage) |
