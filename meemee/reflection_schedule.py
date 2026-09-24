@@ -48,6 +48,10 @@ class ReflectionSchedule:
                 );
             """)
 
+    def ping(self) -> bool:
+        with self.lock:
+            return self.db.execute("SELECT 1").fetchone() is not None
+
     def state(self, owner_id: str) -> dict[str, Any] | None:
         with self.lock:
             row = self.db.execute("SELECT * FROM reflection_runs WHERE owner_id=?", (owner_id,)).fetchone()
@@ -129,7 +133,7 @@ async def reflection_forever(settings: Any | None = None) -> None:
     persistence = persistence_from_settings(settings)
     context = persistence.context  # PostgreSQL mode: shared with every API host
     personal = persistence.personal_model
-    schedule = ReflectionSchedule(settings.data_dir / "reflection-schedule.sqlite3")
+    schedule = persistence.reflection_schedule  # PostgreSQL mode: one set of watermarks for every worker
     audit = persistence.audit  # PostgreSQL mode: the shared global chain
     model = build_role_model(settings, "reflection")
     interval = timedelta(minutes=settings.reflection_interval_minutes)
