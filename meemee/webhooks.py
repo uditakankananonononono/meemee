@@ -21,6 +21,8 @@ from .schema_registry import register_schema
 from .secret_cipher import SecretCipher
 
 PRIVATE_HOSTS_ENV = "MEEMEE_WEBHOOK_ALLOW_PRIVATE_HOSTS"
+RESERVED_HEADERS = frozenset({"authorization", "cookie", "host", "content-length", "content-type", "x-meemee-signature-256",
+                              "x-meemee-timestamp", "x-meemee-delivery", "x-meemee-event"})
 
 
 def private_hosts_allowed() -> bool:
@@ -152,7 +154,7 @@ class WebhookStore:
         validate_webhook_url(url)
         if not events or any(not event.strip() for event in events):
             raise ValueError("at least one non-empty event is required")
-        reserved = {"authorization","cookie","host","content-length","content-type","x-meemee-signature-256","x-meemee-timestamp","x-meemee-delivery","x-meemee-event"}
+        reserved = RESERVED_HEADERS
         headers = headers or {}
         if any(name.lower() in reserved or name.lower().startswith("proxy-") for name in headers):
             raise ValueError("custom headers contain a forbidden sensitive or transport name")
@@ -323,6 +325,103 @@ class WebhookStore:
             ).rowcount
         return secret if changed else None
 
+    def ping(self) -> bool:
+        with self.lock:
+            return self.db.execute("SELECT 1 FROM webhook_subscriptions LIMIT 1").fetchall() is not None
+
+    def active_count(self, principal: str) -> int:
+        """Active subscriptions owned by ``principal`` (plan limits and usage)."""
+        with self.lock:
+            return int(self.db.execute(
+                "SELECT count(*) FROM webhook_subscriptions WHERE principal=? AND active=1", (principal,)).fetchone()[0])
+
+    def list_subscriptions(self, principal: str, limit: int = 100, cursor: str | None = None) -> tuple[list[dict], str | None]:
+        """Principal-owned subscriptions, newest first, without secrets. Raises ValueError on a bad cursor."""
+        clauses, parameters = ["principal=?"], [principal]
+        if cursor:
+            cursor_time, cursor_id = decode_cursor(cursor)
+            clauses.append("(created_at<? OR (created_at=? AND id<?))")
+            parameters.extend((cursor_time, cursor_time, cursor_id))
+        page_size = min(max(limit, 1), 500); parameters.append(page_size + 1)
+        with self.lock:
+            rows = self.db.execute(
+                f"SELECT id,url,events,active,created_at FROM webhook_subscriptions WHERE {' AND '.join(clauses)} ORDER BY created_at DESC,id DESC LIMIT ?",
+                tuple(parameters)).fetchall()
+        items = [dict(row) for row in rows[:page_size]]
+        return items, (encode_cursor(items[-1]["created_at"], items[-1]["id"]) if len(rows) > page_size else None)
+
+    def enqueue_test(self, ident: str, principal: str) -> str | None:
+        """Queue a ``webhook.test`` delivery to one active owned subscription; None if not found."""
+        event_id = f"test:{uuid.uuid4().hex}"
+        payload = json.dumps({"webhook_id": ident, "test": True}, sort_keys=True, separators=(",", ":"))
+        with self.lock, self.db:
+            owned = self.db.execute("SELECT 1 FROM webhook_subscriptions WHERE id=? AND principal=? AND active=1", (ident, principal)).fetchone()
+            if owned is None:
+                return None
+            self.db.execute(
+                "INSERT INTO webhook_deliveries(id,subscription_id,event_id,event_type,payload,payload_sha256,status,next_attempt_at,created_at) VALUES(?,?,?,?,?,?,'queued',?,?)",
+                (uuid.uuid4().hex, ident, event_id, "webhook.test", payload, hashlib.sha256(payload.encode()).hexdigest(), time.time(), datetime.now(timezone.utc).isoformat()))
+        return event_id
+
+    def delivery_metrics(self) -> dict[str, int]:
+        with self.lock:
+            rows = self.db.execute("SELECT status,count(*) AS count FROM webhook_deliveries GROUP BY status").fetchall()
+        counts = {status: 0 for status in ("queued", "sending", "delivered", "failed")}
+        counts.update({row["status"]: int(row["count"]) for row in rows})
+        return counts
+
+    def list_deliveries(self, principal: str, status: str | None = None, after: str | None = None,
+                        limit: int = 100, cursor: str | None = None) -> tuple[list[dict], str | None]:
+        clauses, parameters = ["s.principal=?"], [principal]
+        if status:
+            clauses.append("d.status=?"); parameters.append(status)
+        if after:
+            clauses.append("d.id>?"); parameters.append(after)
+        if cursor:
+            cursor_time, cursor_id = decode_cursor(cursor)
+            clauses.append("(d.created_at<? OR (d.created_at=? AND d.id<?))")
+            parameters.extend((cursor_time, cursor_time, cursor_id))
+        page_size = min(max(limit, 1), 500); parameters.append(page_size + 1)
+        query = f"""SELECT d.id,d.subscription_id,d.event_id,d.event_type,d.payload_sha256,d.status,d.attempts,
+            d.next_attempt_at,d.response_status,d.last_error,d.created_at
+            FROM webhook_deliveries d JOIN webhook_subscriptions s ON s.id=d.subscription_id
+            WHERE {' AND '.join(clauses)} ORDER BY d.created_at DESC,d.id DESC LIMIT ?"""
+        with self.lock:
+            rows = self.db.execute(query, tuple(parameters)).fetchall()
+        items = [dict(row) for row in rows[:page_size]]
+        return items, (encode_cursor(items[-1]["created_at"], items[-1]["id"]) if len(rows) > page_size else None)
+
+    def get_delivery(self, principal: str, delivery_id: str) -> dict | None:
+        with self.lock:
+            row = self.db.execute("""SELECT d.id,d.subscription_id,d.event_id,d.event_type,d.payload_sha256,d.status,d.attempts,
+                d.next_attempt_at,d.response_status,d.last_error,d.created_at
+                FROM webhook_deliveries d JOIN webhook_subscriptions s ON s.id=d.subscription_id
+                WHERE d.id=? AND s.principal=?""", (delivery_id, principal)).fetchone()
+        return dict(row) if row else None
+
+    def replay_delivery(self, principal: str, delivery_id: str) -> bool:
+        with self.lock, self.db:
+            return bool(self.db.execute(
+                """UPDATE webhook_deliveries SET status='queued',next_attempt_at=?,last_error=NULL
+                WHERE id=? AND status='failed' AND subscription_id IN
+                (SELECT id FROM webhook_subscriptions WHERE principal=? AND active=1)""",
+                (time.time(), delivery_id, principal)).rowcount)
+
+    def cleanup_deliveries(self, delivered_before: str, failed_before: str) -> dict[str, int]:
+        with self.lock, self.db:
+            self.db.execute("""DELETE FROM webhook_attempts WHERE delivery_id IN (SELECT id FROM webhook_deliveries
+                WHERE (status='delivered' AND created_at<?) OR (status='failed' AND created_at<?))""", (delivered_before, failed_before))
+            delivered = self.db.execute("DELETE FROM webhook_deliveries WHERE status='delivered' AND created_at<?", (delivered_before,)).rowcount
+            failed = self.db.execute("DELETE FROM webhook_deliveries WHERE status='failed' AND created_at<?", (failed_before,)).rowcount
+        return {"delivered": delivered, "failed": failed}
+
+    def operational_metrics(self) -> dict[str, float]:
+        with self.lock:
+            terminal = self.db.execute("SELECT status,count(*) FROM webhook_deliveries WHERE status IN ('delivered','failed') GROUP BY status").fetchall()
+            queued = self.db.execute("SELECT min(created_at) FROM webhook_deliveries WHERE status='queued'").fetchone()[0]
+            suspended = self.db.execute("SELECT count(*) FROM webhook_subscriptions WHERE active=0").fetchone()[0]
+        return _operational({row[0]: int(row[1]) for row in terminal}, queued, suspended)
+
     def delete_principal(self, principal: str) -> dict[str, int]:
         """Hard-delete a principal's subscriptions, queued/finished deliveries and attempt logs."""
         if not principal:
@@ -396,82 +495,36 @@ async def dispatch_forever(store: WebhookStore, poll_seconds: float = 1.0) -> No
         await dispatcher.client.aclose()
 
 
-def delivery_metrics(store: WebhookStore) -> dict[str, int]:
-    """Return exact outbox counts by delivery status."""
-    with store.lock:
-        rows = store.db.execute(
-            "SELECT status,count(*) AS count FROM webhook_deliveries GROUP BY status"
-        ).fetchall()
-    counts = {status: 0 for status in ("queued", "sending", "delivered", "failed")}
-    counts.update({row["status"]: int(row["count"]) for row in rows})
-    return counts
-
-
-def list_deliveries(
-    store: WebhookStore,
-    principal: str,
-    status: str | None = None,
-    after: str | None = None,
-    limit: int = 100,
-    cursor: str | None = None,
-) -> tuple[list[dict], str | None]:
-    """List principal-owned deliveries without signing secrets or payload bodies."""
-    clauses, parameters = ["s.principal=?"], [principal]
-    if status:
-        clauses.append("d.status=?"); parameters.append(status)
-    if after:
-        clauses.append("d.id>?"); parameters.append(after)
-    if cursor:
-        cursor_time, cursor_id = decode_cursor(cursor)
-        clauses.append("(d.created_at<? OR (d.created_at=? AND d.id<?))")
-        parameters.extend((cursor_time, cursor_time, cursor_id))
-    page_size = min(max(limit, 1), 500); parameters.append(page_size + 1)
-    query = f"""SELECT d.id,d.subscription_id,d.event_id,d.event_type,d.payload_sha256,d.status,d.attempts,
-        d.next_attempt_at,d.response_status,d.last_error,d.created_at
-        FROM webhook_deliveries d JOIN webhook_subscriptions s ON s.id=d.subscription_id
-        WHERE {' AND '.join(clauses)} ORDER BY d.created_at DESC,d.id DESC LIMIT ?"""
-    with store.lock:
-        rows = store.db.execute(query, tuple(parameters)).fetchall()
-    items = [dict(row) for row in rows[:page_size]]
-    next_cursor = encode_cursor(items[-1]["created_at"], items[-1]["id"]) if len(rows) > page_size else None
-    return items, next_cursor
-
-
-def replay_delivery(store: WebhookStore, principal: str, delivery_id: str) -> bool:
-    """Requeue a failed principal-owned delivery without resetting attempt history."""
-    with store.lock, store.db:
-        changed = store.db.execute(
-            """UPDATE webhook_deliveries SET status='queued',next_attempt_at=?,last_error=NULL
-            WHERE id=? AND status='failed' AND subscription_id IN
-            (SELECT id FROM webhook_subscriptions WHERE principal=? AND active=1)""",
-            (time.time(), delivery_id, principal),
-        ).rowcount
-    return bool(changed)
-
-
-def cleanup_deliveries(store: WebhookStore, delivered_before: str, failed_before: str) -> dict[str, int]:
-    """Delete old terminal delivery records; queued/sending rows are never touched."""
-    with store.lock, store.db:
-        delivered = store.db.execute(
-            "DELETE FROM webhook_deliveries WHERE status='delivered' AND created_at<?",
-            (delivered_before,),
-        ).rowcount
-        failed = store.db.execute(
-            "DELETE FROM webhook_deliveries WHERE status='failed' AND created_at<?",
-            (failed_before,),
-        ).rowcount
-    return {"delivered": delivered, "failed": failed}
-
-
-def operational_metrics(store: WebhookStore) -> dict[str, float]:
-    with store.lock:
-        terminal = store.db.execute("SELECT status,count(*) FROM webhook_deliveries WHERE status IN ('delivered','failed') GROUP BY status").fetchall()
-        queued = store.db.execute("SELECT min(created_at) FROM webhook_deliveries WHERE status='queued'").fetchone()[0]
-        suspended = store.db.execute("SELECT count(*) FROM webhook_subscriptions WHERE active=0").fetchone()[0]
-    counts = {row[0]: int(row[1]) for row in terminal}
-    total = counts.get("delivered",0)+counts.get("failed",0)
-    success = counts.get("delivered",0)/total if total else 1.0
+def _operational(counts: dict[str, int], oldest_queued: str | None, suspended: int) -> dict[str, float]:
+    total = counts.get("delivered", 0) + counts.get("failed", 0)
+    success = counts.get("delivered", 0) / total if total else 1.0
     age = 0.0
-    if queued:
-        age = max((datetime.now(timezone.utc)-datetime.fromisoformat(queued)).total_seconds(),0.0)
-    return {"success_rate":success,"oldest_queued_seconds":age,"suspended":float(suspended)}
+    if oldest_queued:
+        age = max((datetime.now(timezone.utc) - datetime.fromisoformat(oldest_queued)).total_seconds(), 0.0)
+    return {"success_rate": success, "oldest_queued_seconds": age, "suspended": float(suspended)}
+
+
+# Module-level helpers kept for existing callers; they work with either backend's store.
+def delivery_metrics(store) -> dict[str, int]:
+    """Return exact outbox counts by delivery status."""
+    return store.delivery_metrics()
+
+
+def list_deliveries(store, principal: str, status: str | None = None, after: str | None = None,
+                    limit: int = 100, cursor: str | None = None) -> tuple[list[dict], str | None]:
+    """List principal-owned deliveries without signing secrets or payload bodies."""
+    return store.list_deliveries(principal, status, after, limit, cursor)
+
+
+def replay_delivery(store, principal: str, delivery_id: str) -> bool:
+    """Requeue a failed principal-owned delivery without resetting attempt history."""
+    return store.replay_delivery(principal, delivery_id)
+
+
+def cleanup_deliveries(store, delivered_before: str, failed_before: str) -> dict[str, int]:
+    """Delete old terminal delivery records; queued/sending rows are never touched."""
+    return store.cleanup_deliveries(delivered_before, failed_before)
+
+
+def operational_metrics(store) -> dict[str, float]:
+    return store.operational_metrics()
