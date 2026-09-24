@@ -29,7 +29,7 @@ from .companion.runtime import build_companion
 from .config import Settings
 from .context import ContextStore
 from .email_verification import ResendMailer
-from .entitlements import EntitlementStore, public_catalog
+from .entitlements import public_catalog
 from .health import ReadinessChecker
 from .idempotency import IdempotencyConflict, IdempotencyStore
 from .model_profiles import ModelCatalog, build_role_model, probe_profile, uses_routing
@@ -46,9 +46,9 @@ from .observability import (
     metrics_response,
 )
 from .oidc import OIDCConfig, OIDCValidator
-from .persistence import build_persistence
+from .persistence import persistence_from_settings
 from .personal_model import PersonalItemInput, PersonalModelStore
-from .quotas import QuotaExceeded, QuotaStore
+from .quotas import QuotaExceeded
 from .rate_limit import RateLimitMiddleware, SQLiteRateLimiter
 from .reflection import PersonalModelReflector
 from .reflection_schedule import ReflectionSchedule
@@ -95,7 +95,7 @@ mount_console(app)
 mount_webapp(app)
 mount_site(app)
 app.add_middleware(MetricsMiddleware)
-persistence = build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn)
+persistence = persistence_from_settings(settings)
 browser_sessions = BrowserSessionManager(
     BrowserSessionStore(settings.data_dir / "browser-sessions.sqlite3"),
     headless=settings.browser_headless,
@@ -119,8 +119,8 @@ else:
 app.add_middleware(RateLimitMiddleware, limiter=rate_limiter)
 runs = RunStore(settings.data_dir / "runs.sqlite3")
 idempotency = IdempotencyStore(settings.data_dir / "idempotency.sqlite3")
-quotas = QuotaStore(settings.data_dir / "quotas.sqlite3", settings.default_daily_jobs)
-entitlements = EntitlementStore(settings.data_dir / "entitlements.sqlite3", settings.default_plan)
+quotas = persistence.quotas  # PostgreSQL mode: one daily counter per principal across hosts
+entitlements = persistence.entitlements
 tokens = persistence.tokens  # PostgreSQL mode: shared by every API host
 email_verifications = persistence.email_verifications  # PostgreSQL mode: links work on every host
 mailer = ResendMailer(settings.resend_api_key, settings.email_from_address, settings.public_url, settings.resend_api_url)
@@ -156,7 +156,7 @@ if any(web_values):
         raise RuntimeError("interactive login requires complete OIDC and web-login configuration")
     web_login = WebLogin(WebLoginConfig(*web_values), oidc)
 auth = Authenticator(tokens, settings.api_token, oidc, web_login.authenticate_session if web_login else None)
-readiness = ReadinessChecker(settings.data_dir, {"memory": persistence.check_memory, "jobs": persistence.check_jobs, "runs": lambda: runs.db.execute("SELECT 1").fetchone(), "tokens": tokens.ping, "entitlements": lambda: entitlements.db.execute("SELECT 1").fetchone()}, settings.model_base_url, settings.readiness_min_free_bytes, require_model=settings.readiness_require_model)
+readiness = ReadinessChecker(settings.data_dir, {"memory": persistence.check_memory, "jobs": persistence.check_jobs, "runs": lambda: runs.db.execute("SELECT 1").fetchone(), "tokens": tokens.ping, "entitlements": entitlements.ping}, settings.model_base_url, settings.readiness_min_free_bytes, require_model=settings.readiness_require_model)
 jobs_write_auth = auth.dependency("jobs:write")
 jobs_write_dependency = Depends(jobs_write_auth)
 runs_write_dependency = Depends(auth.dependency("runs:write"))

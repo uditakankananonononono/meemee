@@ -63,6 +63,9 @@ class QuotaStore:
         used = int(row[0]) if row else 0
         return {"day": day, "used": used, "limit": maximum, "remaining": max(maximum-used, 0)}
 
+    def ping(self) -> bool:
+        return self.db.execute("SELECT 1").fetchone() is not None
+
     def delete_principal(self, principal: str) -> dict[str, int]:
         with self.lock, self.db:
             usage = self.db.execute("DELETE FROM quota_usage WHERE principal=?", (principal,)).rowcount
