@@ -27,7 +27,7 @@ def test_custom_headers_reject_sensitive_and_deliver_safe(tmp_path, monkeypatch)
     store=WebhookStore(tmp_path/"w.db", encryption_key=TEST_KEY)
     with pytest.raises(ValueError,match="forbidden"):
         store.subscribe("u","https://hooks.example/a",{"*"},headers={"Authorization":"bad"})
-    store.subscribe("u","https://hooks.example/a",{"*"},headers={"X-Tenant":"alpha"}); store.enqueue("e","x",{})
+    store.subscribe("u","https://hooks.example/a",{"*"},headers={"X-Tenant":"alpha"}); store.enqueue("e","x",{}, principal="u")
     seen={}
     def handler(request): seen.update(request.headers); return httpx.Response(204,request=request)
     import asyncio

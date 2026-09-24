@@ -206,6 +206,8 @@ Items 164-166 and 172 are unreleased pb7 work and items 167-171 are unreleased p
 
 172. Blocked flag (branch pb7, unreleased): run reports, `GET /v1/runs[/{id}]`, `GET /v1/jobs[/{id}]` and the `job.done` webhook carry a top-level `blocked` boolean, true when `approvals_required` is non-empty. Job `status` stays `done` so existing filters and clients are unaffected; a `done` job with `blocked: true` finished its run but did not do everything asked. `run.create` audit entries record `blocked` and the refusal count. Job `result` is now a JSON string on both backends (PostgreSQL mode returned decoded JSON, which the SDK's `Job` model rejected). SDK: `RunReport.blocked`, `Job.blocked`, `Job.is_blocked` (falls back to `approvals_required` against older servers). Verified live on SQLite and PostgreSQL 16.2.
 
+173. Tenant-scoped webhooks and live webhook verification (branch pb7, unreleased): SECURITY FIX - job webhook events were delivered to every principal's subscriptions; they now reach only the job owner's. Test-only `MEEMEE_WEBHOOK_ALLOW_PRIVATE_HOSTS=1` lets a local HTTPS receiver pass the SSRF guard and is refused when `MEEMEE_ENV=production` (never set it on a deployed instance). Verified live against a real receiver: signed `job.done` with `blocked`, signature scheme, retry after 500, cross-tenant isolation, with SQLite and PostgreSQL job stores.
+
 ## Thin (0)
 
 Nothing is classified as thin. A capability is either implemented and tested at its stated boundary below, or listed as missing.

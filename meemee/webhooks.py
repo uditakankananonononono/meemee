@@ -20,11 +20,39 @@ from .cursors import decode_cursor, encode_cursor
 from .schema_registry import register_schema
 from .secret_cipher import SecretCipher
 
+PRIVATE_HOSTS_ENV = "MEEMEE_WEBHOOK_ALLOW_PRIVATE_HOSTS"
+
+
+def private_hosts_allowed() -> bool:
+    """Test-only SSRF override: MEEMEE_WEBHOOK_ALLOW_PRIVATE_HOSTS=1 lets webhook URLs resolve to
+    loopback/private addresses so a local receiver can be exercised end to end. HTTPS is still
+    required. NEVER set it in production; with MEEMEE_ENV=production it raises instead of applying."""
+    from .config import Settings
+
+    settings = Settings()
+    if not settings.webhook_allow_private_hosts:
+        return False
+    if settings.env.strip().lower() == "production":
+        raise RuntimeError(f"{PRIVATE_HOSTS_ENV} is test-only and is refused when MEEMEE_ENV=production")
+    return True
+
+
+def check_private_hosts_override(component: str) -> None:
+    """Startup guard: refuse to run with the test-only override in production, warn loudly otherwise."""
+    if private_hosts_allowed():
+        import logging
+
+        logging.getLogger("meemee.webhooks").warning(
+            "%s: %s=1 - webhook SSRF protection is OFF (test-only; never use on a deployed instance)",
+            component, PRIVATE_HOSTS_ENV)
+
 
 def validate_webhook_url(url: str) -> str:
     parsed = urlparse(url)
     if parsed.scheme != "https" or not parsed.hostname:
         raise ValueError("webhook URL must use HTTPS")
+    if private_hosts_allowed():
+        return url
     for address in socket.getaddrinfo(parsed.hostname, parsed.port or 443):
         if not ipaddress.ip_address(address[4][0]).is_global:
             raise ValueError("webhook URL resolves to a private or reserved address")
@@ -145,13 +173,18 @@ class WebhookStore:
                 (ident, principal),
             ).rowcount)
 
-    def enqueue(self, event_id: str, event_type: str, payload: dict) -> int:
+    def enqueue(self, event_id: str, event_type: str, payload: dict, *, principal: str) -> int:
+        """Queue one delivery per matching subscription owned by `principal` (the event's owner).
+
+        Subscriptions of other principals never receive the event."""
         envelope = {"schema":"meemee.webhook.v1","event_id":event_id,"event_type":event_type,"data":payload}
         encoded, now = json.dumps(envelope, sort_keys=True, separators=(",", ":")), time.time()
         if len(encoded.encode()) > self.max_payload_bytes:
             raise ValueError(f"webhook payload exceeds {self.max_payload_bytes} bytes")
         with self.lock, self.db:
-            subscriptions = self.db.execute("SELECT id,events,fields FROM webhook_subscriptions WHERE active=1").fetchall()
+            subscriptions = self.db.execute(
+                "SELECT id,events,fields FROM webhook_subscriptions WHERE active=1 AND principal=?", (principal,)
+            ).fetchall()
             created = 0
             for subscription in subscriptions:
                 if event_type not in subscription["events"].split() and "*" not in subscription["events"].split():

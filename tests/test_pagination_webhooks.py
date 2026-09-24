@@ -9,7 +9,7 @@ KEY="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 def test_webhook_delivery_keyset_pages(tmp_path,monkeypatch):
     monkeypatch.setattr(socket,"getaddrinfo",lambda *a:[(2,1,6,"",("93.184.216.34",443))])
     store=WebhookStore(tmp_path/"w.db",encryption_key=KEY); store.subscribe("u","https://x.example/h",{"*"})
-    for i in range(3): store.enqueue(f"e{i}","x",{})
+    for i in range(3): store.enqueue(f"e{i}","x",{}, principal="u")
     first,cursor=list_deliveries(store,"u",limit=2); second,end=list_deliveries(store,"u",limit=2,cursor=cursor)
     assert len(first)==2 and len(second)==1 and end is None
     assert {x["id"] for x in first}.isdisjoint({x["id"] for x in second})

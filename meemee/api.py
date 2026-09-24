@@ -61,6 +61,7 @@ from .streaming import job_event_stream
 from .web_login import WebLogin, WebLoginConfig
 from .webhooks import (
     WebhookStore,
+    check_private_hosts_override,
     delivery_metrics,
     list_deliveries,
     operational_metrics,
@@ -129,6 +130,7 @@ personal_model = PersonalModelStore(settings.data_dir / "personal-model.sqlite3"
 monitors = MonitorStore(settings.data_dir / "monitors.sqlite3")
 audit = AuditLog(settings.data_dir / "audit.sqlite3")
 approvals = ApprovalStore(settings.data_dir / "approvals.sqlite3")
+check_private_hosts_override("api")  # raises when MEEMEE_ENV=production
 webhooks = WebhookStore(settings.data_dir / "webhooks.sqlite3", settings.webhook_max_payload_bytes, settings.vault_key)
 companion = build_companion(settings)
 deletion_ledger = DeletionLedger(settings.data_dir / "account-deletions.sqlite3")
@@ -679,7 +681,7 @@ def cancel_job(request: Request, job_id: str):
         raise HTTPException(404, "job not found")
     if status in {"cancelled", "cancel_requested"}:
         if status == "cancelled":
-            webhooks.enqueue(f"job:{job_id}:cancelled", "job.cancelled", {"job_id": job_id, "status": "cancelled"})
+            webhooks.enqueue(f"job:{job_id}:cancelled", "job.cancelled", {"job_id": job_id, "status": "cancelled"}, principal=request.state.principal.id)
         audit.append("api", "job.cancel", job_id, "success", {"status": status})
         return {"id": job_id, "status": status}
     raise HTTPException(409, f"cannot cancel job in {status} state")

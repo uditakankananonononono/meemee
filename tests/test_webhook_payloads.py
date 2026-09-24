@@ -15,7 +15,7 @@ def public_dns(*args): return [(socket.AF_INET,socket.SOCK_STREAM,6,"",("93.184.
 def test_envelope_selection_and_hash(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(socket,"getaddrinfo",public_dns)
     store=WebhookStore(tmp_path/"w.db", encryption_key=TEST_KEY); store.subscribe("u","https://hooks.example/a",{"job.done"},{"job_id","status"})
-    store.enqueue("e1","job.done",{"job_id":"j","status":"done","private":"omit"})
+    store.enqueue("e1","job.done",{"job_id":"j","status":"done","private":"omit"}, principal="u")
     row=store.db.execute("SELECT payload,payload_sha256 FROM webhook_deliveries").fetchone()
     body=json.loads(row["payload"])
     assert body=={"schema":"meemee.webhook.v1","event_id":"e1","event_type":"job.done","data":{"job_id":"j","status":"done"}}
@@ -28,5 +28,5 @@ def test_payload_ceiling_fails_before_enqueue(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(socket,"getaddrinfo",public_dns)
     store=WebhookStore(tmp_path/"w.db",max_payload_bytes=1024, encryption_key=TEST_KEY); store.subscribe("u","https://hooks.example/a",{"*"})
     with pytest.raises(ValueError,match="exceeds"):
-        store.enqueue("e","x",{"large":"x"*2000})
+        store.enqueue("e","x",{"large":"x"*2000}, principal="u")
     assert store.db.execute("SELECT count(*) FROM webhook_deliveries").fetchone()[0]==0

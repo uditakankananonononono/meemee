@@ -66,7 +66,7 @@ def seed(t: PurgeTargets, who: str) -> dict:
     t.context.register_source(who, "mail", "gmail", {})
     t.context.ingest(ContextRecord(who, "mail", "e1", "message", "subject", f"{who}walrus inbox text", "2026-09-24T00:00:00Z", {"source": "test"}))
     t.webhooks.subscribe(who, "https://hooks.example.com/x", {"job.done"})
-    t.webhooks.enqueue(f"job:{job}:done", "job.done", {"job_id": job})
+    t.webhooks.enqueue(f"job:{job}:done", "job.done", {"job_id": job}, principal=who)
     t.companion.upsert_user(UserProfile(user_id=who, display_name=who))
     t.companion.add_fact(who, FactInput(text=f"{who} likes tea"), source="test")
     return {"job": job, "item": item}
