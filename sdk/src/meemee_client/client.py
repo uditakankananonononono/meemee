@@ -69,6 +69,7 @@ from .models import (
     ResponseInfo,
     RevokedToken,
     RunReport,
+    TokenIntrospection,
     TokenMetadata,
     WebhookDelivery,
     WebhookSubscription,
@@ -725,6 +726,18 @@ class TokensResource:
             items, cursor = self.page(revoked=revoked, cursor=cursor, limit=limit)
             yield from items
             if cursor is None: return
+
+    def introspect(self, token: str) -> TokenIntrospection:
+        """POST /v1/tokens/introspect (admin) - scopes, expiry and revocation state of a raw token.
+
+        The secret travels only in the request body; the response carries a
+        redacted form. Unknown tokens return ``active=False, state="unknown"``
+        rather than raising. Introspection does not update ``last_used_at``.
+        """
+        if not isinstance(token, str) or not token.strip() or len(token) > 4096:
+            raise ValueError("token must be a non-empty string of at most 4096 characters")
+        payload = self._client._request_json("POST", "/v1/tokens/introspect", json_body={"token": token})
+        return TokenIntrospection.model_validate(payload)
 
     def revoke(self, token_id: str) -> RevokedToken:
         """DELETE /v1/tokens/{id} - revoke an active token (idempotent-safe:

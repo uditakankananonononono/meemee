@@ -1,4 +1,4 @@
-"""Live: AsyncMeemeeClient and WebSocket streaming against a booted Meemee server.
+"""Live: AsyncMeemeeClient, WebSocket streaming and token introspection against a booted Meemee server.
 
 Reuses the uvicorn fixture from test_live_integration, so the real server
 package, its token store, job queue and WebSocket handler are exercised over
@@ -116,3 +116,40 @@ async def test_live_async_ws_follows_live_cancel(live_server: str, reader_and_wr
             if event.kind == "queued":
                 await client.jobs.cancel(job.id)
         assert kinds == ["queued", "cancelled"]
+
+
+def test_live_token_introspection_sync(live_server: str) -> None:  # noqa: F811
+    with MeemeeClient(live_server, auth=BOOT) as admin:
+        minted = admin.tokens.create("live-introspect", {"jobs:read", "jobs:write"})
+        active = admin.tokens.introspect(minted.token)
+        assert active.active and active.state == "active" and active.credential == "api_token"
+        assert active.id == minted.id and active.scopes == ["jobs:read", "jobs:write"]
+        assert active.last_used_at is None
+        assert active.redacted_token == f"{minted.token[:4]}...{minted.token[-4:]}"
+        assert minted.token not in active.model_dump_json()
+        with MeemeeClient(live_server, auth=minted.token) as user:
+            user.jobs.list()
+            with pytest.raises(PermissionDeniedError) as caught:
+                user.tokens.introspect(minted.token)
+            assert caught.value.missing_scope == "admin"
+        assert admin.tokens.introspect(minted.token).last_used_at is not None
+        admin.tokens.revoke(minted.id)
+        revoked = admin.tokens.introspect(minted.token)
+        assert not revoked.active and revoked.state == "revoked" and revoked.revoked_at is not None
+        expired = admin.tokens.create("live-expired", {"jobs:read"}, expires_at="2020-01-01T00:00:00+00:00")
+        assert admin.tokens.introspect(expired.token).state == "expired"
+        unknown = admin.tokens.introspect("mee_never_issued_here")
+        assert unknown.state == "unknown" and not unknown.active and unknown.id is None
+        assert admin.tokens.introspect(BOOT).credential == "bootstrap"
+        audit = admin.audit.list(limit=500)
+        assert audit.verified and "token.introspect" in {e.action for e in audit.entries}
+        assert all(minted.token not in str(e.metadata) for e in audit.entries)
+
+
+async def test_live_token_introspection_async(live_server: str) -> None:  # noqa: F811
+    async with AsyncMeemeeClient(live_server, auth=BOOT) as admin:
+        minted = await admin.tokens.create("live-introspect-async", {"companion:read"})
+        result = await admin.tokens.introspect(minted.token)
+        assert result.active and result.scopes == ["companion:read"] and result.id == minted.id
+        await admin.tokens.revoke(minted.id)
+        assert (await admin.tokens.introspect(minted.token)).state == "revoked"

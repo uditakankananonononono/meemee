@@ -238,6 +238,10 @@ class AccountTokenRequest(BaseModel):
     expires_at: str | None = None
 
 
+class TokenIntrospectionRequest(BaseModel):
+    token: str = Field(min_length=1, max_length=4096)
+
+
 class TokenRequest(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     scopes: set[str] = Field(min_length=1)
@@ -685,6 +689,43 @@ def list_tokens(revoked: bool | None = None, before: str | None = None, limit: i
     try: items, next_cursor = tokens.list_metadata(revoked, before, limit, cursor)
     except ValueError as exc: raise HTTPException(422, str(exc)) from exc
     return {"tokens": items, "next_cursor": next_cursor}
+
+
+def redact_token(token: str) -> str:
+    """Enough to recognise a credential in a UI, never enough to use it."""
+    if len(token) <= 12:
+        return "****"
+    return f"{token[:4]}...{token[-4:]}"
+
+
+@app.post("/v1/tokens/introspect", dependencies=[Depends(auth.dependency("admin"))])
+def introspect_token(request: TokenIntrospectionRequest):
+    """Report a credential's scopes, expiry and revocation state (RFC 7662 style).
+
+    POST keeps the secret out of URLs and access logs. The response never
+    contains the secret or its digest; ``redacted_token`` shows only its ends.
+    Unknown credentials answer ``active: false, state: unknown`` rather than 404,
+    so the endpoint does not distinguish "never issued" from other failures by status.
+    Introspection does not count as use: ``last_used_at`` is unchanged.
+    """
+    supplied = request.token
+    base = {"redacted_token": redact_token(supplied)}
+    if settings.api_token and hmac.compare_digest(supplied, settings.api_token):
+        result = {**base, "active": True, "state": "active", "credential": "bootstrap",
+                  "principal": "bootstrap", "name": "bootstrap",
+                  "scopes": ["admin", "companion:read", "companion:write", "jobs:read", "jobs:write", "runs:write"],
+                  "expires_at": None, "revoked_at": None}
+    elif (record := tokens.introspect(supplied)) is not None:
+        result = {**base, **record}
+    elif oidc is not None and (claims := oidc.authenticate(supplied)) is not None:
+        result = {**base, "active": True, "state": "active", "credential": "oidc",
+                  "principal": claims.id, "name": claims.name, "scopes": sorted(claims.scopes),
+                  "expires_at": None, "revoked_at": None}
+    else:
+        result = {**base, "active": False, "state": "unknown", "credential": None, "scopes": []}
+    audit.append("api-admin", "token.introspect", result.get("id") or result["credential"] or "unknown",
+                 "success", {"state": result["state"], "credential": result["credential"]})
+    return result
 
 
 @app.delete("/v1/tokens/{token_id}", dependencies=[Depends(auth.dependency("admin"))])

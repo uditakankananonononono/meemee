@@ -259,6 +259,30 @@ class TokenMetadata(BaseModel):
     revoked_at: datetime | None = None
 
 
+class TokenIntrospection(BaseModel):
+    """POST /v1/tokens/introspect result: a credential's state, never its secret.
+
+    ``state`` is active, revoked, expired or unknown (never issued here, or an
+    OIDC token that no longer validates). ``credential`` is api_token,
+    bootstrap, oidc, or None when unknown. Only ``redacted_token`` (first and
+    last four characters) echoes the input.
+    """
+
+    active: bool
+    state: str
+    credential: str | None = None
+    redacted_token: str
+    id: str | None = None
+    name: str | None = None
+    principal: str | None = None
+    token_kind: str | None = None
+    scopes: list[str] = Field(default_factory=list)
+    created_at: datetime | None = None
+    last_used_at: datetime | None = None
+    expires_at: datetime | None = None
+    revoked_at: datetime | None = None
+
+
 class PersonaConfig(BaseModel):
     """How the companion speaks for and to one user."""
 
