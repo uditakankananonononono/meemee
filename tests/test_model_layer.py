@@ -274,3 +274,14 @@ async def test_real_instruct_model_answers_through_the_route(monkeypatch):
     assert "paris" in out.lower()
     assert m.attempts[-1] == {"profile": "local-transformers", "outcome": "ok"}
     await m.aclose()
+
+
+def test_fugu_defaults_to_the_real_sakana_alias_and_reads_sakana_key(monkeypatch):
+    monkeypatch.delenv("SAKANA_API_KEY", raising=False)
+    p = ModelCatalog.from_settings(settings()).profiles["fugu"]
+    assert (p.model, p.base_url, p.kind, p.api_key) == ("fugu-ultra", "https://api.sakana.ai/v1", "hosted_paid", None)
+    monkeypatch.setenv("SAKANA_API_KEY", "sk_sakana")
+    cat = ModelCatalog.from_settings(settings(model_routes="chat=fugu,local"))
+    assert cat.profiles["fugu"].api_key == "sk_sakana"
+    assert "MEEMEE_ALLOW_PAID_MODELS" in cat.chain("chat")[1]["fugu"]  # key alone never enables a paid profile
+    assert ModelCatalog.from_settings(settings(fugu_api_key="sk_meemee")).profiles["fugu"].api_key == "sk_meemee"

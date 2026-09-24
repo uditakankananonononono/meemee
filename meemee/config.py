@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     inkling_self_hosted_model: str = "thinkingmachines/Inkling-Small"
     inkling_api_key: str | None = None
     fugu_api_key: str | None = None
-    fugu_model: str = "fugu-ultra-v2.0"
+    fugu_model: str = "fugu-ultra"  # Sakana alias that tracks the latest Fugu Ultra (v1.1 as of 2026-09-24)
     reflection_interval_minutes: int = 360
     reflection_poll_seconds: float = 60.0
     github_token: str | None = None
