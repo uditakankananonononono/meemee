@@ -2,6 +2,16 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## Unreleased (branch pb1)
+
+- Added interactive browser human takeover: durable live browser sessions, challenge-triggered or requested takeovers with one-time expiring links, a WebSocket live view that relays clicks, typing, keys, scrolls and in-policy navigation, and hand-back that resumes the agent on the same page.
+- Takeover view relays drag gestures (press-move-release) so slider challenges can be solved.
+- Added takeover-link notices: sessions opened with `notify_user_id` queue a durable notice delivered on the user's companion check-in channel (local by default); link text is erased after delivery and notices for ended takeovers are cancelled.
+- Added agent tools `browser.session_open`, `browser.session_act`, `browser.session_request_human`, `browser.session_wait_human`, `browser.session_snapshot`, `browser.session_close` (registered in the API server process).
+- Added `/v1/browser/sessions` open/list/detail/takeover/close endpoints, `/v1/browser/takeover/release`, the `/v1/browser/takeover/ws` socket and the `/browser/takeover` viewer.
+- Fixed: `websockets` is now a core dependency. Plain `pip install .` (as in the Dockerfile) previously had no WebSocket support in uvicorn, so WebSocket endpoints could not accept connections.
+- Security headers middleware keeps a route-specific Content-Security-Policy instead of overwriting it; all other responses keep the existing default policy.
+
 ## 0.118.0
 
 - Added named model profiles and per-role routing (`MEEMEE_MODEL_ROUTES`, `MEEMEE_MODEL_PROFILES`) with ordered fallback and per-attempt records. The agent, companion chat and personal-model reflection each resolve their own role. With no routing config, behavior is unchanged (local only).
