@@ -2,7 +2,7 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
-## 0.119.0
+## 0.121.0
 
 Integrates pb1 (browser human takeover), pb4 (product-wide account deletion, now also purging browser sessions and takeover notices) and pb7 (process-isolated tool kill).
 
@@ -23,6 +23,15 @@ Integrates pb1 (browser human takeover), pb4 (product-wide account deletion, now
 - Added `meemee/isolation.py`: opt-in process-isolated tool execution. Cancellation and a per-tool hard timeout terminate, then kill, the child process, so tools blocked in native code can be stopped.
 - `ToolRegistry.execute` honors a new `Tool.isolation` policy; existing tools are unchanged.
 - Added 12 regression tests covering results, errors, crashes, timeouts, cancellation, SIGKILL escalation and event-loop responsiveness.
+
+## 0.120.0
+
+- Added `GET /v1/models/status` (scope `jobs:read`): profiles with availability and reason, routes and paid gating, no secrets. `?probe=true` probes routed profiles' `/models` endpoints concurrently and reports the serving profile per role.
+
+## 0.119.0
+
+- Companion replies now include `model_trace` (role, answering profile, model id and every fallback attempt), stored per assistant message in `companion_message_models` and covered by customer export and deletion. The SDK `CompanionChatReply` gains the optional field.
+- Added `meemee reflection-worker`: scheduled personal-model reflection on the `reflection` route, gated per owner by new context evidence and `MEEMEE_REFLECTION_INTERVAL_MINUTES`, with per-owner status, model trace and audit events. Failed runs retry on the next due pass without advancing the watermark.
 
 ## 0.118.0
 
