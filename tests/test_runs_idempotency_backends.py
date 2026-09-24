@@ -113,13 +113,16 @@ def test_idempotency_claim_races_have_one_winner(persistence):  # noqa: F811
     assert results.count(None) == 1 and results.count("busy") == 15
 
 
-def test_retention_run_refuses_postgresql_mode(monkeypatch, tmp_path):
+def test_retention_run_in_postgresql_mode_never_prunes_local_files(monkeypatch, tmp_path):
+    """PostgreSQL mode prunes the shared tables (tests_pg/test_operator_tools_pg.py); without a DSN
+    it stops before touching the local SQLite files."""
     from typer.testing import CliRunner
 
     from meemee.cli import app
 
     monkeypatch.setenv("MEEMEE_PERSISTENCE_BACKEND", "postgresql")
     monkeypatch.setenv("MEEMEE_DATA_DIR", str(tmp_path))
+    monkeypatch.delenv("MEEMEE_POSTGRES_DSN", raising=False)
     result = CliRunner().invoke(app, ["retention-run"])
-    assert result.exit_code == 2 and "SQLite data directories only" in result.output
+    assert result.exit_code == 2 and "MEEMEE_POSTGRES_DSN" in result.output
     assert not (tmp_path / "runs.sqlite3").exists()
