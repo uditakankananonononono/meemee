@@ -26,7 +26,6 @@ from .browser_sessions import BrowserSessionManager, BrowserSessionStore
 from .companion.api import build_companion_router
 from .companion.runtime import build_companion
 from .config import Settings
-from .context import ContextStore
 from .email_verification import ResendMailer
 from .entitlements import public_catalog
 from .health import ReadinessChecker
@@ -46,7 +45,7 @@ from .observability import (
 )
 from .oidc import OIDCConfig, OIDCValidator
 from .persistence import persistence_from_settings
-from .personal_model import PersonalItemInput, PersonalModelStore
+from .personal_model import PersonalItemInput
 from .quotas import QuotaExceeded
 from .rate_limit import RateLimitMiddleware, SQLiteRateLimiter
 from .reflection import PersonalModelReflector
@@ -105,7 +104,7 @@ browser_sessions = BrowserSessionManager(
     takeover_ttl_seconds=settings.browser_takeover_ttl_seconds,
     notices=TakeoverNoticeQueue(settings.data_dir / "browser-notices.sqlite3"),
 )
-agent = build_agent(settings, memory=persistence.memory, browser_sessions=browser_sessions)
+agent = build_agent(settings, memory=persistence.memory, browser_sessions=browser_sessions, persistence=persistence)
 reflection_model = agent.model if not uses_routing(settings) else build_role_model(settings, "reflection")
 run_gate = RunGate()
 jobs = persistence.jobs
@@ -122,18 +121,18 @@ entitlements = persistence.entitlements
 tokens = persistence.tokens  # PostgreSQL mode: shared by every API host
 email_verifications = persistence.email_verifications  # PostgreSQL mode: links work on every host
 mailer = ResendMailer(settings.resend_api_key, settings.email_from_address, settings.public_url, settings.resend_api_url)
-personal_model = PersonalModelStore(settings.data_dir / "personal-model.sqlite3")
+personal_model = persistence.personal_model  # PostgreSQL mode: shared personal model
 monitors = MonitorStore(settings.data_dir / "monitors.sqlite3")
 audit = persistence.audit  # PostgreSQL mode: one global chain for every host
 approvals = persistence.approvals  # PostgreSQL mode: shared with every worker, not local disk
 check_private_hosts_override("api")  # raises when MEEMEE_ENV=production
 webhooks = persistence.webhooks or WebhookStore(settings.data_dir / "webhooks.sqlite3", settings.webhook_max_payload_bytes, settings.vault_key)  # PostgreSQL mode: shared outbox
-companion = build_companion(settings, store=persistence.companion)  # PostgreSQL mode: shared companion tables
+companion = build_companion(settings, store=persistence.companion, persistence=persistence)  # PostgreSQL mode: shared companion tables
 deletion_ledger = DeletionLedger(settings.data_dir / "account-deletions.sqlite3")
 account_purger = AccountPurger(PurgeTargets(
     jobs=jobs, runs=runs, memory=persistence.memory, idempotency=idempotency, quotas=quotas,
     entitlements=entitlements, approvals=approvals, monitors=monitors, personal_model=personal_model,
-    context=ContextStore(settings.data_dir / "context.sqlite3"), webhooks=webhooks, companion=companion.store,
+    context=persistence.context, webhooks=webhooks, companion=companion.store,
     browser_sessions=browser_sessions.store, browser_notices=browser_sessions.notices,
     reflection_schedule=ReflectionSchedule(settings.data_dir / "reflection-schedule.sqlite3"),
 ), deletion_ledger)
@@ -154,7 +153,7 @@ if any(web_values):
         raise RuntimeError("interactive login requires complete OIDC and web-login configuration")
     web_login = WebLogin(WebLoginConfig(*web_values), oidc)
 auth = Authenticator(tokens, settings.api_token, oidc, web_login.authenticate_session if web_login else None)
-readiness = ReadinessChecker(settings.data_dir, {"memory": persistence.check_memory, "jobs": persistence.check_jobs, "runs": runs.ping, "tokens": tokens.ping, "entitlements": entitlements.ping, "webhooks": webhooks.ping, "companion": companion.store.ping}, settings.model_base_url, settings.readiness_min_free_bytes, require_model=settings.readiness_require_model)
+readiness = ReadinessChecker(settings.data_dir, {"memory": persistence.check_memory, "jobs": persistence.check_jobs, "runs": runs.ping, "tokens": tokens.ping, "entitlements": entitlements.ping, "webhooks": webhooks.ping, "companion": companion.store.ping, "personal_model": personal_model.ping, "context": persistence.context.ping}, settings.model_base_url, settings.readiness_min_free_bytes, require_model=settings.readiness_require_model)
 jobs_write_auth = auth.dependency("jobs:write")
 jobs_write_dependency = Depends(jobs_write_auth)
 runs_write_dependency = Depends(auth.dependency("runs:write"))

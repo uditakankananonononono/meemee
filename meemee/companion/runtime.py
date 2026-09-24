@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from ..config import Settings
 from ..context import ContextStore
@@ -20,17 +21,19 @@ class Companion:
     model: OpenAICompatibleModel | RoutedModel
 
 
-def build_companion(settings: Settings | None = None, store: CompanionStore | None = None) -> Companion:
+def build_companion(settings: Settings | None = None, store: CompanionStore | None = None, persistence: Any = None) -> Companion:
     """Compose the companion layer from runtime settings."""
     settings = settings or Settings()
-    if store is None and settings.persistence_backend.strip().lower() == "postgresql":
-        # Standalone callers (companion worker, CLI): the shared companion tables, not a local file.
+    shared = persistence
+    if shared is None and settings.persistence_backend.strip().lower() == "postgresql":
+        # PostgreSQL mode: shared companion, context and personal-model tables, not local files.
         from ..persistence import persistence_from_settings
 
-        store = persistence_from_settings(settings).companion
+        shared = persistence_from_settings(settings)
+        store = store or shared.companion
     companion_store = store or CompanionStore(settings.data_dir / "companion.sqlite3")
-    context_store = ContextStore(settings.data_dir / "context.sqlite3")
-    personal_model = PersonalModelStore(settings.data_dir / "personal-model.sqlite3")
+    context_store = shared.context if shared else ContextStore(settings.data_dir / "context.sqlite3")
+    personal_model = shared.personal_model if shared else PersonalModelStore(settings.data_dir / "personal-model.sqlite3")
     model = build_role_model(settings, "chat")
     engine = CompanionEngine(
         model,

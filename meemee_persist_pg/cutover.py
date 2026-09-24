@@ -46,18 +46,22 @@ SPECS={
                TableSpec("companion_messages","meemee_companion_messages",("id","conversation_id","role","content","created_at"),("id",)),
                TableSpec("companion_message_models","meemee_companion_message_models",("message_id","conversation_id","role","profile","model","attempts","created_at"),("message_id",)),
                TableSpec("companion_checkins","meemee_companion_checkins",("id","user_id","slot","due_at","status","attempts","max_attempts","channel","address","message","last_error","created_at","updated_at"),("id",))),
+ "personal":(TableSpec("personal_items","meemee_personal_items",("id","owner_id","kind","title","value","confidence","status","valid_from","valid_until","supersedes_id","created_at","updated_at"),("id",)),
+             TableSpec("personal_evidence","meemee_personal_evidence",("id","item_id","owner_id","source_id","source_record_id","observed_value","confidence","observed_at"),("id",))),
+ "context":(TableSpec("context_sources","meemee_context_sources",("owner_id","source_id","connector","config","permission","cursor","created_at","updated_at"),("owner_id","source_id")),
+            TableSpec("context_records","meemee_context_records",("id","owner_id","source_id","external_id","content_hash","kind","title","content","occurred_at","provenance","visibility","cursor","metadata","ingested_at"),("id",))),
  "approvals":(TableSpec("tool_approvals","meemee_tool_approvals",("principal","tool","granted_at","expires_at","revoked_at","granted_by","argument_constraints"),("principal","tool")),),
 }
 # Groups an operator may leave out of a cutover. approvals.sqlite3 only exists once a grant was made,
 # and older cutover invocations predate it; when given, it is copied and verified like every other group.
-OPTIONAL_GROUPS=frozenset({"approvals","email","quotas","entitlements","runs","idempotency","webhooks","companion"})
+OPTIONAL_GROUPS=frozenset({"approvals","email","quotas","entitlements","runs","idempotency","webhooks","companion","personal","context"})
 NOT_NULL_JSON={"response"}
 JSON_COLUMNS={"metadata","document","result","payload","argument_constraints","tool_results","approvals_required","response"}
 UUID_COLUMNS={"id","plan_id","job_id"}
 _DATE_ONLY=re.compile(r"\d{4}-\d{2}-\d{2}")
-IDENTITY_TARGETS={"meemee_memories","meemee_job_events","meemee_audit_log","meemee_webhook_attempts","meemee_companion_facts","meemee_companion_messages"}
+IDENTITY_TARGETS={"meemee_memories","meemee_job_events","meemee_audit_log","meemee_webhook_attempts","meemee_companion_facts","meemee_companion_messages","meemee_personal_evidence","meemee_context_records"}
 # Webhook payloads are signed byte-for-byte, so they stay text; SQLite 0/1 flags become booleans.
-TEXT_PAYLOAD_TARGETS={"meemee_webhook_deliveries"}
+TEXT_PAYLOAD_TARGETS={"meemee_webhook_deliveries","meemee_context_records"}
 BOOL_COLUMNS={("meemee_webhook_subscriptions","active")}
 
 @contextmanager
