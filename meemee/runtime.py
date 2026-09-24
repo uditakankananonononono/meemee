@@ -21,7 +21,7 @@ from .tools import (
 )
 
 
-def build_agent(settings: Settings | None = None, include_delegation: bool = True, memory=None) -> Agent:
+def build_agent(settings: Settings | None = None, include_delegation: bool = True, memory=None, browser_sessions=None) -> Agent:
     settings = settings or Settings()
     registry = ToolRegistry()
     registry.register(GitHubRepoSearch(settings.github_token))
@@ -33,8 +33,12 @@ def build_agent(settings: Settings | None = None, include_delegation: bool = Tru
     registry.register(GitInspect(settings.workspace))
     registry.register(GitCommit(settings.workspace))
     registry.register(BrowserNavigate(settings.workspace, settings.browser_headless, settings.data_dir / "browser-profiles"))
+    if browser_sessions is not None:
+        from .tools.browser_session import session_tools
+        for tool in session_tools(browser_sessions):
+            registry.register(tool)
     if include_delegation:
-        registry.register(DelegateTasks(lambda: AgentTeam(lambda: build_agent(settings, False))))
+        registry.register(DelegateTasks(lambda: AgentTeam(lambda: build_agent(settings, False, browser_sessions=browser_sessions))))
     model = OpenAICompatibleModel(
         settings.model_base_url, settings.model_name, settings.model_api_key, settings.request_timeout, settings.model_max_attempts
     )
