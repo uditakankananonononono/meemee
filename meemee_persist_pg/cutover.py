@@ -35,12 +35,15 @@ SPECS={
  "quotas":(TableSpec("quota_limits","meemee_quota_limits",("principal","daily_jobs"),("principal",)),
            TableSpec("quota_usage","meemee_quota_usage",("principal","day","jobs"),("principal","day"))),
  "entitlements":(TableSpec("principal_plans","meemee_principal_plans",("principal","plan","updated_at"),("principal",)),),
+ "runs":(TableSpec("runs","meemee_runs",("run_id","principal","goal","final","steps_used","tool_results","created_at","approvals_required"),("run_id",)),),
+ "idempotency":(TableSpec("idempotency","meemee_idempotency",("principal","route","key","request_hash","response","status","created_at","expires_at"),("principal","route","key")),),
  "approvals":(TableSpec("tool_approvals","meemee_tool_approvals",("principal","tool","granted_at","expires_at","revoked_at","granted_by","argument_constraints"),("principal","tool")),),
 }
 # Groups an operator may leave out of a cutover. approvals.sqlite3 only exists once a grant was made,
 # and older cutover invocations predate it; when given, it is copied and verified like every other group.
-OPTIONAL_GROUPS=frozenset({"approvals","email","quotas","entitlements"})
-JSON_COLUMNS={"metadata","document","result","payload","argument_constraints"}
+OPTIONAL_GROUPS=frozenset({"approvals","email","quotas","entitlements","runs","idempotency"})
+NOT_NULL_JSON={"response"}
+JSON_COLUMNS={"metadata","document","result","payload","argument_constraints","tool_results","approvals_required","response"}
 UUID_COLUMNS={"id","plan_id","job_id"}
 _DATE_ONLY=re.compile(r"\d{4}-\d{2}-\d{2}")
 IDENTITY_TARGETS={"meemee_memories","meemee_job_events","meemee_audit_log"}
@@ -73,7 +76,9 @@ def transform(spec:TableSpec,row:sqlite3.Row)->tuple[Any,...]:
 
 def insert_values(spec:TableSpec,row:sqlite3.Row)->tuple[Any,...]:
     """transform() output adapted for INSERT: decoded JSON columns go in as jsonb (psycopg will not adapt a bare dict)."""
-    return tuple(Jsonb(value) if col in JSON_COLUMNS and value is not None else value for col,value in zip(spec.columns,transform(spec,row)))
+    # meemee_idempotency.response is NOT NULL jsonb; an unfinished claim stores JSON null there.
+    return tuple(Jsonb(value) if col in JSON_COLUMNS and (value is not None or col in NOT_NULL_JSON) else value
+                 for col,value in zip(spec.columns,transform(spec,row)))
 
 def canonical(value:Any)->Any:
     if isinstance(value,memoryview):return bytes(value).hex()

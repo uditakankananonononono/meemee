@@ -9,9 +9,11 @@ from .audit import AuditLog as SQLiteAuditLog
 from .auth import TokenStore as SQLiteTokenStore
 from .email_verification import EmailVerificationStore as SQLiteEmailVerificationStore
 from .entitlements import EntitlementStore as SQLiteEntitlementStore
+from .idempotency import IdempotencyStore as SQLiteIdempotencyStore
 from .jobs import JobStore as SQLiteJobStore
 from .memory import MemoryStore as SQLiteMemoryStore
 from .quotas import QuotaStore as SQLiteQuotaStore
+from .runs import RunStore as SQLiteRunStore
 
 
 @dataclass
@@ -35,6 +37,10 @@ class Persistence:
     #: PostgreSQL: one counter per (principal, UTC day) and one plan row, enforced on every host.
     quotas: Any = None
     entitlements: Any = None
+    #: Completed run reports and idempotency records. SQLite: runs.sqlite3 / idempotency.sqlite3.
+    #: PostgreSQL: shared, so runs are visible and idempotent retries dedupe on every host.
+    runs: Any = None
+    idempotency: Any = None
 
     def check_memory(self) -> bool:
         if self.backend == "sqlite":
@@ -59,7 +65,8 @@ def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = N
                            tokens=SQLiteTokenStore(data_dir / "auth.sqlite3"), audit=SQLiteAuditLog(data_dir / "audit.sqlite3"),
                            email_verifications=SQLiteEmailVerificationStore(data_dir / "email-verifications.sqlite3"),
                            quotas=SQLiteQuotaStore(data_dir / "quotas.sqlite3", default_daily_jobs),
-                           entitlements=SQLiteEntitlementStore(data_dir / "entitlements.sqlite3", default_plan))
+                           entitlements=SQLiteEntitlementStore(data_dir / "entitlements.sqlite3", default_plan),
+                           runs=SQLiteRunStore(data_dir / "runs.sqlite3"), idempotency=SQLiteIdempotencyStore(data_dir / "idempotency.sqlite3"))
     if normalized != "postgresql":
         raise ValueError("MEEMEE_PERSISTENCE_BACKEND must be sqlite or postgresql")
     if not postgres_dsn:
@@ -70,10 +77,12 @@ def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = N
         Database,
         EmailVerificationStore,
         EntitlementStore,
+        IdempotencyStore,
         JobStore,
         MemoryStore,
         MigrationStore,
         QuotaStore,
+        RunStore,
         TokenStore,
     )
     database = Database(postgres_dsn)
@@ -81,7 +90,8 @@ def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = N
     return Persistence("postgresql", MemoryStore(database), JobStore(database), database.close, database,
                        approvals=ApprovalStore(database), tokens=TokenStore(database), audit=AuditLog(database),
                        email_verifications=EmailVerificationStore(database),
-                       quotas=QuotaStore(database, default_daily_jobs), entitlements=EntitlementStore(database, default_plan))
+                       quotas=QuotaStore(database, default_daily_jobs), entitlements=EntitlementStore(database, default_plan),
+                       runs=RunStore(database), idempotency=IdempotencyStore(database))
 
 
 def persistence_from_settings(settings: Any) -> Persistence:

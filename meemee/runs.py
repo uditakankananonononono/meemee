@@ -72,6 +72,10 @@ class RunStore:
         result["approvals_required"]=json.loads(result.get("approvals_required") or "[]")
         result["blocked"]=bool(result["approvals_required"]); return result
 
+    def ping(self) -> bool:
+        with self.lock:
+            return self.db.execute("SELECT 1").fetchone() is not None
+
     def run_ids(self, principal: str) -> list[str]:
         with self.lock:
             return [row["run_id"] for row in self.db.execute("SELECT run_id FROM runs WHERE principal=?", (principal,))]
