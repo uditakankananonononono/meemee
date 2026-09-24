@@ -1,3 +1,19 @@
+Metadata-Version: 2.4
+Name: meemee-client
+Version: 0.118.0
+Summary: Typed Python client SDK for the Meemee agent platform API (targets server v0.118.0).
+Author: Udita Phookan
+License-Expression: LicenseRef-Proprietary
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: httpx<1.0,>=0.27
+Requires-Dist: pydantic<3.0,>=2.5
+Requires-Dist: typing-extensions<5,>=4.7
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+Dynamic: license-file
+
 # meemee-client
 
 Typed Python SDK for the [Meemee](../README.md) agent platform API. Targets the

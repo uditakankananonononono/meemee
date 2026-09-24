@@ -29,6 +29,7 @@ from .email_verification import EmailVerificationStore, ResendMailer
 from .entitlements import EntitlementStore, public_catalog
 from .health import ReadinessChecker
 from .idempotency import IdempotencyConflict, IdempotencyStore
+from .model_profiles import build_role_model
 from .monitors import MonitorInput, MonitorStore
 from .observability import (
     AGENT_RUNS,
@@ -90,6 +91,7 @@ mount_site(app)
 app.add_middleware(MetricsMiddleware)
 persistence = build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn)
 agent = build_agent(settings, memory=persistence.memory)
+reflection_model = agent.model if not (settings.model_routes or settings.model_profiles) else build_role_model(settings, "reflection")
 run_gate = RunGate()
 jobs = persistence.jobs
 if persistence.backend == "postgresql":
@@ -388,7 +390,7 @@ async def reflect_personal_model(principal=runs_write_dependency):
     context_store = agent.context
     if context_store is None:
         raise HTTPException(503, "unified context is not configured")
-    reflector = PersonalModelReflector(context_store, personal_model, agent.model)
+    reflector = PersonalModelReflector(context_store, personal_model, reflection_model)
     result = await reflector.reflect(principal.id)
     audit.append(principal.id, "personal_model.reflect", principal.id, "success", {"accepted": result["accepted"], "rejected": result["rejected"]})
     return result
