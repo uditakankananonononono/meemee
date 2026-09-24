@@ -128,7 +128,7 @@ audit = persistence.audit  # PostgreSQL mode: one global chain for every host
 approvals = persistence.approvals  # PostgreSQL mode: shared with every worker, not local disk
 check_private_hosts_override("api")  # raises when MEEMEE_ENV=production
 webhooks = persistence.webhooks or WebhookStore(settings.data_dir / "webhooks.sqlite3", settings.webhook_max_payload_bytes, settings.vault_key)  # PostgreSQL mode: shared outbox
-companion = build_companion(settings)
+companion = build_companion(settings, store=persistence.companion)  # PostgreSQL mode: shared companion tables
 deletion_ledger = DeletionLedger(settings.data_dir / "account-deletions.sqlite3")
 account_purger = AccountPurger(PurgeTargets(
     jobs=jobs, runs=runs, memory=persistence.memory, idempotency=idempotency, quotas=quotas,
@@ -154,7 +154,7 @@ if any(web_values):
         raise RuntimeError("interactive login requires complete OIDC and web-login configuration")
     web_login = WebLogin(WebLoginConfig(*web_values), oidc)
 auth = Authenticator(tokens, settings.api_token, oidc, web_login.authenticate_session if web_login else None)
-readiness = ReadinessChecker(settings.data_dir, {"memory": persistence.check_memory, "jobs": persistence.check_jobs, "runs": runs.ping, "tokens": tokens.ping, "entitlements": entitlements.ping, "webhooks": webhooks.ping}, settings.model_base_url, settings.readiness_min_free_bytes, require_model=settings.readiness_require_model)
+readiness = ReadinessChecker(settings.data_dir, {"memory": persistence.check_memory, "jobs": persistence.check_jobs, "runs": runs.ping, "tokens": tokens.ping, "entitlements": entitlements.ping, "webhooks": webhooks.ping, "companion": companion.store.ping}, settings.model_base_url, settings.readiness_min_free_bytes, require_model=settings.readiness_require_model)
 jobs_write_auth = auth.dependency("jobs:write")
 jobs_write_dependency = Depends(jobs_write_auth)
 runs_write_dependency = Depends(auth.dependency("runs:write"))

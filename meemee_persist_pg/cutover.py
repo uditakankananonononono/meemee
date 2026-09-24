@@ -40,16 +40,22 @@ SPECS={
  "webhooks":(TableSpec("webhook_subscriptions","meemee_webhook_subscriptions",("id","principal","url","secret","events","fields","headers","active","created_at"),("id",)),
               TableSpec("webhook_deliveries","meemee_webhook_deliveries",("id","subscription_id","event_id","event_type","payload","payload_sha256","status","attempts","next_attempt_at","response_status","last_error","sending_started_at","created_at"),("id",)),
               TableSpec("webhook_attempts","meemee_webhook_attempts",("id","delivery_id","attempt","started_at","finished_at","outcome","response_status","error"),("id",))),
+ "companion":(TableSpec("companion_users","meemee_companion_users",("user_id","display_name","timezone","persona","checkins","created_at","updated_at"),("user_id",)),
+               TableSpec("companion_facts","meemee_companion_facts",("id","user_id","category","text","confidence","source","superseded_by","created_at","updated_at"),("id",)),
+               TableSpec("companion_conversations","meemee_companion_conversations",("id","user_id","channel","created_at","last_message_at"),("id",)),
+               TableSpec("companion_messages","meemee_companion_messages",("id","conversation_id","role","content","created_at"),("id",)),
+               TableSpec("companion_message_models","meemee_companion_message_models",("message_id","conversation_id","role","profile","model","attempts","created_at"),("message_id",)),
+               TableSpec("companion_checkins","meemee_companion_checkins",("id","user_id","slot","due_at","status","attempts","max_attempts","channel","address","message","last_error","created_at","updated_at"),("id",))),
  "approvals":(TableSpec("tool_approvals","meemee_tool_approvals",("principal","tool","granted_at","expires_at","revoked_at","granted_by","argument_constraints"),("principal","tool")),),
 }
 # Groups an operator may leave out of a cutover. approvals.sqlite3 only exists once a grant was made,
 # and older cutover invocations predate it; when given, it is copied and verified like every other group.
-OPTIONAL_GROUPS=frozenset({"approvals","email","quotas","entitlements","runs","idempotency","webhooks"})
+OPTIONAL_GROUPS=frozenset({"approvals","email","quotas","entitlements","runs","idempotency","webhooks","companion"})
 NOT_NULL_JSON={"response"}
 JSON_COLUMNS={"metadata","document","result","payload","argument_constraints","tool_results","approvals_required","response"}
 UUID_COLUMNS={"id","plan_id","job_id"}
 _DATE_ONLY=re.compile(r"\d{4}-\d{2}-\d{2}")
-IDENTITY_TARGETS={"meemee_memories","meemee_job_events","meemee_audit_log","meemee_webhook_attempts"}
+IDENTITY_TARGETS={"meemee_memories","meemee_job_events","meemee_audit_log","meemee_webhook_attempts","meemee_companion_facts","meemee_companion_messages"}
 # Webhook payloads are signed byte-for-byte, so they stay text; SQLite 0/1 flags become booleans.
 TEXT_PAYLOAD_TARGETS={"meemee_webhook_deliveries"}
 BOOL_COLUMNS={("meemee_webhook_subscriptions","active")}
@@ -144,7 +150,7 @@ class Cutover:
                 changed=[name for name,conn in src.items() if conn.execute("PRAGMA data_version").fetchone()[0] != versions[name]]
                 if changed: raise RuntimeError(f"SQLite writers were active during copy: {changed}; PostgreSQL copy rolled back")
                 for table in IDENTITY_TARGETS:
-                    column="id" if table in {"meemee_memories","meemee_webhook_attempts"} else "sequence"
+                    column="sequence" if table in {"meemee_job_events","meemee_audit_log"} else "id"
                     target.execute("SELECT setval(pg_get_serial_sequence(%s,%s),COALESCE((SELECT max("+column+") FROM "+table+"),1),EXISTS(SELECT 1 FROM "+table+"))",(table,column))
         return copied
 
