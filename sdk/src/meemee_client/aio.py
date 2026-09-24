@@ -13,6 +13,7 @@ worker thread so a token refresh never blocks the event loop.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
@@ -157,6 +158,15 @@ class AsyncMeemeeClient:
             return auth.authorization_header()
         return await asyncio.to_thread(auth.authorization_header)
 
+    def _can_refresh(self) -> bool:
+        return callable(getattr(self._auth, "refresh", None))
+
+    async def _refresh_auth(self) -> None:
+        """Force a new credential before the single retry; async refresh() is awaited."""
+        result = self._auth.refresh()  # type: ignore[union-attr]
+        if inspect.isawaitable(result):
+            await result
+
     async def _headers(self, extra: dict[str, str] | None) -> dict[str, str]:
         headers: dict[str, str] = {}
         value = await self._authorization()
@@ -186,9 +196,12 @@ class AsyncMeemeeClient:
         policy = self._retry
         retryable_write = method.upper() == "POST" and bool(headers and headers.get("Idempotency-Key"))
         attempt = 0
+        auth_refreshed = False
         while True:
             attempt += 1
             try:
+                # The body is rebuilt from ``json_body`` on every attempt, so a
+                # retry never resends a consumed stream.
                 response = await self._http.request(
                     method, path, params=params, json=json_body,
                     headers=await self._headers(headers),
@@ -200,6 +213,12 @@ class AsyncMeemeeClient:
                     continue
                 raise NetworkError(f"{method} {path} failed before a response: {exc}") from exc
             self._record(response)
+            if response.status_code == 401 and not auth_refreshed and self._can_refresh():
+                auth_refreshed = True
+                attempt -= 1
+                await response.aclose()
+                await self._refresh_auth()
+                continue
             keyed_status_retry = retryable_write and response.status_code != 429 and attempt < policy.max_attempts
             if (
                 response.status_code >= 400
@@ -234,15 +253,26 @@ class AsyncMeemeeClient:
         headers: dict[str, str] | None = None,
         timeout: httpx.Timeout | None = None,
     ) -> AsyncIterator[httpx.Response]:
-        async with self._http.stream(
-            method, path, params=params, headers=await self._headers(headers),
-            timeout=timeout or httpx.Timeout(DEFAULT_STREAM_READ_TIMEOUT, connect=5.0),
-        ) as response:
-            self._record(response)
-            if response.status_code >= 400:
-                await response.aread()
-                raise _map_error(response)
-            yield response
+        for refresh_left in (True, False):
+            async with self._http.stream(
+                method, path, params=params, headers=await self._headers(headers),
+                timeout=timeout or httpx.Timeout(DEFAULT_STREAM_READ_TIMEOUT, connect=5.0),
+            ) as response:
+                self._record(response)
+                if response.status_code == 401 and refresh_left and self._can_refresh():
+                    # Drain and close the rejected response; the stream is
+                    # reopened from scratch, never replayed from a consumed body.
+                    await response.aread()
+                    retry = True
+                else:
+                    retry = False
+                    if response.status_code >= 400:
+                        await response.aread()
+                        raise _map_error(response)
+                    yield response
+                    return
+            if retry:
+                await self._refresh_auth()
 
 
 # ----------------------------------------------------------------- resources
@@ -412,8 +442,10 @@ class AsyncJobsResource:
         cursor = max(after, 0)
         reconnects_left = max_reconnects
         backoff = 1.0
+        auth_refreshed = False
         while True:
             failure: BaseException | None = None
+            refresh_now = False
             try:
                 async with connect(
                     _ws.ws_url(self._client._base_url, job_id, cursor),
@@ -430,6 +462,9 @@ class AsyncJobsResource:
                         except ConnectionClosed as closed:
                             code = closed.rcvd.code if closed.rcvd is not None else None
                             reason = closed.rcvd.reason if closed.rcvd is not None else ""
+                            if code == 4401 and not auth_refreshed and self._client._can_refresh():
+                                refresh_now = True
+                                break
                             rejection = _ws.rejection_error(code, reason, job_id)
                             if rejection is not None:
                                 raise rejection from None
@@ -445,12 +480,19 @@ class AsyncJobsResource:
                         if is_terminal:
                             return
             except InvalidStatus as exc:
-                mapped = _ws.handshake_error(exc.response.status_code, job_id)
-                if mapped is not None:
-                    raise mapped from exc
-                failure = exc
+                if exc.response.status_code == 401 and not auth_refreshed and self._client._can_refresh():
+                    refresh_now = True
+                else:
+                    mapped = _ws.handshake_error(exc.response.status_code, job_id)
+                    if mapped is not None:
+                        raise mapped from exc
+                    failure = exc
             except (OSError, TimeoutError, websockets.exceptions.InvalidHandshake) as exc:
                 failure = exc
+            if refresh_now:
+                auth_refreshed = True
+                await self._client._refresh_auth()
+                continue
             if not reconnect or reconnects_left <= 0:
                 raise NetworkError(
                     f"job WebSocket for {job_id} interrupted and the reconnect budget is "

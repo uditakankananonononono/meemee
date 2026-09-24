@@ -190,6 +190,14 @@ class MeemeeClient:
 
     # ------------------------------------------------------------- http core
 
+    def _can_refresh(self) -> bool:
+        return callable(getattr(self._auth, "refresh", None))
+
+    def _refresh_auth(self) -> None:
+        """Force the provider to fetch a new credential before the single retry."""
+        assert self._auth is not None
+        self._auth.refresh()  # type: ignore[attr-defined]
+
     def _headers(self, extra: dict[str, str] | None) -> dict[str, str]:
         headers: dict[str, str] = {}
         if self._auth is not None:
@@ -211,9 +219,12 @@ class MeemeeClient:
     ) -> httpx.Response:
         policy = self._retry
         attempt = 0
+        auth_refreshed = False
         while True:
             attempt += 1
             try:
+                # The body is rebuilt from ``json_body`` on every attempt, so a
+                # retry never depends on a consumed stream.
                 response = self._http.request(
                     method, path, params=params, json=json_body,
                     headers=self._headers(headers),
@@ -230,6 +241,13 @@ class MeemeeClient:
                 request_id=response.headers.get("X-Request-ID"),
                 rate_limit=RateLimitInfo.from_headers(response.headers),
             )
+            if response.status_code == 401 and not auth_refreshed and self._can_refresh():
+                # One forced credential refresh and one retry per request. The
+                # server rejected before running the handler, so resending is safe.
+                auth_refreshed = True
+                attempt -= 1
+                self._refresh_auth()
+                continue
             retryable_write = method.upper() == "POST" and bool(headers and headers.get("Idempotency-Key"))
             keyed_status_retry = retryable_write and response.status_code != 429 and attempt < policy.max_attempts
             if (
@@ -264,16 +282,27 @@ class MeemeeClient:
         headers: dict[str, str] | None = None,
         timeout: httpx.Timeout | None = None,
     ):
-        """Open a streaming response, mapping an error status before returning it."""
-        stream = self._http.stream(
-            method, path, params=params, headers=self._headers(headers),
-            timeout=timeout or httpx.Timeout(DEFAULT_STREAM_READ_TIMEOUT, connect=5.0),
-        )
-        response = stream.__enter__()
-        self.last_response_info = ResponseInfo(
-            request_id=response.headers.get("X-Request-ID"),
-            rate_limit=RateLimitInfo.from_headers(response.headers),
-        )
+        """Open a streaming response, mapping an error status before returning it.
+
+        A 401 with a refresh-capable provider closes the rejected response,
+        refreshes once and reopens the stream once.
+        """
+        for refresh_left in (True, False):
+            stream = self._http.stream(
+                method, path, params=params, headers=self._headers(headers),
+                timeout=timeout or httpx.Timeout(DEFAULT_STREAM_READ_TIMEOUT, connect=5.0),
+            )
+            response = stream.__enter__()
+            self.last_response_info = ResponseInfo(
+                request_id=response.headers.get("X-Request-ID"),
+                rate_limit=RateLimitInfo.from_headers(response.headers),
+            )
+            if response.status_code == 401 and refresh_left and self._can_refresh():
+                response.read()
+                stream.__exit__(None, None, None)
+                self._refresh_auth()
+                continue
+            break
         if response.status_code >= 400:
             response.read()
             error = _map_error(response)
@@ -572,8 +601,10 @@ class JobsResource:
         reconnects_left = max_reconnects
         backoff = 1.0
         base = str(self._client._http.base_url)
+        auth_refreshed = False
         while True:
             failure: BaseException | None = None
+            refresh_now = False
             try:
                 with connect(
                     _ws.ws_url(base, job_id, cursor),
@@ -590,6 +621,9 @@ class JobsResource:
                         except ConnectionClosed as closed:
                             code = closed.rcvd.code if closed.rcvd is not None else None
                             reason = closed.rcvd.reason if closed.rcvd is not None else ""
+                            if code == 4401 and not auth_refreshed and self._client._can_refresh():
+                                refresh_now = True
+                                break
                             rejection = _ws.rejection_error(code, reason, job_id)
                             if rejection is not None:
                                 raise rejection from None
@@ -606,12 +640,20 @@ class JobsResource:
                             return
             except InvalidStatus as exc:
                 status = exc.response.status_code
-                mapped = _ws.handshake_error(status, job_id)
-                if mapped is not None:
-                    raise mapped from exc
-                failure = exc
+                if status == 401 and not auth_refreshed and self._client._can_refresh():
+                    refresh_now = True
+                else:
+                    mapped = _ws.handshake_error(status, job_id)
+                    if mapped is not None:
+                        raise mapped from exc
+                    failure = exc
             except (OSError, TimeoutError, websockets.exceptions.InvalidHandshake) as exc:
                 failure = exc
+            if refresh_now:
+                # One credential refresh per stream; it does not use the reconnect budget.
+                auth_refreshed = True
+                self._client._refresh_auth()
+                continue
             if not reconnect or reconnects_left <= 0:
                 raise NetworkError(
                     f"job WebSocket for {job_id} interrupted and the reconnect budget is "
