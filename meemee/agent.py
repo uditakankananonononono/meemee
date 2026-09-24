@@ -37,8 +37,8 @@ class Agent:
         self.context = context
         self.personal_model = personal_model
 
-    async def run(self, goal: str, approve: Approval | None = None, cancel: Event | None = None, owner_id: str = "default") -> RunReport:
-        run_id = uuid.uuid4().hex
+    async def run(self, goal: str, approve: Approval | None = None, cancel: Event | None = None, owner_id: str = "default", run_id: str | None = None) -> RunReport:
+        run_id = run_id or uuid.uuid4().hex
         goal = scrub_text(goal)
         plan = self.planner.plan(goal)
         prior = self.memory.hybrid_search(goal, limit=5)

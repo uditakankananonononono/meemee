@@ -49,6 +49,10 @@ class EntitlementStore:
     def allows(self, principal: str, resource: str, current: int) -> bool:
         return current < int(PLANS[self.plan_name(principal)][resource])
 
+    def delete_principal(self, principal: str) -> int:
+        with self.lock, self.db:
+            return self.db.execute("DELETE FROM principal_plans WHERE principal=?", (principal,)).rowcount
+
 
 def public_catalog() -> dict:
     return {

@@ -38,11 +38,14 @@ class JobStore:
         columns = {row[1] for row in self.db.execute("PRAGMA table_info(jobs)")}
         if "principal" not in columns:
             self.db.execute("ALTER TABLE jobs ADD COLUMN principal TEXT")
+        if "purge_pending" not in columns:
+            self.db.execute("ALTER TABLE jobs ADD COLUMN purge_pending INTEGER NOT NULL DEFAULT 0")
         self.db.execute(
             "CREATE INDEX IF NOT EXISTS jobs_principal_updated ON jobs(principal,updated_at DESC,id DESC)"
         )
-        register_schema(self.db, "jobs", 2, [
-            "jobs principal ownership", "job events", "principal updated index"
+        register_schema(self.db, "jobs", 3, [
+            "jobs principal ownership", "job events", "principal updated index",
+            "account purge tombstones"
         ])
 
     def event(self, ident: str, kind: str, payload: dict[str, Any]) -> None:
@@ -92,7 +95,18 @@ class JobStore:
             self.event(row["id"], "running", {"attempt": row["attempts"] + 1})
         return dict(row) if changed else None
 
-    def finish(self, ident: str, result: dict[str, Any]) -> None:
+    def _settle_purge(self, ident: str) -> bool:
+        """Delete a job tombstoned by account deletion once its worker lets go of it."""
+        with self.lock, self.db:
+            deleted = self.db.execute("DELETE FROM jobs WHERE id=? AND purge_pending=1", (ident,)).rowcount
+            if deleted:
+                self.db.execute("DELETE FROM job_events WHERE job_id=?", (ident,))
+        return bool(deleted)
+
+    def finish(self, ident: str, result: dict[str, Any]) -> bool:
+        """Mark a running job done. Returns True when the job was purged instead."""
+        if self._settle_purge(ident):
+            return True
         now = datetime.now(timezone.utc).isoformat()
         with self.lock, self.db:
             self.db.execute(
@@ -100,8 +114,12 @@ class JobStore:
                 (json.dumps(result), now, ident),
             )
         self.event(ident, "done", {"result": result})
+        return False
 
-    def fail(self, ident: str, error: str) -> None:
+    def fail(self, ident: str, error: str) -> bool:
+        """Fail or requeue a running job. Returns True when the job was purged instead."""
+        if self._settle_purge(ident):
+            return True
         now = datetime.now(timezone.utc).isoformat()
         with self.lock, self.db:
             self.db.execute(
@@ -110,6 +128,7 @@ class JobStore:
             )
         job = self.get(ident)
         self.event(ident, "retry" if job and job["status"] == "queued" else "failed", {"error": error})
+        return False
 
 
     def request_cancel(self, ident: str) -> str | None:
@@ -129,6 +148,8 @@ class JobStore:
         return target
 
     def cancel_running(self, ident: str) -> bool:
+        if self._settle_purge(ident):
+            return True
         now = datetime.now(timezone.utc).isoformat()
         with self.lock, self.db:
             changed = self.db.execute("UPDATE jobs SET status='cancelled', error='cancelled', updated_at=? WHERE id=? AND status='cancel_requested'", (now, ident)).rowcount
@@ -182,3 +203,66 @@ class JobStore:
         with self.lock:
             row = self.db.execute("SELECT * FROM jobs WHERE id=?", (ident,)).fetchone()
         return dict(row) if row else None
+
+    def purge_principal(self, principal: str) -> dict[str, int]:
+        """Hard-delete every job and event owned by a principal.
+
+        Jobs a worker is executing cannot vanish under it, so they are tombstoned instead:
+        goal, result and owner are wiped, the job is moved to ``cancel_requested`` so the
+        worker's cancellation watcher stops the run, and the worker's terminal call deletes
+        the row. ``sweep_purges`` removes tombstones whose worker died.
+        """
+        if not principal:
+            raise ValueError("principal is required")
+        now = datetime.now(timezone.utc).isoformat()
+        with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            try:
+                running = [row["id"] for row in self.db.execute(
+                    "SELECT id FROM jobs WHERE principal=? AND status IN ('running','cancel_requested')", (principal,)
+                )]
+                events = 0
+                for ident in running:
+                    events += self.db.execute("DELETE FROM job_events WHERE job_id=?", (ident,)).rowcount
+                    self.db.execute(
+                        "UPDATE jobs SET goal='[deleted]', result=NULL, error='account deleted', principal=NULL, "
+                        "status='cancel_requested', purge_pending=1, updated_at=? WHERE id=?",
+                        (now, ident),
+                    )
+                idle = [row["id"] for row in self.db.execute("SELECT id FROM jobs WHERE principal=?", (principal,))]
+                for ident in idle:
+                    events += self.db.execute("DELETE FROM job_events WHERE job_id=?", (ident,)).rowcount
+                deleted = self.db.execute("DELETE FROM jobs WHERE principal=?", (principal,)).rowcount
+                self.db.execute("COMMIT")
+            except BaseException:
+                self.db.execute("ROLLBACK")
+                raise
+        return {"jobs_deleted": deleted, "job_events_deleted": events, "running_tombstoned": len(running)}
+
+    def run_ids_for_principal(self, principal: str) -> list[str]:
+        """Run IDs recorded in the principal's finished job results (for memory purge)."""
+        with self.lock:
+            rows = self.db.execute("SELECT result FROM jobs WHERE principal=? AND result IS NOT NULL", (principal,)).fetchall()
+        found = []
+        for row in rows:
+            try:
+                value = json.loads(row["result"]).get("run_id")
+            except (ValueError, AttributeError):
+                continue
+            if isinstance(value, str) and value:
+                found.append(value)
+        return found
+
+    def sweep_purges(self, stale_before: str | None = None) -> int:
+        """Delete purge tombstones no worker holds; with ``stale_before``, also abandoned ones."""
+        with self.lock, self.db:
+            query = "SELECT id FROM jobs WHERE purge_pending=1 AND (status NOT IN ('running','cancel_requested')"
+            params: list[Any] = []
+            if stale_before is not None:
+                query += " OR updated_at<?"
+                params.append(stale_before)
+            idents = [row["id"] for row in self.db.execute(query + ")", params)]
+            for ident in idents:
+                self.db.execute("DELETE FROM job_events WHERE job_id=?", (ident,))
+                self.db.execute("DELETE FROM jobs WHERE id=?", (ident,))
+        return len(idents)

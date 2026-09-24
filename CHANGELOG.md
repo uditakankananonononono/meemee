@@ -2,6 +2,15 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## Unreleased (branch pb4)
+
+- Product-wide account deletion: jobs and job events, run reports, agent memories, personal model (including soft-deleted history), connected context, monitors, webhooks, quotas, plans, idempotency records, tool approvals and companion content are hard-deleted for the principal. Audit log retained.
+- Running jobs are tombstoned and removed when their worker settles; memories written by the in-flight run are removed too. Late synchronous runs are discarded with HTTP 410.
+- Durable deletion ledger with crash resume (`meemee account-delete-resume`, automatic on API start); admin erasure endpoint for external principals; `meemee account-delete PRINCIPAL --yes`.
+- PostgreSQL migration 004 adds job purge tombstones; expired tombstones are reaped on claim.
+- Fixed PostgreSQL `AuditLog.verify` failing on servers whose timezone is not UTC.
+- `Agent.run` accepts an optional caller-supplied `run_id`.
+
 ## 0.117.0
 
 - Completed the personal-model v1 with user correction provenance, owner-scoped evidence inspection and confidence decay for stale inferred claims.

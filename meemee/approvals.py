@@ -72,3 +72,9 @@ class ApprovalStore:
                 (principal,),
             ).fetchall()
         return [{**dict(row), "argument_constraints": json.loads(row["argument_constraints"]) if row["argument_constraints"] else None} for row in rows]
+
+    def delete_principal(self, principal: str) -> int:
+        """Remove every standing tool grant, active or revoked, held by a principal."""
+        with self.lock, self.db:
+            return self.db.execute("DELETE FROM tool_approvals WHERE principal=?", (principal,)).rowcount
+
