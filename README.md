@@ -185,6 +185,8 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 
 162. Forced interruption of blocking tools: a tool that sets `isolation = IsolationPolicy(...)` runs in a spawned child process; cancellation or its hard timeout sends SIGTERM, then SIGKILL after a grace period, and the child is always reaped. Covered by `tests/test_isolation.py` (12 tests, including a SIGTERM-ignoring child and an event loop that stays responsive while the tool blocks).
 
+155. Companion console screens (branch pb4): profile editor, persona editor, facts with retire, conversations browser across channels with timestamped paged history, check-in queue with status filter and admin delivery run, verified by a headless Chromium test against a live server.
+
 ## Thin (0)
 
 Nothing is classified as thin. A capability is either implemented and tested at its stated boundary below, or listed as missing.

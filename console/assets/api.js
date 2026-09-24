@@ -221,3 +221,5 @@ export const listCompanionCheckins = (userId, status = null, opts) => {
   const suffix = params.toString() ? `?${params}` : "";
   return request(`/v1/companion/users/${encodeURIComponent(userId)}/checkins${suffix}`, opts);
 };
+export const tickCompanionCheckins = (opts) =>
+  request("/v1/companion/checkins/tick", { method: "POST", ...opts });
