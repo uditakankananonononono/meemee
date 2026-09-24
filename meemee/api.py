@@ -18,7 +18,7 @@ from product_site.mount import mount_site
 from webapp.mount import mount_webapp
 
 from . import __version__
-from .account_deletion import AccountPurger, DeletionLedger, PurgeTargets
+from .account_deletion import AccountPurger, PurgeTargets
 from .auth import Authenticator, Principal
 from .browser_api import build_browser_router
 from .browser_notices import TakeoverNoticeQueue
@@ -127,7 +127,7 @@ approvals = persistence.approvals  # PostgreSQL mode: shared with every worker, 
 check_private_hosts_override("api")  # raises when MEEMEE_ENV=production
 webhooks = persistence.webhooks or WebhookStore(settings.data_dir / "webhooks.sqlite3", settings.webhook_max_payload_bytes, settings.vault_key)  # PostgreSQL mode: shared outbox
 companion = build_companion(settings, store=persistence.companion, persistence=persistence)  # PostgreSQL mode: shared companion tables
-deletion_ledger = DeletionLedger(settings.data_dir / "account-deletions.sqlite3")
+deletion_ledger = persistence.deletion_ledger  # PostgreSQL mode: shared, any host resumes a deletion
 account_purger = AccountPurger(PurgeTargets(
     jobs=jobs, runs=runs, memory=persistence.memory, idempotency=idempotency, quotas=quotas,
     entitlements=entitlements, approvals=approvals, monitors=monitors, personal_model=personal_model,
@@ -152,7 +152,7 @@ if any(web_values):
         raise RuntimeError("interactive login requires complete OIDC and web-login configuration")
     web_login = WebLogin(WebLoginConfig(*web_values), oidc)
 auth = Authenticator(tokens, settings.api_token, oidc, web_login.authenticate_session if web_login else None)
-readiness = ReadinessChecker(settings.data_dir, {"memory": persistence.check_memory, "jobs": persistence.check_jobs, "runs": runs.ping, "tokens": tokens.ping, "entitlements": entitlements.ping, "webhooks": webhooks.ping, "companion": companion.store.ping, "personal_model": personal_model.ping, "context": persistence.context.ping, "monitors": monitors.ping, "reflection_schedule": persistence.reflection_schedule.ping}, settings.model_base_url, settings.readiness_min_free_bytes, require_model=settings.readiness_require_model)
+readiness = ReadinessChecker(settings.data_dir, {"memory": persistence.check_memory, "jobs": persistence.check_jobs, "runs": runs.ping, "tokens": tokens.ping, "entitlements": entitlements.ping, "webhooks": webhooks.ping, "companion": companion.store.ping, "personal_model": personal_model.ping, "context": persistence.context.ping, "monitors": monitors.ping, "reflection_schedule": persistence.reflection_schedule.ping, "account_deletions": deletion_ledger.ping}, settings.model_base_url, settings.readiness_min_free_bytes, require_model=settings.readiness_require_model)
 jobs_write_auth = auth.dependency("jobs:write")
 jobs_write_dependency = Depends(jobs_write_auth)
 runs_write_dependency = Depends(auth.dependency("runs:write"))

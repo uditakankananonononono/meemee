@@ -68,6 +68,10 @@ class DeletionLedger:
             );
         """)
 
+    def ping(self) -> bool:
+        with self.lock:
+            return self.db.execute("SELECT 1").fetchone() is not None
+
     def open(self, principal: str, requested_by: str) -> str:
         with self.lock:
             row = self.db.execute(
@@ -238,4 +242,4 @@ def build_account_purger(settings: Any, persistence: Any) -> AccountPurger:
         browser_notices=TakeoverNoticeQueue(root / "browser-notices.sqlite3"),
         reflection_schedule=persistence.reflection_schedule or ReflectionSchedule(root / "reflection-schedule.sqlite3"),
     )
-    return AccountPurger(targets, DeletionLedger(root / "account-deletions.sqlite3"))
+    return AccountPurger(targets, persistence.deletion_ledger or DeletionLedger(root / "account-deletions.sqlite3"))

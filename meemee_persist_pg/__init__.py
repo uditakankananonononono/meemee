@@ -1,5 +1,6 @@
 """Additive PostgreSQL stores for Meemee. No import changes to the SQLite core."""
 from ._db import Database
+from .account_deletion import DeletionLedger
 from .approvals import ApprovalStore
 from .audit import AuditLog
 from .companion import CompanionStore
@@ -28,6 +29,8 @@ __all__ = [
     "ContextStore",
     "ContextStoreInterface",
     "Database",
+    "DeletionLedger",
+    "DeletionLedgerInterface",
     "EmailVerificationStore",
     "EmailVerificationStoreInterface",
     "EntitlementStore",
@@ -66,6 +69,7 @@ from .interfaces import (
     AuditStoreInterface,
     CompanionStoreInterface,
     ContextStoreInterface,
+    DeletionLedgerInterface,
     EmailVerificationStoreInterface,
     EntitlementStoreInterface,
     IdempotencyStoreInterface,

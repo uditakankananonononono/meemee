@@ -53,11 +53,13 @@ SPECS={
  "monitors":(TableSpec("monitors","meemee_monitors",("id","owner_id","name","source_id","predicate","deadline","max_fires","fire_count","status","created_at","updated_at"),("id",)),
              TableSpec("monitor_events","meemee_monitor_events",("sequence","monitor_id","owner_id","kind","payload","created_at"),("sequence",))),
  "reflection":(TableSpec("reflection_runs","meemee_reflection_runs",("owner_id","watermark","last_attempt_at","last_success_at","last_status","last_result"),("owner_id",)),),
+ "deletions":(TableSpec("account_deletions","meemee_account_deletions",("id","principal","requested_by","status","started_at","completed_at"),("id",)),
+              TableSpec("account_deletion_steps","meemee_account_deletion_steps",("deletion_id","step","counts","finished_at"),("deletion_id","step"))),
  "approvals":(TableSpec("tool_approvals","meemee_tool_approvals",("principal","tool","granted_at","expires_at","revoked_at","granted_by","argument_constraints"),("principal","tool")),),
 }
 # Groups an operator may leave out of a cutover. approvals.sqlite3 only exists once a grant was made,
 # and older cutover invocations predate it; when given, it is copied and verified like every other group.
-OPTIONAL_GROUPS=frozenset({"approvals","email","quotas","entitlements","runs","idempotency","webhooks","companion","personal","context","monitors","reflection"})
+OPTIONAL_GROUPS=frozenset({"approvals","email","quotas","entitlements","runs","idempotency","webhooks","companion","personal","context","monitors","reflection","deletions"})
 NOT_NULL_JSON={"response"}
 JSON_COLUMNS={"metadata","document","result","payload","argument_constraints","tool_results","approvals_required","response"}
 UUID_COLUMNS={"id","plan_id","job_id"}
