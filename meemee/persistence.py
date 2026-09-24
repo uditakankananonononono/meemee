@@ -7,6 +7,7 @@ from typing import Any
 from .approvals import ApprovalStore as SQLiteApprovalStore
 from .audit import AuditLog as SQLiteAuditLog
 from .auth import TokenStore as SQLiteTokenStore
+from .companion.store import CompanionStore as SQLiteCompanionStore
 from .email_verification import EmailVerificationStore as SQLiteEmailVerificationStore
 from .entitlements import EntitlementStore as SQLiteEntitlementStore
 from .idempotency import IdempotencyStore as SQLiteIdempotencyStore
@@ -45,6 +46,9 @@ class Persistence:
     #: Webhook subscriptions and delivery outbox. SQLite: webhooks.sqlite3. PostgreSQL: shared by every
     #: API host, worker and dispatcher. None when no vault key is configured (secrets are encrypted).
     webhooks: Any = None
+    #: Companion profiles, facts, conversations and check-ins. SQLite: companion.sqlite3.
+    #: PostgreSQL: shared by every API host and companion worker.
+    companion: Any = None
 
     def check_memory(self) -> bool:
         if self.backend == "sqlite":
@@ -72,7 +76,8 @@ def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = N
                            quotas=SQLiteQuotaStore(data_dir / "quotas.sqlite3", default_daily_jobs),
                            entitlements=SQLiteEntitlementStore(data_dir / "entitlements.sqlite3", default_plan),
                            runs=SQLiteRunStore(data_dir / "runs.sqlite3"), idempotency=SQLiteIdempotencyStore(data_dir / "idempotency.sqlite3"),
-                           webhooks=SQLiteWebhookStore(data_dir / "webhooks.sqlite3", webhook_max_payload_bytes, vault_key) if vault_key else None)
+                           webhooks=SQLiteWebhookStore(data_dir / "webhooks.sqlite3", webhook_max_payload_bytes, vault_key) if vault_key else None,
+                           companion=SQLiteCompanionStore(data_dir / "companion.sqlite3"))
     if normalized != "postgresql":
         raise ValueError("MEEMEE_PERSISTENCE_BACKEND must be sqlite or postgresql")
     if not postgres_dsn:
@@ -80,6 +85,7 @@ def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = N
     from meemee_persist_pg import (
         ApprovalStore,
         AuditLog,
+        CompanionStore,
         Database,
         EmailVerificationStore,
         EntitlementStore,
@@ -99,7 +105,8 @@ def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = N
                        email_verifications=EmailVerificationStore(database),
                        quotas=QuotaStore(database, default_daily_jobs), entitlements=EntitlementStore(database, default_plan),
                        runs=RunStore(database), idempotency=IdempotencyStore(database),
-                       webhooks=WebhookStore(database, webhook_max_payload_bytes, vault_key) if vault_key else None)
+                       webhooks=WebhookStore(database, webhook_max_payload_bytes, vault_key) if vault_key else None,
+                       companion=CompanionStore(database))
 
 
 def persistence_from_settings(settings: Any) -> Persistence:
