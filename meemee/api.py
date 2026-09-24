@@ -19,6 +19,7 @@ from product_site.mount import mount_site
 from webapp.mount import mount_webapp
 
 from . import __version__
+from .account_deletion import AccountPurger, DeletionLedger, PurgeTargets
 from .approvals import ApprovalStore
 from .audit import AuditLog
 from .auth import Authenticator, Principal, TokenStore
@@ -28,6 +29,7 @@ from .browser_sessions import BrowserSessionManager, BrowserSessionStore
 from .companion.api import build_companion_router
 from .companion.runtime import build_companion
 from .config import Settings
+from .context import ContextStore
 from .email_verification import EmailVerificationStore, ResendMailer
 from .entitlements import EntitlementStore, public_catalog
 from .health import ReadinessChecker
@@ -128,6 +130,14 @@ audit = AuditLog(settings.data_dir / "audit.sqlite3")
 approvals = ApprovalStore(settings.data_dir / "approvals.sqlite3")
 webhooks = WebhookStore(settings.data_dir / "webhooks.sqlite3", settings.webhook_max_payload_bytes, settings.vault_key)
 companion = build_companion(settings)
+deletion_ledger = DeletionLedger(settings.data_dir / "account-deletions.sqlite3")
+account_purger = AccountPurger(PurgeTargets(
+    jobs=jobs, runs=runs, memory=persistence.memory, idempotency=idempotency, quotas=quotas,
+    entitlements=entitlements, approvals=approvals, monitors=monitors, personal_model=personal_model,
+    context=ContextStore(settings.data_dir / "context.sqlite3"), webhooks=webhooks, companion=companion.store,
+), deletion_ledger)
+for _resumed in account_purger.resume_incomplete():
+    log.warning("resumed interrupted account deletion", extra={"deletion_id": _resumed["deletion_id"]})
 oidc = None
 if any((settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url)):
     if not all((settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url)):
@@ -358,11 +368,32 @@ def export_my_account(principal=jobs_read_dependency):
 def delete_my_account(principal=jobs_read_dependency):
     if tokens.get_account(principal.id) is None:
         raise HTTPException(404, "built-in account not found")
-    deleted = companion.store.delete_user_data(principal.id)
+    # Disable first so no new request can write under this identity while data is purged.
     if not tokens.disable_account(principal.id):
         raise HTTPException(409, "account is already disabled")
-    audit.append(principal.id, "account.delete", principal.id, "success", deleted)
-    return {"account_id": principal.id, "deleted": True, "sessions_revoked": True, "companion_records": deleted, "audit_retained": True}
+    result = account_purger.purge(principal.id, requested_by=principal.id)
+    companion_records = result["steps"].get("companion", {})
+    audit.append(principal.id, "account.delete", principal.id, "success", {"deletion_id": result["deletion_id"], "deleted": result["deleted"]})
+    return {"account_id": principal.id, "deleted": True, "sessions_revoked": True, "companion_records": companion_records,
+            "deletion_id": result["deletion_id"], "product_records": result["deleted"], "audit_retained": True}
+
+
+@app.delete("/v1/admin/principals/{principal_id}/data", dependencies=[Depends(auth.dependency("admin"))])
+def purge_principal_data(principal_id: str, request: Request):
+    """Operator erasure for any principal, including external OIDC identities."""
+    if tokens.get_account(principal_id) is not None:
+        tokens.disable_account(principal_id)
+    result = account_purger.purge(principal_id, requested_by=request.state.principal.id)
+    audit.append(request.state.principal.id, "account.purge", principal_id, "success", {"deletion_id": result["deletion_id"], "deleted": result["deleted"]})
+    return result
+
+
+@app.get("/v1/admin/account-deletions/{deletion_id}", dependencies=[Depends(auth.dependency("admin"))])
+def get_account_deletion(deletion_id: str):
+    record = deletion_ledger.get(deletion_id)
+    if record is None:
+        raise HTTPException(404, "deletion not found")
+    return record
 
 
 @app.post("/v1/account/api-keys", status_code=201)
@@ -502,6 +533,7 @@ async def create_run(request: RunRequest, principal=runs_write_dependency):
     if not run_gate.accepting:
         raise HTTPException(503, "server is draining", headers={"Retry-After":"30"})
     await run_gate.enter()
+    started_at = datetime.now(timezone.utc).isoformat()
     try:
         report = await agent.run(
             request.goal,
@@ -512,6 +544,9 @@ async def create_run(request: RunRequest, principal=runs_write_dependency):
             ),
             owner_id=principal.id,
         )
+        if account_purger.discard_late_run(principal.id, report, started_at):
+            audit.append("api", "run.discard", report.run_id, "success", {"reason": "account deleted during run"})
+            raise HTTPException(410, "account was deleted while this run was in progress; its output was discarded")
         runs.add(principal.id, report)
         audit.append("api", "run.create", report.run_id, "success", {"steps": report.steps_used})
         AGENT_RUNS.labels("success").inc()

@@ -59,3 +59,9 @@ class IdempotencyStore:
                 (principal, route, key, self.request_hash(payload), json.dumps(response, default=str), status,
                  now.isoformat(), (now + self.ttl).isoformat()),
             )
+
+    def delete_principal(self, principal: str) -> int:
+        """Drop stored responses (which can echo job goals) for a principal."""
+        with self.lock, self.db:
+            return self.db.execute("DELETE FROM idempotency WHERE principal=?", (principal,)).rowcount
+

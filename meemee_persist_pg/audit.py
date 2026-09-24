@@ -31,7 +31,7 @@ class AuditLog:
         previous="0"*64
         with self.db.transaction(isolation="REPEATABLE READ") as c:rows=c.execute("SELECT * FROM meemee_audit_log ORDER BY sequence").fetchall()
         for row in rows:
-            encoded=json.dumps(row["metadata"],sort_keys=True,separators=(",",":")); occurred=row["occurred_at"].isoformat()
+            encoded=json.dumps(row["metadata"],sort_keys=True,separators=(",",":")); occurred=row["occurred_at"].astimezone(timezone.utc).isoformat()
             digest=self.hash(previous,occurred,row["actor_id"],row["action"],row["resource"],row["outcome"],encoded)
             if row["previous_hash"]!=previous or row["entry_hash"]!=digest:return False,row["sequence"]
             previous=row["entry_hash"]

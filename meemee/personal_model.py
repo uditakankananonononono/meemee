@@ -148,3 +148,19 @@ class PersonalModelStore:
                 "UPDATE personal_items SET status='superseded',updated_at=? WHERE owner_id=? AND status='active' AND valid_until IS NOT NULL AND valid_until<=?",
                 (clock, owner_id, clock),
             ).rowcount
+
+    def purge_owner(self, owner_id: str) -> dict[str, int]:
+        """Hard-delete the owner's whole personal model, including soft-deleted items and evidence.
+
+        ``delete`` is a user-facing soft delete kept for correction history; account deletion
+        must not leave that history behind.
+        """
+        if not owner_id:
+            raise ValueError("owner is required")
+        with self.lock, self.db:
+            evidence = self.db.execute("DELETE FROM personal_evidence WHERE owner_id=?", (owner_id,)).rowcount
+            evidence += self.db.execute(
+                "DELETE FROM personal_evidence WHERE item_id IN (SELECT id FROM personal_items WHERE owner_id=?)", (owner_id,)
+            ).rowcount
+            items = self.db.execute("DELETE FROM personal_items WHERE owner_id=?", (owner_id,)).rowcount
+        return {"personal_items": items, "personal_evidence": evidence}

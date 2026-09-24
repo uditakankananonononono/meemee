@@ -26,6 +26,7 @@ class JobStore:
             c.execute("INSERT INTO meemee_jobs(id,goal,run_at,status,max_attempts,principal) VALUES(%s,%s,COALESCE(%s,clock_timestamp()),'queued',%s,%s)",(ident,goal,run_at,max_attempts,principal)); self._event(c,ident,"queued",{"run_at":run_at.isoformat() if run_at else None})
         return str(ident)
     def _reap(self,c):
+        c.execute("DELETE FROM meemee_jobs WHERE purge_pending AND (status NOT IN ('running','cancel_requested') OR lease_expires_at IS NULL OR lease_expires_at<=clock_timestamp())")
         rows=c.execute("""UPDATE meemee_jobs SET status=CASE WHEN attempts<max_attempts THEN 'queued'::meemee_job_status ELSE 'failed'::meemee_job_status END,
           error='worker lease expired',lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL,updated_at=clock_timestamp()
           WHERE status='running' AND lease_expires_at<=clock_timestamp() RETURNING id,status""").fetchall()
@@ -43,22 +44,30 @@ class JobStore:
     def heartbeat(self,ident:str,lease_token:str)->bool:
         with self.db.transaction() as c:return bool(c.execute("""UPDATE meemee_jobs SET lease_expires_at=clock_timestamp()+(%s*interval '1 second'),updated_at=clock_timestamp()
           WHERE id=%s AND status='running' AND lease_owner=%s AND lease_token=%s AND lease_expires_at>clock_timestamp()""",(self.lease_seconds,ident,self.worker_id,lease_token)).rowcount)
-    def _terminal(self,ident,lease_token,status,result=None,error=None):
+    def _settle_purge(self,c,ident,lease_token)->bool:
+        return c.execute("DELETE FROM meemee_jobs WHERE id=%s AND purge_pending AND lease_owner=%s AND lease_token=%s RETURNING id",(ident,self.worker_id,lease_token)).fetchone() is not None
+    def _terminal(self,ident,lease_token,status,result=None,error=None)->bool:
         with self.db.transaction() as c:
+            if self._settle_purge(c,ident,lease_token):return True
             row=c.execute("""UPDATE meemee_jobs SET status=%s,result=%s,error=%s,lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL,updated_at=clock_timestamp()
              WHERE id=%s AND status IN ('running','cancel_requested') AND lease_owner=%s AND lease_token=%s AND lease_expires_at>clock_timestamp() RETURNING id""",(status,Jsonb(result) if result is not None else None,error,ident,self.worker_id,lease_token)).fetchone()
             if not row: raise LeaseLostError(f"job {ident} lease is no longer owned")
             self._event(c,ident,status,{"result":result} if result is not None else {"error":error})
-    def finish(self,ident:str,result:dict[str,Any],lease_token:str|None=None)->None:
-        token=lease_token or self._owned_token(ident); self._terminal(ident,token,"done",result=result)
-    def fail(self,ident:str,error:str,lease_token:str|None=None)->None:
+            return False
+    def finish(self,ident:str,result:dict[str,Any],lease_token:str|None=None)->bool:
+        """Mark done; returns True when account deletion purged the job instead."""
+        token=lease_token or self._owned_token(ident); return self._terminal(ident,token,"done",result=result)
+    def fail(self,ident:str,error:str,lease_token:str|None=None)->bool:
+        """Fail or requeue; returns True when account deletion purged the job instead."""
         token=lease_token or self._owned_token(ident)
         with self.db.transaction() as c:
+            if self._settle_purge(c,ident,token):return True
             row=c.execute("""UPDATE meemee_jobs SET status=CASE WHEN attempts<max_attempts THEN 'queued'::meemee_job_status ELSE 'failed'::meemee_job_status END,
              error=%s,lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL,updated_at=clock_timestamp() WHERE id=%s AND status='running' AND lease_owner=%s AND lease_token=%s
              AND lease_expires_at>clock_timestamp() RETURNING status""",(error,ident,self.worker_id,token)).fetchone()
             if not row:raise LeaseLostError(f"job {ident} lease is no longer owned")
             self._event(c,ident,"retry" if row["status"]=="queued" else "failed",{"error":error})
+            return False
     def _owned_token(self,ident):
         with self.db.transaction() as c:r=c.execute("SELECT lease_token FROM meemee_jobs WHERE id=%s AND lease_owner=%s",(ident,self.worker_id)).fetchone()
         if not r:raise LeaseLostError(f"job {ident} lease is no longer owned")
@@ -94,3 +103,25 @@ class JobStore:
         return items,next_cursor
     def get_owned(self,ident:str,principal:str):
         with self.db.transaction() as c:return self._row(c.execute("SELECT * FROM meemee_jobs WHERE id=%s AND principal=%s",(ident,principal)).fetchone())
+    def purge_principal(self,principal:str)->dict[str,int]:
+        """Hard-delete a principal's jobs; running ones are tombstoned until their worker settles."""
+        if not principal:raise ValueError("principal is required")
+        with self.db.transaction() as c:
+            running=[r["id"] for r in c.execute("SELECT id FROM meemee_jobs WHERE principal=%s AND status IN ('running','cancel_requested') FOR UPDATE",(principal,)).fetchall()]
+            events=0
+            if running:
+                events+=c.execute("DELETE FROM meemee_job_events WHERE job_id=ANY(%s)",(running,)).rowcount
+                c.execute("""UPDATE meemee_jobs SET goal='[deleted]',result=NULL,error='account deleted',principal=NULL,
+                  status='cancel_requested',purge_pending=true,updated_at=clock_timestamp() WHERE id=ANY(%s)""",(running,))
+            events+=c.execute("DELETE FROM meemee_job_events e USING meemee_jobs j WHERE e.job_id=j.id AND j.principal=%s",(principal,)).rowcount
+            deleted=c.execute("DELETE FROM meemee_jobs WHERE principal=%s",(principal,)).rowcount
+        return {"jobs_deleted":deleted,"job_events_deleted":events,"running_tombstoned":len(running)}
+    def run_ids_for_principal(self,principal:str)->list[str]:
+        with self.db.transaction() as c:
+            rows=c.execute("SELECT result->>'run_id' AS run_id FROM meemee_jobs WHERE principal=%s AND result IS NOT NULL",(principal,)).fetchall()
+        return [r["run_id"] for r in rows if r["run_id"]]
+    def sweep_purges(self,stale_before:str|None=None)->int:
+        with self.db.transaction() as c:
+            n=c.execute("DELETE FROM meemee_jobs WHERE purge_pending AND (status NOT IN ('running','cancel_requested') OR lease_expires_at IS NULL OR lease_expires_at<=clock_timestamp())").rowcount
+            if stale_before is not None:n+=c.execute("DELETE FROM meemee_jobs WHERE purge_pending AND updated_at<%s",(stale_before,)).rowcount
+        return n

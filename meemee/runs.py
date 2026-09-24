@@ -63,3 +63,15 @@ class RunStore:
     @staticmethod
     def _row(row: sqlite3.Row) -> dict:
         result=dict(row); result["tool_results"]=json.loads(result["tool_results"]); return result
+
+    def run_ids(self, principal: str) -> list[str]:
+        with self.lock:
+            return [row["run_id"] for row in self.db.execute("SELECT run_id FROM runs WHERE principal=?", (principal,))]
+
+    def delete_principal(self, principal: str) -> int:
+        """Hard-delete every completed run report owned by a principal."""
+        if not principal:
+            raise ValueError("principal is required")
+        with self.lock, self.db:
+            return self.db.execute("DELETE FROM runs WHERE principal=?", (principal,)).rowcount
+
