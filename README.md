@@ -2,7 +2,9 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.122.0 (163)
+## Verified in v0.122.0 (168)
+
+Item 164 is pb7 work and items 165-168 are unreleased work on branch `pb4`, both verified in this tree; the rest shipped in v0.122.0.
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -189,7 +191,10 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 
 164. End-to-end run path, verified live (branch pb7, unreleased): `tests/test_live_runs_e2e.py` boots the real server and worker in SQLite and PostgreSQL modes against a local OpenAI-compatible provider with a fixed script, and checks `POST /v1/runs` (model call, real `workspace.read_file` tool, tool result fed back, final answer), run storage and owner scoping, `run.create` in a verified audit chain, a queued job streamed over SSE from `queued` to `done` and replayed, routed-profile fallback, and a 502 on model outage. It found and fixed a bug where every rate-limited request returned 500 in PostgreSQL mode.
 
-156. SDK asyncio client and WebSocket job streaming (branch pb4): `AsyncMeemeeClient` mirrors the full synchronous SDK surface with the same models, errors and retry policy, async SSE resume and thread-offloaded blocking auth; `jobs.stream_ws` (sync and async) follows `/v1/jobs/{id}/ws` with `?after` resume, ping/pong dead-peer detection and typed 44xx errors, verified against a scripted WebSocket server and a booted server. Fixed the WebSocket handler to accept before rejecting, so 4400/4401/4403/4404 close codes reach real network clients instead of a bare HTTP 403.
+165. SDK asyncio client and WebSocket job streaming (branch pb4): `AsyncMeemeeClient` mirrors the full synchronous SDK surface with the same models, errors and retry policy, async SSE resume and thread-offloaded blocking auth; `jobs.stream_ws` (sync and async) follows `/v1/jobs/{id}/ws` with `?after` resume, ping/pong dead-peer detection and typed 44xx errors, verified against a scripted WebSocket server and a booted server. Fixed the WebSocket handler to accept before rejecting, so 4400/4401/4403/4404 close codes reach real network clients instead of a bare HTTP 403.
+166. Token introspection (branch pb4): admin `POST /v1/tokens/introspect` takes a raw credential in the body and returns its state (active, revoked, expired or unknown), credential type (API token, bootstrap or OIDC), scopes, principal, created/last-used/expiry/revocation times and a redacted form showing only the first and last four characters; the secret and its digest are never returned or audited, unknown tokens answer `active: false` instead of 404, and introspection does not count as use. SQLite and PostgreSQL token stores share the same semantics (PostgreSQL verified live), and the SDK exposes `tokens.introspect` on both sync and async clients, verified against a booted server.
+167. asyncio-native OIDC client credentials in the SDK (branch pb4): `AsyncOIDCClientCredentialsAuth` discovers the token endpoint, fetches and caches tokens on `httpx.AsyncClient` with leeway refresh and a single shared fetch for concurrent callers, and is awaited by `AsyncMeemeeClient` without a worker thread; sync-style providers keep the thread-offload fallback. Verified with mocked issuers and live against a local HTTPS issuer whose RS256 tokens the booted server validates through JWKS.
+168. SDK 401 recovery (branch pb4): with a refresh-capable auth provider, sync and async clients answer a 401 with exactly one forced credential refresh and one retry of the same request (JSON bodies rebuilt, SSE and WebSocket streams reopened from scratch, reconnect and retry budgets untouched); a repeated 401 raises, and static tokens keep failing fast. Verified mocked and live, including revoked-then-valid tokens and OIDC tokens rejected after issuance.
 
 ## Thin (0)
 
