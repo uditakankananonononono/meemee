@@ -59,6 +59,10 @@ class ContextStore:
                 END;
             """)
 
+    def ping(self) -> bool:
+        with self.lock:
+            return self.db.execute("SELECT 1").fetchone() is not None
+
     def register_source(self, owner_id: str, source_id: str, connector: str, config: dict, permission: Visibility = "private") -> dict:
         if not owner_id or not source_id or not connector: raise ValueError("owner, source and connector are required")
         now=datetime.now(timezone.utc).isoformat()

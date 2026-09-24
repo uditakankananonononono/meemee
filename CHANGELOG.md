@@ -4,6 +4,7 @@ All entries describe shipped repository behavior. Missing work is never presente
 
 ## Unreleased (main)
 
+- PostgreSQL-backed personal model and connected context: `meemee_persist_pg.PersonalModelStore`/`ContextStore`, migration `011_personal_context.sql`, `Persistence.personal_model`/`context`; wired into the API, agent, `meemee worker`, companion, reflection worker, readiness and account deletion. Cutover groups `--personal` and `--context`. SQLite fix: repeated corrections of one personal-model claim no longer raise IntegrityError (legacy files rebuilt on open).
 - PostgreSQL-backed API tokens, accounts and audit chain: `build_persistence` returns `tokens` and `audit`; the API, `meemee account-delete` and `meemee reflection-worker` use them, so in PostgreSQL mode every host shares tokens, accounts and one global audit chain.
 - `meemee_persist_pg.TokenStore` reaches parity with the SQLite store: `owner_id`/`token_kind` on create, session tokens authenticate as their account (previously the token id), `list_metadata` with cursors, owner-scoped `revoke`, `create_account`, `login_account`, `account_by_email`, `get_account`, `reset_password`, `disable_account`, `ping`. Timestamps are returned in UTC.
 - `meemee_persist_pg.AuditLog`: appends run at READ COMMITTED under the advisory lock (SERIALIZABLE made concurrent appends fail), `list_page`, `ping`, and chain-base support via migration `006_audit_chain_base.sql`.
