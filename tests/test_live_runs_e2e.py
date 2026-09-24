@@ -467,3 +467,46 @@ def test_refusals_are_machine_readable_on_runs_jobs_and_sdk(stack):
         parsed = client.runs.get(report["run_id"])
         assert parsed.is_blocked and parsed.approvals_required[0].persistent_grant["tool"] == WRITE_TOOL
         assert client.runs.get(retried["run_id"]).is_blocked is False
+
+
+def test_blocked_flag_on_runs_jobs_and_sdk(stack):
+    """Status-level visibility: a run or job that refused a tool call says blocked=true at the top
+    level (job status stays "done" so existing clients and filters are unchanged)."""
+    base = stack["base"]
+    token = _minted(base)["token"]
+    blocked = _run(base, token, "WRITE blocked/a.txt x")
+    clean = _run(base, token, "Read note.txt")
+    assert blocked["blocked"] is True and clean["blocked"] is False
+    for run in (blocked, clean):
+        stored = httpx.get(f"{base}/v1/runs/{run['run_id']}", headers=_headers(token), timeout=10).json()
+        assert stored["blocked"] is run["blocked"]
+    listed = {r["run_id"]: r["blocked"] for r in
+              httpx.get(f"{base}/v1/runs", headers=_headers(token), timeout=10).json()["runs"]}
+    assert listed[blocked["run_id"]] is True and listed[clean["run_id"]] is False
+
+    ids = {}
+    for name, goal in (("blocked", "WRITE blocked/job.txt y"), ("clean", "Read note.txt")):
+        created = httpx.post(f"{base}/v1/jobs", headers=_headers(token), json={"goal": goal}, timeout=10)
+        assert created.status_code in (200, 201, 202), created.text
+        ids[name] = created.json()["id"]
+        assert [kind for kind, _ in _read_sse(base, ids[name], token)][-1] == "done"
+    for name, expected in (("blocked", True), ("clean", False)):
+        job = httpx.get(f"{base}/v1/jobs/{ids[name]}", headers=_headers(token), timeout=10).json()
+        assert job["status"] == "done" and job["blocked"] is expected
+        assert isinstance(job["result"], str)  # same wire shape on SQLite and PostgreSQL
+    done = httpx.get(f"{base}/v1/jobs", params={"status": "done"}, headers=_headers(token), timeout=10).json()["jobs"]
+    flags = {j["id"]: j["blocked"] for j in done}
+    assert flags[ids["blocked"]] is True and flags[ids["clean"]] is False
+    queued = httpx.post(f"{base}/v1/jobs", headers=_headers(token),
+                        json={"goal": "Read note.txt", "run_at": "2999-01-01T00:00:00Z"}, timeout=10)
+    assert queued.status_code in (200, 201, 202), queued.text  # no result yet: not blocked
+    assert httpx.get(f"{base}/v1/jobs/{queued.json()['id']}", headers=_headers(token),
+                     timeout=10).json()["blocked"] is False
+
+    sdk = pytest.importorskip("meemee_client")
+    with sdk.MeemeeClient(base, auth=token) as client:
+        assert client.runs.get(blocked["run_id"]).blocked is True
+        assert client.runs.get(clean["run_id"]).is_blocked is False
+        job = client.jobs.get(ids["blocked"])
+        assert job.blocked is True and job.is_blocked and job.status == sdk.JobStatus.DONE
+        assert client.jobs.get(ids["clean"]).is_blocked is False

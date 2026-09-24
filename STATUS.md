@@ -3,7 +3,7 @@
 **Current core version:** 0.122.0  
 **Ledger:** 163 verified, 0 thin  
 **Supported production shape:** SQLite/WAL single-host; PostgreSQL memory and owner-scoped jobs are selectable but require target-environment live verification  
-**Last core verification (main after pb7 + pb4 merge, on ad57677):** 431 core passed (12 skipped: 11 PostgreSQL-only live e2e without a PostgreSQL server, 1 opt-in live HF router check); 258 SDK passed (7 PostgreSQL-only live skipped); core Ruff clean. pb4 branch-run evidence on 4d0cf89: PostgreSQL suite 24 passed, 3 skipped; 262 SDK passed including 44 live-server tests  
+**Last core verification (main after pb7 841a3b1 merge, on 1eda8b6):** 473 core + PostgreSQL passed (1 skipped: opt-in live HF router check), including all live PostgreSQL 16 e2e and `tests_pg`; 266 SDK passed including live PostgreSQL SDK runs; core Ruff clean  
 
 ## What is production-usable now
 
@@ -28,6 +28,7 @@ The authoritative detailed list is the 123-item "Verified" section in [README.md
 | PostgreSQL package | contract run at v0.103.0 | 5 contract tests passed; 2 live tests skipped without `MEEMEE_TEST_DATABASE_URL` |
 | Console | core mount test plus console worker's headless live test | passed at merge |
 | Structured refusals (pb7) | `tests/test_approval_refusals.py`, SDK `tests/test_models.py`, live refusal test in `tests/test_live_runs_e2e.py` | 5 unit + 3 SDK model tests; live SQLite and PostgreSQL 16.2: runs, stored runs, run list, jobs and SDK parse `approvals_required`; suggested bodies work unchanged |
+| Blocked flag (pb7) | `tests/test_approval_refusals.py`, SDK `tests/test_models.py`, `tests/test_live_runs_e2e.py::test_blocked_flag_on_runs_jobs_and_sdk` | 2 unit + 1 SDK model test; live SQLite and PostgreSQL 16.2 (UTC and America/Los_Angeles): runs, stored runs, run list, job get/list (status=done), unfinished job, SDK parse; PG job `result` wire shape fixed to a JSON string |
 | Write-approval gate (pb7) | `tests/test_live_runs_e2e.py` approval tests, booted server + worker | SQLite and PostgreSQL 16.2: 10 passed (deny, per-run allow, grant constraints/scope/expiry/revoke with audit order, unknown-tool grant rejected, jobs honor grants) |
 | End-to-end run path (pb7) | `tests/test_live_runs_e2e.py` against booted uvicorn + `meemee worker`, local scripted OpenAI-compatible provider | SQLite and PostgreSQL 16.2 modes: 10 passed (sync run, owner scoping, queued job over SSE to done, replay, routed fallback, 502 on model outage) |
 | Live PostgreSQL (pb7) | `python scripts/pg_live_check.py` on local PostgreSQL 16.2 | UTC server: 31 passed, 0 skipped. Asia/Kolkata server: 29 passed, 2 failed (audit verify timezone bug; fixed on branch pb4, 31 passed with that fix applied) |

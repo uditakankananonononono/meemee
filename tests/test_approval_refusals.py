@@ -83,3 +83,19 @@ async def test_refusals_survive_the_run_store_and_old_databases(tmp_path):
     assert upgraded.get("p", "r1")["approvals_required"] == []
     upgraded.add("p", report)
     assert upgraded.get("p", report.run_id)["approvals_required"][0]["reason"] == "approval_required"
+
+
+async def test_blocked_flag_follows_refusals_and_is_serialized(tmp_path):
+    blocked = await _agent(tmp_path, WRITE, {"final": "All done!"}).run("write a file")
+    assert blocked.blocked is True and blocked.model_dump()["blocked"] is True
+    clean = await _agent(tmp_path, WRITE, {"final": "ok"}).run("write", approve=lambda *_: True)
+    assert clean.blocked is False and json.loads(clean.model_dump_json())["blocked"] is False
+
+
+async def test_stored_run_carries_blocked_flag(tmp_path):
+    report = await _agent(tmp_path, WRITE, {"final": "done"}).run("write")
+    store = RunStore(tmp_path / "runs.sqlite3")
+    store.add("alice", report)
+    assert store.get("alice", report.run_id)["blocked"] is True
+    [listed], _ = store.list("alice")
+    assert listed["blocked"] is True

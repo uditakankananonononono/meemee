@@ -59,12 +59,14 @@ class RunReport(BaseModel):
     steps_used: int
     tool_results: list[dict[str, Any]] = Field(default_factory=list)
     approvals_required: list[ApprovalRefusal] = Field(default_factory=list)
+    #: Server-computed: true when any tool call was refused. Defaults to False for older servers.
+    blocked: bool = False
     created_at: datetime | None = None
 
     @property
     def is_blocked(self) -> bool:
         """True when any tool call was refused; do not present such a run as done."""
-        return bool(self.approvals_required)
+        return self.blocked or bool(self.approvals_required)
 
 
 class JobStatus(str, Enum):
@@ -86,9 +88,9 @@ class Job(BaseModel):
     """A durable queued job as returned by GET /v1/jobs/{id}.
 
     ``result`` is kept as a JSON-encoded string; use ``result_data`` for the
-    decoded value. The SQLite job store returns that string, while the
-    PostgreSQL store (JSONB column) returns the decoded object; the SDK
-    re-encodes an object here so both backends give the same ``Job``.
+    decoded value. Servers send that string on both backends; a decoded
+    object (older PostgreSQL-backed servers) is re-encoded so every server
+    gives the same ``Job``. ``blocked`` / ``is_blocked`` flag refused tool calls.
     """
 
     model_config = ConfigDict(use_enum_values=False)
@@ -103,13 +105,18 @@ class Job(BaseModel):
     error: str | None = None
     created_at: datetime
     updated_at: datetime
+    #: Server-computed: true when the job's run refused any tool call. A "done"
+    #: job with blocked=True finished its run but did not do everything asked.
+    blocked: bool = False
 
     @field_validator("result", mode="before")
     @classmethod
-    def _encode_structured_result(cls, value: Any) -> Any:
-        if isinstance(value, (dict, list)):
-            return json.dumps(value, separators=(",", ":"), ensure_ascii=False)
-        return value
+    def _encode_decoded_result(cls, value: Any) -> Any:
+        """Accept the JSON string current servers send, or the decoded JSON value
+        older PostgreSQL-backed servers returned; either way keep a JSON string."""
+        if value is None or isinstance(value, str):
+            return value
+        return json.dumps(value, separators=(",", ":"), ensure_ascii=False)
 
     @property
     def is_terminal(self) -> bool:
@@ -133,6 +140,11 @@ class Job(BaseModel):
         if not isinstance(data, dict):
             return []
         return [ApprovalRefusal.model_validate(item) for item in data.get("approvals_required", [])]
+
+    @property
+    def is_blocked(self) -> bool:
+        """True when the job's run refused any tool call (works against older servers too)."""
+        return self.blocked or bool(self.approvals_required)
 
 
 class JobQuotaSnapshot(BaseModel):

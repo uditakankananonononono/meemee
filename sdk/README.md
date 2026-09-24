@@ -280,6 +280,11 @@ package or its dependencies are absent.
     `persistent_grant` body that would allow the call). Verified in the model
     suite and live against a booted server in the repo's
     `tests/test_live_runs_e2e.py`. Treat `is_blocked` runs as not done.
+15. Blocked flag (branch pb7, unreleased): `RunReport.blocked` and `Job.blocked`
+    come from the server; `Job.is_blocked` also checks `approvals_required`, so it
+    works against older servers. A `done` job with `is_blocked` did not do
+    everything asked. `Job.result` accepts decoded JSON from older PostgreSQL-mode
+    servers and keeps it a string.
 
 **Thin:** nothing. Every SDK behaviour above is implemented and tested at its
 stated boundary.
