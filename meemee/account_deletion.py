@@ -232,7 +232,7 @@ def build_account_purger(settings: Any, persistence: Any) -> AccountPurger:
         approvals=persistence.approvals or ApprovalStore(root / "approvals.sqlite3"), monitors=MonitorStore(root / "monitors.sqlite3"),
         personal_model=PersonalModelStore(root / "personal-model.sqlite3"), context=ContextStore(root / "context.sqlite3"),
         webhooks=persistence.webhooks or WebhookStore(root / "webhooks.sqlite3", settings.webhook_max_payload_bytes, settings.vault_key),
-        companion=CompanionStore(root / "companion.sqlite3"),
+        companion=persistence.companion or CompanionStore(root / "companion.sqlite3"),
         browser_sessions=BrowserSessionStore(root / "browser-sessions.sqlite3"),
         browser_notices=TakeoverNoticeQueue(root / "browser-notices.sqlite3"),
         reflection_schedule=ReflectionSchedule(root / "reflection-schedule.sqlite3"),

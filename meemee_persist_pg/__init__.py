@@ -2,6 +2,7 @@
 from ._db import Database
 from .approvals import ApprovalStore
 from .audit import AuditLog
+from .companion import CompanionStore
 from .email_verification import EmailVerificationStore
 from .entitlements import EntitlementStore
 from .idempotency import IdempotencyStore
@@ -20,6 +21,8 @@ __all__ = [
     "ApprovalStoreInterface",
     "AuditLog",
     "AuditStoreInterface",
+    "CompanionStore",
+    "CompanionStoreInterface",
     "Database",
     "EmailVerificationStore",
     "EmailVerificationStoreInterface",
@@ -51,6 +54,7 @@ from .accounts import AccountStore
 from .interfaces import (
     ApprovalStoreInterface,
     AuditStoreInterface,
+    CompanionStoreInterface,
     EmailVerificationStoreInterface,
     EntitlementStoreInterface,
     IdempotencyStoreInterface,
