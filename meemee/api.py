@@ -31,7 +31,7 @@ from .context import ContextStore
 from .email_verification import ResendMailer
 from .entitlements import public_catalog
 from .health import ReadinessChecker
-from .idempotency import IdempotencyConflict, IdempotencyStore
+from .idempotency import IdempotencyConflict
 from .model_profiles import ModelCatalog, build_role_model, probe_profile, uses_routing
 from .monitors import MonitorInput, MonitorStore
 from .observability import (
@@ -52,7 +52,6 @@ from .quotas import QuotaExceeded
 from .rate_limit import RateLimitMiddleware, SQLiteRateLimiter
 from .reflection import PersonalModelReflector
 from .reflection_schedule import ReflectionSchedule
-from .runs import RunStore
 from .runtime import build_agent
 from .shutdown import RunGate
 from .streaming import job_event_stream
@@ -117,8 +116,8 @@ if persistence.backend == "postgresql":
 else:
     rate_limiter = SQLiteRateLimiter(settings.data_dir / "rate-limits.sqlite3", settings.rate_limit_requests, settings.rate_limit_window_seconds)
 app.add_middleware(RateLimitMiddleware, limiter=rate_limiter)
-runs = RunStore(settings.data_dir / "runs.sqlite3")
-idempotency = IdempotencyStore(settings.data_dir / "idempotency.sqlite3")
+runs = persistence.runs  # PostgreSQL mode: run history and idempotency keys shared by every host
+idempotency = persistence.idempotency
 quotas = persistence.quotas  # PostgreSQL mode: one daily counter per principal across hosts
 entitlements = persistence.entitlements
 tokens = persistence.tokens  # PostgreSQL mode: shared by every API host
@@ -156,7 +155,7 @@ if any(web_values):
         raise RuntimeError("interactive login requires complete OIDC and web-login configuration")
     web_login = WebLogin(WebLoginConfig(*web_values), oidc)
 auth = Authenticator(tokens, settings.api_token, oidc, web_login.authenticate_session if web_login else None)
-readiness = ReadinessChecker(settings.data_dir, {"memory": persistence.check_memory, "jobs": persistence.check_jobs, "runs": lambda: runs.db.execute("SELECT 1").fetchone(), "tokens": tokens.ping, "entitlements": entitlements.ping}, settings.model_base_url, settings.readiness_min_free_bytes, require_model=settings.readiness_require_model)
+readiness = ReadinessChecker(settings.data_dir, {"memory": persistence.check_memory, "jobs": persistence.check_jobs, "runs": runs.ping, "tokens": tokens.ping, "entitlements": entitlements.ping}, settings.model_base_url, settings.readiness_min_free_bytes, require_model=settings.readiness_require_model)
 jobs_write_auth = auth.dependency("jobs:write")
 jobs_write_dependency = Depends(jobs_write_auth)
 runs_write_dependency = Depends(auth.dependency("runs:write"))
@@ -613,21 +612,28 @@ def create_job(
 ):
     payload = request.model_dump()
     if idempotency_key:
-        try:
-            cached = idempotency.get(principal.id, "/v1/jobs", idempotency_key, payload)
+        try:  # claim is atomic, so concurrent retries (even on other hosts) cannot both create a job
+            cached = idempotency.claim(principal.id, "/v1/jobs", idempotency_key, payload)
         except IdempotencyConflict as exc:
             raise HTTPException(409, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
         if cached is not None:
             return cached[1]
     try:
-        run_at = datetime.fromisoformat(request.run_at.replace("Z", "+00:00")) if request.run_at else None
-    except ValueError as exc:
-        raise HTTPException(422, "run_at must be ISO 8601") from exc
-    try:
-        quota = quotas.consume_job(principal.id)
-    except QuotaExceeded as exc:
-        raise HTTPException(429, str(exc), headers={"Retry-After":"86400"}) from exc
-    ident = jobs.enqueue(request.goal, run_at, principal=principal.id)
+        try:
+            run_at = datetime.fromisoformat(request.run_at.replace("Z", "+00:00")) if request.run_at else None
+        except ValueError as exc:
+            raise HTTPException(422, "run_at must be ISO 8601") from exc
+        try:
+            quota = quotas.consume_job(principal.id)
+        except QuotaExceeded as exc:
+            raise HTTPException(429, str(exc), headers={"Retry-After":"86400"}) from exc
+        ident = jobs.enqueue(request.goal, run_at, principal=principal.id)
+    except BaseException:
+        if idempotency_key:
+            idempotency.release(principal.id, "/v1/jobs", idempotency_key)
+        raise
     response = {"id": ident, "quota": quota}
     if idempotency_key:
         idempotency.put(principal.id, "/v1/jobs", idempotency_key, payload, 200, response)

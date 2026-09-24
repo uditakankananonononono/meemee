@@ -45,6 +45,7 @@ def pg_hosts(tmp_path_factory, names=("host-a", "host-b"), extra_env: dict | Non
     provider = f"http://127.0.0.1:{provider_server.server_address[1]}/v1"
     dsn, drop = _pg_database()
     workspace = tmp_path_factory.mktemp("mh-ws")
+    (workspace / "note.txt").write_text("shared note\n")
     procs, bases, dirs = [], [], []
     try:
         for name in names:
@@ -58,7 +59,7 @@ def pg_hosts(tmp_path_factory, names=("host-a", "host-b"), extra_env: dict | Non
                 env.pop(key, None)
             proc, base = _boot(env, workspace, data_dir / "server.log")
             procs.append(proc); bases.append(base); dirs.append(data_dir)
-        yield {"bases": bases, "dirs": dirs, "dsn": dsn}
+        yield {"bases": bases, "dirs": dirs, "dsn": dsn, "workspace": workspace}
     finally:
         for proc in procs:
             proc.kill(); proc.wait(timeout=10)

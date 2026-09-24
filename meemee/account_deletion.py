@@ -225,8 +225,8 @@ def build_account_purger(settings: Any, persistence: Any) -> AccountPurger:
 
     root = settings.data_dir
     targets = PurgeTargets(
-        jobs=persistence.jobs, runs=RunStore(root / "runs.sqlite3"), memory=persistence.memory,
-        idempotency=IdempotencyStore(root / "idempotency.sqlite3"),
+        jobs=persistence.jobs, runs=persistence.runs or RunStore(root / "runs.sqlite3"), memory=persistence.memory,
+        idempotency=persistence.idempotency or IdempotencyStore(root / "idempotency.sqlite3"),
         quotas=persistence.quotas or QuotaStore(root / "quotas.sqlite3", settings.default_daily_jobs),
         entitlements=persistence.entitlements or EntitlementStore(root / "entitlements.sqlite3", settings.default_plan),
         approvals=persistence.approvals or ApprovalStore(root / "approvals.sqlite3"), monitors=MonitorStore(root / "monitors.sqlite3"),
