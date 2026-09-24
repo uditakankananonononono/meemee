@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.119.0 (158)
+## Verified in v0.120.0 (159)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -177,6 +177,7 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 156. Self-hosted Inkling-Small: hardware-floor detection (NVIDIA VRAM, RAM, disk), best-plan selection across vLLM NVFP4/BF16 and llama.cpp Unsloth GGUF, exact launch/download commands, `meemee models inkling-local [--run]` and `deploy/inkling/serve-inkling.sh`. Never substitutes a smaller model. See [deploy/inkling/README.md](deploy/inkling/README.md).
 157. Per-turn model audit trail: every companion reply returns and durably stores which profile and model answered, with the full fallback attempt list; traces are task-isolated under concurrent requests and included in customer export and deletion.
 158. Scheduled personal-model reflection (`meemee reflection-worker`) on the reflection model route: reflects only owners with new context evidence after `MEEMEE_REFLECTION_INTERVAL_MINUTES` (default 360), records status and model trace per owner, never advances past failed runs, and writes audit events.
+159. `GET /v1/models/status` (scope `jobs:read`) for the web app: every model profile with availability and reason, active routes and paid-model gating, never exposing keys; `?probe=true` checks each routed profile's `/models` endpoint concurrently (3s timeout, zero tokens) and reports which profile is serving each role.
 
 ## Thin (0)
 

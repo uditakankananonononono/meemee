@@ -29,7 +29,7 @@ from .email_verification import EmailVerificationStore, ResendMailer
 from .entitlements import EntitlementStore, public_catalog
 from .health import ReadinessChecker
 from .idempotency import IdempotencyConflict, IdempotencyStore
-from .model_profiles import build_role_model
+from .model_profiles import ModelCatalog, build_role_model, probe_profile
 from .monitors import MonitorInput, MonitorStore
 from .observability import (
     AGENT_RUNS,
@@ -394,6 +394,30 @@ async def reflect_personal_model(principal=runs_write_dependency):
     result = await reflector.reflect(principal.id)
     audit.append(principal.id, "personal_model.reflect", principal.id, "success", {"accepted": result["accepted"], "rejected": result["rejected"]})
     return result
+
+
+@app.get("/v1/models/status")
+async def models_status(probe: bool = False, principal=jobs_read_dependency):
+    """Model profiles, routes and (optionally) live reachability of routed profiles.
+
+    Never returns API keys, only whether one is configured. Probing hits each routed,
+    usable profile's /models endpoint (no completion, no tokens spent).
+    """
+    catalog = ModelCatalog.from_settings(settings)
+    body = {
+        "allow_paid_models": catalog.allow_paid,
+        "routes": catalog.routes,
+        "profiles": [p.public_dict(catalog.allow_paid) for p in catalog.profiles.values()],
+    }
+    if probe:
+        routed = sorted({name for chain in catalog.routes.values() for name in chain})
+        usable = [catalog.profiles[n] for n in routed if catalog.profiles[n].unavailable_reason(catalog.allow_paid) is None]
+        results = await asyncio.gather(*(probe_profile(p, timeout=3.0) for p in usable))
+        body["probes"] = {r["name"]: r for r in results}
+        for chain_role, chain in catalog.routes.items():
+            first = next((n for n in chain if body["probes"].get(n, {}).get("reachable")), None)
+            body.setdefault("serving", {})[chain_role] = first
+    return body
 
 
 @app.get("/v1/personal-model")
