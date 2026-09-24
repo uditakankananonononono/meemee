@@ -17,6 +17,7 @@ from .plans import PlanStore
 from .quotas import QuotaStore
 from .runs import RunStore
 from .tokens import TokenStore
+from .vault import SecretVault, rotate_pg_keys
 from .webhooks import WebhookStore
 
 __all__ = [
@@ -59,11 +60,13 @@ __all__ = [
     "ReflectionScheduleInterface",
     "RunStore",
     "RunStoreInterface",
+    "SecretVault",
     "TakeoverNoticeQueue",
     "TokenStore",
     "TokenStoreInterface",
     "WebhookStore",
     "WebhookStoreInterface",
+    "rotate_pg_keys",
 ]
 
 from .accounts import AccountStore
