@@ -126,10 +126,10 @@ async def reflection_forever(settings: Any | None = None) -> None:
     settings = settings or Settings()
     if settings.reflection_interval_minutes <= 0:
         raise ValueError("scheduled reflection is disabled (MEEMEE_REFLECTION_INTERVAL_MINUTES <= 0)")
-    context = ContextStore(settings.data_dir / "context.sqlite3")
-    personal = PersonalModelStore(settings.data_dir / "personal-model.sqlite3")
-    schedule = ReflectionSchedule(settings.data_dir / "reflection-schedule.sqlite3")
     persistence = persistence_from_settings(settings)
+    context = persistence.context  # PostgreSQL mode: shared with every API host
+    personal = persistence.personal_model
+    schedule = ReflectionSchedule(settings.data_dir / "reflection-schedule.sqlite3")
     audit = persistence.audit  # PostgreSQL mode: the shared global chain
     model = build_role_model(settings, "reflection")
     interval = timedelta(minutes=settings.reflection_interval_minutes)

@@ -21,7 +21,7 @@ from .tools import (
 )
 
 
-def build_agent(settings: Settings | None = None, include_delegation: bool = True, memory=None, browser_sessions=None) -> Agent:
+def build_agent(settings: Settings | None = None, include_delegation: bool = True, memory=None, browser_sessions=None, persistence=None) -> Agent:
     settings = settings or Settings()
     registry = ToolRegistry()
     registry.register(GitHubRepoSearch(settings.github_token))
@@ -38,9 +38,12 @@ def build_agent(settings: Settings | None = None, include_delegation: bool = Tru
         for tool in session_tools(browser_sessions):
             registry.register(tool)
     if include_delegation:
-        registry.register(DelegateTasks(lambda: AgentTeam(lambda: build_agent(settings, False, browser_sessions=browser_sessions))))
+        registry.register(DelegateTasks(lambda: AgentTeam(lambda: build_agent(settings, False, browser_sessions=browser_sessions, persistence=persistence))))
     model = build_role_model(settings, "agent")
-    selected_memory = memory or build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn).memory
-    context = ContextStore(settings.data_dir / "context.sqlite3")
-    personal_model = PersonalModelStore(settings.data_dir / "personal-model.sqlite3")
+    if persistence is None and (memory is None or settings.persistence_backend.strip().lower() == "postgresql"):
+        persistence = build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn)
+    selected_memory = memory or persistence.memory
+    # PostgreSQL mode: the shared personal model and context index, not per-host files.
+    context = persistence.context if persistence is not None else ContextStore(settings.data_dir / "context.sqlite3")
+    personal_model = persistence.personal_model if persistence is not None else PersonalModelStore(settings.data_dir / "personal-model.sqlite3")
     return Agent(model, registry, selected_memory, settings.max_steps, PolicyEngine.from_file(settings.policy_file), context, personal_model)

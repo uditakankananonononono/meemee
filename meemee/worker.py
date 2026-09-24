@@ -60,7 +60,7 @@ async def work_forever(settings: Settings | None = None) -> None:
         run_id = uuid.uuid4().hex
         try:
             owner = job.get("principal") or "default"
-            report = await build_agent(settings, memory=persistence.memory).run(
+            report = await build_agent(settings, memory=persistence.memory, persistence=persistence).run(
                 job["goal"], approve=job_approval(approvals, owner), cancel=cancel, owner_id=owner, run_id=run_id)
             if cancel.is_set():
                 jobs.cancel_running(job["id"])
