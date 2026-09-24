@@ -27,6 +27,7 @@ dependencies = [
 [project.optional-dependencies]
 browser = ["playwright>=1.47,<2"]
 postgresql = ["psycopg[binary,pool]>=3.2,<4"]
+transformers = ["transformers>=4.46,<6", "torch>=2.4", "huggingface_hub>=0.25"]
 dev = ["pytest>=8.2,<9", "pytest-asyncio>=0.23,<1", "respx>=0.21,<1", "ruff>=0.6,<1"]
 
 [project.scripts]

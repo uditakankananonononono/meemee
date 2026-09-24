@@ -76,6 +76,26 @@ def models_check(name: list[str] = typer.Argument(None)) -> None:  # noqa: B008
         raise typer.Exit(1)
 
 
+@models_app.command("pull")
+def models_pull(name: str = typer.Argument(..., help="A transport=transformers profile, e.g. local-transformers")) -> None:
+    """Download a local transformers profile's weights once, so runs never download mid-request."""
+    from .model_profiles import ModelCatalog
+    from .providers import pull_weights, transformers_missing
+
+    catalog = ModelCatalog.from_settings(Settings())
+    profile = catalog.profiles.get(name)
+    if profile is None:
+        raise typer.BadParameter(f"unknown profile {name!r}")
+    if profile.transport != "transformers":
+        raise typer.BadParameter(f"{name!r} is served over HTTP ({profile.base_url}); pull its model on that server")
+    reason = transformers_missing()
+    if reason:
+        typer.echo(reason, err=True)
+        raise typer.Exit(1)
+    path = pull_weights(profile.model)
+    typer.echo(json.dumps({"name": name, "model": profile.model, "path": path}, indent=2))
+
+
 @models_app.command("inkling-local")
 def models_inkling_local(
     plan: str = typer.Option("auto", help="auto or one of: vllm-nvfp4, vllm-bf16, llamacpp-q4, llamacpp-q3, llamacpp-q2"),

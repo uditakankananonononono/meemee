@@ -23,6 +23,7 @@ from .types import AgentDecision
 
 ProfileKind = Literal["local", "self_hosted", "hosted_paid", "hosted_free"]
 ROLES = ("agent", "chat", "reflection")
+TRANSPORTS = ("openai", "transformers")
 _last_trace: ContextVar[dict[str, Any] | None] = ContextVar("meemee_model_trace", default=None)
 
 
@@ -36,12 +37,17 @@ class ModelProfile:
     requires_key: bool = False
     description: str = ""
     source_url: str = ""
+    transport: str = "openai"  # "openai" (any OpenAI-compatible HTTP API) or "transformers" (in-process)
 
     @property
     def paid(self) -> bool:
         return self.kind == "hosted_paid"
 
     def unavailable_reason(self, allow_paid: bool) -> str | None:
+        if self.transport == "transformers":
+            from .providers import transformers_missing
+
+            return transformers_missing()
         if self.requires_key and not self.api_key:
             return "no API key configured"
         if self.paid and not allow_paid:
@@ -55,6 +61,7 @@ class ModelProfile:
             "base_url": self.base_url,
             "model": self.model,
             "kind": self.kind,
+            "transport": self.transport,
             "key_configured": bool(self.api_key),
             "available": reason is None,
             "unavailable_reason": reason,
@@ -126,6 +133,19 @@ def builtin_profiles(settings: Any) -> dict[str, ModelProfile]:
             ),
             source_url="https://github.com/SakanaAI/fugu",
         ),
+        ModelProfile(
+            name="local-transformers",
+            base_url="",
+            model=settings.transformers_model,
+            kind="local",
+            transport="transformers",
+            description=(
+                "Open weights run inside Meemee with Hugging Face transformers on this machine (CPU, CUDA "
+                "or MPS); no model server needed. Free. Needs the transformers extra and a one-time "
+                "`meemee models pull local-transformers`."
+            ),
+            source_url=f"https://huggingface.co/{settings.transformers_model}",
+        ),
     ]
     return {p.name: p for p in profiles}
 
@@ -147,7 +167,11 @@ def _custom_profiles(raw: str | None) -> dict[str, ModelProfile]:
     for item in items:
         if not isinstance(item, dict):
             raise TypeError("each model profile must be an object")
-        missing = [k for k in ("name", "base_url", "model") if not item.get(k)]
+        transport = item.get("transport", "openai")
+        if transport not in TRANSPORTS:
+            raise ValueError(f"model profile {item.get('name')!r} has unknown transport {transport!r}")
+        required = ("name", "model") if transport == "transformers" else ("name", "base_url", "model")
+        missing = [k for k in required if not item.get(k)]
         if missing:
             raise ValueError(f"model profile missing fields: {', '.join(missing)}")
         kind = item.get("kind", "self_hosted")
@@ -159,20 +183,38 @@ def _custom_profiles(raw: str | None) -> dict[str, ModelProfile]:
             key = os.environ.get(key_env) or key
         out[item["name"]] = ModelProfile(
             name=item["name"],
-            base_url=str(item["base_url"]).rstrip("/"),
+            base_url=str(item.get("base_url", "")).rstrip("/"),
             model=item["model"],
             kind=kind,
             api_key=key,
-            requires_key=bool(item.get("requires_key", kind.startswith("hosted"))),
+            requires_key=bool(item.get("requires_key", kind.startswith("hosted") and transport == "openai")),
             description=item.get("description", ""),
             source_url=item.get("source_url", ""),
+            transport=transport,
         )
     return out
 
 
-def parse_routes(raw: str | None) -> dict[str, list[str]]:
+def default_chain(settings: Any) -> list[str]:
+    """Route for roles with no explicit entry: local first, then the HF router when a token is set.
+
+    The HF fallback uses Inkling-Small on the token's Inference Providers credits (metered: free
+    monthly credits, then only prepaid credits). ``MEEMEE_HF_FALLBACK=false`` turns it off.
+    """
+    chain = ["local"]
+    if getattr(settings, "hf_token", None) and getattr(settings, "hf_fallback", True):
+        chain.append("inkling")
+    return chain
+
+
+def uses_routing(settings: Any) -> bool:
+    """True when roles resolve through a RoutedModel rather than the single local client."""
+    return bool(settings.model_routes or settings.model_profiles or len(default_chain(settings)) > 1)
+
+
+def parse_routes(raw: str | None, default: list[str] | None = None) -> dict[str, list[str]]:
     """Parse ``agent=local,inkling;chat=inkling-small,local`` into ordered lists."""
-    routes = {role: ["local"] for role in ROLES}
+    routes = {role: list(default or ["local"]) for role in ROLES}
     if not raw:
         return routes
     for part in raw.split(";"):
@@ -201,7 +243,7 @@ class ModelCatalog:
     def from_settings(cls, settings: Any) -> ModelCatalog:
         profiles = builtin_profiles(settings)
         profiles.update(_custom_profiles(settings.model_profiles))
-        routes = parse_routes(settings.model_routes)
+        routes = parse_routes(settings.model_routes, default_chain(settings))
         for role, chain in routes.items():
             unknown = [n for n in chain if n not in profiles]
             if unknown:
@@ -232,10 +274,20 @@ class RoutedModel:
     client: httpx.AsyncClient | None = None
     last_profile: str | None = None
     attempts: list[dict[str, str]] = field(default_factory=list)
-    _clients: dict[str, OpenAICompatibleModel] = field(default_factory=dict)
+    _clients: dict[str, Any] = field(default_factory=dict)
+    transformers_device: str = "auto"
+    transformers_max_new_tokens: int = 512
 
-    def _model_for(self, profile: ModelProfile) -> OpenAICompatibleModel:
-        if profile.name not in self._clients:
+    def _model_for(self, profile: ModelProfile) -> Any:
+        if profile.name in self._clients:
+            return self._clients[profile.name]
+        if profile.transport == "transformers":
+            from .providers import TransformersModel
+
+            self._clients[profile.name] = TransformersModel(
+                profile.model, self.transformers_device, self.transformers_max_new_tokens
+            )
+        else:
             self._clients[profile.name] = OpenAICompatibleModel(
                 profile.base_url,
                 profile.model,
@@ -283,7 +335,22 @@ class RoutedModel:
 
 
 async def probe_profile(profile: ModelProfile, timeout: float = 5.0, client: httpx.AsyncClient | None = None) -> dict[str, Any]:
-    """Check an endpoint's /models listing; never sends a completion or spends tokens."""
+    """Check an endpoint's /models listing; never sends a completion or spends tokens.
+
+    For the in-process transformers transport there is no endpoint: it reports whether the
+    libraries are installed and the weights are already on disk (never downloads).
+    """
+    if profile.transport == "transformers":
+        from .providers import transformers_missing, weights_available
+
+        reason = transformers_missing()
+        if reason:
+            return {"name": profile.name, "reachable": False, "error": reason}
+        on_disk = weights_available(profile.model)
+        out: dict[str, Any] = {"name": profile.name, "reachable": on_disk, "model_listed": on_disk, "served": [profile.model] if on_disk else []}
+        if not on_disk:
+            out["error"] = f"weights not downloaded; run `meemee models pull {profile.name}`"
+        return out
     owns = client is None
     client = client or httpx.AsyncClient(timeout=timeout)
     try:
@@ -307,9 +374,14 @@ def build_role_model(settings: Any, role: str) -> OpenAICompatibleModel | Routed
     """Model for one role: routed when profiles/routes are configured, else the plain local client."""
     if role not in ROLES:
         raise ValueError(f"unknown role {role!r}")
-    if settings.model_routes or settings.model_profiles:
+    if uses_routing(settings):
         return RoutedModel(
-            ModelCatalog.from_settings(settings), role, settings.request_timeout, settings.model_max_attempts
+            ModelCatalog.from_settings(settings),
+            role,
+            settings.request_timeout,
+            settings.model_max_attempts,
+            transformers_device=settings.transformers_device,
+            transformers_max_new_tokens=settings.transformers_max_new_tokens,
         )
     return OpenAICompatibleModel(
         settings.model_base_url,
