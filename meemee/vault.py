@@ -28,6 +28,9 @@ class SecretVault:
     def generate_key() -> str:
         return base64.urlsafe_b64encode(AESGCM.generate_key(bit_length=256)).decode()
 
+    def ping(self) -> bool:
+        return self.db.execute("SELECT 1").fetchone() is not None
+
     def put(self, name: str, value: str) -> None:
         if not name or not value:
             raise ValueError("secret name and value cannot be empty")
@@ -47,3 +50,17 @@ class SecretVault:
 
     def export_metadata(self) -> str:
         return json.dumps({"names": self.names(), "count": len(self.names())})
+
+
+def vault_from_settings(settings) -> SecretVault:
+    """The vault for this process: shared PostgreSQL table in PostgreSQL mode, else vault.sqlite3."""
+    if not settings.vault_key:
+        raise ValueError("MEEMEE_VAULT_KEY is required")
+    if settings.persistence_backend.strip().lower() == "postgresql":
+        from meemee_persist_pg import Database, MigrationStore
+        from meemee_persist_pg import SecretVault as PGVault
+
+        database = Database(settings.postgres_dsn, min_size=1, max_size=2)
+        MigrationStore(database).apply()
+        return PGVault(database, settings.vault_key)  # type: ignore[return-value]
+    return SecretVault(settings.data_dir / "vault.sqlite3", settings.vault_key)

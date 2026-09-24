@@ -27,7 +27,7 @@ from .retention import RetentionManager
 from .runtime import build_agent
 from .schema_registry import schema_status
 from .tools.github import GitHubRepoSearch, GitHubSearchArgs
-from .vault import SecretVault
+from .vault import SecretVault, vault_from_settings
 from .webhook_verify import verify_signature
 from .webhooks import WebhookStore, check_private_hosts_override, dispatch_forever
 from .worker import work_forever
@@ -207,7 +207,7 @@ def vault_put(name: str) -> None:
     settings = Settings()
     if not settings.vault_key:
         raise typer.BadParameter("MEEMEE_VAULT_KEY is required")
-    SecretVault(settings.data_dir / "vault.sqlite3", settings.vault_key).put(name, getpass.getpass("Secret: "))
+    vault_from_settings(settings).put(name, getpass.getpass("Secret: "))
     typer.echo(f"stored {name}")
 
 
@@ -221,7 +221,18 @@ def rotate_encryption_key() -> None:
     confirmation = getpass.getpass("Confirm new key: ")
     if not new_key or new_key != confirmation:
         raise typer.BadParameter("new key confirmation does not match")
-    report = rotate_keys(settings.data_dir, settings.vault_key, new_key)
+    if settings.persistence_backend.strip().lower() == "postgresql":
+        # PostgreSQL mode: the shared vault and webhook secrets, in one transaction.
+        from meemee_persist_pg import Database, MigrationStore, rotate_pg_keys
+
+        database = Database(settings.postgres_dsn, min_size=1, max_size=2)
+        try:
+            MigrationStore(database).apply()
+            report = rotate_pg_keys(database, settings.vault_key, new_key)
+        finally:
+            database.close()
+    else:
+        report = rotate_keys(settings.data_dir, settings.vault_key, new_key)
     typer.echo(json.dumps({**report, "status":"rotated", "next":"replace MEEMEE_VAULT_KEY and restart all processes"}))
 
 
@@ -231,7 +242,7 @@ def vault_list() -> None:
     settings = Settings()
     if not settings.vault_key:
         raise typer.BadParameter("MEEMEE_VAULT_KEY is required")
-    for name in SecretVault(settings.data_dir / "vault.sqlite3", settings.vault_key).names():
+    for name in vault_from_settings(settings).names():
         typer.echo(name)
 
 
@@ -509,7 +520,7 @@ def webhook_verify(
     settings = Settings()
     if not settings.vault_key:
         raise typer.BadParameter("MEEMEE_VAULT_KEY is required")
-    secret = SecretVault(settings.data_dir / "vault.sqlite3", settings.vault_key).get(secret_name)
+    secret = vault_from_settings(settings).get(secret_name)
     body = body_file.read_bytes() if body_file else __import__("sys").stdin.buffer.read()
     valid = verify_signature(secret, timestamp, body, signature, tolerance_seconds)
     typer.echo(json.dumps({"valid": valid}))

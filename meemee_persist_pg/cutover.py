@@ -59,11 +59,12 @@ SPECS={
             TableSpec("browser_takeovers","meemee_browser_takeovers",("id","session_id","token_digest","reason","requested_by","created_at","expires_at","claimed_at","finished_at","outcome","note"),("id",)),
             TableSpec("browser_session_events","meemee_browser_session_events",("id","session_id","ts","actor","kind","detail"),("id",))),
  "notices":(TableSpec("browser_takeover_notices","meemee_browser_takeover_notices",("id","takeover_id","session_id","user_id","text","status","attempts","channel","detail","created_at","updated_at"),("id",)),),
+ "vault":(TableSpec("secrets","meemee_vault_secrets",("name","nonce","ciphertext"),("name",)),),
  "approvals":(TableSpec("tool_approvals","meemee_tool_approvals",("principal","tool","granted_at","expires_at","revoked_at","granted_by","argument_constraints"),("principal","tool")),),
 }
 # Groups an operator may leave out of a cutover. approvals.sqlite3 only exists once a grant was made,
 # and older cutover invocations predate it; when given, it is copied and verified like every other group.
-OPTIONAL_GROUPS=frozenset({"approvals","email","quotas","entitlements","runs","idempotency","webhooks","companion","personal","context","monitors","reflection","deletions","browser","notices"})
+OPTIONAL_GROUPS=frozenset({"approvals","email","quotas","entitlements","runs","idempotency","webhooks","companion","personal","context","monitors","reflection","deletions","browser","notices","vault"})
 NOT_NULL_JSON={"response"}
 JSON_COLUMNS={"metadata","document","result","payload","argument_constraints","tool_results","approvals_required","response"}
 UUID_COLUMNS={"id","plan_id","job_id"}
