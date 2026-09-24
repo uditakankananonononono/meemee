@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.118.0 (156)
+## Verified in v0.119.0 (158)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -175,6 +175,8 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 154. Named model profiles with per-role routing (agent, chat, reflection), ordered fallback with a per-attempt record, and free-first gating: local Ollama by default, paid hosted profiles (Sakana Fugu) only with a key plus MEEMEE_ALLOW_PAID_MODELS=true. See [docs/models.md](docs/models.md).
 155. Inkling through the Hugging Face Inference Providers router (`inkling` = Inkling-Small, `inkling-large` = Inkling) with a free HF token, falling back to local on rejection or exhausted credits; zero-token `/models` health probe; `meemee models list|check`.
 156. Self-hosted Inkling-Small: hardware-floor detection (NVIDIA VRAM, RAM, disk), best-plan selection across vLLM NVFP4/BF16 and llama.cpp Unsloth GGUF, exact launch/download commands, `meemee models inkling-local [--run]` and `deploy/inkling/serve-inkling.sh`. Never substitutes a smaller model. See [deploy/inkling/README.md](deploy/inkling/README.md).
+157. Per-turn model audit trail: every companion reply returns and durably stores which profile and model answered, with the full fallback attempt list; traces are task-isolated under concurrent requests and included in customer export and deletion.
+158. Scheduled personal-model reflection (`meemee reflection-worker`) on the reflection model route: reflects only owners with new context evidence after `MEEMEE_REFLECTION_INTERVAL_MINUTES` (default 360), records status and model trace per owner, never advances past failed runs, and writes audit events.
 
 ## Thin (0)
 

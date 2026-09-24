@@ -90,6 +90,12 @@ class ContextStore:
         with self.lock: rows=self.db.execute(sql,(query,owner_id,*sorted(visibility),max(1,min(limit,100)))).fetchall()
         return [self._record(row) for row in rows]
 
+    def owner_watermarks(self) -> dict[str, int]:
+        """Highest context record id per owner; lets schedulers skip owners with nothing new."""
+        with self.lock:
+            rows = self.db.execute("SELECT owner_id, MAX(id) AS top FROM context_records GROUP BY owner_id").fetchall()
+        return {row["owner_id"]: int(row["top"]) for row in rows}
+
     def recent(self, owner_id: str, limit: int = 12, allowed: set[str] | None = None) -> list[dict]:
         visibility=allowed or {"private","agent"};placeholders=','.join('?' for _ in visibility)
         with self.lock:rows=self.db.execute(f"SELECT * FROM context_records WHERE owner_id=? AND visibility IN ({placeholders}) ORDER BY occurred_at DESC,id DESC LIMIT ?",(owner_id,*sorted(visibility),max(1,min(limit,100)))).fetchall()

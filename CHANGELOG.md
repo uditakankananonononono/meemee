@@ -2,6 +2,11 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.119.0
+
+- Companion replies now include `model_trace` (role, answering profile, model id and every fallback attempt), stored per assistant message in `companion_message_models` and covered by customer export and deletion. The SDK `CompanionChatReply` gains the optional field.
+- Added `meemee reflection-worker`: scheduled personal-model reflection on the `reflection` route, gated per owner by new context evidence and `MEEMEE_REFLECTION_INTERVAL_MINUTES`, with per-owner status, model trace and audit events. Failed runs retry on the next due pass without advancing the watermark.
+
 ## 0.118.0
 
 - Added named model profiles and per-role routing (`MEEMEE_MODEL_ROUTES`, `MEEMEE_MODEL_PROFILES`) with ordered fallback and per-attempt records. The agent, companion chat and personal-model reflection each resolve their own role. With no routing config, behavior is unchanged (local only).
