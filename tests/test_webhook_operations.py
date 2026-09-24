@@ -20,7 +20,7 @@ def populated(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(socket, "getaddrinfo", public_dns)
     store = WebhookStore(tmp_path / "w.db", encryption_key=TEST_KEY)
     store.subscribe("u", "https://hooks.example/a", {"*"})
-    store.enqueue("e1", "job.done", {"x":1})
+    store.enqueue("e1", "job.done", {"x":1}, principal="u")
     claimed = store.claim(now=4102444800); store.retry(claimed["id"], "bad", max_attempts=1)
     return store, claimed["id"]
 

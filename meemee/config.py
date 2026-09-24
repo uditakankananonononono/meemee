@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     audit_anchor_key: str | None = None
     browser_headless: bool = True
     browser_allow_private_hosts: bool = False
+    #: Deployment environment label. "production" refuses test-only overrides at startup.
+    env: str = "development"
+    #: TEST ONLY: let webhook URLs resolve to loopback/private hosts (local receivers in tests).
+    #: Refused when env == "production". Never enable on a deployed instance.
+    webhook_allow_private_hosts: bool = False
     browser_max_sessions: int = 4
     browser_idle_timeout_seconds: float = 900
     browser_takeover_ttl_seconds: float = 900

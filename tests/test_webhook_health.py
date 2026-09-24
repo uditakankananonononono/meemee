@@ -10,7 +10,7 @@ def public_dns(*args): return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.
 
 def setup(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(socket, "getaddrinfo", public_dns)
-    store=WebhookStore(tmp_path/"w.db", encryption_key=TEST_KEY); sid,_=store.subscribe("u","https://hooks.example/a",{"*"}); store.enqueue("e","job.done",{}); delivery=store.claim(now=4102444800)
+    store=WebhookStore(tmp_path/"w.db", encryption_key=TEST_KEY); sid,_=store.subscribe("u","https://hooks.example/a",{"*"}); store.enqueue("e","job.done",{},principal="u"); delivery=store.claim(now=4102444800)
     return store,sid,delivery["id"]
 
 
@@ -28,7 +28,7 @@ def test_circuit_breaker_suspends_after_five_terminal_failures(tmp_path: Path, m
     monkeypatch.setattr(socket, "getaddrinfo", public_dns)
     store=WebhookStore(tmp_path/"w.db", encryption_key=TEST_KEY); sid,_=store.subscribe("u","https://hooks.example/a",{"*"})
     for i in range(5):
-        store.enqueue(f"e{i}","job.failed",{})
+        store.enqueue(f"e{i}","job.failed",{},principal="u")
         delivery=store.claim(now=4102444800); store.retry(delivery["id"],"permanent",max_attempts=1)
     assert not store.health(sid,"u")["active"]
 
@@ -36,7 +36,7 @@ def test_circuit_breaker_suspends_after_five_terminal_failures(tmp_path: Path, m
 def test_breaker_cooldown_blocks_early_resume(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(socket, "getaddrinfo", public_dns)
     store=WebhookStore(tmp_path/"w.db", encryption_key=TEST_KEY); sid,_=store.subscribe("u","https://hooks.example/a",{"*"})
-    store.enqueue("e","job.failed",{}); delivery=store.claim(now=4102444800); store.retry(delivery["id"],"bad",max_attempts=1)
+    store.enqueue("e","job.failed",{},principal="u"); delivery=store.claim(now=4102444800); store.retry(delivery["id"],"bad",max_attempts=1)
     store.set_active(sid,"u",False)
     import pytest
     with pytest.raises(ValueError, match="cooldown"):

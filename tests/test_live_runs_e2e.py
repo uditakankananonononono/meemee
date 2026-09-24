@@ -94,6 +94,57 @@ def provider():
     server.shutdown()
 
 
+class WebhookReceiver(BaseHTTPRequestHandler):
+    """Real HTTPS receiver. /fail-once/* answers 500 to the first delivery it sees, then 200."""
+
+    hits: ClassVar[list[dict]] = []
+    failed_once: ClassVar[set[str]] = set()
+
+    def log_message(self, *_args):
+        pass
+
+    def do_POST(self):
+        body = self.rfile.read(int(self.headers["Content-Length"]))
+        type(self).hits.append({"path": self.path, "headers": dict(self.headers), "body": body,
+                                "received": time.time()})
+        status = 200
+        if self.path.startswith("/fail-once/") and self.path not in type(self).failed_once:
+            type(self).failed_once.add(self.path)
+            status = 500
+        self.send_response(status)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+
+@pytest.fixture(scope="module")
+def tls(tmp_path_factory):
+    """Self-signed cert for 127.0.0.1 plus a CA bundle (certifi + that cert) for the dispatcher."""
+    certifi = pytest.importorskip("certifi")
+    folder = tmp_path_factory.mktemp("tls")
+    cert, key = folder / "cert.pem", folder / "key.pem"
+    subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-subj", "/CN=127.0.0.1",
+                    "-addext", "subjectAltName=IP:127.0.0.1", "-keyout", str(key), "-out", str(cert)],
+                   check=True, capture_output=True)
+    bundle = folder / "bundle.pem"
+    bundle.write_text(Path(certifi.where()).read_text() + "\n" + cert.read_text())
+    return {"cert": cert, "key": key, "bundle": bundle}
+
+
+@pytest.fixture(scope="module")
+def receiver(tls):
+    import ssl
+
+    WebhookReceiver.hits, WebhookReceiver.failed_once = [], set()
+    server = ThreadingHTTPServer(("127.0.0.1", 0), WebhookReceiver)
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(tls["cert"], tls["key"])
+    server.socket = context.wrap_socket(server.socket, server_side=True)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield f"https://127.0.0.1:{server.server_address[1]}"
+    server.shutdown()
+
+
 def _pg_database():
     import psycopg
     from psycopg.conninfo import make_conninfo
@@ -113,7 +164,7 @@ BACKENDS = ["sqlite", pytest.param("postgresql", marks=pytest.mark.skipif(not PG
 
 
 @pytest.fixture(scope="module", params=BACKENDS)
-def stack(request, provider, tmp_path_factory):
+def stack(request, provider, tls, tmp_path_factory):
     pytest.importorskip("uvicorn")
     backend = request.param
     data_dir = tmp_path_factory.mktemp(f"e2e-{backend}-data")
@@ -133,7 +184,12 @@ def stack(request, provider, tmp_path_factory):
         "MEEMEE_VAULT_KEY": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
         "MEEMEE_PERSISTENCE_BACKEND": backend,
         "MEEMEE_RATE_LIMIT_REQUESTS": "10000",
+        # test-only: lets the local HTTPS receiver pass the webhook SSRF guard (never in production)
+        "MEEMEE_WEBHOOK_ALLOW_PRIVATE_HOSTS": "1",
+        "MEEMEE_WEBHOOK_POLL_SECONDS": "0.2",
+        "SSL_CERT_FILE": str(tls["bundle"]),
     }
+    env.pop("MEEMEE_ENV", None)
     for key in ("MEEMEE_MODEL_ROUTES", "MEEMEE_MODEL_PROFILES"):
         env.pop(key, None)
     drop = None
@@ -148,6 +204,10 @@ def stack(request, provider, tmp_path_factory):
     worker = subprocess.Popen(
         [sys.executable, "-c", "from meemee.cli import app; app()", "worker"],
         env=env, cwd=workspace, stdout=worker_logs.open("w"), stderr=subprocess.STDOUT)
+    dispatcher_logs = data_dir / "webhook-worker.log"
+    dispatcher = subprocess.Popen(
+        [sys.executable, "-c", "from meemee.cli import app; app()", "webhook-worker"],
+        env=env, cwd=workspace, stdout=dispatcher_logs.open("w"), stderr=subprocess.STDOUT)
     base = f"http://127.0.0.1:{port}"
     deadline = time.monotonic() + 30
     while True:
@@ -164,9 +224,10 @@ def stack(request, provider, tmp_path_factory):
         time.sleep(0.2)
     try:
         yield {"base": base, "backend": backend, "workspace": workspace, "env_ref": lambda: env,
-               "logs": logs, "worker_logs": worker_logs, "worker": worker}
+               "logs": logs, "worker_logs": worker_logs, "worker": worker,
+               "dispatcher_logs": dispatcher_logs}
     finally:
-        for proc in (worker, server):
+        for proc in (dispatcher, worker, server):
             proc.kill()
             proc.wait(timeout=10)
         if drop:
@@ -510,3 +571,88 @@ def test_blocked_flag_on_runs_jobs_and_sdk(stack):
         job = client.jobs.get(ids["blocked"])
         assert job.blocked is True and job.is_blocked and job.status == sdk.JobStatus.DONE
         assert client.jobs.get(ids["clean"]).is_blocked is False
+
+
+def _subscribe(base: str, token: str, url: str, events: list[str]) -> dict:
+    response = httpx.post(f"{base}/v1/webhooks", headers=_headers(token), json={"url": url, "events": events}, timeout=10)
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def _wait_hits(path: str, count: int, stack, seconds: float = 20) -> list[dict]:
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        hits = [hit for hit in WebhookReceiver.hits if hit["path"] == path]
+        if len(hits) >= count:
+            return hits
+        time.sleep(0.1)
+    pytest.fail(f"{path}: {len(hits)}/{count} deliveries\n{stack['dispatcher_logs'].read_text()[-3000:]}")
+
+
+def test_signed_job_webhooks_reach_a_real_receiver_retry_and_stay_in_tenant(stack, receiver):
+    """job.done reaches a real local HTTPS receiver with `blocked` in the payload, the signature
+    verifies under the documented scheme, a 500 is retried with the same delivery and a fresh
+    signature, and another principal's subscription receives nothing."""
+    from meemee.webhook_verify import verify_signature
+
+    base = stack["base"]
+    alice, bob = _minted(base)["token"], _minted(base)["token"]
+    tag = uuid.uuid4().hex[:8]
+    alice_path, bob_path = f"/fail-once/alice-{tag}", f"/bob-{tag}"
+    alice_hook = _subscribe(base, alice, receiver + alice_path, ["job.done"])
+    _subscribe(base, bob, receiver + bob_path, ["*"])
+
+    created = httpx.post(f"{base}/v1/jobs", headers=_headers(alice), json={"goal": "WRITE hooks/x.txt y"}, timeout=10)
+    assert created.status_code in (200, 201, 202), created.text
+    job_id = created.json()["id"]
+    first, second = _wait_hits(alice_path, 2, stack)[:2]
+
+    # same delivery retried after the 500, with the documented headers and a valid signature each time
+    assert first["headers"]["X-Meemee-Delivery"] == second["headers"]["X-Meemee-Delivery"]
+    assert first["body"] == second["body"]
+    assert second["received"] - first["received"] >= 0.9  # backoff: 2**0 seconds before attempt 2
+    for hit in (first, second):
+        headers = hit["headers"]
+        assert headers["X-Meemee-Event"] == "job.done" and headers["Content-Type"] == "application/json"
+        assert verify_signature(alice_hook["secret"], headers["X-Meemee-Timestamp"], hit["body"],
+                                headers["X-Meemee-Signature-256"])
+        assert not verify_signature(alice_hook["secret"], headers["X-Meemee-Timestamp"], hit["body"] + b" ",
+                                    headers["X-Meemee-Signature-256"])
+        assert not verify_signature("wrong-secret", headers["X-Meemee-Timestamp"], hit["body"],
+                                    headers["X-Meemee-Signature-256"])
+    event = json.loads(second["body"])
+    assert event["schema"] == "meemee.webhook.v1" and event["event_type"] == "job.done"
+    assert event["event_id"] == f"job:{job_id}:done"
+    data = event["data"]
+    assert data["job_id"] == job_id and data["status"] == "done" and data["blocked"] is True
+    assert data["result"]["blocked"] is True
+    assert [item["tool"] for item in data["result"]["approvals_required"]] == ["workspace.write_file"]
+
+    # delivery record: delivered on attempt 2, attempt timeline shows the failure then success
+    delivery_id = first["headers"]["X-Meemee-Delivery"]
+    deadline = time.monotonic() + 10
+    while True:
+        delivery = httpx.get(f"{base}/v1/webhook-deliveries/{delivery_id}", headers=_headers(alice), timeout=10).json()
+        if delivery.get("status") == "delivered" or time.monotonic() > deadline:
+            break
+        time.sleep(0.2)
+    assert delivery["status"] == "delivered" and delivery["attempts"] == 2, delivery
+    attempts = httpx.get(f"{base}/v1/webhook-deliveries/{delivery_id}/attempts", headers=_headers(alice),
+                         timeout=10).json()["attempts"]
+    assert [a["outcome"] for a in attempts] == ["queued", "delivered"], attempts
+    assert httpx.get(f"{base}/v1/webhook-deliveries/{delivery_id}", headers=_headers(bob), timeout=10).status_code == 404
+
+    # a clean job for alice: blocked is false; bob still has received nothing from alice
+    clean = httpx.post(f"{base}/v1/jobs", headers=_headers(alice), json={"goal": "Read note.txt"}, timeout=10).json()
+    third = _wait_hits(alice_path, 3, stack)[2]
+    clean_event = json.loads(third["body"])
+    assert clean_event["data"]["job_id"] == clean["id"] and clean_event["data"]["blocked"] is False
+    time.sleep(1.5)  # several dispatcher polls: anything misrouted to bob would have arrived
+    assert [hit for hit in WebhookReceiver.hits if hit["path"] == bob_path] == []
+
+    # bob's own job does reach bob, signed with bob's secret, and not alice
+    bob_job = httpx.post(f"{base}/v1/jobs", headers=_headers(bob), json={"goal": "Read note.txt"}, timeout=10).json()
+    [bob_hit] = _wait_hits(bob_path, 1, stack)
+    assert json.loads(bob_hit["body"])["data"]["job_id"] == bob_job["id"]
+    time.sleep(1.0)
+    assert len([hit for hit in WebhookReceiver.hits if hit["path"] == alice_path]) == 3
