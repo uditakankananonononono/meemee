@@ -14,6 +14,7 @@ from .jobs import JobStore as SQLiteJobStore
 from .memory import MemoryStore as SQLiteMemoryStore
 from .quotas import QuotaStore as SQLiteQuotaStore
 from .runs import RunStore as SQLiteRunStore
+from .webhooks import WebhookStore as SQLiteWebhookStore
 
 
 @dataclass
@@ -41,6 +42,9 @@ class Persistence:
     #: PostgreSQL: shared, so runs are visible and idempotent retries dedupe on every host.
     runs: Any = None
     idempotency: Any = None
+    #: Webhook subscriptions and delivery outbox. SQLite: webhooks.sqlite3. PostgreSQL: shared by every
+    #: API host, worker and dispatcher. None when no vault key is configured (secrets are encrypted).
+    webhooks: Any = None
 
     def check_memory(self) -> bool:
         if self.backend == "sqlite":
@@ -56,7 +60,8 @@ class Persistence:
 
 
 def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = None, *,
-                      default_daily_jobs: int = 100, default_plan: str = "starter") -> Persistence:
+                      default_daily_jobs: int = 100, default_plan: str = "starter",
+                      vault_key: str | None = None, webhook_max_payload_bytes: int = 256_000) -> Persistence:
     """Select and initialize the supported persistence composition root."""
     normalized = backend.strip().lower()
     if normalized == "sqlite":
@@ -66,7 +71,8 @@ def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = N
                            email_verifications=SQLiteEmailVerificationStore(data_dir / "email-verifications.sqlite3"),
                            quotas=SQLiteQuotaStore(data_dir / "quotas.sqlite3", default_daily_jobs),
                            entitlements=SQLiteEntitlementStore(data_dir / "entitlements.sqlite3", default_plan),
-                           runs=SQLiteRunStore(data_dir / "runs.sqlite3"), idempotency=SQLiteIdempotencyStore(data_dir / "idempotency.sqlite3"))
+                           runs=SQLiteRunStore(data_dir / "runs.sqlite3"), idempotency=SQLiteIdempotencyStore(data_dir / "idempotency.sqlite3"),
+                           webhooks=SQLiteWebhookStore(data_dir / "webhooks.sqlite3", webhook_max_payload_bytes, vault_key) if vault_key else None)
     if normalized != "postgresql":
         raise ValueError("MEEMEE_PERSISTENCE_BACKEND must be sqlite or postgresql")
     if not postgres_dsn:
@@ -84,6 +90,7 @@ def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = N
         QuotaStore,
         RunStore,
         TokenStore,
+        WebhookStore,
     )
     database = Database(postgres_dsn)
     MigrationStore(database).apply()
@@ -91,10 +98,12 @@ def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = N
                        approvals=ApprovalStore(database), tokens=TokenStore(database), audit=AuditLog(database),
                        email_verifications=EmailVerificationStore(database),
                        quotas=QuotaStore(database, default_daily_jobs), entitlements=EntitlementStore(database, default_plan),
-                       runs=RunStore(database), idempotency=IdempotencyStore(database))
+                       runs=RunStore(database), idempotency=IdempotencyStore(database),
+                       webhooks=WebhookStore(database, webhook_max_payload_bytes, vault_key) if vault_key else None)
 
 
 def persistence_from_settings(settings: Any) -> Persistence:
     """``build_persistence`` with the product defaults (quota, plan) taken from settings."""
     return build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn,
-                             default_daily_jobs=settings.default_daily_jobs, default_plan=settings.default_plan)
+                             default_daily_jobs=settings.default_daily_jobs, default_plan=settings.default_plan,
+                             vault_key=settings.vault_key, webhook_max_payload_bytes=settings.webhook_max_payload_bytes)

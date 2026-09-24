@@ -4,7 +4,6 @@ import asyncio
 import hmac
 import json
 import logging
-import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -128,7 +127,7 @@ monitors = MonitorStore(settings.data_dir / "monitors.sqlite3")
 audit = persistence.audit  # PostgreSQL mode: one global chain for every host
 approvals = persistence.approvals  # PostgreSQL mode: shared with every worker, not local disk
 check_private_hosts_override("api")  # raises when MEEMEE_ENV=production
-webhooks = WebhookStore(settings.data_dir / "webhooks.sqlite3", settings.webhook_max_payload_bytes, settings.vault_key)
+webhooks = persistence.webhooks or WebhookStore(settings.data_dir / "webhooks.sqlite3", settings.webhook_max_payload_bytes, settings.vault_key)  # PostgreSQL mode: shared outbox
 companion = build_companion(settings)
 deletion_ledger = DeletionLedger(settings.data_dir / "account-deletions.sqlite3")
 account_purger = AccountPurger(PurgeTargets(
@@ -155,7 +154,7 @@ if any(web_values):
         raise RuntimeError("interactive login requires complete OIDC and web-login configuration")
     web_login = WebLogin(WebLoginConfig(*web_values), oidc)
 auth = Authenticator(tokens, settings.api_token, oidc, web_login.authenticate_session if web_login else None)
-readiness = ReadinessChecker(settings.data_dir, {"memory": persistence.check_memory, "jobs": persistence.check_jobs, "runs": runs.ping, "tokens": tokens.ping, "entitlements": entitlements.ping}, settings.model_base_url, settings.readiness_min_free_bytes, require_model=settings.readiness_require_model)
+readiness = ReadinessChecker(settings.data_dir, {"memory": persistence.check_memory, "jobs": persistence.check_jobs, "runs": runs.ping, "tokens": tokens.ping, "entitlements": entitlements.ping, "webhooks": webhooks.ping}, settings.model_base_url, settings.readiness_min_free_bytes, require_model=settings.readiness_require_model)
 jobs_write_auth = auth.dependency("jobs:write")
 jobs_write_dependency = Depends(jobs_write_auth)
 runs_write_dependency = Depends(auth.dependency("runs:write"))
@@ -263,9 +262,7 @@ async def ready():
 @app.get("/v1/whoami")
 def whoami(principal=jobs_read_dependency):
     entitlement = entitlements.get(principal.id)
-    active_webhooks = webhooks.db.execute(
-        "SELECT count(*) FROM webhook_subscriptions WHERE principal=? AND active=1", (principal.id,)
-    ).fetchone()[0]
+    active_webhooks = webhooks.active_count(principal.id)
     quota = quotas.status(principal.id)
     entitlement["usage"] = {
         "daily_jobs": quota["used"],
@@ -937,9 +934,7 @@ def product_plans():
 @app.get("/v1/entitlements")
 def current_entitlements(principal=jobs_write_dependency):
     result = entitlements.get(principal.id)
-    active_webhooks = webhooks.db.execute(
-        "SELECT count(*) FROM webhook_subscriptions WHERE principal=? AND active=1", (principal.id,)
-    ).fetchone()[0]
+    active_webhooks = webhooks.active_count(principal.id)
     quota = quotas.status(principal.id)
     result["usage"] = {
         "daily_jobs": quota["used"],
@@ -969,9 +964,7 @@ class WebhookRequest(BaseModel):
 
 @app.post("/v1/webhooks")
 def create_webhook(request: WebhookRequest, principal=jobs_write_dependency):
-    current = webhooks.db.execute(
-        "SELECT count(*) FROM webhook_subscriptions WHERE principal=? AND active=1", (principal.id,)
-    ).fetchone()[0]
+    current = webhooks.active_count(principal.id)
     if not entitlements.allows(principal.id, "webhooks", current):
         raise HTTPException(403, "plan webhook limit reached")
     allowed = {"job.done", "job.failed", "job.cancelled", "*"}
@@ -987,22 +980,10 @@ def create_webhook(request: WebhookRequest, principal=jobs_write_dependency):
 
 @app.get("/v1/webhooks", dependencies=[Depends(auth.dependency("jobs:read"))])
 def list_webhooks(request: Request, cursor: str | None = None, limit: int = 100):
-    from .cursors import decode_cursor, encode_cursor
-
-    principal = request.state.principal
-    clauses, parameters = ["principal=?"], [principal.id]
-    if cursor:
-        try: cursor_time, cursor_id = decode_cursor(cursor)
-        except ValueError as exc: raise HTTPException(422, str(exc)) from exc
-        clauses.append("(created_at<? OR (created_at=? AND id<?))")
-        parameters.extend((cursor_time, cursor_time, cursor_id))
-    page_size = min(max(limit, 1), 500); parameters.append(page_size + 1)
-    rows = webhooks.db.execute(
-        f"SELECT id,url,events,active,created_at FROM webhook_subscriptions WHERE {' AND '.join(clauses)} ORDER BY created_at DESC,id DESC LIMIT ?",
-        tuple(parameters),
-    ).fetchall()
-    items = [dict(row) for row in rows[:page_size]]
-    next_cursor = encode_cursor(items[-1]["created_at"], items[-1]["id"]) if len(rows)>page_size else None
+    try:
+        items, next_cursor = webhooks.list_subscriptions(request.state.principal.id, limit, cursor)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
     return {"webhooks": items, "next_cursor": next_cursor}
 
 
@@ -1025,8 +1006,7 @@ def get_webhook_deliveries(request: Request, status: str | None = None, after: s
 
 @app.get("/v1/webhook-deliveries/{delivery_id}", dependencies=[Depends(auth.dependency("jobs:read"))])
 def get_webhook_delivery(request: Request, delivery_id: str):
-    rows = list_deliveries(webhooks, request.state.principal.id, after=None, limit=500)[0]
-    match = next((row for row in rows if row["id"] == delivery_id), None)
+    match = webhooks.get_delivery(request.state.principal.id, delivery_id)
     if match is None:
         raise HTTPException(404, "delivery not found")
     return match
@@ -1052,13 +1032,9 @@ def rotate_webhook_secret(webhook_id: str, principal=jobs_write_dependency):
 
 @app.post("/v1/webhooks/{webhook_id}/test")
 def test_webhook(webhook_id: str, principal=jobs_write_dependency):
-    owned = webhooks.db.execute("SELECT 1 FROM webhook_subscriptions WHERE id=? AND principal=? AND active=1", (webhook_id, principal.id)).fetchone()
-    if owned is None:
+    event_id = webhooks.enqueue_test(webhook_id, principal.id)
+    if event_id is None:
         raise HTTPException(404, "active webhook not found")
-    event_id = f"test:{uuid.uuid4().hex}"
-    payload = json.dumps({"webhook_id": webhook_id, "test": True}, sort_keys=True, separators=(",", ":"))
-    with webhooks.lock, webhooks.db:
-        webhooks.db.execute("INSERT INTO webhook_deliveries(id,subscription_id,event_id,event_type,payload,status,next_attempt_at,created_at) VALUES(?,?,?,?,?,'queued',?,?)", (uuid.uuid4().hex, webhook_id, event_id, "webhook.test", payload, time.time(), datetime.now(timezone.utc).isoformat()))
     audit.append(principal.id, "webhook.test", webhook_id, "success", {"event_id": event_id})
     return {"event_id": event_id, "queued": True}
 
