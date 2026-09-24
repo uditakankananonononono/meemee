@@ -32,7 +32,7 @@ from .email_verification import EmailVerificationStore, ResendMailer
 from .entitlements import EntitlementStore, public_catalog
 from .health import ReadinessChecker
 from .idempotency import IdempotencyConflict, IdempotencyStore
-from .model_profiles import ModelCatalog, build_role_model, probe_profile
+from .model_profiles import ModelCatalog, build_role_model, probe_profile, uses_routing
 from .monitors import MonitorInput, MonitorStore
 from .observability import (
     AGENT_RUNS,
@@ -108,7 +108,7 @@ browser_sessions = BrowserSessionManager(
     notices=TakeoverNoticeQueue(settings.data_dir / "browser-notices.sqlite3"),
 )
 agent = build_agent(settings, memory=persistence.memory, browser_sessions=browser_sessions)
-reflection_model = agent.model if not (settings.model_routes or settings.model_profiles) else build_role_model(settings, "reflection")
+reflection_model = agent.model if not uses_routing(settings) else build_role_model(settings, "reflection")
 run_gate = RunGate()
 jobs = persistence.jobs
 if persistence.backend == "postgresql":
