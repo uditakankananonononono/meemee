@@ -238,6 +238,10 @@ class AccountTokenRequest(BaseModel):
     expires_at: str | None = None
 
 
+class TokenIntrospectionRequest(BaseModel):
+    token: str = Field(min_length=1, max_length=4096)
+
+
 class TokenRequest(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     scopes: set[str] = Field(min_length=1)
@@ -687,6 +691,43 @@ def list_tokens(revoked: bool | None = None, before: str | None = None, limit: i
     return {"tokens": items, "next_cursor": next_cursor}
 
 
+def redact_token(token: str) -> str:
+    """Enough to recognise a credential in a UI, never enough to use it."""
+    if len(token) <= 12:
+        return "****"
+    return f"{token[:4]}...{token[-4:]}"
+
+
+@app.post("/v1/tokens/introspect", dependencies=[Depends(auth.dependency("admin"))])
+def introspect_token(request: TokenIntrospectionRequest):
+    """Report a credential's scopes, expiry and revocation state (RFC 7662 style).
+
+    POST keeps the secret out of URLs and access logs. The response never
+    contains the secret or its digest; ``redacted_token`` shows only its ends.
+    Unknown credentials answer ``active: false, state: unknown`` rather than 404,
+    so the endpoint does not distinguish "never issued" from other failures by status.
+    Introspection does not count as use: ``last_used_at`` is unchanged.
+    """
+    supplied = request.token
+    base = {"redacted_token": redact_token(supplied)}
+    if settings.api_token and hmac.compare_digest(supplied, settings.api_token):
+        result = {**base, "active": True, "state": "active", "credential": "bootstrap",
+                  "principal": "bootstrap", "name": "bootstrap",
+                  "scopes": ["admin", "companion:read", "companion:write", "jobs:read", "jobs:write", "runs:write"],
+                  "expires_at": None, "revoked_at": None}
+    elif (record := tokens.introspect(supplied)) is not None:
+        result = {**base, **record}
+    elif oidc is not None and (claims := oidc.authenticate(supplied)) is not None:
+        result = {**base, "active": True, "state": "active", "credential": "oidc",
+                  "principal": claims.id, "name": claims.name, "scopes": sorted(claims.scopes),
+                  "expires_at": None, "revoked_at": None}
+    else:
+        result = {**base, "active": False, "state": "unknown", "credential": None, "scopes": []}
+    audit.append("api-admin", "token.introspect", result.get("id") or result["credential"] or "unknown",
+                 "success", {"state": result["state"], "credential": result["credential"]})
+    return result
+
+
 @app.delete("/v1/tokens/{token_id}", dependencies=[Depends(auth.dependency("admin"))])
 def revoke_token(token_id: str):
     if not tokens.revoke(token_id):
@@ -761,7 +802,13 @@ def stream_job_events(request: Request, job_id: str, after: int = 0):
 
 @app.websocket("/v1/jobs/{job_id}/ws")
 async def websocket_job_events(websocket: WebSocket, job_id: str):
-    """Stream owner-scoped durable job events over an authenticated WebSocket."""
+    """Stream owner-scoped durable job events over an authenticated WebSocket.
+
+    The handshake is accepted before authorization so a rejection reaches real
+    network clients as a 44xx close code; closing before accept makes ASGI
+    servers answer a bare HTTP 403 that hides the reason.
+    """
+    await websocket.accept()
     authorization = websocket.headers.get("authorization", "")
     principal = None
     if authorization.lower().startswith("bearer "):
@@ -783,13 +830,13 @@ async def websocket_job_events(websocket: WebSocket, job_id: str):
     try: after = int(websocket.query_params.get("after", "0"))
     except ValueError:
         await websocket.close(code=4400, reason="after must be an integer"); return
-    await websocket.accept()
     try:
         while True:
             events = jobs.events(job_id, after)
             for event in events:
                 after = event["sequence"]
-                await websocket.send_json(event)
+                # Same encoding as the SSE stream: PostgreSQL rows carry UUID and datetime values.
+                await websocket.send_text(json.dumps(event, separators=(",", ":"), default=str))
             current = jobs.get_owned(job_id, principal.id)
             if current and current["status"] in {"done", "failed", "cancelled"} and not events:
                 await websocket.close(code=1000); return

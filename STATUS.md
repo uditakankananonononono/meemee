@@ -3,7 +3,7 @@
 **Current core version:** 0.122.0  
 **Ledger:** 163 verified, 0 thin  
 **Supported production shape:** SQLite/WAL single-host; PostgreSQL memory and owner-scoped jobs are selectable but require target-environment live verification  
-**Last core verification:** 308 passed; 133 SDK passed (15 live skipped); PostgreSQL suite 8 passed, 2 live skipped; Ruff, package audit and explicit 0.112.0 release audit clean
+**Last core verification (main after pb7 + pb4 merge, on ad57677):** 431 core passed (12 skipped: 11 PostgreSQL-only live e2e without a PostgreSQL server, 1 opt-in live HF router check); 258 SDK passed (7 PostgreSQL-only live skipped); core Ruff clean. pb4 branch-run evidence on 4d0cf89: PostgreSQL suite 24 passed, 3 skipped; 262 SDK passed including 44 live-server tests  
 
 ## What is production-usable now
 
@@ -12,10 +12,10 @@ The authoritative detailed list is the 123-item "Verified" section in [README.md
 - Bounded agent loop, typed tools, per-run and persistent exact-tool approvals, deterministic policy, secret scrubbing and safe provenance.
 - Local and scheduled jobs, atomic claims, retries, cooperative cancellation, resumable SSE and idempotent submission.
 - SQLite/WAL persistence, backups, checksummed migrations, retention, quotas and shared single-host rate limits.
-- Scoped/revocable API tokens, OIDC bearer validation, interactive OIDC login and tamper-evident audit.
+- Scoped/revocable API tokens with admin introspection, OIDC bearer validation, interactive OIDC login and tamper-evident audit.
 - Browser automation, safe workspace I/O, allowlisted command execution, local Git inspection/commit and GitHub repository scouting.
 - Metrics, JSON logs, dependency readiness, request IDs, graceful shutdown, Docker, Kubernetes manifests and operator documentation.
-- Customer application at `/app/`, operator console at `/console/`, and the additive `meemee-client` Python SDK.
+- Customer application at `/app/`, operator console at `/console/`, and the additive `meemee-client` Python SDK (sync and asyncio clients; SSE and WebSocket job streaming).
 - Companion layer: persistent per-user profiles with validated persona configuration, durable provenanced fact memory with full-text retrieval, per-channel conversation persistence, a persona-conditioned conversational engine with bounded fact extraction, proactive check-ins with timezone-aware quiet hours on a durable delivery queue, and local/webhook/WhatsApp/iMessage channel adapters (provider channels config-gated), exposed over scoped HTTP APIs and the `meemee companion` CLI.
 
 ## Verification evidence
@@ -24,7 +24,7 @@ The authoritative detailed list is the 123-item "Verified" section in [README.md
 |---|---|---|
 | Core server/runtime | `pytest -q` at v0.103.0 | 291 passed |
 | Core lint | `ruff check meemee tests examples/webhook_receiver` after v0.100.0 | clean |
-| SDK | v0.103.0 local run | 133 passed; 15 live-server tests skipped |
+| SDK | branch pb4 local run with `websockets` installed | 262 passed, including 44 live-server tests (async client, WebSocket streaming, token introspection, async OIDC against a local HTTPS issuer, 401 refresh-and-retry, and 14 agent-run tests against a booted server + worker + scripted provider in SQLite and PostgreSQL modes) |
 | PostgreSQL package | contract run at v0.103.0 | 5 contract tests passed; 2 live tests skipped without `MEEMEE_TEST_DATABASE_URL` |
 | Console | core mount test plus console worker's headless live test | passed at merge |
 | Structured refusals (pb7) | `tests/test_approval_refusals.py`, SDK `tests/test_models.py`, live refusal test in `tests/test_live_runs_e2e.py` | 5 unit + 3 SDK model tests; live SQLite and PostgreSQL 16.2: runs, stored runs, run list, jobs and SDK parse `approvals_required`; suggested bodies work unchanged |

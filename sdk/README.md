@@ -2,16 +2,19 @@
 
 Typed Python SDK for the [Meemee](../README.md) agent platform API. Targets the
 server **v0.122.0** HTTP contract: scoped API tokens and OIDC bearer auth,
-synchronous runs, durable queued jobs, resume-safe SSE progress, fixed-window
-rate limiting, and the tamper-evident audit chain.
+synchronous runs, durable queued jobs, resume-safe SSE and WebSocket progress,
+fixed-window rate limiting, and the tamper-evident audit chain. Every call is
+available synchronously (`MeemeeClient`) and on asyncio (`AsyncMeemeeClient`).
 
-Python 3.10+. Dependencies: `httpx`, `pydantic` v2. Nothing else.
+Python 3.10+. Dependencies: `httpx`, `pydantic` v2. WebSocket streaming needs
+the optional `ws` extra (`websockets`); nothing else.
 
 ## Install
 
 ```bash
 pip install -e ./sdk          # from the repository root
-pip install -e './sdk[dev]'   # with pytest for the test-suite
+pip install -e './sdk[ws]'    # adds WebSocket job streaming
+pip install -e './sdk[dev]'   # with pytest, pytest-asyncio and websockets for the test-suite
 pytest sdk/tests              # full mocked and live-server suite
 ```
 
@@ -30,6 +33,67 @@ with MeemeeClient("http://127.0.0.1:8787", auth="mee_...") as client:
     finished = client.jobs.get(job.id)
     print(finished.status, finished.result_data)
 ```
+
+### asyncio
+
+```python
+import asyncio
+from meemee_client import AsyncMeemeeClient
+
+async def main() -> None:
+    async with AsyncMeemeeClient("http://127.0.0.1:8787", auth="mee_...") as client:
+        job = await client.jobs.create("Summarise today's arXiv cs.AI highlights")
+        async for event in client.jobs.stream_ws(job.id):     # or stream_events (SSE)
+            print(event.kind, event.payload)
+        async for past in client.jobs.iter_all(status="done"):
+            print(past.id)
+
+asyncio.run(main())
+```
+
+`AsyncMeemeeClient` has the same resources, arguments, models, errors and retry
+policy as `MeemeeClient`; methods are coroutines and iterators are async
+iterators. `TokenAuth` is used directly; a provider with an
+`async authorization_header_async()` method, such as
+`AsyncOIDCClientCredentialsAuth`, is awaited; any other provider (such as the
+sync `OIDCClientCredentialsAuth`, whose refresh does blocking HTTP) runs in a
+worker thread so a token refresh never blocks the event loop.
+
+```python
+from meemee_client import AsyncMeemeeClient, AsyncOIDCClientCredentialsAuth
+
+auth = AsyncOIDCClientCredentialsAuth(
+    "https://idp.example.com/realms/meemee",
+    client_id="meemee-worker",
+    client_secret=os.environ["OIDC_CLIENT_SECRET"],
+    scope="operator",
+)
+async with AsyncMeemeeClient(base_url, auth=auth) as client:
+    await client.jobs.list()      # token fetched once, shared by concurrent calls
+await auth.aclose()
+```
+
+### Expired credentials
+
+When the auth provider has a `refresh()` method (both OIDC providers do), a
+401 makes the client call it once and retry the request once. SSE and
+WebSocket streams reopen from scratch with the new credential. A second 401
+raises `AuthenticationError`, so there is never a loop. Static `TokenAuth`
+tokens have no refresh and fail on the first 401, as before.
+
+### WebSocket streaming
+
+`client.jobs.stream_ws(job_id, after=0)` (sync and async) follows
+`/v1/jobs/{id}/ws`. It sends the bearer token in the handshake, yields each
+JobEvent once in order, and returns after a terminal event or the server's
+1000 close. A dropped connection reconnects with `?after=<last sequence>` under
+the same budget and backoff as SSE (`max_reconnects`, default 6). The server
+sends no idle frames, so dead peers are caught by WebSocket ping/pong
+(`ping_interval`/`ping_timeout`, 20s each). Rejections raise typed errors
+without reconnecting: 4401 `AuthenticationError`, 4403 `PermissionDeniedError`
+(`missing_scope="jobs:read"`), 4404 `NotFoundError`, 4400 `BadRequestError`.
+A proxy or older server that refuses the handshake with a plain HTTP status is
+mapped the same way; an HTTP 5xx handshake is retried.
 
 More in [../examples](../examples/README.md): quickstart, job watching, manual
 SSE resume across process restarts, OIDC machine auth, admin token + audit work.
@@ -115,9 +179,14 @@ are limiter-exempt server-side.
 
 ## Verified, Thin, Missing
 
-**Verified (148 tests: 133 against a mocked transport implementing the server
-v0.122.0 contract, plus 15 live integration tests that boot the real server
-package and exercise it end to end):**
+**Verified (262 tests: 134 sync tests against a mocked transport implementing
+the server v0.122.0 contract, 27 async, 4 introspection, 18 async-OIDC and 12
+401-refresh tests against mocked transports, 23 WebSocket tests against a
+scripted loopback WebSocket server, plus 44 live integration tests that boot
+the real server package and exercise it end to end: 5 of them against a local
+HTTPS OIDC issuer, and 14 agent-run tests (7 in SQLite mode, 7 in PostgreSQL
+mode, which skip without `MEEMEE_TEST_POSTGRES_DSN`) against a booted server,
+worker and scripted model provider):**
 
 1. Auth header attachment, 401/403 mapping including `WWW-Authenticate` and
    `missing_scope` extraction (mocked + live).
@@ -150,6 +219,56 @@ package and exercise it end to end):**
 13. Companion live: the same companion surface exercised against a booted
     server, including chat turns with server-side fact extraction, idempotent
     check-in planning and companion scope enforcement (live).
+14. `AsyncMeemeeClient`: every resource (runs, jobs, tokens, audit, quota,
+    approvals, webhooks, companion) with identical request shapes and path
+    encoding, error mapping for every status, Retry-After-honouring GET
+    retries, POST never retried unless keyed, async cursor pagination, async
+    SSE with `Last-Event-ID` resume, heartbeats and client-side close on
+    `cancelled`, `wait()` timeouts, native async and thread-offloaded auth
+    providers, and 20 concurrent requests on one client (mocked + live).
+15. WebSocket job streaming (sync and async): bearer handshake, ordered
+    delivery, resume with `?after` after an abrupt TCP drop or a 1011 close,
+    duplicate suppression, 44xx and HTTP handshake rejections as typed errors
+    without reconnect, 5xx handshake retry, malformed-frame errors, reconnect
+    budget and backoff, connection refused, and socket close when the consumer
+    stops early (scripted server); replay, resume, following a job while it is
+    cancelled, and 4401/4403/4404 rejections over real sockets (live).
+16. Token introspection, `tokens.introspect(raw_token)` (sync and async):
+    the secret is sent only in the POST body, never the URL; active, revoked,
+    expired, unknown and bootstrap states parse into `TokenIntrospection`;
+    introspection leaves `last_used_at` untouched while real use updates it;
+    non-admin callers get `PermissionDeniedError(missing_scope="admin")`; the
+    audit chain records the call without the secret (mocked + live).
+17. `AsyncOIDCClientCredentialsAuth`: discovery, explicit token endpoint,
+    client_secret_basic, scope pass-through, caching with leeway refresh,
+    forced refresh, single-flight fetch for concurrent callers, every
+    discovery/token failure mode with the sync provider's error types, no
+    thread offload when used by AsyncMeemeeClient, TypeError on the sync
+    client, and the thread-offload fallback for the sync provider (mocked).
+    Live: a local HTTPS issuer mints RS256 JWTs that the booted server
+    validates via JWKS; concurrent requests share one fetch, a refreshed token
+    is accepted and introspects as `oidc`, a wrong client secret, an unmapped
+    role and a forged signature are all rejected.
+18. 401 refresh-and-retry-once (sync and async): with a provider exposing
+    `refresh()` (both OIDC providers; sync or async `refresh`), a 401 forces one
+    refresh and one retry of the same request, including POST bodies rebuilt
+    from their JSON and SSE/WebSocket streams reopened from scratch; a second
+    401 raises `AuthenticationError`; the refresh does not use a retry attempt
+    or the stream reconnect budget; providers without `refresh()` (such as
+    `TokenAuth`) keep the single attempt; a failing refresh propagates (mocked;
+    live with a revoked-then-valid token over HTTP, SSE and WebSocket, and with
+    OIDC providers whose cached token the server rejects).
+19. Live agent runs (sync and async, `tests/test_live_runs.py`): `runs.create`
+    against a booted server whose model is a local scripted OpenAI-protocol
+    provider parses the final answer, step count and the real
+    `workspace.read_file` tool result; `runs.get/list/iter_all` return the
+    stored run (created_at stamped by the store) with cursor paging; other
+    owners get `NotFoundError` and a token without `runs:write` gets
+    `PermissionDeniedError`; a queued job runs in `meemee worker` and streams
+    over SSE and WebSocket from `queued` to `done` with `result_data` parsed;
+    a dead model endpoint raises `ServerError` 502 with `agent run failed`
+    and no automatic retry. Runs in SQLite and PostgreSQL modes. `Job.result`
+    accepts the PostgreSQL store's decoded object as well as SQLite's string.
 
 The live suite lives in `tests/test_live_integration.py`; it boots uvicorn
 against the `meemee` package next to `sdk/` and skips cleanly when that
@@ -167,12 +286,9 @@ stated boundary.
 
 **Missing, not claimed:**
 
-- An async (`asyncio`) client - the SDK is synchronous only.
-- A live `POST /v1/runs` test through this SDK against a real hosted model.
-  The server-side run path is verified live in `tests/test_live_runs_e2e.py`
-  (repo root) with a local scripted OpenAI-compatible provider; SDK run
-  parsing is covered in the mocked suite.
-- WebSocket streaming - the server offers resume-safe SSE only.
+- A live `POST /v1/runs` test against a real hosted model. The SDK run path is
+  verified live in `tests/test_live_runs.py` against a booted server and worker
+  with a local scripted OpenAI-compatible provider, not a hosted model.
 - Interactive OIDC browser login - owned by the server's `/auth/login`.
-- Token introspection/listing and job listing endpoints - the server does not
-  expose them (token admin is create/revoke; jobs are addressed by id).
+- Self-service introspection for non-admin callers - `/v1/tokens/introspect`
+  is admin-only. Customers see their own tokens through the account token list.

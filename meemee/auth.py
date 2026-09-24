@@ -23,6 +23,38 @@ class Principal:
     scopes: frozenset[str]
 
 
+def token_state(revoked_at: str | None, expires_at: str | None, now: datetime) -> str:
+    """Derive active/revoked/expired the same way authenticate() decides."""
+    if revoked_at:
+        return "revoked"
+    if expires_at:
+        try:
+            expiry = datetime.fromisoformat(str(expires_at).replace("Z", "+00:00"))
+        except ValueError:
+            return "expired"  # unparseable expiry never authenticates safely
+        if expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=timezone.utc)
+        if expiry <= now:
+            return "expired"
+    return "active"
+
+
+def token_introspection(row: dict, now: datetime) -> dict:
+    """Redacted introspection record shared by the SQLite and PostgreSQL stores."""
+    def text(value):
+        return value.isoformat() if isinstance(value, datetime) else value
+    scopes = row["scopes"]
+    scopes = sorted(scopes.split() if isinstance(scopes, str) else scopes)
+    state = token_state(text(row.get("revoked_at")), text(row.get("expires_at")), now)
+    return {
+        "active": state == "active", "state": state, "credential": "api_token",
+        "id": row["id"], "name": row["name"], "scopes": scopes,
+        "principal": row.get("owner_id") or row["id"], "token_kind": row.get("token_kind") or "api",
+        "created_at": text(row.get("created_at")), "last_used_at": text(row.get("last_used_at")),
+        "expires_at": text(row.get("expires_at")), "revoked_at": text(row.get("revoked_at")),
+    }
+
+
 class TokenStore:
     """Persistent, revocable, scoped API tokens. Only SHA-256 token digests are stored."""
 
@@ -85,6 +117,24 @@ class TokenStore:
                 return None
             self.db.execute("UPDATE api_tokens SET last_used_at=? WHERE id=?", (now, row["id"]))
             return Principal(row["owner_id"] or row["id"], row["name"], frozenset(row["scopes"].split()))
+
+    def introspect(self, token: str) -> dict | None:
+        """Look up a raw token by digest, whatever its state, without touching it.
+
+        Returns redacted metadata (never the secret or its digest) plus the
+        derived ``state``: active, revoked or expired. Revocation wins over
+        expiry. ``last_used_at`` is not updated: introspection is not use.
+        None means no token with this secret was ever issued here.
+        """
+        digest, now = self.digest(token), datetime.now(timezone.utc)
+        with self.lock:
+            row = self.db.execute(
+                "SELECT id,name,digest,scopes,created_at,last_used_at,expires_at,revoked_at,owner_id,token_kind "
+                "FROM api_tokens WHERE digest=?", (digest,),
+            ).fetchone()
+        if row is None or not hmac.compare_digest(row["digest"], digest):
+            return None
+        return token_introspection(dict(row), now)
 
     def list_metadata(
         self, revoked: bool | None = None, before: str | None = None,

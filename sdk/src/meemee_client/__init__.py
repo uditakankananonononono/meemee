@@ -2,7 +2,9 @@
 
 Targets the Meemee server v0.122.0 HTTP contract: scoped API tokens and OIDC
 bearer auth, synchronous runs, durable queued jobs, resume-safe SSE progress,
-fixed-window rate limiting, and the tamper-evident audit chain.
+fixed-window rate limiting, and the tamper-evident audit chain. An asyncio
+client (AsyncMeemeeClient) mirrors the whole surface, and job progress streams
+over SSE or, with the ``ws`` extra, WebSocket.
 
 Quick start:
     from meemee_client import MeemeeClient
@@ -13,7 +15,8 @@ Quick start:
             print(event.kind, event.payload)
 """
 from ._version import __version__
-from .auth import AuthProvider, OIDCClientCredentialsAuth, TokenAuth
+from .auth import AsyncOIDCClientCredentialsAuth, AuthProvider, OIDCClientCredentialsAuth, TokenAuth
+from .aio import AsyncMeemeeClient
 from .client import MeemeeClient
 from .errors import (
     ApiError,
@@ -66,6 +69,7 @@ from .models import (
     ReadinessStatus,
     ResponseInfo,
     RevokedToken,
+    TokenIntrospection,
     TokenMetadata,
     RunReport,
     WebhookDelivery,
@@ -110,10 +114,12 @@ __all__ = [
     "JobQuotaSnapshot",
     "JobStatus",
     "MeemeeClient",
+    "AsyncMeemeeClient",
     "MeemeeError",
     "NetworkError",
     "NotFoundError",
     "OIDCClientCredentialsAuth",
+    "AsyncOIDCClientCredentialsAuth",
     "PermissionDeniedError",
     "QuotaStatus",
     "RateLimitError",
@@ -129,6 +135,7 @@ __all__ = [
     "ServerError",
     "StreamError",
     "TokenAuth",
+    "TokenIntrospection",
     "TokenMetadata",
     "ValidationError",
     "WaitTimeoutError",
