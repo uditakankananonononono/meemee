@@ -1,5 +1,6 @@
 """Additive PostgreSQL stores for Meemee. No import changes to the SQLite core."""
 from ._db import Database
+from .approvals import ApprovalStore
 from .audit import AuditLog
 from .jobs import JobStore, LeaseLostError
 from .memory import MemoryStore
@@ -8,7 +9,7 @@ from .plans import PlanStore
 from .tokens import TokenStore
 
 __all__ = [
-    "AccountStore", "AuditLog", "AuditStoreInterface", "Database", "JobStore",
+    "AccountStore", "ApprovalStore", "ApprovalStoreInterface", "AuditLog", "AuditStoreInterface", "Database", "JobStore",
     "JobStoreInterface", "LeaseLostError", "MemoryStore", "MemoryStoreInterface",
     "Migration", "MigrationStore", "MigrationStoreInterface", "PlanStore",
     "PlanStoreInterface", "TokenStore", "TokenStoreInterface",
@@ -16,6 +17,7 @@ __all__ = [
 
 from .accounts import AccountStore
 from .interfaces import (
+    ApprovalStoreInterface,
     AuditStoreInterface,
     JobStoreInterface,
     MemoryStoreInterface,

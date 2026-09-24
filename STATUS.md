@@ -3,7 +3,7 @@
 **Current core version:** 0.122.0  
 **Ledger:** 163 verified, 0 thin  
 **Supported production shape:** SQLite/WAL single-host; PostgreSQL memory and owner-scoped jobs are selectable but require target-environment live verification  
-**Last core verification (main after pb7 841a3b1 merge, on 1eda8b6):** 473 core + PostgreSQL passed (1 skipped: opt-in live HF router check), including all live PostgreSQL 16 e2e and `tests_pg`; 266 SDK passed including live PostgreSQL SDK runs; core Ruff clean  
+**Last core verification (main, PostgreSQL-backed grants):** 496 core + `tests_pg` passed against live PostgreSQL 16.2 (1 skipped: opt-in live HF router check); 266 SDK passed including live PostgreSQL SDK runs; core Ruff clean  
 
 ## What is production-usable now
 
@@ -56,7 +56,7 @@ Nothing is classified as thin. A capability is either verified at a stated bound
 
 - Approval is decided up front only. There is no pause-for-approval and resume: an unapproved write tool is refused and the run continues or ends. Refusals are reported in `approvals_required` with the body that would allow them, but acting on one means re-running the goal.
 - Queued jobs cannot carry per-request approvals, and granting requires the admin scope, so a non-admin user cannot approve a write for their own job.
-- Persistent approvals live in `approvals.sqlite3` on the host even in PostgreSQL mode, so API and workers on different hosts do not share grants.
+- In PostgreSQL mode, API tokens, the audit chain, runs, quotas, entitlements and the other product stores are still per-host SQLite files; only memory, jobs, rate limits and tool-approval grants are shared through PostgreSQL. Multi-host setups must use the bootstrap token or OIDC until tokens move too.
 - Webhook outbox and subscriptions stay in `webhooks.sqlite3` on the host in PostgreSQL mode too, so the live webhook test's PostgreSQL run exercises the PostgreSQL job store with the SQLite outbox. The SSRF check runs when a URL is subscribed, not again at delivery, so a hostname that later re-resolves to a private address (DNS rebinding) is not re-checked.
 
 ## Release gate

@@ -12,6 +12,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from psycopg.types.json import Jsonb
+
 from ._db import Database
 
 
@@ -25,8 +27,12 @@ SPECS={
  "jobs":(TableSpec("jobs","meemee_jobs",("id","goal","run_at","status","attempts","max_attempts","result","error","created_at","updated_at"),("id",)),TableSpec("job_events","meemee_job_events",("sequence","job_id","kind","payload","created_at"),("sequence",))),
  "tokens":(TableSpec("api_tokens","meemee_api_tokens",("id","name","digest","scopes","created_at","last_used_at","expires_at","revoked_at"),("id",)),),
  "audit":(TableSpec("audit_log","meemee_audit_log",("sequence","occurred_at","actor_id","action","resource","outcome","metadata","previous_hash","entry_hash"),("sequence",)),),
+ "approvals":(TableSpec("tool_approvals","meemee_tool_approvals",("principal","tool","granted_at","expires_at","revoked_at","granted_by","argument_constraints"),("principal","tool")),),
 }
-JSON_COLUMNS={"metadata","document","result","payload"}
+# Groups an operator may leave out of a cutover. approvals.sqlite3 only exists once a grant was made,
+# and older cutover invocations predate it; when given, it is copied and verified like every other group.
+OPTIONAL_GROUPS=frozenset({"approvals"})
+JSON_COLUMNS={"metadata","document","result","payload","argument_constraints"}
 UUID_COLUMNS={"id","plan_id","job_id"}
 IDENTITY_TARGETS={"meemee_memories","meemee_job_events","meemee_audit_log"}
 
@@ -56,6 +62,10 @@ def transform(spec:TableSpec,row:sqlite3.Row)->tuple[Any,...]:
         values.append(value)
     return tuple(values)
 
+def insert_values(spec:TableSpec,row:sqlite3.Row)->tuple[Any,...]:
+    """transform() output adapted for INSERT: decoded JSON columns go in as jsonb (psycopg will not adapt a bare dict)."""
+    return tuple(Jsonb(value) if col in JSON_COLUMNS and value is not None else value for col,value in zip(spec.columns,transform(spec,row)))
+
 def canonical(value:Any)->Any:
     if isinstance(value,memoryview):return bytes(value).hex()
     if isinstance(value,bytes):return value.hex()
@@ -78,9 +88,11 @@ def digest_rows(rows)->tuple[int,str]:
 class Cutover:
     """Offline, repeatable SQLite-to-PostgreSQL copy and exact canonical verification."""
     def __init__(self,db:Database,sources:dict[str,Path]):
-        missing=set(SPECS)-set(sources)
+        missing=set(SPECS)-OPTIONAL_GROUPS-set(sources)
         if missing:raise ValueError(f"missing SQLite sources: {sorted(missing)}")
+        if unknown:=set(sources)-set(SPECS):raise ValueError(f"unknown SQLite sources: {sorted(unknown)}")
         self.db,self.sources=db,{k:Path(v) for k,v in sources.items()}
+        self.specs={group:specs for group,specs in SPECS.items() if group in self.sources}
 
     def copy(self,*,batch_size:int=1000)->dict[str,int]:
         if batch_size<1:raise ValueError("batch_size must be positive")
@@ -90,7 +102,7 @@ class Cutover:
             src={name:stack.enter_context(sqlite_snapshot(path)) for name,path in self.sources.items()}
             versions={name:conn.execute("PRAGMA data_version").fetchone()[0] for name,conn in src.items()}
             with self.db.transaction(isolation="SERIALIZABLE") as target:
-                for group,specs in SPECS.items():
+                for group,specs in self.specs.items():
                     for spec in specs:
                         existing=target.execute(f"SELECT count(*) AS n FROM {spec.target}").fetchone()["n"]
                         if existing:raise RuntimeError(f"target {spec.target} is not empty ({existing} rows); refusing a mixed cutover")
@@ -102,7 +114,9 @@ class Cutover:
                         while True:
                             rows=cursor.fetchmany(batch_size)
                             if not rows:break
-                            target.executemany(statement,[transform(spec,row) for row in rows]);count+=len(rows)
+                            # psycopg 3 exposes executemany on cursors only; the Connection shortcut does not exist.
+                            with target.cursor() as batch:batch.executemany(statement,[insert_values(spec,row) for row in rows])
+                            count+=len(rows)
                         copied[spec.target]=count
                 changed=[name for name,conn in src.items() if conn.execute("PRAGMA data_version").fetchone()[0] != versions[name]]
                 if changed: raise RuntimeError(f"SQLite writers were active during copy: {changed}; PostgreSQL copy rolled back")
@@ -116,7 +130,7 @@ class Cutover:
         with ExitStack() as stack:
             src={name:stack.enter_context(sqlite_snapshot(path)) for name,path in self.sources.items()}
             with self.db.transaction(isolation="REPEATABLE READ") as target:
-                for group,specs in SPECS.items():
+                for group,specs in self.specs.items():
                     for spec in specs:
                         columns=",".join(spec.columns); order=",".join(spec.order)
                         source_rows=(dict(zip(spec.columns,transform(spec,row))) for row in src[group].execute(f"SELECT {columns} FROM {spec.source} ORDER BY {order}"))

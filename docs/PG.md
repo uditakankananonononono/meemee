@@ -1,6 +1,6 @@
 # PostgreSQL persistence path
 
-This additive package provides PostgreSQL implementations of the six persistence surfaces: memory, jobs, plans, API tokens, audit, and migrations. It does not switch the existing runtime automatically. SQLite remains the default until the composition root explicitly selects these stores.
+This package provides PostgreSQL implementations of memory, jobs, plans, API tokens, audit, migrations, rate limits and tool-approval grants. SQLite remains the default. `MEEMEE_PERSISTENCE_BACKEND=postgresql` with `MEEMEE_POSTGRES_DSN` makes the API and `meemee worker` use PostgreSQL for memory, jobs, rate limits and tool-approval grants (other product stores are still per-host SQLite; see STATUS).
 
 ## Install and initialize
 
@@ -21,6 +21,7 @@ The migrator takes a transaction-scoped advisory lock, checks every previously a
 - Token creation stores SHA-256 digests only. Authentication locks the row while recording `last_used_at`; revocation is atomic.
 - Audit appends are globally serialized by an advisory lock and SHA-256 chained. The application role should not own the tables. The migration revokes mutation from `PUBLIC`; explicitly grant only `SELECT, INSERT` on `meemee_audit_log` and sequence usage to the app role.
 - Memory search uses a stored `tsvector` and GIN index with `websearch_to_tsquery`.
+- Tool-approval grants (`PUT/GET/DELETE /v1/approvals/...`) live in `meemee_tool_approvals` (migration 005). The API and every worker read the same rows, so a grant or revoke made on one host applies to the next tool call of any worker or API process on the database. Expiry is stored as UTC `timestamptz` and is exclusive; non-ISO `expires_at` values are rejected with 422 on both backends. No `approvals.sqlite3` is written in PostgreSQL mode.
 - Pool limits are explicit. Set `max_size` below PostgreSQL `max_connections` after reserving room for migrations, maintenance, and replicas.
 
 ## Free-tier-first deployment
@@ -33,6 +34,7 @@ Use one small PostgreSQL instance, a pool of 2-5 connections per process, and sh
 2. Apply PostgreSQL migrations.
 3. Export SQLite rows in primary-key order. Transform timestamps to UTC `timestamptz`, text JSON to validated `jsonb`, token digests to `bytea`, and SQLite integer IDs to PostgreSQL identity values.
 4. Import parent tables before history/events. Reset identity sequences with `setval`.
+   `python -m meemee_persist_pg.cli --memory meemee.sqlite3 --plans plans.sqlite3 --jobs jobs.sqlite3 --tokens auth.sqlite3 --audit audit.sqlite3 [--approvals approvals.sqlite3] copy` (DSN from `MEEMEE_POSTGRES_DSN`) does steps 3-5 in one serializable transaction and refuses non-empty targets. Pass `--approvals` to move existing tool grants; without it, grants start empty in PostgreSQL and must be re-granted.
 5. Compare row counts and deterministic hashes of canonical exported rows. Verify the full audit chain in both systems.
 6. Smoke-test token auth, memory search, plan conflicts, job claim/lease expiry, event cursors, and cancellation.
 7. Switch the application configuration once, start one API and one worker, inspect metrics, then scale.
@@ -40,6 +42,5 @@ Use one small PostgreSQL instance, a pool of 2-5 connections per process, and sh
 
 ## Missing, not claimed
 
-- Core runtime/config wiring is intentionally not included because this package is additive and does not edit core files.
-- An automated SQLite-to-PostgreSQL data-copy CLI is not included. The cutover is documented but remains operator-run.
+- The copy CLI is offline only (stop writers first); it has live PostgreSQL tests for the tool-grant group and the empty-store path, not a production-size rehearsal.
 - Logical replication, multi-region failover, online dual-write migration, partitioning, row-level security, and managed backup automation are not claimed.
