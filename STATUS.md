@@ -3,7 +3,7 @@
 **Current core version:** 0.122.0  
 **Ledger:** 163 verified, 0 thin  
 **Supported production shape:** SQLite/WAL single-host; PostgreSQL memory and owner-scoped jobs are selectable but require target-environment live verification  
-**Last core verification:** 308 passed; 133 SDK passed (15 live skipped); PostgreSQL suite 8 passed, 2 live skipped; Ruff, package audit and explicit 0.112.0 release audit clean
+**Last core verification (branch pb4):** 357 core passed; 200 SDK passed including 21 live-server tests; PostgreSQL contract 4 passed (live PG suite passed earlier on pb4); Ruff and 0.117.0 release audit clean  
 
 ## What is production-usable now
 
@@ -15,7 +15,7 @@ The authoritative detailed list is the 123-item "Verified" section in [README.md
 - Scoped/revocable API tokens, OIDC bearer validation, interactive OIDC login and tamper-evident audit.
 - Browser automation, safe workspace I/O, allowlisted command execution, local Git inspection/commit and GitHub repository scouting.
 - Metrics, JSON logs, dependency readiness, request IDs, graceful shutdown, Docker, Kubernetes manifests and operator documentation.
-- Customer application at `/app/`, operator console at `/console/`, and the additive `meemee-client` Python SDK.
+- Customer application at `/app/`, operator console at `/console/`, and the additive `meemee-client` Python SDK (sync and asyncio clients; SSE and WebSocket job streaming).
 - Companion layer: persistent per-user profiles with validated persona configuration, durable provenanced fact memory with full-text retrieval, per-channel conversation persistence, a persona-conditioned conversational engine with bounded fact extraction, proactive check-ins with timezone-aware quiet hours on a durable delivery queue, and local/webhook/WhatsApp/iMessage channel adapters (provider channels config-gated), exposed over scoped HTTP APIs and the `meemee companion` CLI.
 
 ## Verification evidence
@@ -24,7 +24,7 @@ The authoritative detailed list is the 123-item "Verified" section in [README.md
 |---|---|---|
 | Core server/runtime | `pytest -q` at v0.103.0 | 291 passed |
 | Core lint | `ruff check meemee tests examples/webhook_receiver` after v0.100.0 | clean |
-| SDK | v0.103.0 local run | 133 passed; 15 live-server tests skipped |
+| SDK | branch pb4 local run with `websockets` installed | 200 passed, including 21 live-server tests (async client, WebSocket streaming) |
 | PostgreSQL package | contract run at v0.103.0 | 5 contract tests passed; 2 live tests skipped without `MEEMEE_TEST_DATABASE_URL` |
 | Console | core mount test plus console worker's headless live test | passed at merge |
 | End-to-end run path (pb7) | `tests/test_live_runs_e2e.py` against booted uvicorn + `meemee worker`, local scripted OpenAI-compatible provider | SQLite and PostgreSQL 16.2 modes: 10 passed (sync run, owner scoping, queued job over SSE to done, replay, routed fallback, 502 on model outage) |

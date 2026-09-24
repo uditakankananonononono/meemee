@@ -18,7 +18,7 @@ jobs:
           python-version: "3.10"
           cache: pip
       - name: Install release dependencies
-        run: python -m pip install -e '.[dev,postgresql]' build && python -m pip install -e ./sdk
+        run: python -m pip install -e '.[dev,postgresql]' build && python -m pip install -e './sdk[dev]'
       - name: Lint
         run: ruff check meemee tests examples/webhook_receiver
       - name: Core and PostgreSQL contract tests
