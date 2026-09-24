@@ -6,7 +6,7 @@ import uuid
 
 from .approvals import ApprovalStore
 from .config import Settings
-from .persistence import build_persistence
+from .persistence import persistence_from_settings
 from .runtime import build_agent
 from .webhooks import WebhookStore
 
@@ -38,7 +38,7 @@ def job_approval(approvals: ApprovalStore, owner: str):
 
 async def work_forever(settings: Settings | None = None) -> None:
     settings = settings or Settings()
-    persistence = build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn)
+    persistence = persistence_from_settings(settings)
     jobs = persistence.jobs
     webhooks = WebhookStore(
         settings.data_dir / "webhooks.sqlite3",

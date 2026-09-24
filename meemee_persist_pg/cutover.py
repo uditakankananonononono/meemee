@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sqlite3
 import time
 import uuid
 from collections.abc import Iterator
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -31,13 +32,17 @@ SPECS={
           TableSpec("audit_chain_base","meemee_audit_chain_base",("singleton","sequence","entry_hash"),("singleton",))),
  "email":(TableSpec("email_verifications","meemee_email_verifications",("account_id","token_digest","expires_at","verified_at","sent_at"),("account_id",)),
           TableSpec("password_resets","meemee_password_resets",("account_id","token_digest","expires_at","used_at","sent_at"),("account_id",))),
+ "quotas":(TableSpec("quota_limits","meemee_quota_limits",("principal","daily_jobs"),("principal",)),
+           TableSpec("quota_usage","meemee_quota_usage",("principal","day","jobs"),("principal","day"))),
+ "entitlements":(TableSpec("principal_plans","meemee_principal_plans",("principal","plan","updated_at"),("principal",)),),
  "approvals":(TableSpec("tool_approvals","meemee_tool_approvals",("principal","tool","granted_at","expires_at","revoked_at","granted_by","argument_constraints"),("principal","tool")),),
 }
 # Groups an operator may leave out of a cutover. approvals.sqlite3 only exists once a grant was made,
 # and older cutover invocations predate it; when given, it is copied and verified like every other group.
-OPTIONAL_GROUPS=frozenset({"approvals","email"})
+OPTIONAL_GROUPS=frozenset({"approvals","email","quotas","entitlements"})
 JSON_COLUMNS={"metadata","document","result","payload","argument_constraints"}
 UUID_COLUMNS={"id","plan_id","job_id"}
+_DATE_ONLY=re.compile(r"\d{4}-\d{2}-\d{2}")
 IDENTITY_TARGETS={"meemee_memories","meemee_job_events","meemee_audit_log"}
 
 @contextmanager
@@ -75,7 +80,9 @@ def canonical(value:Any)->Any:
     if isinstance(value,bytes):return value.hex()
     if isinstance(value,uuid.UUID):return str(value)
     if isinstance(value,datetime):return value.astimezone(timezone.utc).isoformat(timespec="microseconds")
+    if isinstance(value,date):return value.isoformat()  # calendar dates (quota days) carry no zone
     if isinstance(value,str):
+        if _DATE_ONLY.fullmatch(value):return value
         try:return datetime.fromisoformat(value).astimezone(timezone.utc).isoformat(timespec="microseconds")
         except (ValueError,TypeError):return value
     if isinstance(value,dict):return {k:canonical(value[k]) for k in sorted(value)}
