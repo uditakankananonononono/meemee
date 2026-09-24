@@ -7,7 +7,7 @@ when the API and workers share one data directory.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from psycopg.types.json import Jsonb
@@ -20,7 +20,8 @@ _ACTIVE = "revoked_at IS NULL AND (expires_at IS NULL OR expires_at > %s)"
 
 
 def _iso(value: datetime | None) -> str | None:
-    return value.isoformat() if value is not None else None
+    # UTC regardless of the server/session TimeZone, like the SQLite store.
+    return value.astimezone(timezone.utc).isoformat() if value is not None else None
 
 
 class ApprovalStore:

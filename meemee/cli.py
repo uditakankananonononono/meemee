@@ -276,10 +276,9 @@ def account_delete(principal: str, yes: bool = typer.Option(False, "--yes", help
     settings = Settings()
     persistence = build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn)
     try:
-        from .auth import TokenStore
-        TokenStore(settings.data_dir / "auth.sqlite3").disable_account(principal)
+        persistence.tokens.disable_account(principal)
         result = build_account_purger(settings, persistence).purge(principal, requested_by="cli")
-        AuditLog(settings.data_dir / "audit.sqlite3").append("cli", "account.purge", principal, "success", {"deletion_id": result["deletion_id"], "deleted": result["deleted"]})
+        persistence.audit.append("cli", "account.purge", principal, "success", {"deletion_id": result["deletion_id"], "deleted": result["deleted"]})
     finally:
         persistence.close()
     typer.echo(json.dumps(result, indent=2))
@@ -314,13 +313,21 @@ def account_import_inspect(source: Path, target_principal: str | None = None) ->
     typer.echo(json.dumps({**report, "dry_run":True}, indent=2))
 
 
+def _anchor_audit(settings: Settings) -> AuditLog:
+    """Anchors and pruning operate on the SQLite chain. In PostgreSQL mode the chain lives in the
+    database, and anchoring the stale local audit.sqlite3 would certify the wrong chain."""
+    if settings.persistence_backend.strip().lower() == "postgresql":
+        raise typer.BadParameter("audit anchors and pruning are SQLite-only; in PostgreSQL mode verify the shared chain with GET /v1/audit")
+    return AuditLog(settings.data_dir / "audit.sqlite3")
+
+
 @app.command("audit-anchor")
 def audit_anchor(destination: Path) -> None:
     """Write a signed tamper-evident audit checkpoint to external storage."""
     settings = Settings()
     if not settings.audit_anchor_key:
         raise typer.BadParameter("MEEMEE_AUDIT_ANCHOR_KEY is required")
-    report = create_anchor(AuditLog(settings.data_dir / "audit.sqlite3"), destination, settings.audit_anchor_key)
+    report = create_anchor(_anchor_audit(settings), destination, settings.audit_anchor_key)
     typer.echo(json.dumps(report, indent=2))
 
 
@@ -330,7 +337,7 @@ def audit_prune(anchor: Path) -> None:
     settings = Settings()
     if not settings.audit_anchor_key:
         raise typer.BadParameter("MEEMEE_AUDIT_ANCHOR_KEY is required")
-    report = prune_to_anchor(AuditLog(settings.data_dir / "audit.sqlite3"), anchor, settings.audit_anchor_key)
+    report = prune_to_anchor(_anchor_audit(settings), anchor, settings.audit_anchor_key)
     typer.echo(json.dumps(report, indent=2))
 
 
@@ -340,7 +347,7 @@ def audit_anchor_verify(source: Path) -> None:
     settings = Settings()
     if not settings.audit_anchor_key:
         raise typer.BadParameter("MEEMEE_AUDIT_ANCHOR_KEY is required")
-    report = verify_anchor(AuditLog(settings.data_dir / "audit.sqlite3"), source, settings.audit_anchor_key)
+    report = verify_anchor(_anchor_audit(settings), source, settings.audit_anchor_key)
     typer.echo(json.dumps(report, indent=2))
     if report["status"] != "pass":
         raise typer.Exit(1)

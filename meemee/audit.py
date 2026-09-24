@@ -33,6 +33,10 @@ class AuditLog:
                 );
             """)
 
+    def ping(self) -> bool:
+        with self.lock:
+            return self.db.execute("SELECT 1").fetchone() is not None
+
     @staticmethod
     def hash(previous: str, occurred: str, actor: str, action: str, resource: str, outcome: str, metadata: str) -> str:
         canonical = f"{previous}\x1f{occurred}\x1f{actor}\x1f{action}\x1f{resource}\x1f{outcome}\x1f{metadata}"

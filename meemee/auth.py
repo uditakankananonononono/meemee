@@ -94,9 +94,16 @@ class TokenStore:
     def digest(token: str) -> bytes:
         return hashlib.sha256(token.encode()).digest()
 
+    def ping(self) -> bool:
+        with self.lock:
+            return self.db.execute("SELECT 1").fetchone() is not None
+
     def create(self, name: str, scopes: set[str], expires_at: str | None = None, owner_id: str | None = None, token_kind: str = "api") -> tuple[str, str]:
         if not name.strip() or not scopes:
             raise ValueError("token name and at least one scope are required")
+        # A non-ISO expiry used to be stored as-is and compared as text, so "never" outlived every date.
+        from .approvals import normalize_expiry
+        expires_at = normalize_expiry(expires_at)
         ident, token = secrets.token_hex(12), f"mee_{secrets.token_urlsafe(32)}"
         now = datetime.now(timezone.utc).isoformat()
         with self.lock, self.db:
