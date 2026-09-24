@@ -3,6 +3,8 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from psycopg.types.json import Jsonb
+
 from ._db import Database
 
 
@@ -11,8 +13,8 @@ class PlanStore:
     def create(self, plan: Any) -> dict[str,Any]:
         ident=uuid.uuid4(); document=plan.model_dump(mode="json")
         with self.db.transaction() as c:
-            c.execute("INSERT INTO meemee_plans(id,goal,version,document) VALUES(%s,%s,1,%s)",(ident,plan.goal,document))
-            c.execute("INSERT INTO meemee_plan_history(plan_id,version,document,reason) VALUES(%s,1,%s,'created')",(ident,document))
+            c.execute("INSERT INTO meemee_plans(id,goal,version,document) VALUES(%s,%s,1,%s)",(ident,plan.goal,Jsonb(document)))
+            c.execute("INSERT INTO meemee_plan_history(plan_id,version,document,reason) VALUES(%s,1,%s,'created')",(ident,Jsonb(document)))
         return self.get(str(ident))
     @staticmethod
     def _decode(row):
@@ -33,12 +35,12 @@ class PlanStore:
         doc=plan.model_dump(mode="json")
         with self.db.transaction() as c:
             row=c.execute("""UPDATE meemee_plans SET goal=%s,version=version+1,document=%s,updated_at=clock_timestamp()
-              WHERE id=%s AND version=%s RETURNING version""",(plan.goal,doc,ident,expected_version)).fetchone()
+              WHERE id=%s AND version=%s RETURNING version""",(plan.goal,Jsonb(doc),ident,expected_version)).fetchone()
             if not row:
                 actual=c.execute("SELECT version FROM meemee_plans WHERE id=%s",(ident,)).fetchone()
                 if not actual: raise KeyError(ident)
                 raise ValueError(f"version conflict: expected {expected_version}, actual {actual['version']}")
-            c.execute("INSERT INTO meemee_plan_history(plan_id,version,document,reason) VALUES(%s,%s,%s,%s)",(ident,row["version"],doc,reason))
+            c.execute("INSERT INTO meemee_plan_history(plan_id,version,document,reason) VALUES(%s,%s,%s,%s)",(ident,row["version"],Jsonb(doc),reason))
         return self.get(ident)
     def update_status(self, ident: str, step_id: str, status: str, expected_version: int) -> dict[str,Any]:
         current=self.get(ident); plan=current["plan"]; found=False

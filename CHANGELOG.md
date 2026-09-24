@@ -2,6 +2,16 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.122.0
+
+Integrates pb4 console companion screens and pb7 live PostgreSQL verification onto 0.121.0.
+
+- Console companion screens: profile editor that keeps persona/check-ins intact, conversations browser across all channels with timestamps and paging, check-in queue with status filter/counts and an admin "Deliver due now" action; headless Chromium test against a live server.
+- Added `scripts/pg_live_check.py` and `tests_pg/test_live_stores.py` (15 live tests); PostgreSQL suites now run for real, with skips treated as failures.
+- Fixed `meemee_persist_pg.PlanStore`: plan documents are now sent as JSONB (before, every create/replace failed on real PostgreSQL).
+- Fixed `meemee_persist_pg.JobStore`: a `cancel_requested` job whose worker lease expires is now reaped to `cancelled`, and a worker can keep heartbeating while it winds down a cancel.
+- `tests_pg/test_postgres_integration.py` accepts `MEEMEE_TEST_DATABASE_URL` as well as `MEEMEE_TEST_POSTGRES_DSN`.
+
 ## 0.121.0
 
 Integrates pb1 (browser human takeover), pb4 (product-wide account deletion, now also purging browser sessions and takeover notices) and pb7 (process-isolated tool kill).
