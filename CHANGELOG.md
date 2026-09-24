@@ -2,6 +2,10 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## 0.120.0
+
+- Added `GET /v1/models/status` (scope `jobs:read`): profiles with availability and reason, routes and paid gating, no secrets. `?probe=true` probes routed profiles' `/models` endpoints concurrently and reports the serving profile per role.
+
 ## 0.119.0
 
 - Companion replies now include `model_trace` (role, answering profile, model id and every fallback attempt), stored per assistant message in `companion_message_models` and covered by customer export and deletion. The SDK `CompanionChatReply` gains the optional field.

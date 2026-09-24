@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "meemee-client"
-version = "0.119.0"
-description = "Typed Python client SDK for the Meemee agent platform API (targets server v0.119.0)."
+version = "0.120.0"
+description = "Typed Python client SDK for the Meemee agent platform API (targets server v0.120.0)."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "LicenseRef-Proprietary"
