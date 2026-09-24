@@ -404,6 +404,7 @@ def backup_verify(directory: Path) -> None:
 @app.command("retention-run")
 def retention_run() -> None:
     """Apply configured retention windows and print deletion counts."""
+    _refuse_in_postgresql_mode("retention-run")
     settings = Settings()
     report = RetentionManager(settings.data_dir).run(
         jobs_days=settings.retention_jobs_days,
