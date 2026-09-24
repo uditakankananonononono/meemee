@@ -173,13 +173,15 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 
 153. Personal-model v1 closeout: user correction provenance, owner-scoped evidence inspection and safe confidence decay that never weakens explicit corrections.
 
+154. Forced interruption of blocking tools (branch pb7, unreleased): a tool that sets `isolation = IsolationPolicy(...)` runs in a spawned child process; cancellation or its hard timeout sends SIGTERM, then SIGKILL after a grace period, and the child is always reaped. Covered by `tests/test_isolation.py` (12 tests, including a SIGTERM-ignoring child and an event loop that stays responsive while the tool blocks).
+
 ## Thin (0)
 
 Nothing is classified as thin. A capability is either implemented and tested at its stated boundary below, or listed as missing.
 
 ## Missing, not claimed
 
-Live WhatsApp and iMessage delivery over real provider networks is unverified: the adapters and durable delivery queue are implemented and config-gated, but no provider account exists yet. Live PostgreSQL integration is not verified in this environment; target deployments must run the unskipped PostgreSQL suite and preflight. Built-in email/password signup and login are implemented; external OIDC remains optional. Email verification, password reset, customer data export and account deletion are implemented. Browser challenges are detected and handed off, but an interactive live human-control channel is not built in. Async tools can be cancelled; blocking third-party native code that does not yield cannot be forcibly interrupted safely. Multi-region failover, online dual-write migration and logical replication remain deployment/infrastructure work and are not claimed.
+Live WhatsApp and iMessage delivery over real provider networks is unverified: the adapters and durable delivery queue are implemented and config-gated, but no provider account exists yet. Live PostgreSQL integration is not verified in this environment; target deployments must run the unskipped PostgreSQL suite and preflight. Built-in email/password signup and login are implemented; external OIDC remains optional. Email verification, password reset, customer data export and account deletion are implemented. Browser challenges are detected and handed off, but an interactive live human-control channel is not built in. Async tools can be cancelled cooperatively. Tools that opt into process isolation can also be forcibly killed on cancel or timeout; tools that are not picklable, or that are not marked for isolation, still rely on cooperative cancellation. Multi-region failover, online dual-write migration and logical replication remain deployment/infrastructure work and are not claimed.
 
 The SQLite single-host shape and PostgreSQL memory, owner-scoped jobs and shared rate limiting are stated at their tested boundaries. SSE and authenticated WebSocket job streams are implemented. No missing item is represented as shipped.
 
@@ -241,6 +243,23 @@ A model statement is never treated as proof that work happened. Tool returns are
 
 
 ## Advanced operation
+
+### Forced interruption for blocking tools
+
+Cooperative cancellation cannot stop a tool stuck in blocking or native code. Mark such a tool for process isolation:
+
+```python
+from meemee.isolation import IsolationPolicy
+from meemee.tools.base import Tool
+
+class OcrTool(Tool):
+    name = "ocr.page"
+    isolation = IsolationPolicy(timeout_s=120, grace_s=2)
+    ...
+```
+
+`ToolRegistry.execute` then runs the call in a spawned child. Cancelling the job or passing `timeout_s` sends SIGTERM, then SIGKILL after `grace_s`; the call returns `ToolResult(ok=False, error="tool cancelled")` or a hard-timeout error. The tool class must be importable at module level, the tool instance, its arguments and its return value must be picklable, and each call pays a fresh interpreter start (about 0.3 s per call measured in the pb7 sandbox). `run_isolated` / `run_isolated_sync` in `meemee/isolation.py` can also be used directly.
+
 
 Set `MEEMEE_API_TOKEN` in production-facing environments. Run one or more durable workers with `meemee worker`. Schedule work through `POST /v1/jobs` with an ISO 8601 `run_at`; workers atomically claim due jobs. Shell and local Git mutations are side effects and still require agent-run approval. Commands are direct argv calls, never `shell=True`, and only configured executables can run. Git commits name explicit paths and never push.
 
