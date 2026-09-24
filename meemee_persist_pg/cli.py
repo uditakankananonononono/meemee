@@ -8,13 +8,16 @@ import sys
 from pathlib import Path
 
 from . import Database, MigrationStore
-from .cutover import SPECS, Cutover
+from .cutover import OPTIONAL_GROUPS, SPECS, Cutover
 
 
 def parser()->argparse.ArgumentParser:
     p=argparse.ArgumentParser(prog="meemee-pg",description="Offline SQLite to PostgreSQL cutover tools")
     p.add_argument("--dsn",default=os.getenv("MEEMEE_POSTGRES_DSN"),help="PostgreSQL DSN (prefer MEEMEE_POSTGRES_DSN to avoid shell history)")
-    for name in SPECS:p.add_argument(f"--{name}",type=Path,required=True,help=f"path to {name} SQLite database")
+    for name in SPECS:
+        optional=name in OPTIONAL_GROUPS
+        p.add_argument(f"--{name}",type=Path,required=not optional,
+                       help=f"path to {name} SQLite database"+(" (optional; include it to move tool grants to PostgreSQL)" if optional else ""))
     sub=p.add_subparsers(dest="command",required=True)
     copy=sub.add_parser("copy",help="copy into empty migrated PostgreSQL tables")
     copy.add_argument("--batch-size",type=int,default=1000)
@@ -38,7 +41,7 @@ def validate_sqlite(sources:dict[str,Path])->None:
 def main(argv:list[str]|None=None)->int:
     args=parser().parse_args(argv)
     if not args.dsn:raise SystemExit("PostgreSQL DSN required via --dsn or MEEMEE_POSTGRES_DSN")
-    sources={name:getattr(args,name) for name in SPECS};validate_sqlite(sources)
+    sources={name:getattr(args,name) for name in SPECS if getattr(args,name) is not None};validate_sqlite(sources)
     db=Database(args.dsn)
     try:
         MigrationStore(db).apply();cutover=Cutover(db,sources)

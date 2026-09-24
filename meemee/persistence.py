@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .approvals import ApprovalStore as SQLiteApprovalStore
 from .jobs import JobStore as SQLiteJobStore
 from .memory import MemoryStore as SQLiteMemoryStore
 
@@ -15,6 +16,9 @@ class Persistence:
     jobs: Any
     close: Any
     database: Any = None
+    #: Tool-approval grants. SQLite: approvals.sqlite3 in the data directory (single host).
+    #: PostgreSQL: meemee_tool_approvals, shared by the API and every worker on the database.
+    approvals: Any = None
 
     def check_memory(self) -> bool:
         if self.backend == "sqlite":
@@ -33,12 +37,14 @@ def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = N
     """Select and initialize the supported persistence composition root."""
     normalized = backend.strip().lower()
     if normalized == "sqlite":
-        return Persistence("sqlite", SQLiteMemoryStore(data_dir / "meemee.sqlite3"), SQLiteJobStore(data_dir / "jobs.sqlite3"), lambda: None)
+        return Persistence("sqlite", SQLiteMemoryStore(data_dir / "meemee.sqlite3"), SQLiteJobStore(data_dir / "jobs.sqlite3"), lambda: None,
+                           approvals=SQLiteApprovalStore(data_dir / "approvals.sqlite3"))
     if normalized != "postgresql":
         raise ValueError("MEEMEE_PERSISTENCE_BACKEND must be sqlite or postgresql")
     if not postgres_dsn:
         raise ValueError("MEEMEE_POSTGRES_DSN is required for the postgresql backend")
-    from meemee_persist_pg import Database, JobStore, MemoryStore, MigrationStore
+    from meemee_persist_pg import ApprovalStore, Database, JobStore, MemoryStore, MigrationStore
     database = Database(postgres_dsn)
     MigrationStore(database).apply()
-    return Persistence("postgresql", MemoryStore(database), JobStore(database), database.close, database)
+    return Persistence("postgresql", MemoryStore(database), JobStore(database), database.close, database,
+                       approvals=ApprovalStore(database))
