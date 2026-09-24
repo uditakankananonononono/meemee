@@ -10,6 +10,7 @@ All entries describe shipped repository behavior. Missing work is never presente
 - PostgreSQL migration 004 adds job purge tombstones; expired tombstones are reaped on claim.
 - Fixed PostgreSQL `AuditLog.verify` failing on servers whose timezone is not UTC.
 - `Agent.run` accepts an optional caller-supplied `run_id`.
+- Console companion screens: profile editor that keeps persona/check-ins intact, conversations browser across all channels with timestamps and paging, check-in queue with status filter/counts and an admin "Deliver due now" action; headless Chromium test against a live server.
 
 ## 0.117.0
 

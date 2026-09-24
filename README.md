@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.117.0 (153) + pb4 unreleased (154)
+## Verified in v0.117.0 (153) + pb4 unreleased (155)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -174,6 +174,8 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 153. Personal-model v1 closeout: user correction provenance, owner-scoped evidence inspection and safe confidence decay that never weakens explicit corrections.
 
 154. Product-wide account deletion (branch pb4): `DELETE /v1/account`, admin `DELETE /v1/admin/principals/{id}/data` and `meemee account-delete PRINCIPAL --yes` hard-delete the principal's jobs and job events, run reports, agent memories (with embeddings and full-text rows), personal model including soft-deleted history, connected-context sources and records, monitors, webhook subscriptions/deliveries/attempts, quotas, plan assignment, idempotency records, standing tool approvals and companion content. Running jobs are tombstoned (goal/owner wiped, cancellation requested) and deleted when the worker settles, including memories written after the purge; synchronous runs that finish after deletion are discarded with 410. Every step is recorded in a durable deletion ledger and resumed after a crash (`meemee account-delete-resume`, also on API start). SQLite and PostgreSQL job backends are covered; the PostgreSQL path passed a live run. The tamper-evident audit log is retained by design.
+
+155. Companion console screens (branch pb4): profile editor, persona editor, facts with retire, conversations browser across channels with timestamped paged history, check-in queue with status filter and admin delivery run, verified by a headless Chromium test against a live server.
 
 ## Thin (0)
 
