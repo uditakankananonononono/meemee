@@ -12,6 +12,9 @@ All entries describe shipped repository behavior. Missing work is never presente
 - SDK: `tokens.introspect` and the `TokenIntrospection` model on sync and async clients.
 - SDK: `AsyncOIDCClientCredentialsAuth`, an asyncio-native client-credentials provider (discovery, caching, leeway refresh, single-flight fetch) awaited by `AsyncMeemeeClient` without a worker thread; discovery and token-response validation are shared with the sync provider.
 - SDK: a 401 with a refresh-capable provider triggers one forced refresh and one retry (HTTP, SSE, WebSocket; sync and async); repeated 401s raise, static tokens are unchanged.
+- Added `sdk/tests/test_live_runs.py`: live SDK run tests (sync and async) against a booted server and worker with a scripted OpenAI-protocol provider, SQLite and PostgreSQL modes: final answer, tool results, stored run listing, owner scoping, SSE and WebSocket job streams to `done`, 502 on model outage.
+- Fixed PostgreSQL mode: `/v1/jobs/{id}/ws` crashed on the first event because PostgreSQL rows carry UUID and datetime values; events are now encoded like the SSE stream. Regression test in `tests/test_websocket.py`.
+- SDK: `Job.result` accepts the decoded object the PostgreSQL job store returns and re-encodes it, so `result_data` works on both backends.
 
 ## Unreleased (branch pb7)
 

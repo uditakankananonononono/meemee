@@ -38,6 +38,16 @@ def test_job_result_is_stored_as_json_string_and_decoded_on_demand() -> None:
     assert job.result_data == {"summary": "three papers"}
 
 
+def test_job_result_from_postgresql_jsonb_object_matches_sqlite_string() -> None:
+    # SQLite returns the JSON string; the PostgreSQL store's JSONB column returns the object.
+    sqlite = Job.model_validate(job_payload("done", result={"final": "The note says: ok", "steps": [1, 2]}))
+    raw = job_payload("done")
+    raw["result"] = {"final": "The note says: ok", "steps": [1, 2]}
+    pg = Job.model_validate(raw)
+    assert isinstance(pg.result, str)
+    assert pg.result_data == sqlite.result_data == {"final": "The note says: ok", "steps": [1, 2]}
+
+
 def test_job_without_result_decodes_to_none() -> None:
     job = Job.model_validate(job_payload("queued"))
     assert job.result is None

@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class HealthStatus(BaseModel):
@@ -61,8 +61,10 @@ TERMINAL_JOB_STATUSES: frozenset[JobStatus] = frozenset(
 class Job(BaseModel):
     """A durable queued job as returned by GET /v1/jobs/{id}.
 
-    The server stores ``result`` as a JSON-encoded string; use ``result_data``
-    for the decoded value.
+    ``result`` is kept as a JSON-encoded string; use ``result_data`` for the
+    decoded value. The SQLite job store returns that string, while the
+    PostgreSQL store (JSONB column) returns the decoded object; the SDK
+    re-encodes an object here so both backends give the same ``Job``.
     """
 
     model_config = ConfigDict(use_enum_values=False)
@@ -77,6 +79,13 @@ class Job(BaseModel):
     error: str | None = None
     created_at: datetime
     updated_at: datetime
+
+    @field_validator("result", mode="before")
+    @classmethod
+    def _encode_structured_result(cls, value: Any) -> Any:
+        if isinstance(value, (dict, list)):
+            return json.dumps(value, separators=(",", ":"), ensure_ascii=False)
+        return value
 
     @property
     def is_terminal(self) -> bool:

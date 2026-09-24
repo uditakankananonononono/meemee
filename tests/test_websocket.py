@@ -43,3 +43,20 @@ def test_websocket_rejects_missing_scope_and_bad_cursor(monkeypatch,tmp_path):
                 socket.receive_json()
         except WebSocketDisconnect as exc: assert exc.code==code
         else: raise AssertionError("connection should be rejected")
+
+
+def test_websocket_encodes_postgresql_row_types(monkeypatch,tmp_path):
+    """PostgreSQL job events carry UUID job ids and datetime timestamps; the socket must
+    encode them like the SSE stream does instead of dropping the connection."""
+    import uuid
+    from datetime import datetime, timezone
+    store=JobStore(tmp_path/"jobs.db"); monkeypatch.setattr(api,"jobs",store)
+    ident=store.enqueue("work",principal="bootstrap")
+    job_uuid=uuid.UUID(int=7); stamp=datetime(2026,9,24,6,0,tzinfo=timezone.utc)
+    original=store.events
+    def pg_like_events(job_id,after=0):
+        return [dict(e,job_id=job_uuid,created_at=stamp) for e in original(job_id,after)]
+    monkeypatch.setattr(store,"events",pg_like_events)
+    with TestClient(api.app).websocket_connect(f"/v1/jobs/{ident}/ws",headers={"Authorization":"Bearer test-bootstrap-token"}) as socket:
+        event=socket.receive_json()
+    assert event["kind"]=="queued" and event["job_id"]==str(job_uuid) and event["created_at"]==str(stamp)
