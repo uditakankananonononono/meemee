@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class HealthStatus(BaseModel):
@@ -85,8 +85,10 @@ TERMINAL_JOB_STATUSES: frozenset[JobStatus] = frozenset(
 class Job(BaseModel):
     """A durable queued job as returned by GET /v1/jobs/{id}.
 
-    The server stores ``result`` as a JSON-encoded string; use ``result_data``
-    for the decoded value.
+    ``result`` is kept as a JSON-encoded string; use ``result_data`` for the
+    decoded value. The SQLite job store returns that string, while the
+    PostgreSQL store (JSONB column) returns the decoded object; the SDK
+    re-encodes an object here so both backends give the same ``Job``.
     """
 
     model_config = ConfigDict(use_enum_values=False)
@@ -101,6 +103,13 @@ class Job(BaseModel):
     error: str | None = None
     created_at: datetime
     updated_at: datetime
+
+    @field_validator("result", mode="before")
+    @classmethod
+    def _encode_structured_result(cls, value: Any) -> Any:
+        if isinstance(value, (dict, list)):
+            return json.dumps(value, separators=(",", ":"), ensure_ascii=False)
+        return value
 
     @property
     def is_terminal(self) -> bool:
@@ -286,6 +295,30 @@ class TokenMetadata(BaseModel):
     name: str
     scopes: list[str]
     created_at: datetime
+    last_used_at: datetime | None = None
+    expires_at: datetime | None = None
+    revoked_at: datetime | None = None
+
+
+class TokenIntrospection(BaseModel):
+    """POST /v1/tokens/introspect result: a credential's state, never its secret.
+
+    ``state`` is active, revoked, expired or unknown (never issued here, or an
+    OIDC token that no longer validates). ``credential`` is api_token,
+    bootstrap, oidc, or None when unknown. Only ``redacted_token`` (first and
+    last four characters) echoes the input.
+    """
+
+    active: bool
+    state: str
+    credential: str | None = None
+    redacted_token: str
+    id: str | None = None
+    name: str | None = None
+    principal: str | None = None
+    token_kind: str | None = None
+    scopes: list[str] = Field(default_factory=list)
+    created_at: datetime | None = None
     last_used_at: datetime | None = None
     expires_at: datetime | None = None
     revoked_at: datetime | None = None

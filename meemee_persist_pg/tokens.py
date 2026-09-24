@@ -27,5 +27,14 @@ class TokenStore:
             from meemee.auth import Principal
             return Principal(row["id"],row["name"],frozenset(row["scopes"]))
         except ImportError: return {"id":row["id"],"name":row["name"],"scopes":frozenset(row["scopes"])}
+    def introspect(self,token:str)->dict|None:
+        """Redacted metadata and derived state for a raw token; never updates last_used_at."""
+        digest=self.digest(token)
+        with self.db.transaction() as c:
+            row=c.execute("""SELECT id,name,digest,scopes,created_at,last_used_at,expires_at,revoked_at,owner_id,token_kind,
+              clock_timestamp() AS now FROM meemee_api_tokens WHERE digest=%s""",(digest,)).fetchone()
+        if not row or not hmac.compare_digest(bytes(row["digest"]),digest): return None
+        from meemee.auth import token_introspection
+        return token_introspection(dict(row),row["now"])
     def revoke(self,ident:str)->bool:
         with self.db.transaction() as c: return bool(c.execute("UPDATE meemee_api_tokens SET revoked_at=clock_timestamp() WHERE id=%s AND revoked_at IS NULL",(ident,)).rowcount)

@@ -2,6 +2,20 @@
 
 All entries describe shipped repository behavior. Missing work is never presented as completed.
 
+## Unreleased (branch pb4)
+
+- SDK: `AsyncMeemeeClient`, an asyncio client covering every resource with the same models, errors and retry policy, including async SSE with `Last-Event-ID` resume.
+- SDK: `jobs.stream_ws` WebSocket job streaming (sync and async) with `?after` resume, ping/pong keepalive and typed errors for 4400/4401/4403/4404; new optional `ws` extra.
+- Server: the `/v1/jobs/{id}/ws` handler now accepts the handshake before rejecting, so its 44xx close codes reach real network clients (they were previously collapsed into a bare HTTP 403).
+- SDK README: removed stale "missing" entries for token/job listing and WebSocket streaming.
+- Added admin `POST /v1/tokens/introspect`: state (active/revoked/expired/unknown), credential type, scopes, principal and timestamps for a raw token, with only a redacted form echoed; audited without the secret; does not update `last_used_at`. `TokenStore.introspect` on SQLite and PostgreSQL.
+- SDK: `tokens.introspect` and the `TokenIntrospection` model on sync and async clients.
+- SDK: `AsyncOIDCClientCredentialsAuth`, an asyncio-native client-credentials provider (discovery, caching, leeway refresh, single-flight fetch) awaited by `AsyncMeemeeClient` without a worker thread; discovery and token-response validation are shared with the sync provider.
+- SDK: a 401 with a refresh-capable provider triggers one forced refresh and one retry (HTTP, SSE, WebSocket; sync and async); repeated 401s raise, static tokens are unchanged.
+- Added `sdk/tests/test_live_runs.py`: live SDK run tests (sync and async) against a booted server and worker with a scripted OpenAI-protocol provider, SQLite and PostgreSQL modes: final answer, tool results, stored run listing, owner scoping, SSE and WebSocket job streams to `done`, 502 on model outage.
+- Fixed PostgreSQL mode: `/v1/jobs/{id}/ws` crashed on the first event because PostgreSQL rows carry UUID and datetime values; events are now encoded like the SSE stream. Regression test in `tests/test_websocket.py`.
+- SDK: `Job.result` accepts the decoded object the PostgreSQL job store returns and re-encodes it, so `result_data` works on both backends.
+
 ## Unreleased (branch pb7)
 
 - Added `tests/test_live_runs_e2e.py`: live end-to-end run tests against a booted server and worker, in SQLite and PostgreSQL modes, using a local scripted OpenAI-compatible provider (sync runs, SSE job stream to completion, audit, owner scoping, routed fallback, model outage).

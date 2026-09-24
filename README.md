@@ -2,7 +2,9 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.122.0 (163)
+## Verified in v0.122.0 (171)
+
+Items 164-166 are unreleased pb7 work and items 167-171 are unreleased pb4 work, all verified in this tree; the rest shipped in v0.122.0.
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -192,6 +194,16 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 165. Write-approval gate verified live (branch pb7, unreleased): in SQLite and PostgreSQL modes, a write tool is refused without approval (nothing written, the model sees the denial), per-run `approved_tools` / `approve_writes` allow it, persistent grants honor argument constraints, principal scoping, expiry and revocation, unknown tools cannot be granted, and `approval.grant` / `approval.revoke` / `run.create` land in order in a verified audit chain. Fixed: queued jobs ignored persistent grants (the worker passed no approval callback), so a job could never use an approval-gated tool; jobs now apply the owner's grants exactly as runs do.
 
 166. Structured refusals (branch pb7, unreleased): every run report, stored run and finished job result carries `approvals_required`, a list of refused tool calls with `step`, `tool`, `risk`, `reason` (`approval_required` or `policy_denied`), redacted `arguments`, `grantable`, and the exact `per_run` body or `persistent_grant` (`PUT /v1/approvals/{principal}`) that would have allowed the call. An empty list means nothing was refused; clients must not present a run with refusals as done, whatever the model's `final` text says. The SDK exposes `RunReport.approvals_required`, `RunReport.is_blocked`, `Job.approvals_required` and `ApprovalRefusal`. Live tests submit the suggested bodies unchanged and the retried run or job succeeds.
+
+167. SDK asyncio client and WebSocket job streaming (branch pb4): `AsyncMeemeeClient` mirrors the full synchronous SDK surface with the same models, errors and retry policy, async SSE resume and thread-offloaded blocking auth; `jobs.stream_ws` (sync and async) follows `/v1/jobs/{id}/ws` with `?after` resume, ping/pong dead-peer detection and typed 44xx errors, verified against a scripted WebSocket server and a booted server. Fixed the WebSocket handler to accept before rejecting, so 4400/4401/4403/4404 close codes reach real network clients instead of a bare HTTP 403.
+
+168. Token introspection (branch pb4): admin `POST /v1/tokens/introspect` takes a raw credential in the body and returns its state (active, revoked, expired or unknown), credential type (API token, bootstrap or OIDC), scopes, principal, created/last-used/expiry/revocation times and a redacted form showing only the first and last four characters; the secret and its digest are never returned or audited, unknown tokens answer `active: false` instead of 404, and introspection does not count as use. SQLite and PostgreSQL token stores share the same semantics (PostgreSQL verified live), and the SDK exposes `tokens.introspect` on both sync and async clients, verified against a booted server.
+
+169. asyncio-native OIDC client credentials in the SDK (branch pb4): `AsyncOIDCClientCredentialsAuth` discovers the token endpoint, fetches and caches tokens on `httpx.AsyncClient` with leeway refresh and a single shared fetch for concurrent callers, and is awaited by `AsyncMeemeeClient` without a worker thread; sync-style providers keep the thread-offload fallback. Verified with mocked issuers and live against a local HTTPS issuer whose RS256 tokens the booted server validates through JWKS.
+
+170. SDK 401 recovery (branch pb4): with a refresh-capable auth provider, sync and async clients answer a 401 with exactly one forced credential refresh and one retry of the same request (JSON bodies rebuilt, SSE and WebSocket streams reopened from scratch, reconnect and retry budgets untouched); a repeated 401 raises, and static tokens keep failing fast. Verified mocked and live, including revoked-then-valid tokens and OIDC tokens rejected after issuance.
+
+171. SDK live runs (branch pb4): `sdk/tests/test_live_runs.py` drives the sync and async SDK clients against a booted server and `meemee worker` with a local scripted OpenAI-protocol provider, in SQLite and PostgreSQL modes: `runs.create` parses the final answer, step count and real `workspace.read_file` tool result, `runs.get/list/iter_all` read the stored run with cursor paging, other owners get 404 and a token without `runs:write` gets 403, queued jobs are streamed live to `done` over SSE and WebSocket with the result parsed, and a model outage raises `ServerError` 502 without an automatic retry. It found and fixed two PostgreSQL-mode bugs: the job WebSocket dropped the connection on the first event (UUID and datetime values were not JSON-encodable), and the SDK rejected finished jobs because the PostgreSQL store returns `result` as an object instead of a JSON string.
 
 ## Thin (0)
 

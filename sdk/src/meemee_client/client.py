@@ -4,8 +4,9 @@ Endpoint contract implemented here:
 - GET  /health, GET /ready                          (unauthenticated, rate-limit exempt)
 - POST /v1/runs                                     (scope runs:write)
 - POST /v1/jobs, GET /v1/jobs/{id}, DELETE /v1/jobs/{id},
-  GET /v1/jobs/{id}/events, GET /v1/jobs/{id}/stream (scopes jobs:write / jobs:read)
-- POST /v1/tokens, DELETE /v1/tokens/{id}           (scope admin)
+  GET /v1/jobs/{id}/events, GET /v1/jobs/{id}/stream,
+  GET /v1/jobs (list), WS /v1/jobs/{id}/ws           (scopes jobs:write / jobs:read)
+- POST/GET /v1/tokens, DELETE /v1/tokens/{id}       (scope admin)
 - GET  /v1/audit                                    (scope admin)
 - GET  /metrics                                     (scope admin, Prometheus text)
 """
@@ -20,6 +21,7 @@ from typing import Any
 import httpx
 from typing_extensions import Self
 
+from . import _ws
 from ._version import __version__
 from .auth import AuthProvider, TokenAuth
 from .errors import (
@@ -67,6 +69,7 @@ from .models import (
     ResponseInfo,
     RevokedToken,
     RunReport,
+    TokenIntrospection,
     TokenMetadata,
     WebhookDelivery,
     WebhookSubscription,
@@ -187,6 +190,14 @@ class MeemeeClient:
 
     # ------------------------------------------------------------- http core
 
+    def _can_refresh(self) -> bool:
+        return callable(getattr(self._auth, "refresh", None))
+
+    def _refresh_auth(self) -> None:
+        """Force the provider to fetch a new credential before the single retry."""
+        assert self._auth is not None
+        self._auth.refresh()  # type: ignore[attr-defined]
+
     def _headers(self, extra: dict[str, str] | None) -> dict[str, str]:
         headers: dict[str, str] = {}
         if self._auth is not None:
@@ -208,9 +219,12 @@ class MeemeeClient:
     ) -> httpx.Response:
         policy = self._retry
         attempt = 0
+        auth_refreshed = False
         while True:
             attempt += 1
             try:
+                # The body is rebuilt from ``json_body`` on every attempt, so a
+                # retry never depends on a consumed stream.
                 response = self._http.request(
                     method, path, params=params, json=json_body,
                     headers=self._headers(headers),
@@ -227,6 +241,13 @@ class MeemeeClient:
                 request_id=response.headers.get("X-Request-ID"),
                 rate_limit=RateLimitInfo.from_headers(response.headers),
             )
+            if response.status_code == 401 and not auth_refreshed and self._can_refresh():
+                # One forced credential refresh and one retry per request. The
+                # server rejected before running the handler, so resending is safe.
+                auth_refreshed = True
+                attempt -= 1
+                self._refresh_auth()
+                continue
             retryable_write = method.upper() == "POST" and bool(headers and headers.get("Idempotency-Key"))
             keyed_status_retry = retryable_write and response.status_code != 429 and attempt < policy.max_attempts
             if (
@@ -261,16 +282,27 @@ class MeemeeClient:
         headers: dict[str, str] | None = None,
         timeout: httpx.Timeout | None = None,
     ):
-        """Open a streaming response, mapping an error status before returning it."""
-        stream = self._http.stream(
-            method, path, params=params, headers=self._headers(headers),
-            timeout=timeout or httpx.Timeout(DEFAULT_STREAM_READ_TIMEOUT, connect=5.0),
-        )
-        response = stream.__enter__()
-        self.last_response_info = ResponseInfo(
-            request_id=response.headers.get("X-Request-ID"),
-            rate_limit=RateLimitInfo.from_headers(response.headers),
-        )
+        """Open a streaming response, mapping an error status before returning it.
+
+        A 401 with a refresh-capable provider closes the rejected response,
+        refreshes once and reopens the stream once.
+        """
+        for refresh_left in (True, False):
+            stream = self._http.stream(
+                method, path, params=params, headers=self._headers(headers),
+                timeout=timeout or httpx.Timeout(DEFAULT_STREAM_READ_TIMEOUT, connect=5.0),
+            )
+            response = stream.__enter__()
+            self.last_response_info = ResponseInfo(
+                request_id=response.headers.get("X-Request-ID"),
+                rate_limit=RateLimitInfo.from_headers(response.headers),
+            )
+            if response.status_code == 401 and refresh_left and self._can_refresh():
+                response.read()
+                stream.__exit__(None, None, None)
+                self._refresh_auth()
+                continue
+            break
         if response.status_code >= 400:
             response.read()
             error = _map_error(response)
@@ -537,6 +569,100 @@ class JobsResource:
                 self._client._sleeper(min(backoff, 30.0))
                 backoff *= 2.0
 
+    def stream_ws(
+        self,
+        job_id: str,
+        *,
+        after: int = 0,
+        reconnect: bool = True,
+        max_reconnects: int = 6,
+        open_timeout: float = 10.0,
+        ping_interval: float | None = 20.0,
+        ping_timeout: float | None = 20.0,
+    ) -> Iterator[JobEvent]:
+        """GET /v1/jobs/{id}/ws - follow live progress over WebSocket with resume.
+
+        Yields JobEvents in sequence order and returns after a terminal event
+        (done, failed or cancelled) or the server's normal 1000 close. A dropped
+        connection reconnects with ``?after=<last delivered sequence>``, so no
+        event is repeated or skipped; the server sends no idle frames, so dead
+        peers are detected by WebSocket ping/pong (``ping_interval``/``ping_timeout``).
+
+        Raises AuthenticationError (4401), PermissionDeniedError (4403 or a
+        pre-handshake HTTP 403), NotFoundError (4404), BadRequestError (4400),
+        StreamError for a malformed frame, and NetworkError once the reconnect
+        budget is spent. Needs the ``ws`` extra (``websockets``).
+        """
+        websockets = _ws.require_websockets()
+        from websockets.exceptions import ConnectionClosed, InvalidStatus
+        from websockets.sync.client import connect
+
+        cursor = max(after, 0)
+        reconnects_left = max_reconnects
+        backoff = 1.0
+        base = str(self._client._http.base_url)
+        auth_refreshed = False
+        while True:
+            failure: BaseException | None = None
+            refresh_now = False
+            try:
+                with connect(
+                    _ws.ws_url(base, job_id, cursor),
+                    additional_headers=self._client._headers(None),
+                    user_agent_header=self._client._http.headers.get("User-Agent"),
+                    open_timeout=open_timeout,
+                    ping_interval=ping_interval,
+                    ping_timeout=ping_timeout,
+                    proxy=None,
+                ) as connection:
+                    while True:
+                        try:
+                            frame = connection.recv()
+                        except ConnectionClosed as closed:
+                            code = closed.rcvd.code if closed.rcvd is not None else None
+                            reason = closed.rcvd.reason if closed.rcvd is not None else ""
+                            if code == 4401 and not auth_refreshed and self._client._can_refresh():
+                                refresh_now = True
+                                break
+                            rejection = _ws.rejection_error(code, reason, job_id)
+                            if rejection is not None:
+                                raise rejection from None
+                            if code == _ws.NORMAL_CLOSE:
+                                return
+                            failure = closed
+                            break
+                        event, is_terminal = _ws.parse_frame(frame, job_id)
+                        if event.sequence <= cursor:
+                            continue
+                        cursor = event.sequence
+                        yield event
+                        if is_terminal:
+                            return
+            except InvalidStatus as exc:
+                status = exc.response.status_code
+                if status == 401 and not auth_refreshed and self._client._can_refresh():
+                    refresh_now = True
+                else:
+                    mapped = _ws.handshake_error(status, job_id)
+                    if mapped is not None:
+                        raise mapped from exc
+                    failure = exc
+            except (OSError, TimeoutError, websockets.exceptions.InvalidHandshake) as exc:
+                failure = exc
+            if refresh_now:
+                # One credential refresh per stream; it does not use the reconnect budget.
+                auth_refreshed = True
+                self._client._refresh_auth()
+                continue
+            if not reconnect or reconnects_left <= 0:
+                raise NetworkError(
+                    f"job WebSocket for {job_id} interrupted and the reconnect budget is "
+                    f"exhausted (last delivered event id {cursor}): {failure}"
+                ) from failure
+            reconnects_left -= 1
+            self._client._sleeper(min(backoff, 30.0))
+            backoff *= 2.0
+
     @staticmethod
     def _handle_stream_message(
         message: SSEMessage,
@@ -642,6 +768,18 @@ class TokensResource:
             items, cursor = self.page(revoked=revoked, cursor=cursor, limit=limit)
             yield from items
             if cursor is None: return
+
+    def introspect(self, token: str) -> TokenIntrospection:
+        """POST /v1/tokens/introspect (admin) - scopes, expiry and revocation state of a raw token.
+
+        The secret travels only in the request body; the response carries a
+        redacted form. Unknown tokens return ``active=False, state="unknown"``
+        rather than raising. Introspection does not update ``last_used_at``.
+        """
+        if not isinstance(token, str) or not token.strip() or len(token) > 4096:
+            raise ValueError("token must be a non-empty string of at most 4096 characters")
+        payload = self._client._request_json("POST", "/v1/tokens/introspect", json_body={"token": token})
+        return TokenIntrospection.model_validate(payload)
 
     def revoke(self, token_id: str) -> RevokedToken:
         """DELETE /v1/tokens/{id} - revoke an active token (idempotent-safe:
