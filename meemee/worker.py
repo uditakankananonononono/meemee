@@ -4,6 +4,7 @@ import asyncio
 import threading
 import uuid
 
+from .approvals import ApprovalStore
 from .config import Settings
 from .persistence import build_persistence
 from .runtime import build_agent
@@ -30,6 +31,11 @@ def purge_if_deleted(jobs, memory, job_id: str, run_id: str) -> bool:
     return True
 
 
+def job_approval(approvals: ApprovalStore, owner: str):
+    """Approval callback for a queued job: only the owner's active persistent grants count."""
+    return lambda name, arguments, _risk: approvals.allows(owner, name, arguments=arguments)
+
+
 async def work_forever(settings: Settings | None = None) -> None:
     settings = settings or Settings()
     persistence = build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn)
@@ -39,6 +45,9 @@ async def work_forever(settings: Settings | None = None) -> None:
         settings.webhook_max_payload_bytes,
         settings.vault_key,
     )
+    # Same persistent, argument-scoped grants the API applies to POST /v1/runs. Queued jobs have no
+    # per-request approval fields, so a grant is the only way a job may use an approval-gated tool.
+    approvals = ApprovalStore(settings.data_dir / "approvals.sqlite3")
     while True:
         job = jobs.claim()
         if job is None:
@@ -49,7 +58,9 @@ async def work_forever(settings: Settings | None = None) -> None:
         watcher.start()
         run_id = uuid.uuid4().hex
         try:
-            report = await build_agent(settings, memory=persistence.memory).run(job["goal"], cancel=cancel, owner_id=job.get("principal") or "default", run_id=run_id)
+            owner = job.get("principal") or "default"
+            report = await build_agent(settings, memory=persistence.memory).run(
+                job["goal"], approve=job_approval(approvals, owner), cancel=cancel, owner_id=owner, run_id=run_id)
             if cancel.is_set():
                 jobs.cancel_running(job["id"])
                 if not purge_if_deleted(jobs, persistence.memory, job["id"], run_id):

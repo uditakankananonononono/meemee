@@ -49,15 +49,24 @@ class ScriptedProvider(BaseHTTPRequestHandler):
             self.end_headers()
             return
         last = body["messages"][-1]
+        goal = json.loads(body["messages"][1]["content"])["goal"]
+        writing = goal.startswith("WRITE ")  # "WRITE <path> <content>" asks for the approval-gated tool
         if last["role"] == "user":
-            decision = {"thought": "read the note", "tool_call": {"name": "workspace.read_file", "arguments": {"path": "note.txt"}}}
+            if writing:
+                _, path, content = goal.split(" ", 2)
+                call = {"name": "workspace.write_file", "arguments": {"path": path, "content": content}}
+            else:
+                call = {"name": "workspace.read_file", "arguments": {"path": "note.txt"}}
+            decision = {"thought": "use the tool", "tool_call": call}
         else:
             event = json.loads(last["content"])
             result = event.get("result") or {}
-            if result.get("ok"):
-                decision = {"thought": "done", "final": "The note says: " + result["content"]["content"].strip()}
-            else:
+            if not result.get("ok"):
                 decision = {"thought": "blocked", "final": "BLOCKED: " + str(result.get("error"))}
+            elif writing:
+                decision = {"thought": "done", "final": "WROTE " + result["content"]["path"]}
+            else:
+                decision = {"thought": "done", "final": "The note says: " + result["content"]["content"].strip()}
         payload = {"id": "cmpl-e2e", "object": "chat.completion", "model": body.get("model"),
                    "choices": [{"index": 0, "message": {"role": "assistant", "content": json.dumps(decision)},
                                 "finish_reason": "stop"}]}
@@ -168,11 +177,15 @@ def _headers(token: str = ADMIN) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _scoped_token(base: str) -> str:
+def _minted(base: str) -> dict:
     response = httpx.post(f"{base}/v1/tokens", headers=_headers(),
                           json={"name": "e2e", "scopes": ["runs:write", "jobs:read", "jobs:write"]}, timeout=10)
     assert response.status_code in (200, 201), response.text
-    return response.json()["token"]
+    return response.json()
+
+
+def _scoped_token(base: str) -> str:
+    return _minted(base)["token"]
 
 
 def test_sync_run_uses_model_tool_and_records_run_and_audit(stack, provider):
@@ -302,3 +315,116 @@ def test_routed_profiles_fall_back_to_next_provider(stack, provider):
     finally:
         proc.kill()
         proc.wait(timeout=10)
+
+
+# --- Approval gate on write tools (up-front model: approve per run, or persistent grant) ---
+
+WRITE_TOOL = "workspace.write_file"
+
+
+def _run(base: str, token: str, goal: str, **extra) -> dict:
+    response = httpx.post(f"{base}/v1/runs", headers=_headers(token), json={"goal": goal, **extra}, timeout=60)
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def _audit(base: str) -> list[dict]:
+    response = httpx.get(f"{base}/v1/audit", headers=_headers(), params={"limit": 500}, timeout=10)
+    assert response.status_code == 200 and response.json()["verified"] is True, response.text
+    return response.json()["entries"]
+
+
+def test_write_without_approval_is_denied_and_nothing_is_written(stack):
+    base, workspace = stack["base"], stack["workspace"]
+    report = _run(base, _scoped_token(base), "WRITE out/denied.txt should-not-exist")
+    assert report["final"] == "BLOCKED: approval denied for write tool"
+    [event] = report["tool_results"]
+    assert event["tool"] == WRITE_TOOL and event["result"]["ok"] is False
+    assert not (workspace / "out" / "denied.txt").exists()
+    # an allowlist for a different tool does not approve this one
+    report = _run(base, _scoped_token(base), "WRITE out/denied.txt still-no", approved_tools=["git.commit"])
+    assert report["final"].startswith("BLOCKED") and not (workspace / "out" / "denied.txt").exists()
+
+
+def test_per_run_approval_allows_the_write(stack):
+    base, workspace = stack["base"], stack["workspace"]
+    token = _scoped_token(base)
+    report = _run(base, token, "WRITE out/per-run.txt approved-by-list", approved_tools=[WRITE_TOOL])
+    assert report["final"] == "WROTE out/per-run.txt"
+    assert (workspace / "out" / "per-run.txt").read_text() == "approved-by-list"
+    report = _run(base, token, "WRITE out/switch.txt approved-by-switch", approve_writes=True)
+    assert (workspace / "out" / "switch.txt").read_text() == "approved-by-switch"
+    entries = _audit(base)
+    assert any(e["action"] == "run.create" and e["resource"] == report["run_id"] for e in entries)
+
+
+def test_persistent_grant_constraints_expiry_and_revoke_with_audit(stack):
+    base, workspace = stack["base"], stack["workspace"]
+    minted = _minted(base)
+    principal, token = minted["id"], minted["token"]
+    url = f"{base}/v1/approvals/{principal}"
+
+    granted = httpx.put(url, headers=_headers(), timeout=10,
+                        json={"tool": WRITE_TOOL, "argument_constraints": {"path": "granted/ok.txt"}})
+    assert granted.status_code == 200, granted.text
+    assert _run(base, token, "WRITE granted/ok.txt v1")["final"] == "WROTE granted/ok.txt"
+    assert (workspace / "granted" / "ok.txt").read_text() == "v1"
+    outside = _run(base, token, "WRITE granted/other.txt nope")
+    assert outside["final"].startswith("BLOCKED") and not (workspace / "granted" / "other.txt").exists()
+    # grants are per principal: another token gets nothing from this grant
+    assert _run(base, _scoped_token(base), "WRITE granted/ok.txt stranger")["final"].startswith("BLOCKED")
+    assert (workspace / "granted" / "ok.txt").read_text() == "v1"
+
+    revoked = httpx.delete(f"{url}/{WRITE_TOOL}", headers=_headers(), timeout=10)
+    assert revoked.status_code == 200, revoked.text
+    assert _run(base, token, "WRITE granted/ok.txt v2")["final"].startswith("BLOCKED")
+    assert (workspace / "granted" / "ok.txt").read_text() == "v1"
+
+    expired = httpx.put(url, headers=_headers(), timeout=10,
+                        json={"tool": WRITE_TOOL, "expires_at": "2000-01-01T00:00:00+00:00"})
+    assert expired.status_code == 200, expired.text
+    assert _run(base, token, "WRITE granted/ok.txt v3")["final"].startswith("BLOCKED")
+    assert (workspace / "granted" / "ok.txt").read_text() == "v1"
+
+    entries = _audit(base)
+    grants = [e for e in entries if e["action"] == "approval.grant" and e["resource"] == principal]
+    revokes = [e for e in entries if e["action"] == "approval.revoke" and e["resource"] == principal]
+    assert len(grants) == 2 and grants[0]["metadata"]["argument_constraints"] == {"path": "granted/ok.txt"}
+    assert grants[1]["metadata"]["expires_at"] == "2000-01-01T00:00:00+00:00"
+    assert len(revokes) == 1 and revokes[0]["metadata"]["tool"] == WRITE_TOOL
+    assert grants[0]["sequence"] < revokes[0]["sequence"] < grants[1]["sequence"]
+
+
+def test_unknown_tool_grant_is_rejected(stack):
+    base = stack["base"]
+    response = httpx.put(f"{base}/v1/approvals/{_minted(base)['id']}", headers=_headers(), timeout=10,
+                         json={"tool": "workspace.delete_everything"})
+    assert response.status_code in (400, 404, 422), response.text
+
+
+def _job(base: str, token: str, goal: str) -> dict:
+    created = httpx.post(f"{base}/v1/jobs", headers=_headers(token), json={"goal": goal}, timeout=10)
+    assert created.status_code in (200, 201, 202), created.text
+    job_id = created.json()["id"]
+    kinds = [kind for kind, _ in _read_sse(base, job_id, token)]
+    assert kinds[-1] == "done", kinds
+    job = httpx.get(f"{base}/v1/jobs/{job_id}", headers=_headers(token), timeout=10).json()
+    return job["result"] if isinstance(job["result"], dict) else json.loads(job["result"])
+
+
+def test_queued_jobs_honor_persistent_grants_like_runs(stack):
+    """Regression: the worker passed no approval callback, so grants never applied to jobs."""
+    base, workspace = stack["base"], stack["workspace"]
+    minted = _minted(base)
+    denied = _job(base, minted["token"], "WRITE jobs/before-grant.txt x")
+    assert denied["final"] == "BLOCKED: approval denied for write tool"
+    assert not (workspace / "jobs" / "before-grant.txt").exists()
+
+    granted = httpx.put(f"{base}/v1/approvals/{minted['id']}", headers=_headers(), timeout=10,
+                        json={"tool": WRITE_TOOL, "argument_constraints": {"path": "jobs/granted.txt"}})
+    assert granted.status_code == 200, granted.text
+    assert _job(base, minted["token"], "WRITE jobs/granted.txt from-job")["final"] == "WROTE jobs/granted.txt"
+    assert (workspace / "jobs" / "granted.txt").read_text() == "from-job"
+    assert _job(base, minted["token"], "WRITE jobs/elsewhere.txt y")["final"].startswith("BLOCKED")
+    assert _job(base, _scoped_token(base), "WRITE jobs/granted.txt stranger")["final"].startswith("BLOCKED")
+    assert (workspace / "jobs" / "granted.txt").read_text() == "from-job"
