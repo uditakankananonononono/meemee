@@ -6,6 +6,7 @@ import json
 import os
 import urllib.error
 import urllib.request
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -44,15 +45,17 @@ def http_json(url: str, body: dict, headers: dict, timeout: float) -> dict:
         raise ProviderUnavailable(f"cannot reach {url}: {exc}") from exc
 
 
-class Provider:
+class Provider(ABC):
     name = "provider"
     locality = LOCAL
 
+    @abstractmethod
     def available(self) -> bool:
-        raise NotImplementedError
+        """True when this provider is configured and can be called now."""
 
+    @abstractmethod
     def chat(self, messages: list[dict], *, tools: list[dict] | None = None, max_tokens: int = 1024) -> ChatResult:
-        raise NotImplementedError
+        """One chat turn; raises ProviderError / ProviderUnavailable on failure."""
 
 
 class _OpenAICompat(Provider):
