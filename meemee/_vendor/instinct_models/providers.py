@@ -7,8 +7,9 @@ import os
 import urllib.error
 import urllib.request
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 LOCAL, HOSTED = "local", "hosted"
 
@@ -105,6 +106,44 @@ class InklingHFRouter(_OpenAICompat):
         return bool(self.model and self.api_key)
 
 
+# cactus-needle 3.0.5 (latest on PyPI as of 2026-09-24) pins the Needle 3 engine to 3.0.2 in
+# needle/agent/fetch.py, but Hugging Face Cactus-Compute/needle3/python only publishes 3.0.0 and
+# 3.0.1 wheels, so the first Needle() call 404s. Map known-unpublished pins to the newest published
+# engine. Remove once upstream publishes 3.0.2. INSTINCT_NEEDLE_ENGINE_V3 overrides the choice.
+NEEDLE_UNPUBLISHED_ENGINES = {"3.0.2": "3.0.1"}
+
+
+def fix_needle_engine(fetch_module: Any, env: dict | None = None) -> str | None:
+    """Point cactus-needle's Needle 3 engine at a published version. Returns the version in use."""
+    e = os.environ if env is None else env
+    versions = getattr(fetch_module, "ENGINE_VERSIONS", None)
+    if not isinstance(versions, dict):
+        return None
+    current = versions.get(3)
+    target = e.get("INSTINCT_NEEDLE_ENGINE_V3") or NEEDLE_UNPUBLISHED_ENGINES.get(current)
+    if target and target != current:
+        versions[3] = target
+    return versions.get(3)
+
+
+def needle_with_fallback(needle_cls: Callable[..., Any]) -> Callable[..., Any]:
+    """Construct Needle 3; if the engine cannot be fetched or loaded, fall back to Needle 2 (engine 2.0.4).
+
+    Only for the base model: tuned weights carry their own generation, so errors there propagate.
+    """
+    def make(**kwargs: Any) -> Any:
+        if kwargs.get("weights") or "generation" in kwargs:
+            return needle_cls(**kwargs)
+        try:
+            return needle_cls(**kwargs)
+        except Exception as first:  # noqa: BLE001 - HF 404s, missing libs and load errors all mean "try v2"
+            try:
+                return needle_cls(generation=2, **kwargs)
+            except Exception as second:
+                raise ProviderUnavailable(f"Needle 3 failed ({first}); Needle 2 fallback failed ({second})") from second
+    return make
+
+
 class NeedleLocal(Provider):
     """On-device Needle (pip cactus-needle). Tool selection + argument extraction only:
     short inputs (256-token window at inference), no free-form generation."""
@@ -120,12 +159,20 @@ class NeedleLocal(Provider):
         if self.factory:
             return self.factory
         if not self.telemetry:
+            # Verified in cactus-needle 3.0.5: needle/_telemetry.py checks NEEDLE_TELEMETRY == "0" and DO_NOT_TRACK;
+            # its package README says the engine binary needs both NEEDLE_TELEMETRY=0 and DO_NOT_TRACK=1.
             os.environ["NEEDLE_TELEMETRY"] = "0"
+            os.environ["DO_NOT_TRACK"] = "1"
         try:
             import needle  # type: ignore  # pip install cactus-needle; import does not load JAX
         except ImportError as exc:
             raise ProviderUnavailable("cactus-needle is not installed (pip install cactus-needle)") from exc
-        return needle.Needle
+        try:
+            from needle.agent import fetch as needle_fetch  # type: ignore
+            fix_needle_engine(needle_fetch)
+        except ImportError:
+            pass
+        return needle_with_fallback(needle.Needle)
 
     def available(self) -> bool:
         try:
@@ -155,6 +202,7 @@ class NeedleLocal(Provider):
         conf = out.get("confidence")
         if calls and not self.weights and isinstance(conf, (int, float)) and conf < self.min_confidence:
             calls = []  # low confidence: let the router escalate
+        # validation.ungrounded is written by needle/__init__.py _annotate_ungrounded (cactus-needle 3.0.5).
         if calls and (out.get("validation") or {}).get("ungrounded"):
             calls = []  # Needle flagged argument values not found in the query: escalate instead of trusting them
         return ChatResult(self.name, self.weights or "needle-base", "", calls, out)
