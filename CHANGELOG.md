@@ -16,6 +16,14 @@ All entries describe shipped repository behavior. Missing work is never presente
 - Cutover: optional `approvals` group (`--approvals approvals.sqlite3`) copies and verifies existing grants. Fixed `copy` for non-empty stores: psycopg 3 has no `Connection.executemany` (now a cursor), and decoded JSON columns are inserted as jsonb.
 - Tests: `tests/test_approvals.py` on both backends, `tests/test_approvals_multihost_e2e.py` (two API servers + worker with separate data directories), `tests_pg/test_approvals_cutover_pg.py`.
 
+## Unreleased (branch pg-webhooks)
+
+- `meemee_persist_pg.WebhookStore` (migration `009_webhooks.sql`), same contract as SQLite; `build_persistence` returns `webhooks` when a vault key is configured, and the API, worker, `webhook-worker`, readiness and account deletion use it.
+- `WebhookStore` gains `active_count`, `list_subscriptions`, `enqueue_test`, `get_delivery`, `list_deliveries`, `replay_delivery`, `cleanup_deliveries`, `delivery_metrics`, `operational_metrics` and `ping`; the module-level helpers delegate to them and `api.py` no longer uses the SQLite connection directly.
+- Fixed: `GET /v1/webhook-deliveries/{id}` returned 404 for deliveries older than the newest 500; delivery cleanup now removes the matching attempt rows; test deliveries record `payload_sha256`.
+- Cutover: optional `webhooks` group.
+- `WebhookStoreInterface` added.
+
 ## Unreleased (branch pg-runs)
 
 - `meemee_persist_pg.RunStore` and `IdempotencyStore` (migration `008_runs_idempotency.sql`), same contracts as SQLite plus `ping`; `build_persistence` returns `runs` and `idempotency`, and the API, readiness and account deletion use them.

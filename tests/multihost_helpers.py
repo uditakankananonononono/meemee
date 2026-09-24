@@ -59,7 +59,19 @@ def pg_hosts(tmp_path_factory, names=("host-a", "host-b"), extra_env: dict | Non
                 env.pop(key, None)
             proc, base = _boot(env, workspace, data_dir / "server.log")
             procs.append(proc); bases.append(base); dirs.append(data_dir)
-        yield {"bases": bases, "dirs": dirs, "dsn": dsn, "workspace": workspace}
+        def spawn(command: str, name: str):
+            """Start ``meemee <command>`` (worker, webhook-worker) as another host: own data dir, same database."""
+            import subprocess
+            import sys
+            data_dir = tmp_path_factory.mktemp(name)
+            log = data_dir / f"{command}.log"
+            proc = subprocess.Popen([sys.executable, "-c", "from meemee.cli import app; app()", command],
+                                    env={**env, "MEEMEE_DATA_DIR": str(data_dir)}, cwd=workspace,
+                                    stdout=log.open("w"), stderr=subprocess.STDOUT)
+            procs.append(proc)
+            return proc, log
+
+        yield {"bases": bases, "dirs": dirs, "dsn": dsn, "workspace": workspace, "spawn": spawn}
     finally:
         for proc in procs:
             proc.kill(); proc.wait(timeout=10)

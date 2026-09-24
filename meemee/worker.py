@@ -40,11 +40,11 @@ async def work_forever(settings: Settings | None = None) -> None:
     settings = settings or Settings()
     persistence = persistence_from_settings(settings)
     jobs = persistence.jobs
-    webhooks = WebhookStore(
+    webhooks = persistence.webhooks or WebhookStore(
         settings.data_dir / "webhooks.sqlite3",
         settings.webhook_max_payload_bytes,
         settings.vault_key,
-    )
+    )  # PostgreSQL mode: the shared outbox
     # Same persistent, argument-scoped grants the API applies to POST /v1/runs. Queued jobs have no
     # per-request approval fields, so a grant is the only way a job may use an approval-gated tool.
     # PostgreSQL mode reads them from the shared database, so a grant made on the API host applies here.
