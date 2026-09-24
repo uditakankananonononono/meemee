@@ -11,7 +11,7 @@ def public_dns(*args): return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.
 
 def test_stale_sending_is_recovered(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(socket, "getaddrinfo", public_dns)
-    store = WebhookStore(tmp_path / "w.db", encryption_key=TEST_KEY); store.subscribe("u","https://hooks.example/a",{"*"}); store.enqueue("e","job.done",{})
+    store = WebhookStore(tmp_path / "w.db", encryption_key=TEST_KEY); store.subscribe("u","https://hooks.example/a",{"*"}); store.enqueue("e","job.done",{}, principal="u")
     claimed = store.claim(now=time.time()+1); assert claimed
     assert store.recover_stale(time.time()+2) == 1
     row = store.db.execute("SELECT status,last_error FROM webhook_deliveries").fetchone()
