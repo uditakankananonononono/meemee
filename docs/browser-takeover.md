@@ -12,6 +12,14 @@ Some sites stop an agent with a captcha, a "verify you are human" page or a sign
 
 While a person holds the session, agent actions are refused.
 
+## Telling the person
+
+Open the session with `notify_user_id` (tool argument or API field) to have Meemee tell a companion user whenever a takeover link is created. The notice goes into a durable queue (`browser-notices.sqlite3`) and is delivered on the user's configured companion check-in channel and address. The default `local` channel stores it in their Meemee conversation, so it shows up in the web app. Webhook or provider channels are used only if the operator configured them for that user.
+
+- The notice text holds the link, so it is erased once the notice is delivered, cancelled or finally failed. Only metadata stays.
+- A notice whose takeover already ended or expired is cancelled instead of sent.
+- Failed deliveries retry up to 3 times. `POST /v1/browser/notices/tick` (admin) retries queued notices; `GET /v1/browser/notices` (admin) lists them.
+
 ## Safety
 
 - Takeover tokens are 256-bit random values stored only as SHA-256 digests and compared in constant time. Each link works only for its own takeover, ends when released, and expires after `MEEMEE_BROWSER_TAKEOVER_TTL_SECONDS` (default 900). Input from the person extends the expiry by up to 2 minutes so an active person is not cut off.
@@ -32,6 +40,8 @@ While a person holds the session, agent actions are refused.
 | DELETE | `/v1/browser/sessions/{id}` | runs:write |
 | POST | `/v1/browser/takeover/release` | takeover token |
 | WS | `/v1/browser/takeover/ws` | takeover token in the first message |
+| GET | `/v1/browser/notices` | admin |
+| POST | `/v1/browser/notices/tick` | admin |
 | GET | `/browser/takeover` | viewer page |
 
 WebSocket messages from the viewer: `{"takeover_id","token"}` first, then `{"type":"click","x","y","double"?}`, `{"type":"drag","from":[x,y],"to":[x,y],"steps"?}`, `{"type":"type","text"}`, `{"type":"key","key":"Control+a"}`, `{"type":"scroll","dx","dy"}`, `{"type":"goto","url"}`, `{"type":"release","outcome":"completed|declined","note"?}`. Server messages: `claimed`, `frame` (`jpeg` base64 + `url`), `ack`, `error`, `released`.

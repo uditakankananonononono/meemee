@@ -253,6 +253,7 @@ class _Live:
     takeover_expires: float | None = None
     released: threading.Event = field(default_factory=threading.Event)
     downloads: list[str] = field(default_factory=list)
+    notify_user_id: str | None = None
 
 
 class BrowserSessionManager:
@@ -270,6 +271,7 @@ class BrowserSessionManager:
         idle_timeout_seconds: float = 900,
         takeover_ttl_seconds: float = 900,
         viewport: tuple[int, int] = (1280, 800),
+        notices=None,
     ):
         self.store = store
         self.headless = headless
@@ -280,6 +282,8 @@ class BrowserSessionManager:
         self.idle_timeout = idle_timeout_seconds
         self.takeover_ttl = takeover_ttl_seconds
         self.viewport = viewport
+        self.notices = notices
+        self.notice_delivery = None  # async callable set by the host process
         self._live: dict[str, _Live] = {}
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
@@ -361,10 +365,19 @@ class BrowserSessionManager:
 
     # ----- agent operations ---------------------------------------------
     async def open(self, url: str, owner_id: str = "agent", allowed_domains: list[str] | None = None,
-                   profile: str | None = None, auto_takeover: bool = True) -> dict[str, Any]:
-        return await self._call(self._open(url, owner_id, list(allowed_domains or []), profile, auto_takeover))
+                   profile: str | None = None, auto_takeover: bool = True, notify_user_id: str | None = None) -> dict[str, Any]:
+        state = await self._call(self._open(url, owner_id, list(allowed_domains or []), profile, auto_takeover, notify_user_id))
+        await self.deliver_notices()
+        return state
 
-    async def _open(self, url: str, owner_id: str, allowed_domains: list[str], profile: str | None, auto_takeover: bool) -> dict[str, Any]:
+    async def deliver_notices(self) -> list[dict[str, Any]]:
+        """Deliver queued takeover notices on the caller's loop (channel clients live there)."""
+        if self.notices is None or self.notice_delivery is None:
+            return []
+        return await self.notice_delivery()
+
+    async def _open(self, url: str, owner_id: str, allowed_domains: list[str], profile: str | None, auto_takeover: bool,
+                    notify_user_id: str | None = None) -> dict[str, Any]:
         check_url(url, allowed_domains, self.allow_private_hosts)
         await self._reap()
         if len(self._live) >= self.max_sessions:
@@ -389,6 +402,7 @@ class BrowserSessionManager:
         session_id = "bs_" + uuid.uuid4().hex
         live = _Live(session_id, owner_id, allowed_domains, context, page, browser, asyncio.Lock(), time.monotonic())
         live.profile = profile  # type: ignore[attr-defined]
+        live.notify_user_id = notify_user_id
 
         async def guard(route):
             try:
@@ -416,7 +430,9 @@ class BrowserSessionManager:
         return state
 
     async def act(self, session_id: str, actions: list[dict[str, Any]], auto_takeover: bool = True) -> dict[str, Any]:
-        return await self._call(self._act(session_id, actions, auto_takeover))
+        state = await self._call(self._act(session_id, actions, auto_takeover))
+        await self.deliver_notices()
+        return state
 
     async def _act(self, session_id: str, actions: list[dict[str, Any]], auto_takeover: bool) -> dict[str, Any]:
         live = self._get(session_id)
@@ -475,7 +491,9 @@ class BrowserSessionManager:
     async def request_takeover(self, session_id: str, reason: str, requested_by: str = "agent") -> dict[str, Any]:
         async def run():
             return await self._request_takeover(self._get(session_id), reason, requested_by)
-        return await self._call(run())
+        takeover = await self._call(run())
+        await self.deliver_notices()
+        return takeover
 
     async def _request_takeover(self, live: _Live, reason: str, requested_by: str) -> dict[str, Any]:
         record = self.store.get_session(live.id) or {}
@@ -490,13 +508,18 @@ class BrowserSessionManager:
         live.released.clear()
         self.store.update_session(live.id, state="awaiting_human")
         self.store.event(live.id, requested_by, "takeover_requested", {"takeover_id": takeover_id, "reason": reason[:500]})
-        return {
+        takeover = {
             "takeover_id": takeover_id,
             "token": token,
             "expires_at": _iso(expires),
             "reason": reason[:500],
             "url": f"{self.public_url}/browser/takeover#{takeover_id}.{token}",
         }
+        if self.notices is not None and live.notify_user_id:
+            self.notices.enqueue(takeover, live.id, live.notify_user_id)
+            self.store.event(live.id, "system", "notice_queued", {"takeover_id": takeover_id, "user_id": live.notify_user_id})
+            takeover["notice_queued_for"] = live.notify_user_id
+        return takeover
 
     async def wait_for_human(self, session_id: str, timeout_seconds: float = 600) -> dict[str, Any]:
         """Block (without holding the loop) until the human hands back control or the takeover ends."""
