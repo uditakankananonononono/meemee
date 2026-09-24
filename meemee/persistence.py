@@ -8,8 +8,10 @@ from .approvals import ApprovalStore as SQLiteApprovalStore
 from .audit import AuditLog as SQLiteAuditLog
 from .auth import TokenStore as SQLiteTokenStore
 from .email_verification import EmailVerificationStore as SQLiteEmailVerificationStore
+from .entitlements import EntitlementStore as SQLiteEntitlementStore
 from .jobs import JobStore as SQLiteJobStore
 from .memory import MemoryStore as SQLiteMemoryStore
+from .quotas import QuotaStore as SQLiteQuotaStore
 
 
 @dataclass
@@ -29,6 +31,10 @@ class Persistence:
     #: Email-verification and password-reset challenges. SQLite: email-verifications.sqlite3.
     #: PostgreSQL: meemee_email_verifications / meemee_password_resets, so links work on any host.
     email_verifications: Any = None
+    #: Daily job quotas and plan assignments. SQLite: quotas.sqlite3 / entitlements.sqlite3.
+    #: PostgreSQL: one counter per (principal, UTC day) and one plan row, enforced on every host.
+    quotas: Any = None
+    entitlements: Any = None
 
     def check_memory(self) -> bool:
         if self.backend == "sqlite":
@@ -43,14 +49,17 @@ class Persistence:
             return connection.execute("SELECT 1").fetchone() is not None
 
 
-def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = None) -> Persistence:
+def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = None, *,
+                      default_daily_jobs: int = 100, default_plan: str = "starter") -> Persistence:
     """Select and initialize the supported persistence composition root."""
     normalized = backend.strip().lower()
     if normalized == "sqlite":
         return Persistence("sqlite", SQLiteMemoryStore(data_dir / "meemee.sqlite3"), SQLiteJobStore(data_dir / "jobs.sqlite3"), lambda: None,
                            approvals=SQLiteApprovalStore(data_dir / "approvals.sqlite3"),
                            tokens=SQLiteTokenStore(data_dir / "auth.sqlite3"), audit=SQLiteAuditLog(data_dir / "audit.sqlite3"),
-                           email_verifications=SQLiteEmailVerificationStore(data_dir / "email-verifications.sqlite3"))
+                           email_verifications=SQLiteEmailVerificationStore(data_dir / "email-verifications.sqlite3"),
+                           quotas=SQLiteQuotaStore(data_dir / "quotas.sqlite3", default_daily_jobs),
+                           entitlements=SQLiteEntitlementStore(data_dir / "entitlements.sqlite3", default_plan))
     if normalized != "postgresql":
         raise ValueError("MEEMEE_PERSISTENCE_BACKEND must be sqlite or postgresql")
     if not postgres_dsn:
@@ -60,13 +69,22 @@ def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = N
         AuditLog,
         Database,
         EmailVerificationStore,
+        EntitlementStore,
         JobStore,
         MemoryStore,
         MigrationStore,
+        QuotaStore,
         TokenStore,
     )
     database = Database(postgres_dsn)
     MigrationStore(database).apply()
     return Persistence("postgresql", MemoryStore(database), JobStore(database), database.close, database,
                        approvals=ApprovalStore(database), tokens=TokenStore(database), audit=AuditLog(database),
-                       email_verifications=EmailVerificationStore(database))
+                       email_verifications=EmailVerificationStore(database),
+                       quotas=QuotaStore(database, default_daily_jobs), entitlements=EntitlementStore(database, default_plan))
+
+
+def persistence_from_settings(settings: Any) -> Persistence:
+    """``build_persistence`` with the product defaults (quota, plan) taken from settings."""
+    return build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn,
+                             default_daily_jobs=settings.default_daily_jobs, default_plan=settings.default_plan)
