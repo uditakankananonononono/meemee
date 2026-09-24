@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     hf_token: str | None = None
     hf_router_base_url: str = "https://router.huggingface.co/v1"
     hf_inkling_model: str = "thinkingmachines/Inkling-Small"
+    hf_fallback: bool = True
+    transformers_model: str = "Qwen/Qwen2.5-0.5B-Instruct"
+    transformers_device: str = "auto"
+    transformers_max_new_tokens: int = 512
     inkling_base_url: str = "http://127.0.0.1:8000/v1"
     inkling_self_hosted_model: str = "thinkingmachines/Inkling-Small"
     inkling_api_key: str | None = None

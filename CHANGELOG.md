@@ -16,6 +16,14 @@ All entries describe shipped repository behavior. Missing work is never presente
 - Cutover: optional `approvals` group (`--approvals approvals.sqlite3`) copies and verifies existing grants. Fixed `copy` for non-empty stores: psycopg 3 has no `Connection.executemany` (now a cursor), and decoded JSON columns are inserted as jsonb.
 - Tests: `tests/test_approvals.py` on both backends, `tests/test_approvals_multihost_e2e.py` (two API servers + worker with separate data directories), `tests_pg/test_approvals_cutover_pg.py`.
 
+## Unreleased (branch model-layer)
+
+- Model profiles have a `transport`: `openai` (HTTP, unchanged) or `transformers` (in-process). `transport` appears in `meemee models list` and `GET /v1/models/status`.
+- New built-in `local-transformers` profile (`MEEMEE_TRANSFORMERS_MODEL`, `MEEMEE_TRANSFORMERS_DEVICE`, `MEEMEE_TRANSFORMERS_MAX_NEW_TOKENS`) backed by `meemee.providers.TransformersModel`; optional extra `meemee[transformers]`.
+- `meemee models pull <profile>` downloads a transformers profile's weights; runtime loads use `local_files_only=True`. `meemee models check` reports installed/on-disk for transformers profiles without network access.
+- Default route: `local`, then `inkling` on the HF router when `MEEMEE_HF_TOKEN` is set (`MEEMEE_HF_FALLBACK=false` disables). Previously a token alone did nothing until routes were configured.
+- Custom profiles accept `transport`; `transformers` profiles need no `base_url`; unknown transports are rejected at startup.
+
 ## Unreleased (branch pb4)
 
 - SDK: `AsyncMeemeeClient`, an asyncio client covering every resource with the same models, errors and retry policy, including async SSE with `Last-Event-ID` resume.

@@ -8,6 +8,15 @@ Free-first: with no configuration, only the `local` profile (Ollama at
 `http://127.0.0.1:11434/v1`) is used, exactly as before. Paid profiles never run unless a key is
 set **and** `MEEMEE_ALLOW_PAID_MODELS=true`.
 
+Default route: `local`, then `inkling` on the Hugging Face router **only when `MEEMEE_HF_TOKEN` is
+set**. That fallback is metered: it spends the token's Inference Providers credits (free monthly
+credits, then only credits you have prepaid). Set `MEEMEE_HF_FALLBACK=false` to keep every role
+local-only even with a token. An explicit `MEEMEE_MODEL_ROUTES` entry always wins for its role.
+
+Every profile has a `transport`: `openai` (any OpenAI-compatible HTTP API: Ollama, vLLM, SGLang,
+llama.cpp server, LM Studio, the HF router, Sakana) or `transformers` (weights run inside the
+Meemee process). Both give the same `decide`/`chat` interface, so they mix freely in one route.
+
 ## Built-in profiles
 
 | Profile | What it is | Cost | How to run it |
@@ -16,6 +25,7 @@ set **and** `MEEMEE_ALLOW_PAID_MODELS=true`.
 | `inkling` | Thinking Machines Lab **Inkling-Small**, Apache-2.0 open weights (276B MoE / 12B active), via the Hugging Face Inference Providers router | Free HF monthly credits ($0.10 on a free account, $2 on PRO), then prepaid credits. About $0.45-0.50 per 1M input, $1.20 per 1M output | `MEEMEE_HF_TOKEN` |
 | `inkling-large` | Full **Inkling** (975B MoE / 41B active) via the HF router | Same credits; about $1.00 in / $4.05 out per 1M | `MEEMEE_HF_TOKEN` |
 | `inkling-vllm` | Your own Inkling server (vLLM or SGLang) | Free weights, needs GPU server hardware | `MEEMEE_INKLING_BASE_URL`, optional `MEEMEE_INKLING_SELF_HOSTED_MODEL` |
+| `local-transformers` | Any open-weight chat model run in-process with Hugging Face `transformers` (`MEEMEE_TRANSFORMERS_MODEL`, default `Qwen/Qwen2.5-0.5B-Instruct`) on CPU, CUDA or MPS. No model server | Free | `pip install 'meemee[transformers]'`, then `meemee models pull local-transformers` |
 | `fugu` | Sakana AI **Fugu**, a closed orchestrator that routes across frontier models. Not open weights | Paid Sakana API | `MEEMEE_FUGU_API_KEY`, `MEEMEE_ALLOW_PAID_MODELS=true`, optional `MEEMEE_FUGU_MODEL` (default `fugu-ultra-v2.0`) |
 
 Sources: https://huggingface.co/thinkingmachines/Inkling ,
@@ -42,6 +52,31 @@ Requests go to `https://router.huggingface.co/v1` (OpenAI-compatible). HF picks 
 `MEEMEE_HF_INKLING_MODEL=thinkingmachines/Inkling-Small:deepinfra`. When credits run out or the
 token is rejected, the call falls back to the next profile in the route and the failure is
 recorded. Pricing: https://huggingface.co/docs/inference-providers/en/pricing
+
+## In-process open weights (`local-transformers`)
+
+For a PC without Ollama, or as a last local fallback:
+
+```
+pip install 'meemee[transformers]'
+export MEEMEE_TRANSFORMERS_MODEL=Qwen/Qwen2.5-0.5B-Instruct   # any HF chat model id or local directory
+meemee models pull local-transformers                        # one-time download into the HF cache
+export MEEMEE_MODEL_ROUTES="agent=local,local-transformers;chat=local,local-transformers"
+```
+
+Weights are never downloaded during a request: an unpulled model fails that attempt with a
+message naming `meemee models pull`, and the route moves on. `MEEMEE_TRANSFORMERS_DEVICE` is
+`auto` (CUDA, then MPS, then CPU), `cpu`, `cuda` or `mps`; `MEEMEE_TRANSFORMERS_MAX_NEW_TOKENS`
+defaults to 512. Loaded weights stay cached in the process. Agent decisions use greedy decoding
+and take the first JSON object in the output, so small models that wrap JSON in prose still work.
+Inkling itself (276B/975B MoE) is far too large for this path; use the HF router or a GPU server
+(`inkling-vllm`, see `meemee models inkling-local`).
+
+Custom profiles take `"transport": "transformers"` and then need no `base_url`:
+
+```json
+[{"name": "qwen-7b-local", "model": "Qwen/Qwen2.5-7B-Instruct", "kind": "local", "transport": "transformers"}]
+```
 
 ## Routes
 
@@ -78,6 +113,10 @@ profile for each role.
 ```
 meemee models list          # every profile, usable or not and why, plus active routes
 meemee models check [names] # probes each /models endpoint; never sends a completion
+meemee models pull <name>   # downloads a transformers-transport profile's weights once
 ```
+
+For `transformers` profiles `check` makes no network call: it reports whether the libraries are
+installed and the weights are already on disk.
 
 `check` exits nonzero when no probed profile is reachable.
