@@ -2,9 +2,9 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.122.0 (172)
+## Verified in v0.122.0 (173)
 
-Items 164-166 and 172 are unreleased pb7 work and items 167-171 are unreleased pb4 work, all verified in this tree; the rest shipped in v0.122.0.
+Items 164-166 and 172 are unreleased pb7 work, items 167-171 are unreleased pb4 work and item 173 is unreleased main-lane work, all verified in this tree; the rest shipped in v0.122.0.
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -205,6 +205,8 @@ Items 164-166 and 172 are unreleased pb7 work and items 167-171 are unreleased p
 171. SDK live runs (branch pb4): `sdk/tests/test_live_runs.py` drives the sync and async SDK clients against a booted server and `meemee worker` with a local scripted OpenAI-protocol provider, in SQLite and PostgreSQL modes: `runs.create` parses the final answer, step count and real `workspace.read_file` tool result, `runs.get/list/iter_all` read the stored run with cursor paging, other owners get 404 and a token without `runs:write` gets 403, queued jobs are streamed live to `done` over SSE and WebSocket with the result parsed, and a model outage raises `ServerError` 502 without an automatic retry. It found and fixed two PostgreSQL-mode bugs: the job WebSocket dropped the connection on the first event (UUID and datetime values were not JSON-encodable), and the SDK rejected finished jobs because the PostgreSQL store returns `result` as an object instead of a JSON string.
 
 172. Blocked flag (branch pb7, unreleased): run reports, `GET /v1/runs[/{id}]`, `GET /v1/jobs[/{id}]` and the `job.done` webhook carry a top-level `blocked` boolean, true when `approvals_required` is non-empty. Job `status` stays `done` so existing filters and clients are unaffected; a `done` job with `blocked: true` finished its run but did not do everything asked. `run.create` audit entries record `blocked` and the refusal count. Job `result` is now a JSON string on both backends (PostgreSQL mode returned decoded JSON, which the SDK's `Job` model rejected). SDK: `RunReport.blocked`, `Job.blocked`, `Job.is_blocked` (falls back to `approvals_required` against older servers). Verified live on SQLite and PostgreSQL 16.2.
+
+173. PostgreSQL-backed tool-approval grants (main, unreleased): in PostgreSQL mode `PUT/GET/DELETE /v1/approvals/...`, run approval checks, queued-job approval checks, `whoami` usage and account purge all use `meemee_tool_approvals` (migration 005) through `Persistence.approvals`, so grants made on one host apply to workers and API servers on other hosts; SQLite mode still uses `approvals.sqlite3`. Both stores share one contract (`ApprovalStoreInterface`), normalize `expires_at` to UTC (fixing offset timestamps that SQLite compared as text) and reject non-ISO expiries with 422. `tests/test_approvals.py` runs every grant test on both backends; `tests/test_approvals_multihost_e2e.py` boots two API servers and a worker with separate data directories on one PostgreSQL database and checks grant on A -> listed on B -> used by B's runs and the worker's jobs -> revoked on B -> refused everywhere, plus the single-host SQLite path. Existing grants move with `python -m meemee_persist_pg.cli ... --approvals approvals.sqlite3 copy`; making that copy work found and fixed two cutover bugs that affected every non-empty store (`Connection.executemany` does not exist in psycopg 3, and decoded JSON columns were not adapted to jsonb).
 
 ## Thin (0)
 

@@ -20,7 +20,6 @@ from webapp.mount import mount_webapp
 
 from . import __version__
 from .account_deletion import AccountPurger, DeletionLedger, PurgeTargets
-from .approvals import ApprovalStore
 from .audit import AuditLog
 from .auth import Authenticator, Principal, TokenStore
 from .browser_api import build_browser_router
@@ -128,7 +127,7 @@ mailer = ResendMailer(settings.resend_api_key, settings.email_from_address, sett
 personal_model = PersonalModelStore(settings.data_dir / "personal-model.sqlite3")
 monitors = MonitorStore(settings.data_dir / "monitors.sqlite3")
 audit = AuditLog(settings.data_dir / "audit.sqlite3")
-approvals = ApprovalStore(settings.data_dir / "approvals.sqlite3")
+approvals = persistence.approvals  # PostgreSQL mode: shared with every worker, not local disk
 webhooks = WebhookStore(settings.data_dir / "webhooks.sqlite3", settings.webhook_max_payload_bytes, settings.vault_key)
 companion = build_companion(settings)
 deletion_ledger = DeletionLedger(settings.data_dir / "account-deletions.sqlite3")
@@ -895,7 +894,10 @@ def grant_tool_approval(principal_id: str, request: ToolApprovalRequest):
         principal_id, "persistent_approvals", approvals.active_count(principal_id)
     ):
         raise HTTPException(403, "plan persistent approval limit reached")
-    approvals.grant(principal_id, request.tool, "api-admin", request.expires_at, request.argument_constraints)
+    try:
+        approvals.grant(principal_id, request.tool, "api-admin", request.expires_at, request.argument_constraints)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
     audit.append("api-admin", "approval.grant", principal_id, "success", {"tool": request.tool, "expires_at": request.expires_at, "argument_constraints": request.argument_constraints})
     return {"principal": principal_id, "tool": request.tool, "granted": True}
 

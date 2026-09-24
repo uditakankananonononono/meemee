@@ -7,6 +7,42 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
+def normalize_expiry(value: str | None) -> str | None:
+    """Canonical UTC ISO 8601 form of a grant expiry, shared by the SQLite and PostgreSQL stores.
+
+    Naive timestamps are read as UTC. Anything that is not ISO 8601 raises ValueError, so a typo
+    can never become a grant that silently never (or always) expires.
+    """
+    if value is None:
+        return None
+    text = value.strip()
+    if text.endswith(("Z", "z")):
+        text = text[:-1] + "+00:00"
+    try:
+        moment = datetime.fromisoformat(text)
+    except ValueError as exc:
+        raise ValueError("expires_at must be an ISO 8601 timestamp") from exc
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(timezone.utc).isoformat()
+
+
+def utc_moment(now: datetime | None = None) -> datetime:
+    """``now`` (default: the current time) as an aware UTC datetime; naive values are read as UTC."""
+    moment = now or datetime.now(timezone.utc)
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(timezone.utc)
+
+
+def constraints_match(constraints: dict | None, arguments: dict | None) -> bool:
+    """A grant with no constraints allows any arguments; otherwise every constrained key must match exactly."""
+    if constraints is None:
+        return True
+    supplied = arguments or {}
+    return all(key in supplied and supplied[key] == value for key, value in constraints.items())
+
+
 class ApprovalStore:
     """Persistent, revocable, expiring per-principal grants for exact tool names."""
 
@@ -29,6 +65,7 @@ class ApprovalStore:
     def grant(self, principal: str, tool: str, granted_by: str, expires_at: str | None = None, argument_constraints: dict | None = None) -> None:
         if not principal or not tool or not granted_by:
             raise ValueError("principal, tool and granted_by are required")
+        expires_at = normalize_expiry(expires_at)
         now = datetime.now(timezone.utc).isoformat()
         with self.lock, self.db:
             self.db.execute(
@@ -37,7 +74,7 @@ class ApprovalStore:
             )
 
     def allows(self, principal: str, tool: str, now: datetime | None = None, arguments: dict | None = None) -> bool:
-        current = (now or datetime.now(timezone.utc)).isoformat()
+        current = utc_moment(now).isoformat()
         with self.lock:
             row = self.db.execute(
                 "SELECT argument_constraints FROM tool_approvals WHERE principal=? AND tool=? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>?)",
@@ -45,9 +82,7 @@ class ApprovalStore:
             ).fetchone()
         if row is None: return False
         constraints = json.loads(row["argument_constraints"]) if row["argument_constraints"] else None
-        if constraints is None: return True
-        supplied = arguments or {}
-        return all(key in supplied and supplied[key] == value for key, value in constraints.items())
+        return constraints_match(constraints, arguments)
 
     def revoke(self, principal: str, tool: str) -> bool:
         with self.lock, self.db:
@@ -58,7 +93,7 @@ class ApprovalStore:
         return bool(changed)
 
     def active_count(self, principal: str, now: datetime | None = None) -> int:
-        current = (now or datetime.now(timezone.utc)).isoformat()
+        current = utc_moment(now).isoformat()
         with self.lock:
             return int(self.db.execute(
                 "SELECT count(*) FROM tool_approvals WHERE principal=? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>?)",
