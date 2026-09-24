@@ -83,7 +83,7 @@ def test_companion_console_screens_in_headless_chromium(server, tmp_path):
     with playwright_api.sync_playwright() as p:
         try:
             browser = p.chromium.launch()
-        except Exception as exc:  # browser binary not installed in this environment
+        except playwright_api.Error as exc:  # browser binary not installed in this environment
             pytest.skip(f"chromium unavailable: {exc}")
         page = browser.new_page(viewport={"width": 1280, "height": 1800})
         errors: list[str] = []
