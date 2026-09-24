@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     vault_key: str | None = None
     audit_anchor_key: str | None = None
     browser_headless: bool = True
+    browser_allow_private_hosts: bool = False
+    browser_max_sessions: int = 4
+    browser_idle_timeout_seconds: float = 900
+    browser_takeover_ttl_seconds: float = 900
     rate_limit_requests: int = 60
     rate_limit_window_seconds: int = 60
     oidc_issuer: str | None = None

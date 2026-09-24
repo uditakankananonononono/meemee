@@ -40,7 +40,7 @@ Nothing is classified as thin. A capability is either verified at a stated bound
 - Live WhatsApp/iMessage delivery over real provider networks: adapters and the delivery queue are implemented and config-gated, but no provider account exists to verify against. Console screens for the companion layer are not built; the surface is HTTP API, CLI, SDK and the console companion view.
 - Live PostgreSQL test run in this environment. Checksummed SQLite-to-PostgreSQL copy/import tooling is implemented.
 - Built-in account deletion covers customer identity and companion content; product-wide jobs/runs remain covered by the existing portable export and retention tools rather than immediate destructive deletion. External OIDC remains optional.
-- Interactive browser human takeover after explicit challenge detection/handoff.
+- Browser takeover across processes: live sessions are held by the API server process; `meemee run` (CLI) and separate `meemee worker` processes do not get the session tools, and open sessions are marked `lost` on restart.
 - Forced interruption inside blocking third-party native code; async tools are interruptible.
 - Multi-region failover, online dual-write database migration and logical replication.
 
@@ -61,3 +61,5 @@ Before calling a release ready:
 - Model layer (0.118.0): named profiles, per-role routing with fallback, Inkling via the HF router (needs a free HF token; metered after HF's small monthly free credits), self-hosted Inkling-Small plans with hardware-floor checks, optional paid Sakana Fugu. A live Inkling completion has not been run from this environment because no HF token is configured here; the unauthenticated live router listing of Inkling-Small is verified by an opt-in test (`MEEMEE_LIVE_HF=1`). Self-hosted Inkling has not been run on real hardware (needs 100GB+ RAM+VRAM minimum).
 
 - Phase B personal-model v1 is complete: typed claims, evidence, conflicts/supersession, temporal expiry, bounded reflection, user correction, evidence view and confidence decay are implemented and tested.
+
+- Browser human takeover (branch pb1): implemented and tested with real Chromium - 8 tests in `tests/test_browser_takeover.py` plus a manual booted-server run where a person solved a challenge through `/browser/takeover` and the session returned to the agent with outcome `completed`.
