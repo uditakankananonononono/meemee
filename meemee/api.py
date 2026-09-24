@@ -23,6 +23,7 @@ from .approvals import ApprovalStore
 from .audit import AuditLog
 from .auth import Authenticator, Principal, TokenStore
 from .browser_api import build_browser_router
+from .browser_notices import TakeoverNoticeQueue
 from .browser_sessions import BrowserSessionManager, BrowserSessionStore
 from .companion.api import build_companion_router
 from .companion.runtime import build_companion
@@ -101,6 +102,7 @@ browser_sessions = BrowserSessionManager(
     max_sessions=settings.browser_max_sessions,
     idle_timeout_seconds=settings.browser_idle_timeout_seconds,
     takeover_ttl_seconds=settings.browser_takeover_ttl_seconds,
+    notices=TakeoverNoticeQueue(settings.data_dir / "browser-notices.sqlite3"),
 )
 agent = build_agent(settings, memory=persistence.memory, browser_sessions=browser_sessions)
 run_gate = RunGate()
@@ -146,6 +148,7 @@ runs_write_dependency = Depends(auth.dependency("runs:write"))
 jobs_read_dependency = Depends(auth.dependency("jobs:read"))
 app.include_router(build_companion_router(companion.store, companion.engine, companion.channels, auth, audit))
 app.include_router(build_browser_router(browser_sessions, auth, audit))
+browser_sessions.notice_delivery = lambda: browser_sessions.notices.deliver_pending(browser_sessions.store, companion.store, companion.channels)
 
 
 @app.middleware("http")

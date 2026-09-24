@@ -16,6 +16,7 @@ class OpenSessionRequest(BaseModel):
     url: str = Field(min_length=8, max_length=2048)
     allowed_domains: list[str] = Field(default_factory=list, max_length=100)
     auto_takeover: bool = True
+    notify_user_id: str | None = Field(default=None, min_length=1, max_length=120)
 
 
 class TakeoverRequest(BaseModel):
@@ -87,6 +88,7 @@ def build_browser_router(manager: BrowserSessionManager, auth, audit=None, frame
     router = APIRouter(tags=["browser"])
     read = Depends(auth.dependency("jobs:read"))
     write = Depends(auth.dependency("runs:write"))
+    admin = Depends(auth.dependency("admin"))
 
     def owner_filter(principal) -> str | None:
         return None if "admin" in principal.scopes else principal.id
@@ -108,7 +110,7 @@ def build_browser_router(manager: BrowserSessionManager, auth, audit=None, frame
     @router.post("/v1/browser/sessions", status_code=201)
     async def open_session(request: OpenSessionRequest, principal=write):
         try:
-            state = await manager.open(request.url, principal.id, request.allowed_domains, None, request.auto_takeover)
+            state = await manager.open(request.url, principal.id, request.allowed_domains, None, request.auto_takeover, request.notify_user_id)
         except BrowserSessionError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         audit_event(principal.id, "browser.session_opened", state["session_id"], {"url": request.url[:500]})
@@ -138,6 +140,14 @@ def build_browser_router(manager: BrowserSessionManager, auth, audit=None, frame
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         audit_event(principal.id, "browser.session_closed", session_id, {})
         return result
+
+    @router.get("/v1/browser/notices")
+    def list_notices(session_id: str | None = None, limit: int = 100, principal=admin):
+        return {"notices": manager.notices.list(session_id, limit) if manager.notices else []}
+
+    @router.post("/v1/browser/notices/tick")
+    async def deliver_notices(principal=admin):
+        return {"results": await manager.deliver_notices()}
 
     @router.post("/v1/browser/takeover/release")
     async def release(request: ReleaseRequest):

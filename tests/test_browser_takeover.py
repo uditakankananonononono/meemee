@@ -240,6 +240,13 @@ def test_api_websocket_takeover_end_to_end(site):
         snap = run(manager.snapshot(sid))
         assert "Welcome inside" in snap["text"]
 
+        assert client.put("/v1/companion/users/browser-notify", headers=headers, json={"display_name": "Notify"}).status_code == 200
+        notified = client.post("/v1/browser/sessions", headers=headers, json={"url": site + "/challenge", "notify_user_id": "browser-notify"}).json()
+        notices = client.get("/v1/browser/notices", headers=headers, params={"session_id": notified["session_id"]}).json()["notices"]
+        assert notices[0]["status"] == "delivered" and notices[0]["channel"] == "local"
+        assert client.post("/v1/browser/notices/tick", headers=headers).status_code == 200
+        client.delete(f"/v1/browser/sessions/{notified['session_id']}", headers=headers)
+
         again = client.post(f"/v1/browser/sessions/{sid}/takeover", headers=headers, json={"reason": "operator check"})
         assert again.status_code == 201 and again.json()["token"]
         assert client.delete(f"/v1/browser/sessions/{sid}", headers=headers).json()["state"] == "closed"
@@ -258,3 +265,42 @@ def test_human_drag_moves_slider(manager, site):
     assert "unlocked" in run(manager.wait_for_human(state["session_id"], 5))["text"]
     drags = [e for e in manager.store.events(state["session_id"]) if e["kind"] == "human_drag"]
     assert drags and drags[0]["detail"]["to"] == [499, 108]
+
+
+def test_takeover_notice_queued_delivered_locally_and_link_erased(tmp_path, site):
+    from meemee.browser_notices import TakeoverNoticeQueue
+    from meemee.companion.channels import LocalChannel
+    from meemee.companion.models import UserProfile
+    from meemee.companion.store import CompanionStore
+
+    companion = CompanionStore(tmp_path / "companion.sqlite3")
+    companion.upsert_user(UserProfile(user_id="udita", display_name="Udita"))
+    queue = TakeoverNoticeQueue(tmp_path / "notices.sqlite3")
+    m = BrowserSessionManager(BrowserSessionStore(tmp_path / "bs.sqlite3"), allow_private_hosts=True,
+                              public_url="https://meemee.example", notices=queue)
+    m.notice_delivery = lambda: queue.deliver_pending(m.store, companion, {"local": LocalChannel(companion)})
+    try:
+        state = run(m.open(site + "/challenge", notify_user_id="udita"))
+        assert state["takeover"]["notice_queued_for"] == "udita"
+        notices = queue.list(state["session_id"])
+        assert [n["status"] for n in notices] == ["delivered"] and notices[0]["channel"] == "local"
+        conversation = companion.latest_conversation("udita", "local")
+        message = companion.history(conversation["id"])[-1]["content"]
+        assert state["takeover"]["url"] in message and "needs a hand" in message
+        stored = queue.db.execute("SELECT text FROM browser_takeover_notices").fetchone()[0]
+        assert stored is None  # link with token erased after delivery
+
+        # a notice for a takeover that ended before delivery is cancelled, not sent
+        m.notice_delivery = None
+        t = run(m.request_takeover(state["session_id"], "second look"))
+        run(m.claim(t["takeover_id"], t["token"]))
+        run(m.release(t["takeover_id"], t["token"]))
+        result = run(queue.deliver_pending(m.store, companion, {"local": LocalChannel(companion)}))
+        assert result == [{"id": result[0]["id"], "status": "cancelled"}]
+
+        # unknown user fails without sending
+        other = run(m.open(site + "/challenge", notify_user_id="nobody"))
+        assert run(queue.deliver_pending(m.store, companion, {}))[0]["status"] == "failed"
+        assert other["takeover"]["notice_queued_for"] == "nobody"
+    finally:
+        m.shutdown()
