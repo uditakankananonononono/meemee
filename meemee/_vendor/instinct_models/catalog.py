@@ -31,7 +31,8 @@ class CatalogItem:
 class CatalogSource(Protocol):
     name: str
 
-    def browse(self, section: str = "", query: str | None = None, limit: int = 50) -> list[CatalogItem]: ...
+    def browse(self, section: str = "", query: str | None = None, limit: int = 50) -> list[CatalogItem]:
+        """Read-only listing of catalog items in `section`, optionally filtered by `query`."""
 
 
 class _Links(HTMLParser):
