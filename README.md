@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.121.0 (162)
+## Verified in v0.122.0 (163)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -185,7 +185,7 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 
 162. Forced interruption of blocking tools: a tool that sets `isolation = IsolationPolicy(...)` runs in a spawned child process; cancellation or its hard timeout sends SIGTERM, then SIGKILL after a grace period, and the child is always reaped. Covered by `tests/test_isolation.py` (12 tests, including a SIGTERM-ignoring child and an event loop that stays responsive while the tool blocks).
 
-155. Companion console screens (branch pb4): profile editor, persona editor, facts with retire, conversations browser across channels with timestamped paged history, check-in queue with status filter and admin delivery run, verified by a headless Chromium test against a live server.
+163. Companion console screens (branch pb4): profile editor, persona editor, facts with retire, conversations browser across channels with timestamped paged history, check-in queue with status filter and admin delivery run, verified by a headless Chromium test against a live server.
 
 ## Thin (0)
 
@@ -255,6 +255,17 @@ A model statement is never treated as proof that work happened. Tool returns are
 
 
 ## Advanced operation
+
+### Live PostgreSQL check
+
+```bash
+pip install -e '.[dev,postgresql]' pgserver
+python scripts/pg_live_check.py                       # throwaway local server
+python scripts/pg_live_check.py --timezone Asia/Kolkata   # test a non-UTC server
+python scripts/pg_live_check.py --dsn postgresql://user:pw@host/db
+```
+
+The DSN role must be allowed to `CREATE DATABASE`; every live test runs in its own throwaway database. Exit code 0 means every PostgreSQL test ran and passed; any skip fails the check.
 
 ### Forced interruption for blocking tools
 

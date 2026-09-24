@@ -2,11 +2,12 @@
 import os
 import pytest
 
-pytestmark=pytest.mark.skipif(not os.getenv("MEEMEE_TEST_POSTGRES_DSN"),reason="requires real PostgreSQL")
+DSN=os.getenv("MEEMEE_TEST_POSTGRES_DSN") or os.getenv("MEEMEE_TEST_DATABASE_URL")
+pytestmark=pytest.mark.skipif(not DSN,reason="requires real PostgreSQL")
 
 def db():
     from meemee_persist_pg import Database,MigrationStore
-    value=Database(os.environ["MEEMEE_TEST_POSTGRES_DSN"],min_size=1,max_size=4)
+    value=Database(DSN,min_size=1,max_size=4)
     MigrationStore(value).apply(); return value
 
 def test_memory_tokens_audit_and_migration_idempotency():
