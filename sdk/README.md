@@ -1,7 +1,7 @@
 # meemee-client
 
 Typed Python SDK for the [Meemee](../README.md) agent platform API. Targets the
-server **v0.117.0** HTTP contract: scoped API tokens and OIDC bearer auth,
+server **v0.118.0** HTTP contract: scoped API tokens and OIDC bearer auth,
 synchronous runs, durable queued jobs, resume-safe SSE progress, fixed-window
 rate limiting, and the tamper-evident audit chain.
 
@@ -116,7 +116,7 @@ are limiter-exempt server-side.
 ## Verified, Thin, Missing
 
 **Verified (148 tests: 133 against a mocked transport implementing the server
-v0.117.0 contract, plus 15 live integration tests that boot the real server
+v0.118.0 contract, plus 15 live integration tests that boot the real server
 package and exercise it end to end):**
 
 1. Auth header attachment, 401/403 mapping including `WWW-Authenticate` and

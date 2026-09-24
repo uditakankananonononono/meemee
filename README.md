@@ -2,7 +2,7 @@
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.117.0 (153)
+## Verified in v0.118.0 (156)
 
 1. Strict JSON agent loop with a configurable step limit.
 2. OpenAI-compatible model client for Ollama, vLLM, llama.cpp, or hosted endpoints.
@@ -172,6 +172,9 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 152. Bounded source-grounded personal reflection with strict evidence citation validation, unsupported-claim rejection and temporal expiry.
 
 153. Personal-model v1 closeout: user correction provenance, owner-scoped evidence inspection and safe confidence decay that never weakens explicit corrections.
+154. Named model profiles with per-role routing (agent, chat, reflection), ordered fallback with a per-attempt record, and free-first gating: local Ollama by default, paid hosted profiles (Sakana Fugu) only with a key plus MEEMEE_ALLOW_PAID_MODELS=true. See [docs/models.md](docs/models.md).
+155. Inkling through the Hugging Face Inference Providers router (`inkling` = Inkling-Small, `inkling-large` = Inkling) with a free HF token, falling back to local on rejection or exhausted credits; zero-token `/models` health probe; `meemee models list|check`.
+156. Self-hosted Inkling-Small: hardware-floor detection (NVIDIA VRAM, RAM, disk), best-plan selection across vLLM NVFP4/BF16 and llama.cpp Unsloth GGUF, exact launch/download commands, `meemee models inkling-local [--run]` and `deploy/inkling/serve-inkling.sh`. Never substitutes a smaller model. See [deploy/inkling/README.md](deploy/inkling/README.md).
 
 154. Forced interruption of blocking tools (branch pb7, unreleased): a tool that sets `isolation = IsolationPolicy(...)` runs in a spawned child process; cancellation or its hard timeout sends SIGTERM, then SIGKILL after a grace period, and the child is always reaped. Covered by `tests/test_isolation.py` (12 tests, including a SIGTERM-ignoring child and an event loop that stays responsive while the tool blocks).
 
