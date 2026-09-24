@@ -24,6 +24,7 @@ import hashlib
 import hmac
 import ipaddress
 import json
+import os
 import secrets
 import socket
 import sqlite3
@@ -111,11 +112,28 @@ def check_url(url: str, allowed_domains: list[str], allow_private_hosts: bool) -
     return url
 
 
+def default_host_id(data_dir: Path) -> str:
+    """Stable id of this host process: ``MEEMEE_HOST_ID`` or hostname plus a digest of the data directory."""
+    explicit = os.getenv("MEEMEE_HOST_ID", "").strip()
+    if explicit:
+        return explicit
+    return f"{socket.gethostname()}:{hashlib.sha256(str(data_dir.resolve()).encode()).hexdigest()[:8]}"
+
+
+def _not_here(record: dict[str, Any], host_id: str) -> str:
+    owner = record.get("host_id")
+    if owner and owner != host_id and record.get("state") not in ("closed", "lost"):
+        # PostgreSQL mode: the record is shared, the live browser is not.
+        return f"browser session is live on host {owner}; send browser requests and takeover links to that host"
+    return f"browser session is {record['state']}"
+
+
 class BrowserSessionStore:
     """SQLite record of sessions, takeovers and events."""
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, host_id: str | None = None):
         path.parent.mkdir(parents=True, exist_ok=True)
+        self.host_id = host_id or default_host_id(path.parent)
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.lock = threading.RLock()
@@ -142,6 +160,13 @@ class BrowserSessionStore:
                 CREATE INDEX IF NOT EXISTS browser_events_session ON browser_session_events(session_id, id);
                 CREATE INDEX IF NOT EXISTS browser_takeovers_session ON browser_takeovers(session_id);
             """)
+            columns = {row["name"] for row in self.db.execute("PRAGMA table_info(browser_sessions)")}
+            if "host_id" not in columns:  # the host whose process holds the live browser
+                self.db.execute("ALTER TABLE browser_sessions ADD COLUMN host_id TEXT")
+
+    def ping(self) -> bool:
+        with self.lock:
+            return self.db.execute("SELECT 1").fetchone() is not None
 
     def delete_owner(self, owner_id: str) -> dict[str, int]:
         """Account deletion: remove every session, takeover and event owned by one principal."""
@@ -158,17 +183,20 @@ class BrowserSessionStore:
     def mark_open_sessions_lost(self) -> int:
         now = _iso(_now())
         with self.lock, self.db:
-            rows = [r["id"] for r in self.db.execute("SELECT id FROM browser_sessions WHERE state NOT IN ('closed','lost')")]
-            self.db.execute("UPDATE browser_sessions SET state='lost', closed_at=?, close_reason='process_restart', updated_at=? WHERE state NOT IN ('closed','lost')", (now, now))
-            self.db.execute("UPDATE browser_takeovers SET finished_at=?, outcome='lost' WHERE finished_at IS NULL", (now,))
+            mine = "state NOT IN ('closed','lost') AND (host_id=? OR host_id IS NULL)"
+            rows = [r["id"] for r in self.db.execute(f"SELECT id FROM browser_sessions WHERE {mine}", (self.host_id,))]
+            if rows:
+                marks = ",".join("?" * len(rows))
+                self.db.execute(f"UPDATE browser_sessions SET state='lost', closed_at=?, close_reason='process_restart', updated_at=? WHERE id IN ({marks})", (now, now, *rows))
+                self.db.execute(f"UPDATE browser_takeovers SET finished_at=?, outcome='lost' WHERE finished_at IS NULL AND session_id IN ({marks})", (now, *rows))
         return len(rows)
 
     def create_session(self, session_id: str, owner_id: str, profile: str | None, allowed_domains: list[str]) -> None:
         now = _iso(_now())
         with self.lock, self.db:
             self.db.execute(
-                "INSERT INTO browser_sessions(id, owner_id, state, profile, allowed_domains, created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
-                (session_id, owner_id, "agent", profile, json.dumps(allowed_domains), now, now),
+                "INSERT INTO browser_sessions(id, owner_id, state, profile, allowed_domains, created_at, updated_at, host_id) VALUES (?,?,?,?,?,?,?,?)",
+                (session_id, owner_id, "agent", profile, json.dumps(allowed_domains), now, now, self.host_id),
             )
 
     def update_session(self, session_id: str, **values: Any) -> None:
@@ -349,7 +377,7 @@ class BrowserSessionManager:
             record = self.store.get_session(session_id)
             if record is None:
                 raise BrowserSessionError("unknown browser session")
-            raise BrowserSessionError(f"browser session is {record['state']}")
+            raise BrowserSessionError(_not_here(record, self.store.host_id))
         return live
 
     async def _state(self, live: _Live, include_text: bool = True, text_limit: int = 20_000) -> dict[str, Any]:
@@ -568,6 +596,8 @@ class BrowserSessionManager:
             record = self.store.get_session(session_id)
             if record is None:
                 raise BrowserSessionError("unknown browser session")
+            if record.get("host_id") not in (None, self.store.host_id) and record["state"] not in ("closed", "lost"):
+                raise BrowserSessionError(_not_here(record, self.store.host_id))  # another host holds the live browser
             return {"session_id": session_id, "state": record["state"]}
         if live.takeover_id:
             self.store.finish_takeover(live.takeover_id, "session_closed")
@@ -606,6 +636,10 @@ class BrowserSessionManager:
         if datetime.fromisoformat(takeover["expires_at"]) < _now():
             raise BrowserSessionError("takeover link expired")
         live = self._live.get(takeover["session_id"])
+        if live is None:
+            record = self.store.get_session(takeover["session_id"]) or {}
+            if record.get("host_id") not in (None, self.store.host_id) and record.get("state") not in ("closed", "lost"):
+                raise BrowserSessionError(_not_here(record, self.store.host_id))
         if live is None or live.takeover_id != takeover_id:
             raise BrowserSessionError("browser session is no longer live")
         return takeover

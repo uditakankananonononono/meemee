@@ -21,8 +21,7 @@ from . import __version__
 from .account_deletion import AccountPurger, PurgeTargets
 from .auth import Authenticator, Principal
 from .browser_api import build_browser_router
-from .browser_notices import TakeoverNoticeQueue
-from .browser_sessions import BrowserSessionManager, BrowserSessionStore
+from .browser_sessions import BrowserSessionManager
 from .companion.api import build_companion_router
 from .companion.runtime import build_companion
 from .config import Settings
@@ -93,7 +92,7 @@ mount_site(app)
 app.add_middleware(MetricsMiddleware)
 persistence = persistence_from_settings(settings)
 browser_sessions = BrowserSessionManager(
-    BrowserSessionStore(settings.data_dir / "browser-sessions.sqlite3"),
+    persistence.browser_sessions,  # PostgreSQL mode: shared records; the live browser stays on this host
     headless=settings.browser_headless,
     profiles_dir=settings.data_dir / "browser-profiles",
     public_url=settings.public_url,
@@ -101,7 +100,7 @@ browser_sessions = BrowserSessionManager(
     max_sessions=settings.browser_max_sessions,
     idle_timeout_seconds=settings.browser_idle_timeout_seconds,
     takeover_ttl_seconds=settings.browser_takeover_ttl_seconds,
-    notices=TakeoverNoticeQueue(settings.data_dir / "browser-notices.sqlite3"),
+    notices=persistence.browser_notices,  # PostgreSQL mode: one queue for every host
 )
 agent = build_agent(settings, memory=persistence.memory, browser_sessions=browser_sessions, persistence=persistence)
 reflection_model = agent.model if not uses_routing(settings) else build_role_model(settings, "reflection")
@@ -152,7 +151,7 @@ if any(web_values):
         raise RuntimeError("interactive login requires complete OIDC and web-login configuration")
     web_login = WebLogin(WebLoginConfig(*web_values), oidc)
 auth = Authenticator(tokens, settings.api_token, oidc, web_login.authenticate_session if web_login else None)
-readiness = ReadinessChecker(settings.data_dir, {"memory": persistence.check_memory, "jobs": persistence.check_jobs, "runs": runs.ping, "tokens": tokens.ping, "entitlements": entitlements.ping, "webhooks": webhooks.ping, "companion": companion.store.ping, "personal_model": personal_model.ping, "context": persistence.context.ping, "monitors": monitors.ping, "reflection_schedule": persistence.reflection_schedule.ping, "account_deletions": deletion_ledger.ping}, settings.model_base_url, settings.readiness_min_free_bytes, require_model=settings.readiness_require_model)
+readiness = ReadinessChecker(settings.data_dir, {"memory": persistence.check_memory, "jobs": persistence.check_jobs, "runs": runs.ping, "tokens": tokens.ping, "entitlements": entitlements.ping, "webhooks": webhooks.ping, "companion": companion.store.ping, "personal_model": personal_model.ping, "context": persistence.context.ping, "monitors": monitors.ping, "reflection_schedule": persistence.reflection_schedule.ping, "account_deletions": deletion_ledger.ping, "browser_sessions": browser_sessions.store.ping, "browser_notices": browser_sessions.notices.ping}, settings.model_base_url, settings.readiness_min_free_bytes, require_model=settings.readiness_require_model)
 jobs_write_auth = auth.dependency("jobs:write")
 jobs_write_dependency = Depends(jobs_write_auth)
 runs_write_dependency = Depends(auth.dependency("runs:write"))
