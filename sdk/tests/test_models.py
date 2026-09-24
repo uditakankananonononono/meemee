@@ -1,6 +1,8 @@
 """Model parsing against the exact server payload shapes."""
 from __future__ import annotations
 
+import json
+
 import pytest
 from conftest import NOW, job_payload
 
@@ -174,3 +176,22 @@ def test_job_exposes_refusals_from_result() -> None:
     job = Job.model_validate(job_payload("done", result={"final": "Done", "approvals_required": [REFUSAL]}))
     assert [item.tool for item in job.approvals_required] == ["workspace.write_file"]
     assert Job.model_validate(job_payload("queued")).approvals_required == []
+
+
+def test_blocked_field_from_server_and_fallback_for_older_servers() -> None:
+    from meemee_client import Job
+    base = {"id": "j", "goal": "g", "run_at": "2026-01-01T00:00:00Z", "status": "done", "attempts": 1,
+            "max_attempts": 3, "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z"}
+    result = json.dumps({"final": "Done!", "approvals_required": [REFUSAL]})
+    new = Job.model_validate({**base, "result": result, "blocked": True})
+    assert new.blocked is True and new.is_blocked is True
+    old = Job.model_validate({**base, "result": result})  # older server: no field, still detected
+    assert old.blocked is False and old.is_blocked is True
+    clean = Job.model_validate({**base, "result": json.dumps({"final": "ok"}), "blocked": False})
+    assert clean.is_blocked is False
+    pending = Job.model_validate({**base, "status": "queued"})
+    assert pending.is_blocked is False
+    report = RunReport.model_validate({"run_id": "r", "goal": "g", "final": "x", "steps_used": 1, "blocked": True})
+    assert report.is_blocked is True
+    decoded = Job.model_validate({**base, "result": {"final": "ok", "approvals_required": [REFUSAL]}})
+    assert json.loads(decoded.result)["final"] == "ok" and decoded.is_blocked is True

@@ -69,7 +69,8 @@ class RunStore:
     @staticmethod
     def _row(row: sqlite3.Row) -> dict:
         result=dict(row); result["tool_results"]=json.loads(result["tool_results"])
-        result["approvals_required"]=json.loads(result.get("approvals_required") or "[]"); return result
+        result["approvals_required"]=json.loads(result.get("approvals_required") or "[]")
+        result["blocked"]=bool(result["approvals_required"]); return result
 
     def run_ids(self, principal: str) -> list[str]:
         with self.lock:
