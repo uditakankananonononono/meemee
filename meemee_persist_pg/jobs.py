@@ -30,6 +30,11 @@ class JobStore:
           error='worker lease expired',lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL,updated_at=clock_timestamp()
           WHERE status='running' AND lease_expires_at<=clock_timestamp() RETURNING id,status""").fetchall()
         for r in rows:self._event(c,r["id"],"retry" if r["status"]=="queued" else "failed",{"error":"worker lease expired"})
+        # A cancel requested while the worker died would otherwise sit in cancel_requested forever.
+        for r in c.execute("""UPDATE meemee_jobs SET status='cancelled',error='cancelled; worker lease expired',lease_owner=NULL,
+          lease_token=NULL,lease_expires_at=NULL,updated_at=clock_timestamp()
+          WHERE status='cancel_requested' AND lease_expires_at<=clock_timestamp() RETURNING id""").fetchall():
+            self._event(c,r["id"],"cancelled",{"error":"worker lease expired after cancel request"})
     def claim(self)->dict[str,Any]|None:
         token=uuid.uuid4()
         with self.db.transaction() as c:
@@ -42,7 +47,7 @@ class JobStore:
         return self._row(row)
     def heartbeat(self,ident:str,lease_token:str)->bool:
         with self.db.transaction() as c:return bool(c.execute("""UPDATE meemee_jobs SET lease_expires_at=clock_timestamp()+(%s*interval '1 second'),updated_at=clock_timestamp()
-          WHERE id=%s AND status='running' AND lease_owner=%s AND lease_token=%s AND lease_expires_at>clock_timestamp()""",(self.lease_seconds,ident,self.worker_id,lease_token)).rowcount)
+          WHERE id=%s AND status IN ('running','cancel_requested') AND lease_owner=%s AND lease_token=%s AND lease_expires_at>clock_timestamp()""",(self.lease_seconds,ident,self.worker_id,lease_token)).rowcount)
     def _terminal(self,ident,lease_token,status,result=None,error=None):
         with self.db.transaction() as c:
             row=c.execute("""UPDATE meemee_jobs SET status=%s,result=%s,error=%s,lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL,updated_at=clock_timestamp()

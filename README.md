@@ -176,7 +176,9 @@ Meemee is Udita's private, local-first agent runtime. It turns a goal into an in
 155. Inkling through the Hugging Face Inference Providers router (`inkling` = Inkling-Small, `inkling-large` = Inkling) with a free HF token, falling back to local on rejection or exhausted credits; zero-token `/models` health probe; `meemee models list|check`.
 156. Self-hosted Inkling-Small: hardware-floor detection (NVIDIA VRAM, RAM, disk), best-plan selection across vLLM NVFP4/BF16 and llama.cpp Unsloth GGUF, exact launch/download commands, `meemee models inkling-local [--run]` and `deploy/inkling/serve-inkling.sh`. Never substitutes a smaller model. See [deploy/inkling/README.md](deploy/inkling/README.md).
 
-154. Forced interruption of blocking tools (branch pb7, unreleased): a tool that sets `isolation = IsolationPolicy(...)` runs in a spawned child process; cancellation or its hard timeout sends SIGTERM, then SIGKILL after a grace period, and the child is always reaped. Covered by `tests/test_isolation.py` (12 tests, including a SIGTERM-ignoring child and an event loop that stays responsive while the tool blocks).
+157. Forced interruption of blocking tools (branch pb7, unreleased): a tool that sets `isolation = IsolationPolicy(...)` runs in a spawned child process; cancellation or its hard timeout sends SIGTERM, then SIGKILL after a grace period, and the child is always reaped. Covered by `tests/test_isolation.py` (12 tests, including a SIGTERM-ignoring child and an event loop that stays responsive while the tool blocks).
+
+158. Live PostgreSQL verification (branch pb7, unreleased): `scripts/pg_live_check.py` starts a throwaway local PostgreSQL 16 through the free `pgserver` package (or takes `--dsn`) and runs every PostgreSQL suite with skips treated as failures. `tests_pg/test_live_stores.py` adds 15 live tests (migrations, memory FTS, tokens, audit tamper detection, job retry/fencing/cancel/pagination, 8-worker concurrent claims, atomic shared rate limit, plans, accounts). The live run found and fixed two bugs: plans could not be stored at all (dict not adapted to JSONB), and a job whose cancel was requested while its worker died stayed in `cancel_requested` forever.
 
 ## Thin (0)
 
@@ -184,7 +186,7 @@ Nothing is classified as thin. A capability is either implemented and tested at 
 
 ## Missing, not claimed
 
-Live WhatsApp and iMessage delivery over real provider networks is unverified: the adapters and durable delivery queue are implemented and config-gated, but no provider account exists yet. Live PostgreSQL integration is not verified in this environment; target deployments must run the unskipped PostgreSQL suite and preflight. Built-in email/password signup and login are implemented; external OIDC remains optional. Email verification, password reset, customer data export and account deletion are implemented. Browser challenges are detected and handed off, but an interactive live human-control channel is not built in. Async tools can be cancelled cooperatively. Tools that opt into process isolation can also be forcibly killed on cancel or timeout; tools that are not picklable, or that are not marked for isolation, still rely on cooperative cancellation. Multi-region failover, online dual-write migration and logical replication remain deployment/infrastructure work and are not claimed.
+Live WhatsApp and iMessage delivery over real provider networks is unverified: the adapters and durable delivery queue are implemented and config-gated, but no provider account exists yet. Live PostgreSQL is verified on a local PostgreSQL 16.2 server (`scripts/pg_live_check.py`, branch pb7); managed/HA servers are not verified, so target deployments must still run the unskipped PostgreSQL suite and preflight there. Built-in email/password signup and login are implemented; external OIDC remains optional. Email verification, password reset, customer data export and account deletion are implemented. Browser challenges are detected and handed off, but an interactive live human-control channel is not built in. Async tools can be cancelled cooperatively. Tools that opt into process isolation can also be forcibly killed on cancel or timeout; tools that are not picklable, or that are not marked for isolation, still rely on cooperative cancellation. Multi-region failover, online dual-write migration and logical replication remain deployment/infrastructure work and are not claimed.
 
 The SQLite single-host shape and PostgreSQL memory, owner-scoped jobs and shared rate limiting are stated at their tested boundaries. SSE and authenticated WebSocket job streams are implemented. No missing item is represented as shipped.
 
@@ -246,6 +248,17 @@ A model statement is never treated as proof that work happened. Tool returns are
 
 
 ## Advanced operation
+
+### Live PostgreSQL check
+
+```bash
+pip install -e '.[dev,postgresql]' pgserver
+python scripts/pg_live_check.py                       # throwaway local server
+python scripts/pg_live_check.py --timezone Asia/Kolkata   # test a non-UTC server
+python scripts/pg_live_check.py --dsn postgresql://user:pw@host/db
+```
+
+The DSN role must be allowed to `CREATE DATABASE`; every live test runs in its own throwaway database. Exit code 0 means every PostgreSQL test ran and passed; any skip fails the check.
 
 ### Forced interruption for blocking tools
 
