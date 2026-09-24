@@ -53,9 +53,24 @@ asyncio.run(main())
 `AsyncMeemeeClient` has the same resources, arguments, models, errors and retry
 policy as `MeemeeClient`; methods are coroutines and iterators are async
 iterators. `TokenAuth` is used directly; a provider with an
-`async authorization_header_async()` method is awaited; any other provider (such
-as `OIDCClientCredentialsAuth`, whose refresh does blocking HTTP) runs in a
+`async authorization_header_async()` method, such as
+`AsyncOIDCClientCredentialsAuth`, is awaited; any other provider (such as the
+sync `OIDCClientCredentialsAuth`, whose refresh does blocking HTTP) runs in a
 worker thread so a token refresh never blocks the event loop.
+
+```python
+from meemee_client import AsyncMeemeeClient, AsyncOIDCClientCredentialsAuth
+
+auth = AsyncOIDCClientCredentialsAuth(
+    "https://idp.example.com/realms/meemee",
+    client_id="meemee-worker",
+    client_secret=os.environ["OIDC_CLIENT_SECRET"],
+    scope="operator",
+)
+async with AsyncMeemeeClient(base_url, auth=auth) as client:
+    await client.jobs.list()      # token fetched once, shared by concurrent calls
+await auth.aclose()
+```
 
 ### WebSocket streaming
 
@@ -210,6 +225,16 @@ package and exercise it end to end):**
     introspection leaves `last_used_at` untouched while real use updates it;
     non-admin callers get `PermissionDeniedError(missing_scope="admin")`; the
     audit chain records the call without the secret (mocked + live).
+17. `AsyncOIDCClientCredentialsAuth`: discovery, explicit token endpoint,
+    client_secret_basic, scope pass-through, caching with leeway refresh,
+    forced refresh, single-flight fetch for concurrent callers, every
+    discovery/token failure mode with the sync provider's error types, no
+    thread offload when used by AsyncMeemeeClient, TypeError on the sync
+    client, and the thread-offload fallback for the sync provider (mocked).
+    Live: a local HTTPS issuer mints RS256 JWTs that the booted server
+    validates via JWKS; concurrent requests share one fetch, a refreshed token
+    is accepted and introspects as `oidc`, a wrong client secret, an unmapped
+    role and a forged signature are all rejected.
 
 The live suite lives in `tests/test_live_integration.py`; it boots uvicorn
 against the `meemee` package next to `sdk/` and skips cleanly when that
@@ -227,7 +252,5 @@ stated boundary.
   parsing is covered in the mocked suite.
 - WebSocket streaming - the server offers resume-safe SSE only.
 - Interactive OIDC browser login - owned by the server's `/auth/login`.
-- An asyncio-native OIDC client-credentials provider - async clients run the
-  existing provider in a worker thread instead.
 - Self-service introspection for non-admin callers - `/v1/tokens/introspect`
   is admin-only. Customers see their own tokens through the account token list.

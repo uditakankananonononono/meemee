@@ -15,7 +15,7 @@ Quick start:
             print(event.kind, event.payload)
 """
 from ._version import __version__
-from .auth import AuthProvider, OIDCClientCredentialsAuth, TokenAuth
+from .auth import AsyncOIDCClientCredentialsAuth, AuthProvider, OIDCClientCredentialsAuth, TokenAuth
 from .aio import AsyncMeemeeClient
 from .client import MeemeeClient
 from .errors import (
@@ -117,6 +117,7 @@ __all__ = [
     "NetworkError",
     "NotFoundError",
     "OIDCClientCredentialsAuth",
+    "AsyncOIDCClientCredentialsAuth",
     "PermissionDeniedError",
     "QuotaStatus",
     "RateLimitError",
