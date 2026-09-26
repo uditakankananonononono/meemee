@@ -142,12 +142,12 @@ The hosted Hugging Face router (metered past its free credit) is only used when
 ### Jev (opt-in, paid)
 
 `meemee.shared_models.build_jev()` returns a client for Jev, TypeSafe AI's hosted "System One"
-evaluation model (https://thejevai.com). It evaluates one state against typed questions
+evaluation model (https://typesafe.ai). It evaluates one state against typed questions
 (choice / score / noul) and returns structured decisions with probabilities; it does not chat,
 so nothing in the agent loop calls it automatically. It is key-gated and paid (credits,
-https://thejevai.com/pricing - no free tier as of 2026-09-26; also listed on the Vercel AI
+https://docs.typesafe.ai/models - no free tier as of 2026-09-26; also listed on the Vercel AI
 Gateway as `typesafe-ai/jev`). OFF by default: set `MEEMEE_JEV_API_KEY` (or `JEV_API_KEY`;
-create a key at https://thejevai.com/settings/apikeys) to enable it. Hosted route: never send
+create a key at https://console.typesafe.ai/keys) to enable it. Hosted route: never send
 it private state.
 
 Training on Meemee data only: write owner-confirmed examples as JSONL
@@ -155,3 +155,7 @@ Training on Meemee data only: write owner-confirmed examples as JSONL
 `meemee.shared_models.train_meemee_needle(examples, out_dir)`. It needs `pip install cactus-needle`.
 Unconfirmed rows and rows tagged for another product are dropped. Needle telemetry is
 turned off by the shared layer.
+
+### Jev API correction (2026-09-26)
+
+Vercel currently lists `typesafe-ai/jev` without Free Tier eligibility; the gateway route is paid. The TypeSafe direct API is also paid. A browser playground, if available from an official provider, is not free API access. The previously referenced `thejevai.com` could not be verified as TypeSafe AI's official site; do not use it for API keys, billing, or model calls. Official direct API: https://api.typesafe.ai/v1/systemone; keys: https://console.typesafe.ai/keys (https://docs.typesafe.ai/api). Gateway: https://ai-gateway.vercel.sh/typesafe/v1/systemone (https://vercel.com/docs/ai-gateway/sdks-and-apis/typesafe). Both routes stay OFF until a key is explicitly configured. Set `AI_GATEWAY_API_KEY` (or `INSTINCT_AI_GATEWAY_API_KEY`) for the preferred gateway route, or `JEV_API_KEY` (or `INSTINCT_JEV_API_KEY`) for the direct alternate; if both are present the gateway wins. Do not add keys to git. Vercel eligibility: https://vercel.com/ai-gateway/models/providers/typesafe-ai and https://vercel.com/docs/ai-gateway/pricing.

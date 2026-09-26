@@ -108,4 +108,4 @@ def test_build_jev_evaluate_through_client():
     out = jev.evaluate({"tool": "delete_records"}, {"safe": {"type": "noul", "instructions": "Safe without approval?"}})
     assert out["answers"]["safe"]["noul"] == 0.1
     assert seen["headers"]["Authorization"] == "Bearer sk-m"
-    assert seen["url"] == "https://thejevai.com/v1/systemone"
+    assert seen["url"] == "https://api.typesafe.ai/v1/systemone"
