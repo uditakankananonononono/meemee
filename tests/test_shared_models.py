@@ -109,3 +109,14 @@ def test_build_jev_evaluate_through_client():
     assert out["answers"]["safe"]["noul"] == 0.1
     assert seen["headers"]["Authorization"] == "Bearer sk-m"
     assert seen["url"] == "https://api.typesafe.ai/v1/systemone"
+
+
+
+def test_local_hermes_and_explicit_openclaw_owner_bridge():
+    s = Settings(shared_hermes_url="http://127.0.0.1:11434/v1", shared_hermes_model="hermes3:3b",
+                 openclaw_url="http://localhost:18789/v1", openclaw_token="dummy")
+    names = [p.name for p in sm.build_chain(s)]
+    assert "hermes-local" in names and "openclaw-owner" not in names
+    assert "inkling-hf-router" not in names
+    with pytest.raises(Exception, match="owner"):
+        sm.openclaw_owner_call(s, [{"role": "user", "content": "hi"}])
