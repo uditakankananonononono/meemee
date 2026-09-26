@@ -7,7 +7,9 @@ It is vendored under ``meemee/_vendor/instinct_models`` at the commit in
 What Meemee gets from it:
 - a ``shared`` model profile (``transport: "instinct"``) that routes Needle -> Ornith -> Inkling;
 - per-product Needle LoRA training on Meemee's own owner-confirmed examples only;
-- a read-only AI Library (theailibrary.co) catalog for browsing AI tools and prompts.
+- a read-only AI Library (theailibrary.co) catalog for browsing AI tools and prompts;
+- an optional Jev evaluation client (TypeSafe AI's hosted System One model) via ``build_jev`` -
+  key-gated and paid, so it is OFF unless MEEMEE_JEV_API_KEY or JEV_API_KEY is set.
 
 Meemee handles personal data, so shared-layer tasks are private by default: they never go to
 the hosted Hugging Face router unless ``MEEMEE_SHARED_ALLOW_HOSTED=true``.
@@ -24,6 +26,7 @@ from typing import Any
 from ._vendor.instinct_models import (
     InklingHFRouter,
     InklingLocal,
+    JevEval,
     NeedleLocal,
     OrnithOpenAICompat,
     Provider,
@@ -63,6 +66,20 @@ def build_chain(settings: Any) -> list[Provider]:
     if settings.shared_allow_hosted:
         chain.append(InklingHFRouter(settings.hf_inkling_model, token=settings.hf_token or ""))
     return chain
+
+
+def build_jev(env: dict | None = None) -> JevEval:
+    """Jev evaluation client (TypeSafe AI's System One model, https://thejevai.com).
+
+    Key from MEEMEE_JEV_API_KEY, else JEV_API_KEY; without one the client is unavailable and
+    OFF - nothing is called or billed. Jev is hosted and paid (credits). It evaluates typed
+    questions (choice / score / noul); it does not chat, and it must never receive private
+    state, so nothing in the agent loop calls it automatically.
+    """
+    import os
+
+    e = os.environ if env is None else env
+    return JevEval(api_key=e.get("MEEMEE_JEV_API_KEY") or e.get("JEV_API_KEY"))
 
 
 def generation_ready(settings: Any) -> str | None:
