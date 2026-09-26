@@ -9,6 +9,8 @@ Env (prefix INSTINCT_):
   INSTINCT_ORNITH_MODEL        model tag as pulled locally (no default: must match what she pulled)
   INSTINCT_NEEDLE_WEIGHTS      path to a product .cact (tuned) - empty means the base Needle model
   INSTINCT_ALLOW_HOSTED        1 to allow the hosted HF router for non-private tasks (default 1)
+  INSTINCT_JEV_API_KEY         TypeSafe AI Jev evaluation API key (optional; falls back to JEV_API_KEY).
+                               Jev is hosted and key-gated (paid credits); empty keeps it OFF.
 """
 from __future__ import annotations
 
@@ -30,6 +32,7 @@ class ProductConfig:
     ornith_model: str | None = None
     needle_weights: str | None = None
     allow_hosted: bool = True
+    jev_api_key: str | None = None
     extra: dict = field(default_factory=dict)
 
     def __post_init__(self):
@@ -55,7 +58,8 @@ def load_config(env: dict | None = None, path: str | None = None) -> ProductConf
                         inkling_local_model=g("INKLING_LOCAL_MODEL", "inkling-small"),
                         hf_model=g("HF_MODEL", "thinkingmachines/Inkling-Small"), ornith_url=g("ORNITH_URL"),
                         ornith_model=g("ORNITH_MODEL"), needle_weights=g("NEEDLE_WEIGHTS"),
-                        allow_hosted=g("ALLOW_HOSTED", "1") not in ("0", "false", "no"))
+                        allow_hosted=g("ALLOW_HOSTED", "1") not in ("0", "false", "no"),
+                        jev_api_key=g("JEV_API_KEY") or e.get("JEV_API_KEY") or None)
     if path:
         data = _load_file(path)
         known = {k: v for k, v in data.items() if k in ProductConfig.__dataclass_fields__ and k != "extra"}

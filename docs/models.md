@@ -139,6 +139,17 @@ Use it through the `shared` profile:
 The hosted Hugging Face router (metered past its free credit) is only used when
 `MEEMEE_SHARED_ALLOW_HOSTED=true`, because Meemee handles personal data.
 
+### Jev (opt-in, paid)
+
+`meemee.shared_models.build_jev()` returns a client for Jev, TypeSafe AI's hosted "System One"
+evaluation model (https://thejevai.com). It evaluates one state against typed questions
+(choice / score / noul) and returns structured decisions with probabilities; it does not chat,
+so nothing in the agent loop calls it automatically. It is key-gated and paid (credits,
+https://thejevai.com/pricing - no free tier as of 2026-09-26; also listed on the Vercel AI
+Gateway as `typesafe-ai/jev`). OFF by default: set `MEEMEE_JEV_API_KEY` (or `JEV_API_KEY`;
+create a key at https://thejevai.com/settings/apikeys) to enable it. Hosted route: never send
+it private state.
+
 Training on Meemee data only: write owner-confirmed examples as JSONL
 (`query`, `tools`, `answers`, `confirmed`, `source_ref`) and call
 `meemee.shared_models.train_meemee_needle(examples, out_dir)`. It needs `pip install cactus-needle`.

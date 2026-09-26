@@ -82,3 +82,30 @@ def test_catalog_route_config_accepts_shared_profile():
                                               shared_ornith_url="http://o/v1", shared_ornith_model="o"))
     usable, _ = cat.chain("chat")
     assert usable[0].name == "shared"
+
+
+def test_build_jev_off_without_key():
+    jev = sm.build_jev({})
+    assert jev.name == "jev"
+    assert not jev.available()
+
+
+def test_build_jev_key_resolution():
+    assert sm.build_jev({"MEEMEE_JEV_API_KEY": "sk-m"}).api_key == "sk-m"
+    assert sm.build_jev({"JEV_API_KEY": "sk-j"}).api_key == "sk-j"
+    assert sm.build_jev({"MEEMEE_JEV_API_KEY": "sk-m", "JEV_API_KEY": "sk-j"}).api_key == "sk-m"
+
+
+def test_build_jev_evaluate_through_client():
+    seen = {}
+
+    def fake(url, body, headers, timeout):
+        seen.update(url=url, body=body, headers=headers)
+        return {"model": "jev-1.13.0", "answers": {"safe": {"type": "noul", "noul": 0.1}}, "usage": {}}
+
+    jev = sm.build_jev({"MEEMEE_JEV_API_KEY": "sk-m"})
+    jev.transport = fake
+    out = jev.evaluate({"tool": "delete_records"}, {"safe": {"type": "noul", "instructions": "Safe without approval?"}})
+    assert out["answers"]["safe"]["noul"] == 0.1
+    assert seen["headers"]["Authorization"] == "Bearer sk-m"
+    assert seen["url"] == "https://thejevai.com/v1/systemone"

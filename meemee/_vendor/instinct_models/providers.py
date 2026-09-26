@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import urllib.error
 import urllib.request
 from abc import ABC, abstractmethod
@@ -206,3 +207,110 @@ class NeedleLocal(Provider):
         if calls and (out.get("validation") or {}).get("ungrounded"):
             calls = []  # Needle flagged argument values not found in the query: escalate instead of trusting them
         return ChatResult(self.name, self.weights or "needle-base", "", calls, out)
+
+# --- Jev (TypeSafe AI System One evaluation model) ---------------------------------
+
+JEV_ENDPOINT = "https://thejevai.com/v1/systemone"
+JEV_QUESTION_TYPES = ("noul", "choice", "score")
+
+
+class JevStatusError(ProviderError):
+    """The Jev API answered with a non-2xx status."""
+
+    def __init__(self, status: int, detail: str):
+        super().__init__(f"Jev API HTTP {status}: {detail[:300]}")
+        self.status = status
+
+
+def _jev_http(url: str, body: dict, headers: dict, timeout: float) -> dict:
+    """Default Jev transport. Same signature as http_json, but keeps the HTTP status so
+    the caller can retry 429/529 and explain 401/422 precisely."""
+    req = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST",
+                                 headers={"Content-Type": "application/json", **headers})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode())
+    except urllib.error.HTTPError as exc:
+        raise JevStatusError(exc.code, exc.read()[:300].decode("utf-8", "replace")) from exc
+    except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+        raise ProviderUnavailable(f"cannot reach {url}: {exc}") from exc
+
+
+def validate_questions(questions: dict) -> dict:
+    """Check a Jev question map against the shapes documented at https://thejevai.com/docs.
+    Returns the map unchanged; raises ProviderError on the first violation."""
+    if not isinstance(questions, dict) or not questions:
+        raise ProviderError("questions must be a non-empty map of question id -> question")
+    for qid, q in questions.items():
+        if not isinstance(q, dict):
+            raise ProviderError(f"question {qid!r} must be an object")
+        qtype = q.get("type")
+        if qtype not in JEV_QUESTION_TYPES:
+            raise ProviderError(f"question {qid!r}: type must be one of {JEV_QUESTION_TYPES}")
+        if "instructions" not in q:
+            raise ProviderError(f"question {qid!r}: instructions are required")
+        criteria = q.get("criteria")
+        if qtype == "choice":
+            if not isinstance(criteria, dict) or not criteria:
+                raise ProviderError(f"choice question {qid!r}: criteria must map options to descriptions")
+            if len(criteria) > 255:
+                raise ProviderError(f"choice question {qid!r}: at most 255 options")
+        elif qtype == "score":
+            if not isinstance(criteria, list) or not 2 <= len(criteria) <= 10:
+                raise ProviderError(f"score question {qid!r}: criteria must be an ordered list of 2-10 levels")
+        elif criteria is not None and not isinstance(criteria, dict):
+            raise ProviderError(f"noul question {qid!r}: criteria, when present, must be an object with true/false keys")
+    return questions
+
+
+class JevEval(Provider):
+    """TypeSafe AI's Jev - a "System One" evaluation model (https://thejevai.com).
+
+    NOT a chat model: it takes one state plus typed questions (choice / score / noul) and
+    returns structured decisions with probabilities, so it never joins the chat Router
+    chain; call ``evaluate()`` directly. Hosted and key-gated (paid credits, no free tier
+    as of 2026-09-26): ``available()`` is False without a key, so it is OFF by default.
+    Create a key at https://thejevai.com/settings/apikeys and set JEV_API_KEY (or
+    INSTINCT_JEV_API_KEY via ProductConfig). Hosted route: never send private state to it.
+    """
+    name, locality = "jev", HOSTED
+
+    def __init__(self, api_key: str | None = None, model: str = "jev-latest",
+                 transport: Transport = _jev_http, timeout: float = 60,
+                 max_retries: int = 3, sleeper: Callable[[float], None] = time.sleep):
+        self.api_key = api_key if api_key is not None else os.environ.get("JEV_API_KEY")
+        self.model, self.transport, self.timeout = model, transport, timeout
+        self.max_retries, self.sleeper = max_retries, sleeper
+
+    def available(self) -> bool:
+        return bool(self.api_key)
+
+    def chat(self, messages, *, tools=None, max_tokens=1024) -> ChatResult:
+        raise ProviderUnavailable("jev is an evaluation model, not a chat model; use evaluate()")
+
+    def evaluate(self, state, questions: dict, *, model: str | None = None) -> dict:
+        """Evaluate ``state`` (str | object | array of str) against typed ``questions``.
+        Returns {"model", "answers", "usage", "raw"}. Retries 429/529 with exponential
+        backoff per the Jev docs; 401 means the key is missing or invalid."""
+        if not self.available():
+            raise ProviderUnavailable(
+                "jev is not configured: set JEV_API_KEY (create one at https://thejevai.com/settings/apikeys)")
+        body = {"state": state, "model": model or self.model, "questions": validate_questions(questions)}
+        headers = {"Authorization": f"Bearer {self.api_key}"}
+        attempt = 0
+        while True:
+            try:
+                data = self.transport(JEV_ENDPOINT, body, headers, self.timeout)
+                break
+            except JevStatusError as exc:
+                if exc.status in (429, 529) and attempt < self.max_retries:
+                    self.sleeper(float(2 ** attempt))
+                    attempt += 1
+                    continue
+                if exc.status == 401:
+                    raise ProviderError("jev: API key missing or invalid (401); check JEV_API_KEY") from exc
+                raise
+        if not isinstance(data, dict) or "answers" not in data:
+            raise ProviderError("jev: unexpected response shape (no 'answers' field)")
+        return {"model": data.get("model", model or self.model), "answers": data["answers"],
+                "usage": data.get("usage") or {}, "raw": data}
