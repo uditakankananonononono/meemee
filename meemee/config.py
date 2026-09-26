@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     shared_inkling_url: str | None = None
     shared_inkling_model: str = "inkling-small"
     shared_needle_weights: str | None = None
+    shared_hermes_url: str | None = None
+    shared_hermes_model: str | None = None
+    openclaw_url: str | None = None
+    openclaw_token: str | None = None
     shared_allow_hosted: bool = False  # Meemee data is personal: never the hosted HF router unless opted in
     reflection_interval_minutes: int = 360
     reflection_poll_seconds: float = 60.0

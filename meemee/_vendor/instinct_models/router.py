@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .config import ProductConfig
-from .providers import (HOSTED, ChatResult, InklingHFRouter, InklingLocal, NeedleLocal, OrnithOpenAICompat, Provider,
+from .providers import (HOSTED, ChatResult, InklingHFRouter, InklingLocal, NeedleLocal, OrnithOpenAICompat, HermesLocal, Provider,
                         ProviderError)
 
 
@@ -49,6 +49,8 @@ class Router:
         chain: list[Provider] = [NeedleLocal(cfg.needle_weights),
                                  OrnithOpenAICompat(cfg.ornith_url, cfg.ornith_model),
                                  InklingLocal(cfg.inkling_local_url, cfg.inkling_local_model)]
+        if cfg.hermes_url and cfg.hermes_model:
+            chain.append(HermesLocal(cfg.hermes_url, cfg.hermes_model))
         if cfg.allow_hosted:
             chain.append(InklingHFRouter(cfg.hf_model))
         return cls(chain)

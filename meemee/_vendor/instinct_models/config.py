@@ -8,9 +8,11 @@ Env (prefix INSTINCT_):
   INSTINCT_ORNITH_URL          OpenAI-compatible base URL (Ollama: http://localhost:11434/v1)
   INSTINCT_ORNITH_MODEL        model tag as pulled locally (no default: must match what she pulled)
   INSTINCT_NEEDLE_WEIGHTS      path to a product .cact (tuned) - empty means the base Needle model
-  INSTINCT_ALLOW_HOSTED        1 to allow the hosted HF router for non-private tasks (default 1)
+  INSTINCT_ALLOW_HOSTED        1 to allow metered hosted HF router for non-private tasks (default 0)
   INSTINCT_JEV_API_KEY         TypeSafe AI direct evaluation API key (optional; falls back to JEV_API_KEY).
   INSTINCT_AI_GATEWAY_API_KEY  Vercel AI Gateway key for Jev (optional; falls back to AI_GATEWAY_API_KEY).
+  INSTINCT_HERMES_URL         local Ollama OpenAI-compatible /v1 URL (opt-in)
+  INSTINCT_HERMES_MODEL       pulled Hermes tag, e.g. hermes3:3b
                                Jev is hosted and key-gated (paid credits); empty keeps it OFF.
 """
 from __future__ import annotations
@@ -32,7 +34,9 @@ class ProductConfig:
     ornith_url: str | None = None
     ornith_model: str | None = None
     needle_weights: str | None = None
-    allow_hosted: bool = True
+    hermes_url: str | None = None
+    hermes_model: str | None = None
+    allow_hosted: bool = False
     jev_api_key: str | None = None
     extra: dict = field(default_factory=dict)
 
@@ -58,8 +62,9 @@ def load_config(env: dict | None = None, path: str | None = None) -> ProductConf
     cfg = ProductConfig(product=g("PRODUCT", ""), inkling_local_url=g("INKLING_LOCAL_URL"),
                         inkling_local_model=g("INKLING_LOCAL_MODEL", "inkling-small"),
                         hf_model=g("HF_MODEL", "thinkingmachines/Inkling-Small"), ornith_url=g("ORNITH_URL"),
-                        ornith_model=g("ORNITH_MODEL"), needle_weights=g("NEEDLE_WEIGHTS"),
-                        allow_hosted=g("ALLOW_HOSTED", "1") not in ("0", "false", "no"),
+                        ornith_model=g("ORNITH_MODEL"), needle_weights=g("NEEDLE_WEIGHTS"), hermes_url=g("HERMES_URL"),
+                        hermes_model=g("HERMES_MODEL"),
+                        allow_hosted=g("ALLOW_HOSTED", "0") not in ("0", "false", "no"),
                         jev_api_key=g("JEV_API_KEY") or e.get("JEV_API_KEY") or None)
     if path:
         data = _load_file(path)

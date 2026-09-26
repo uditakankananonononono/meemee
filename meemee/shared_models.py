@@ -26,6 +26,8 @@ from typing import Any
 from ._vendor.instinct_models import (
     InklingHFRouter,
     InklingLocal,
+    HermesLocal,
+    OpenClawOwner,
     JevEval,
     NeedleLocal,
     OrnithOpenAICompat,
@@ -63,6 +65,8 @@ def build_chain(settings: Any) -> list[Provider]:
         OrnithOpenAICompat(settings.shared_ornith_url, settings.shared_ornith_model),
         InklingLocal(settings.shared_inkling_url, settings.shared_inkling_model),
     ]
+    if settings.shared_hermes_url and settings.shared_hermes_model:
+        chain.append(HermesLocal(settings.shared_hermes_url, settings.shared_hermes_model))
     if settings.shared_allow_hosted:
         chain.append(InklingHFRouter(settings.hf_inkling_model, token=settings.hf_token or ""))
     return chain
@@ -81,6 +85,14 @@ def build_jev(env: dict | None = None) -> JevEval:
     e = os.environ if env is None else env
     return JevEval(api_key=e.get("MEEMEE_JEV_API_KEY") or e.get("JEV_API_KEY") or "",
                    gateway_api_key=e.get("MEEMEE_AI_GATEWAY_API_KEY") or e.get("INSTINCT_AI_GATEWAY_API_KEY") or e.get("AI_GATEWAY_API_KEY") or "")
+
+
+def openclaw_owner_call(settings: Any, messages: list[dict], *, owner_confirmed: bool = False):
+    """Owner-facing explicit action; never register in the shared profile's fallback chain."""
+    if not settings.openclaw_url or not settings.openclaw_token:
+        raise ValueError("OpenClaw owner endpoint and token are not configured")
+    return OpenClawOwner(settings.openclaw_url, settings.openclaw_token).chat(
+        messages, owner_confirmed=owner_confirmed)
 
 
 def generation_ready(settings: Any) -> str | None:

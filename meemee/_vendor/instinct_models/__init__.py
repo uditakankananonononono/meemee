@@ -7,11 +7,11 @@ tool-calling model, LoRA fine-tuned per product) and The AI Library
 Training pipelines are shared; datasets stay per product.
 """
 from .config import ProductConfig, load_config
-from .providers import (ChatResult, InklingHFRouter, InklingLocal, JevEval, JevStatusError, NeedleLocal,
+from .providers import (ChatResult, InklingHFRouter, InklingLocal, HermesLocal, OpenClawOwner, JevEval, JevStatusError, NeedleLocal,
                         OrnithOpenAICompat, Provider, ProviderError, ProviderUnavailable, validate_questions)
 from .router import Router, Task
 
 __all__ = ["ProductConfig", "load_config", "Provider", "ProviderError", "ProviderUnavailable", "ChatResult",
-           "InklingLocal", "InklingHFRouter", "OrnithOpenAICompat", "NeedleLocal", "JevEval", "JevStatusError",
+           "InklingLocal", "InklingHFRouter", "HermesLocal", "OpenClawOwner", "OrnithOpenAICompat", "NeedleLocal", "JevEval", "JevStatusError",
            "validate_questions", "Router", "Task"]
 __version__ = "0.1.0"
