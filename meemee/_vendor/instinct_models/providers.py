@@ -210,7 +210,8 @@ class NeedleLocal(Provider):
 
 # --- Jev (TypeSafe AI System One evaluation model) ---------------------------------
 
-JEV_ENDPOINT = "https://thejevai.com/v1/systemone"
+JEV_GATEWAY_ENDPOINT = "https://ai-gateway.vercel.sh/typesafe/v1/systemone"
+JEV_DIRECT_ENDPOINT = "https://api.typesafe.ai/v1/systemone"
 JEV_QUESTION_TYPES = ("noul", "choice", "score")
 
 
@@ -237,7 +238,7 @@ def _jev_http(url: str, body: dict, headers: dict, timeout: float) -> dict:
 
 
 def validate_questions(questions: dict) -> dict:
-    """Check a Jev question map against the shapes documented at https://thejevai.com/docs.
+    """Check a Jev question map against the shapes documented at https://docs.typesafe.ai/api.
     Returns the map unchanged; raises ProviderError on the first violation."""
     if not isinstance(questions, dict) or not questions:
         raise ProviderError("questions must be a non-empty map of question id -> question")
@@ -264,26 +265,30 @@ def validate_questions(questions: dict) -> dict:
 
 
 class JevEval(Provider):
-    """TypeSafe AI's Jev - a "System One" evaluation model (https://thejevai.com).
+    """TypeSafe AI's Jev - a "System One" evaluation model (https://typesafe.ai).
 
     NOT a chat model: it takes one state plus typed questions (choice / score / noul) and
     returns structured decisions with probabilities, so it never joins the chat Router
     chain; call ``evaluate()`` directly. Hosted and key-gated (paid credits, no free tier
     as of 2026-09-26): ``available()`` is False without a key, so it is OFF by default.
-    Create a key at https://thejevai.com/settings/apikeys and set JEV_API_KEY (or
-    INSTINCT_JEV_API_KEY via ProductConfig). Hosted route: never send private state to it.
+    Gateway is the first configured route (AI_GATEWAY_API_KEY or INSTINCT_AI_GATEWAY_API_KEY).
+    The official TypeSafe direct API is the alternate (JEV_API_KEY or INSTINCT_JEV_API_KEY).
+    Both are hosted, paid routes; never send private state to them.
     """
     name, locality = "jev", HOSTED
 
     def __init__(self, api_key: str | None = None, model: str = "jev-latest",
                  transport: Transport = _jev_http, timeout: float = 60,
-                 max_retries: int = 3, sleeper: Callable[[float], None] = time.sleep):
+                 max_retries: int = 3, sleeper: Callable[[float], None] = time.sleep,
+                 gateway_api_key: str | None = None):
         self.api_key = api_key if api_key is not None else os.environ.get("JEV_API_KEY")
+        self.gateway_api_key = (gateway_api_key if gateway_api_key is not None else
+                                os.environ.get("INSTINCT_AI_GATEWAY_API_KEY") or os.environ.get("AI_GATEWAY_API_KEY"))
         self.model, self.transport, self.timeout = model, transport, timeout
         self.max_retries, self.sleeper = max_retries, sleeper
 
     def available(self) -> bool:
-        return bool(self.api_key)
+        return bool(self.gateway_api_key or self.api_key)
 
     def chat(self, messages, *, tools=None, max_tokens=1024) -> ChatResult:
         raise ProviderUnavailable("jev is an evaluation model, not a chat model; use evaluate()")
@@ -294,13 +299,17 @@ class JevEval(Provider):
         backoff per the Jev docs; 401 means the key is missing or invalid."""
         if not self.available():
             raise ProviderUnavailable(
-                "jev is not configured: set JEV_API_KEY (create one at https://thejevai.com/settings/apikeys)")
-        body = {"state": state, "model": model or self.model, "questions": validate_questions(questions)}
-        headers = {"Authorization": f"Bearer {self.api_key}"}
+                "jev is not configured: set AI_GATEWAY_API_KEY or JEV_API_KEY (both are paid routes)")
+        gateway = bool(self.gateway_api_key)
+        endpoint = JEV_GATEWAY_ENDPOINT if gateway else JEV_DIRECT_ENDPOINT
+        key = self.gateway_api_key if gateway else self.api_key
+        selected_model = model or ("typesafe-ai/jev" if gateway else self.model)
+        body = {"state": state, "model": selected_model, "questions": validate_questions(questions)}
+        headers = {"Authorization": f"Bearer {key}"}
         attempt = 0
         while True:
             try:
-                data = self.transport(JEV_ENDPOINT, body, headers, self.timeout)
+                data = self.transport(endpoint, body, headers, self.timeout)
                 break
             except JevStatusError as exc:
                 if exc.status in (429, 529) and attempt < self.max_retries:
@@ -308,9 +317,9 @@ class JevEval(Provider):
                     attempt += 1
                     continue
                 if exc.status == 401:
-                    raise ProviderError("jev: API key missing or invalid (401); check JEV_API_KEY") from exc
+                    raise ProviderError("jev: API key missing or invalid (401); check " + ("AI_GATEWAY_API_KEY" if gateway else "JEV_API_KEY")) from exc
                 raise
         if not isinstance(data, dict) or "answers" not in data:
             raise ProviderError("jev: unexpected response shape (no 'answers' field)")
-        return {"model": data.get("model", model or self.model), "answers": data["answers"],
+        return {"model": data.get("model", selected_model), "answers": data["answers"],
                 "usage": data.get("usage") or {}, "raw": data}

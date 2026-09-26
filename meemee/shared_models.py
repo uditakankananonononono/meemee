@@ -69,7 +69,7 @@ def build_chain(settings: Any) -> list[Provider]:
 
 
 def build_jev(env: dict | None = None) -> JevEval:
-    """Jev evaluation client (TypeSafe AI's System One model, https://thejevai.com).
+    """Jev evaluation client (TypeSafe AI's System One model, https://typesafe.ai).
 
     Key from MEEMEE_JEV_API_KEY, else JEV_API_KEY; without one the client is unavailable and
     OFF - nothing is called or billed. Jev is hosted and paid (credits). It evaluates typed
@@ -79,7 +79,8 @@ def build_jev(env: dict | None = None) -> JevEval:
     import os
 
     e = os.environ if env is None else env
-    return JevEval(api_key=e.get("MEEMEE_JEV_API_KEY") or e.get("JEV_API_KEY"))
+    return JevEval(api_key=e.get("MEEMEE_JEV_API_KEY") or e.get("JEV_API_KEY") or "",
+                   gateway_api_key=e.get("MEEMEE_AI_GATEWAY_API_KEY") or e.get("INSTINCT_AI_GATEWAY_API_KEY") or e.get("AI_GATEWAY_API_KEY") or "")
 
 
 def generation_ready(settings: Any) -> str | None:
