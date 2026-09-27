@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 MonitorStatus=Literal['active','triggered','completed','timed_out','cancelled']
 class MonitorInput(BaseModel):
@@ -18,7 +18,21 @@ class MonitorInput(BaseModel):
     operator:Literal['eq','contains','gt','gte','lt','lte','exists']
     expected:str|float|bool|None=None
     deadline:str|None=None
-    max_fires:int=1
+    max_fires:int=Field(default=1,ge=1,le=1000)
+
+    @field_validator('deadline')
+    @classmethod
+    def normalize_deadline(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        try:
+            instant = datetime.fromisoformat(value.replace('Z', '+00:00'))
+        except ValueError as exc:
+            raise ValueError('deadline must be an ISO-8601 instant') from exc
+        if instant.tzinfo is None:
+            raise ValueError('deadline must include a timezone')
+        return instant.astimezone(timezone.utc).isoformat()
+
 
 class MonitorStore:
     def __init__(self,path:Path):
@@ -52,7 +66,9 @@ class MonitorStore:
             return {'gt':value>expected,'gte':value>=expected,'lt':value<expected,'lte':value<=expected}[op]
         except (TypeError,KeyError):return False
     def evaluate(self,owner_id,source_id,event,at=None):
-        clock=at or datetime.now(timezone.utc).isoformat();fired=[]
+        instant=datetime.fromisoformat(at.replace('Z','+00:00')) if at else datetime.now(timezone.utc)
+        if instant.tzinfo is None:raise ValueError('evaluation time must include a timezone')
+        clock=instant.astimezone(timezone.utc).isoformat();fired=[]
         with self.lock,self.db:
             rows=self.db.execute("SELECT * FROM monitors WHERE owner_id=? AND source_id=? AND status='active'",(owner_id,source_id)).fetchall()
             for row in rows:
