@@ -68,7 +68,10 @@ class MonitorStore:
         return [self.get(owner_id, row["id"]) for row in rows]
 
     def evaluate(self, owner_id, source_id, event, at=None):
-        clock, fired = at or _now().isoformat(), []
+        instant = datetime.fromisoformat(at.replace('Z', '+00:00')) if at else _now()
+        if instant.tzinfo is None:
+            raise ValueError('evaluation time must include a timezone')
+        clock, fired = instant.astimezone(timezone.utc).isoformat(), []
         with self.db.transaction() as c:
             rows = c.execute("""SELECT * FROM meemee_monitors WHERE owner_id=%s AND source_id=%s AND status='active'
                                 ORDER BY id FOR UPDATE""", (owner_id, source_id)).fetchall()
