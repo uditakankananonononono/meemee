@@ -1,0 +1,372 @@
+"""Finite signup actor. Local-only release; reviewed profiles are not site discovery."""
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+import sqlite3
+import threading
+import time
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from urllib.parse import urlsplit
+from uuid import uuid4
+
+STOPS = frozenset({'payment', 'card', 'paid_trial', 'subscription', 'fee',
+                   'consequential_terms', 'id', 'phone', 'captcha', 'bot_restriction',
+                   'unsupported_auth', 'unknown'})
+
+
+@dataclass(frozen=True)
+class Profile:
+    site: str
+    origin: str
+    signup_path: str = '/signup'
+    policy_selector: str = '#policy'
+    email_selector: str = '#email'
+    name_selector: str = '#name'
+    password_selector: str = '#password'
+    submit_selector: str = '#signup'
+    code_selector: str = '#code'
+    verify_selector: str = '#verify'
+    resend_selector: str = '#resend'
+    account_email_selector: str = '#account-email'
+    account_name_selector: str = '#account-name'
+    # Explicit reviewed classifications, never keyword heuristics.
+    commitments: tuple[str, ...] = ()
+    challenge_selectors: tuple[tuple[str, str], ...] = (
+        ('payment', '#payment'), ('card', '#card'), ('paid_trial', '#paid-trial'),
+        ('subscription', '#subscription'), ('fee', '#fee'), ('id', '#identity'),
+        ('phone', '#phone'), ('captcha', '#captcha'), ('bot_restriction', '#bot-wall'),
+        ('unsupported_auth', '#unsupported-auth'))
+    expected_policy: str = 'Free local test account. No charges. Cancel any time.'
+    sender: str = 'verify@fixture.invalid'
+    subject: str = 'Verify your local test account'
+
+    def __post_init__(self):
+        p = urlsplit(self.origin)
+        # Deliberate shipping boundary. No remote signup is enabled in this release.
+        if p.scheme != 'http' or p.hostname != '127.0.0.1' or not p.port or p.path or p.query or p.fragment or p.username:
+            raise ValueError('local fixture origin must be http://127.0.0.1:PORT')
+        if not re.fullmatch(r'/[A-Za-z0-9/_-]*', self.signup_path):
+            raise ValueError('invalid signup path')
+        if any(c not in STOPS for c in self.commitments):
+            raise ValueError('unknown commitment classification')
+
+    @property
+    def digest(self):
+        return hashlib.sha256(json.dumps(asdict(self), sort_keys=True).encode()).hexdigest()
+
+    def accepts(self, url):
+        p = urlsplit(url)
+        return f'{p.scheme}://{p.netloc}' == self.origin and not p.username and not p.fragment
+
+
+class Store:
+    """Persists only whitelisted public request fields and fixed-state events."""
+    FIELDS = {'id', 'owner', 'site', 'origin', 'email', 'name', 'credential_ref',
+              'state', 'created', 'deadline', 'profile_digest', 'inspection_digest',
+              'approved_digest', 'verification_since', 'generation', 'reason'}
+
+    def __init__(self, path):
+        self.path = str(path)
+        with self.db() as db:
+            db.execute('CREATE TABLE IF NOT EXISTS signup_runs (id TEXT PRIMARY KEY, body TEXT NOT NULL)')
+            db.execute('CREATE TABLE IF NOT EXISTS signup_events (id TEXT, at REAL, state TEXT, reason TEXT)')
+
+    def db(self):
+        return sqlite3.connect(self.path)
+
+    def save(self, run):
+        if set(run) - self.FIELDS:
+            raise ValueError('non-public state field')
+        if run['state'] not in {'inspection', 'ready', 'verification', 'success', 'stopped',
+                                'cancelled', 'unknown', 'partial', 'duplicate', 'expired'}:
+            raise ValueError('invalid state')
+        with self.db() as db:
+            db.execute('INSERT INTO signup_runs VALUES (?,?) ON CONFLICT(id) DO UPDATE SET body=excluded.body',
+                       (run['id'], json.dumps(run)))
+            db.execute('INSERT INTO signup_events VALUES (?,?,?,?)',
+                       (run['id'], time.time(), run['state'], run['reason']))
+
+    def get(self, owner, rid):
+        with self.db() as db:
+            row = db.execute('SELECT body FROM signup_runs WHERE id=?', (rid,)).fetchone()
+        if not row:
+            raise KeyError('request not found')
+        run = json.loads(row[0])
+        if run['owner'] != owner:
+            raise KeyError('request not found')
+        return run
+
+
+class Engine:
+    """Single-thread browser actor. Caller supplies authenticated owner, vault and inbox.
+
+    Credentials are resolved only at the fill boundary; never returned or persisted.
+    Exceptions from pages, vaults and mail are replaced by fixed redacted outcomes.
+    """
+    def __init__(self, store, vault, inbox, profiles, executable='/usr/bin/google-chrome'):
+        from playwright.sync_api import sync_playwright
+        self.store, self.vault, self.inbox = store, vault, inbox
+        self.profiles = {p.site: p for p in profiles}
+        self.thread = threading.get_ident()
+        self.pw = sync_playwright().start()
+        self.browser = self.pw.chromium.launch(executable_path=executable, headless=True,
+                                              args=['--no-sandbox'])
+        self.sessions = {}
+        # Restart never silently resumes or retries a possibly committed action.
+        with store.db() as db:
+            rows = db.execute('SELECT body FROM signup_runs').fetchall()
+        for row in rows:
+            run = json.loads(row[0])
+            if run['state'] in {'inspection', 'ready', 'verification'}:
+                self._state(run, 'unknown', 'process_restart_requires_reconciliation')
+
+    def _click_nav(self, page, selector):
+        """Click and wait for a possible navigation; returns the Response or None.
+
+        None means the outcome cannot be confirmed (transport failure or no
+        navigation) and must never be read as success, partial or duplicate.
+        """
+        try:
+            with page.expect_navigation(wait_until='networkidle', timeout=5000) as nav:
+                page.locator(selector).click()
+            return nav.value
+        except Exception:
+            page.wait_for_timeout(300)
+            return None
+
+    def _thread(self):
+        if threading.get_ident() != self.thread:
+            raise RuntimeError('use the dedicated signup actor thread')
+
+    def close(self):
+        self._thread()
+        self.browser.close()
+        self.pw.stop()
+
+    def _state(self, run, state, reason=''):
+        run.update(state=state, reason=reason)
+        self.store.save(run)
+        return dict(run)
+
+    def get(self, owner, rid):
+        return self.store.get(owner, rid)
+
+    def _load(self, owner, rid):
+        self._thread()
+        run = self.store.get(owner, rid)
+        p = self.profiles.get(run['site'])
+        if not p or p.digest != run['profile_digest']:
+            self._state(run, 'stopped', 'profile_changed')
+            return run, None, None
+        if rid not in self.sessions:
+            if run['state'] not in {'success', 'cancelled', 'duplicate', 'expired', 'stopped', 'unknown'}:
+                self._state(run, 'unknown', 'session_unavailable')
+            return run, p, None
+        page = self.sessions[rid][1]
+        if time.time() > run['deadline'] and run['state'] not in {'success', 'cancelled', 'stopped', 'duplicate'}:
+            self._state(run, 'expired', 'request_timeout')
+        return run, p, page
+
+    def _inspection(self, p, page):
+        if not p.accepts(page.url):
+            return None, 'origin_changed'
+        for reason, selector in p.challenge_selectors:
+            if page.locator(selector).count():
+                return None, reason
+        if p.commitments:
+            return None, p.commitments[0]
+        if page.locator(p.policy_selector).count() != 1:
+            return None, 'policy_unavailable'
+        if page.locator(p.policy_selector).inner_text().strip() != p.expected_policy:
+            return None, 'consequential_terms'
+        # Unexpected controls require review, not inferred intent. Exact form contract.
+        controls = page.locator('form input, form select, form textarea').evaluate_all(
+            '(els) => els.map(e => ({id:e.id,type:e.type,required:e.required})).sort((a,b)=>a.id.localeCompare(b.id))')
+        expected = sorted([
+            {'id': p.email_selector.removeprefix('#'), 'type': 'email', 'required': True},
+            {'id': p.name_selector.removeprefix('#'), 'type': 'text', 'required': True},
+            {'id': p.password_selector.removeprefix('#'), 'type': 'password', 'required': True},
+        ], key=lambda x: x['id'])
+        if controls != expected:
+            return None, 'unknown_form_controls'
+        for selector in (p.email_selector, p.name_selector, p.password_selector, p.submit_selector):
+            if page.locator(selector).count() != 1:
+                return None, 'ambiguous_form'
+        return hashlib.sha256(json.dumps({'profile': p.digest, 'controls': controls,
+                                        'policy': p.expected_policy}, sort_keys=True).encode()).hexdigest(), ''
+
+    def start(self, owner, site, email, name, credential_ref, lifetime=600):
+        self._thread()
+        p = self.profiles[site]
+        if not owner or not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+', email) or not name.strip():
+            raise ValueError('owner, email and name required')
+        if not re.fullmatch(r'[A-Za-z0-9._/-]{1,160}', credential_ref):
+            raise ValueError('opaque credential reference required')
+        if not 1 <= lifetime <= 1800:
+            raise ValueError('request lifetime must be 1..1800 seconds')
+        now = time.time()
+        run = dict(id=str(uuid4()), owner=owner, site=site, origin=p.origin, email=email,
+                   name=name, credential_ref=credential_ref, state='inspection', created=now,
+                   deadline=now+lifetime, profile_digest=p.digest, inspection_digest='',
+                   approved_digest='', verification_since=now, generation=0, reason='')
+        self.store.save(run)
+        context = self.browser.new_context(service_workers='block', accept_downloads=False)
+        # All resources and redirects are bound to this explicit local origin, and the
+        # account-creation POST is allowed exactly once: transparent browser retries
+        # after a reset are aborted so one request can never create two submissions.
+        posts = {'count': 0}
+        def guard(route):
+            request = route.request
+            if not p.accepts(request.url):
+                return route.abort()
+            if request.method == 'POST' and urlsplit(request.url).path == p.signup_path:
+                posts['count'] += 1
+                if posts['count'] > 1:
+                    return route.abort()
+            return route.continue_()
+        context.route('**/*', guard)
+        page = context.new_page()
+        page.set_default_timeout(2000)
+        page.on('dialog', lambda dialog: dialog.dismiss())
+        self.sessions[run['id']] = (context, page)
+        try:
+            page.goto(p.origin+p.signup_path, wait_until='networkidle')
+            digest, stop = self._inspection(p, page)
+            if stop:
+                return self._state(run, 'stopped', stop)
+            run['inspection_digest'] = digest
+            return self._state(run, 'ready')
+        except Exception:
+            return self._state(run, 'stopped', 'inspection_failed')
+
+    def approve(self, owner, rid, digest):
+        run, p, page = self._load(owner, rid)
+        if run['state'] != 'ready' or not digest or digest != run['inspection_digest']:
+            raise ValueError('review current request before approval')
+        run['approved_digest'] = digest
+        self.store.save(run)
+        return dict(run)
+
+    def submit(self, owner, rid):
+        run, p, page = self._load(owner, rid)
+        if run['state'] != 'ready':
+            return dict(run)
+        if not run['approved_digest']:
+            return self._state(run, 'ready', 'approval_required')
+        try:
+            digest, stop = self._inspection(p, page)
+            if stop or digest != run['approved_digest']:
+                return self._state(run, 'stopped', stop or 'inspection_drift')
+            page.locator(p.email_selector).fill(run['email'])
+            page.locator(p.name_selector).fill(run['name'])
+            try:
+                secret = self.vault.get(run['credential_ref'])
+                if not secret:
+                    raise KeyError('missing')
+                page.locator(p.password_selector).fill(secret)
+            except Exception:
+                # A secure provisioning UI owned by the host resolves this reference.
+                return self._state(run, 'ready', 'secure_credentials_required')
+            finally:
+                secret = None
+            # Precommit write makes crashes/non-returning submits non-retryable.
+            run['verification_since'] = time.time()
+            self._state(run, 'unknown', 'submission_in_progress')
+            nav = self._click_nav(page, p.submit_selector)
+            if nav is None or nav.status >= 400:
+                return self._state(run, 'unknown', 'submission_outcome_unverified')
+            if not p.accepts(page.url):
+                return self._state(run, 'unknown', 'origin_changed')
+            if page.locator('#duplicate').count():
+                return self._state(run, 'duplicate', 'account_already_exists')
+            for reason, selector in p.challenge_selectors:
+                if page.locator(selector).count():
+                    return self._state(run, 'stopped', reason)
+            if page.locator(p.code_selector).count() == 1:
+                return self._state(run, 'verification')
+            if page.locator(p.submit_selector).count():
+                # Form still present: the click did not produce a confirmed submission.
+                return self._state(run, 'unknown', 'submission_outcome_unverified')
+            return self._state(run, 'partial', 'account_not_verified')
+        except Exception:
+            return self._state(run, 'unknown', 'submission_outcome_unverified')
+
+    def verify(self, owner, rid):
+        run, p, page = self._load(owner, rid)
+        if run['state'] != 'verification':
+            return dict(run)
+        scope = {'request_id': rid, 'recipient': run['email'], 'sender': p.sender,
+                 'subject': p.subject, 'since': run['verification_since'],
+                 'until': min(time.time(), run['deadline']), 'origin': p.origin,
+                 'generation': run['generation']}
+        try:
+            # Inbox is allowed only this structured request, never email-authored instructions.
+            proof = self.inbox.proof(scope)
+            if proof is None:
+                return self._state(run, 'verification', 'verification_pending')
+            kind, value = proof
+            if kind == 'link':
+                parsed = urlsplit(value)
+                if not p.accepts(value) or parsed.path != '/verify-link' or not re.fullmatch(r'token=[A-Za-z0-9_-]{16,128}', parsed.query):
+                    return self._state(run, 'verification', 'verification_link_rejected')
+                page.goto(value, wait_until='networkidle')
+            elif kind == 'code' and re.fullmatch(r'[0-9]{6}', value):
+                page.locator(p.code_selector).fill(value)
+                if self._click_nav(page, p.verify_selector) is None:
+                    return self._state(run, 'verification', 'verification_outcome_unverified')
+            else:
+                return self._state(run, 'verification', 'verification_proof_rejected')
+            return self._readback(run, p, page)
+        except Exception:
+            return self._state(run, 'verification', 'verification_unavailable')
+        finally:
+            proof = None
+
+    def _readback(self, run, p, page):
+        if not p.accepts(page.url):
+            return self._state(run, 'unknown', 'origin_changed')
+        for reason, selector in p.challenge_selectors:
+            if page.locator(selector).count():
+                return self._state(run, 'stopped', reason)
+        if page.locator(p.account_email_selector).count() == 1 and page.locator(p.account_name_selector).count() == 1:
+            if page.locator(p.account_email_selector).inner_text() == run['email'] and page.locator(p.account_name_selector).inner_text() == run['name']:
+                return self._state(run, 'success', 'account_readback_verified')
+            return self._state(run, 'unknown', 'account_identity_mismatch')
+        if page.locator(p.code_selector).count():
+            return self._state(run, 'verification', 'code_not_accepted')
+        return self._state(run, 'partial', 'account_not_verified')
+
+    def resend(self, owner, rid):
+        run, p, page = self._load(owner, rid)
+        if run['state'] != 'verification':
+            return dict(run)
+        try:
+            run['verification_since'] = time.time()
+            run['generation'] += 1
+            self.store.save(run)
+            if self._click_nav(page, p.resend_selector) is None:
+                return self._state(run, 'verification', 'resend_outcome_unverified')
+            return self._state(run, 'verification', 'code_resent')
+        except Exception:
+            return self._state(run, 'verification', 'resend_unavailable')
+
+    def cancel(self, owner, rid):
+        self._thread()
+        run = self.store.get(owner, rid)
+        if run['state'] == 'success':
+            return dict(run)  # Cancellation is not account deletion.
+        if rid in self.sessions:
+            self.sessions.pop(rid)[0].close()
+        return self._state(run, 'cancelled', 'local_work_cancelled_account_may_remain')
+
+    def screenshot(self, owner, rid, path):
+        self._thread()
+        self.store.get(owner, rid)
+        page = self.sessions[rid][1]
+        # Never capture passwords, OTPs, or arbitrary remote email bodies.
+        for selector in ('input[type=password]', 'input#code'):
+            page.locator(selector).evaluate_all('(els)=>els.forEach(e=>e.value="")')
+        page.screenshot(path=str(path), full_page=True)
