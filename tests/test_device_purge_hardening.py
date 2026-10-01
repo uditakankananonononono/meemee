@@ -109,10 +109,10 @@ def test_race_after_registry_delete_is_also_blocked(tmp_path):
 
 def test_re_enrolled_device_after_purge_is_not_blocked(tmp_path):
     data = mk(tmp_path)
-    reg, creds = enroll(data, 'alice', 'quailmark')
+    reg, _creds = enroll(data, 'alice', 'quailmark')
     reg.db.close()
     LocalDeviceStores(data).delete_owner('alice')
-    reg2, _ = enroll(data, 'alice', 'newmark')  # same owner and device id, new pairing
+    _reg2, _ = enroll(data, 'alice', 'newmark')  # same owner and device id, new pairing
     jr = sqlite3.connect(data / 'native-device.sqlite3')
     assert jr.execute('SELECT count(*) FROM native_commands').fetchone()[0] == 2
     jr.close()
@@ -120,7 +120,7 @@ def test_re_enrolled_device_after_purge_is_not_blocked(tmp_path):
 
 def test_orphan_rows_of_this_owner_are_swept_and_others_kept(tmp_path):
     data = mk(tmp_path)
-    reg, _creds = enroll(data, 'alice', 'quailmark')
+    _reg, _creds = enroll(data, 'alice', 'quailmark')
     enroll(data, 'bob', 'yakmark')
     stores = LocalDeviceStores(data)
     stores.delete_owner('alice')
