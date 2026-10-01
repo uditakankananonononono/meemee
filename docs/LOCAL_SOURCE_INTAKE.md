@@ -34,6 +34,5 @@ intake.sqlite3; context, monitors, goals and source health have separate DBs.
 There is no atomic multi-file snapshot backup; stop workers before backup/restore.
 For owner deletion, use ContextStore.purge_owner, MonitorStore.delete_owner,
 GoalStore.delete_owner and delete owner/source rows from intake_snapshots and
-source_health/checks. Automatic account export/deletion and PG cutover integration
-are not complete. A revoked source retains old records until explicitly purged.
+source_health/checks. Automatic account deletion and export now cover these stores (import does not restore them); PG cutover integration is not complete. A revoked source retains old records until explicitly purged.
 The root directory is a local operator grant boundary, not a remote client API.

@@ -43,6 +43,9 @@ class PurgeTargets:
     browser_sessions: Any = None
     browser_notices: Any = None
     reflection_schedule: Any = None
+    goals: Any = None
+    intake: Any = None
+    source_health: Any = None
 
 
 class DeletionLedger:
@@ -170,6 +173,9 @@ class AccountPurger:
             ("browser_sessions", t.browser_sessions, "delete_owner", "browser_sessions"),
             ("browser_notices", t.browser_notices, "delete_user", "browser_notices"),
             ("reflection_schedule", t.reflection_schedule, "delete_owner", "reflection_runs"),
+            ("agency_goals", t.goals, "delete_owner", "agency_goals"),
+            ("intake_snapshots", t.intake, "delete_owner", "intake_snapshots"),
+            ("source_health", t.source_health, "purge_owner", "source_health"),
         ]
         for name, store, method, key in optional:
             if store is not None:
@@ -219,12 +225,15 @@ def build_account_purger(settings: Any, persistence: Any) -> AccountPurger:
     from .companion.store import CompanionStore
     from .context import ContextStore
     from .entitlements import EntitlementStore
+    from .goals import GoalStore
     from .idempotency import IdempotencyStore
+    from .intake import IntakeSnapshotStore
     from .monitors import MonitorStore
     from .personal_model import PersonalModelStore
     from .quotas import QuotaStore
     from .reflection_schedule import ReflectionSchedule
     from .runs import RunStore
+    from .source_health import SourceHealthStore
     from .webhooks import WebhookStore
 
     root = settings.data_dir
@@ -241,5 +250,7 @@ def build_account_purger(settings: Any, persistence: Any) -> AccountPurger:
         browser_sessions=persistence.browser_sessions or BrowserSessionStore(root / "browser-sessions.sqlite3"),
         browser_notices=persistence.browser_notices or TakeoverNoticeQueue(root / "browser-notices.sqlite3"),
         reflection_schedule=persistence.reflection_schedule or ReflectionSchedule(root / "reflection-schedule.sqlite3"),
+        goals=GoalStore(root / "goals.sqlite3"), intake=IntakeSnapshotStore(root / "intake.sqlite3"),
+        source_health=SourceHealthStore(root / "source-health.sqlite3"),
     )
     return AccountPurger(targets, persistence.deletion_ledger or DeletionLedger(root / "account-deletions.sqlite3"))

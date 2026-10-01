@@ -8,12 +8,13 @@ Implemented and tested boundaries:
 - Persistent explicit goal plans, fresh source waits, exact-step approvals and local notes.
 - Recurring local RSS/ICS file intake, persistent checkpoints and monitor/goal handoff.
 - Paired, signed bounded X11 window observation/title action with replay refusal.
-- Windows adapter code exists; actual Windows execution is UNVERIFIED.
+- Windows adapter code exists; actual Windows execution is UNVERIFIED and the adapter refuses to start unless MEEMEE_WINDOWS_ADAPTER_UNVERIFIED_OK=1.
+- Local agency stores are included in account export (not import) and removed by account deletion.
 
 These are not unlimited agency, internet-wide awareness, provider delivery, or a
 full-computer client. The owner's OS is still unknown: "dell intel core i5" is
-hardware. New workflows are SQLite-only, with no PostgreSQL parity. Automatic
-account deletion/export integration, UI/HTTP goal routes and native transport
+hardware. New workflows are SQLite-only, with no PostgreSQL parity. Account
+import of the local agency section, UI/HTTP goal routes and native transport
 remain missing. Reflection-worker simultaneous-claim races remain Thin (1).
 The docs test now checks this honest status instead of pinning Thin (0).
 

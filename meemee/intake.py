@@ -15,6 +15,14 @@ from .goals import GoalStore
 from .monitors import MonitorStore
 from .source_health import SourceHealthStore
 
+SNAPSHOT_SCHEMA = '''
+    PRAGMA journal_mode=WAL;
+    PRAGMA busy_timeout=5000;
+    CREATE TABLE IF NOT EXISTS intake_snapshots(owner TEXT, source TEXT, fingerprint TEXT,
+        records TEXT NOT NULL, config TEXT NOT NULL, pending INTEGER NOT NULL,
+        next_poll REAL NOT NULL, PRIMARY KEY(owner,source));
+'''
+
 
 class LocalRSS(RSSConnector):
     def __init__(self, path: Path):
@@ -43,6 +51,30 @@ class LocalICS(ICSConnector, LocalRSS):
         return payload
 
 
+class IntakeSnapshotStore:
+    """Owner-scoped access to the durable intake snapshots (they hold copied source records)."""
+
+    def __init__(self, path: Path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self.db = sqlite3.connect(path, isolation_level=None, timeout=5)
+        self.db.row_factory = sqlite3.Row
+        self.db.execute('PRAGMA secure_delete=ON')
+        self.db.executescript(SNAPSHOT_SCHEMA)
+
+    def delete_owner(self, owner: str) -> dict[str, int]:
+        if not owner:
+            raise ValueError('owner is required')
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            count = self.db.execute('DELETE FROM intake_snapshots WHERE owner=?', (owner,)).rowcount
+            self.db.execute('COMMIT')
+            self.db.execute('PRAGMA wal_checkpoint(TRUNCATE)')
+        except BaseException:
+            self.db.execute('ROLLBACK')
+            raise
+        return {'intake_snapshots': count}
+
+
 class IntakeService:
     def __init__(self, data_dir: Path, source_root: Path):
         self.root = source_root.resolve(strict=True)
@@ -54,13 +86,7 @@ class IntakeService:
         self.health = SourceHealthStore(data_dir / 'source-health.sqlite3')
         self.db = sqlite3.connect(data_dir / 'intake.sqlite3', isolation_level=None)
         self.db.row_factory = sqlite3.Row
-        self.db.executescript('''
-            PRAGMA journal_mode=WAL;
-            PRAGMA busy_timeout=5000;
-            CREATE TABLE IF NOT EXISTS intake_snapshots(owner TEXT, source TEXT, fingerprint TEXT,
-                records TEXT NOT NULL, config TEXT NOT NULL, pending INTEGER NOT NULL,
-                next_poll REAL NOT NULL, PRIMARY KEY(owner,source));
-        ''')
+        self.db.executescript(SNAPSHOT_SCHEMA)
 
     def tick(self, *, force=False):
         counts = {'ok': 0, 'failed': 0}

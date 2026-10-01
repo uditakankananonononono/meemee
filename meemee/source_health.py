@@ -15,6 +15,7 @@ class SourceHealthStore:
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
+        self.db.execute('PRAGMA secure_delete=ON')
         self.lock = threading.RLock()
         with self.db:
             self.db.executescript("""
@@ -154,3 +155,13 @@ class SourceHealthStore:
             item["metadata"] = json.loads(item["metadata"])
             result.append(item)
         return result
+
+    def purge_owner(self, owner_id: str) -> dict[str, int]:
+        """Hard-delete an owner's per-source health rows and check history."""
+        if not owner_id:
+            raise ValueError("owner is required")
+        with self.lock, self.db:
+            checks = self.db.execute("DELETE FROM source_health_checks WHERE owner_id=?", (owner_id,)).rowcount
+            rows = self.db.execute("DELETE FROM source_health WHERE owner_id=?", (owner_id,)).rowcount
+        self.db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        return {"source_health": rows, "source_health_checks": checks}
