@@ -2,6 +2,9 @@
 .github
 .venv
 .env
+.env*
+**/.env
+**/.env*
 __pycache__
 .pytest_cache
 .ruff_cache
@@ -10,3 +13,12 @@ dist
 sdk
 *.sqlite3
 *.pyc
+
+# Runtime state and private browser profiles never belong in build contexts.
+.meemee
+**/.meemee
+**/browser-profiles
+*.sqlite3-*
+*.db
+*.key
+*.pem
