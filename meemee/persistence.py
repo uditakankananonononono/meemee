@@ -153,7 +153,9 @@ def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = N
     )
     database = Database(postgres_dsn)
     MigrationStore(database).apply()
-    return Persistence("postgresql", MemoryStore(database), JobStore(database), database.close, database,
+    memory = MemoryStore(database)
+    memory.backfill_embeddings()  # vectors for rows that predate migration 016 (idempotent)
+    return Persistence("postgresql", memory, JobStore(database), database.close, database,
                        approvals=ApprovalStore(database), tokens=TokenStore(database), audit=AuditLog(database),
                        email_verifications=EmailVerificationStore(database),
                        quotas=QuotaStore(database, default_daily_jobs), entitlements=EntitlementStore(database, default_plan),
