@@ -160,9 +160,23 @@ class Engine:
                               'content-security-policy', 'content-length', 'content-encoding',
                               'transfer-encoding', 'link'})
 
-    def _respond(self, route):
-        """Fetch with the context's cookies, no redirect following, then rewrite headers."""
+    def _respond(self, route, p=None, gate=None):
+        """Fetch with the context's cookies, no redirect following, then rewrite headers.
+
+        Redirects: a 3xx answer to anything but GET/HEAD is never handed to the browser. Chrome
+        would replay the approved body on 307/308 (and re-route on 301/302/303), so the request is
+        aborted and the gate is marked; the actor then reports an unknown outcome. A 3xx answer to
+        GET/HEAD is passed on only if its Location resolves to an allowed same-origin URL, which is
+        then re-checked by the route guard like any other request."""
         response = route.fetch(max_redirects=0)
+        if 300 <= response.status < 400:
+            if route.request.method not in ('GET', 'HEAD'):
+                if gate is not None:
+                    gate['redirected'] = True
+                return route.abort()
+            location = response.headers.get('location')
+            if p is None or not location or not self._location_allowed(gate, p, route.request.url, location):
+                return route.abort()
         headers = {}
         for h in response.headers_array:
             name = h['name'].lower()
@@ -172,6 +186,18 @@ class Engine:
         if self.CSP:
             headers['Content-Security-Policy'] = self.CSP
         route.fulfill(response=response, headers=headers)
+
+    @staticmethod
+    def _location_allowed(gate, p, base, location):
+        from urllib.parse import urljoin
+        target = urljoin(base, location)
+        u = urlsplit(target)
+        if not p.accepts(target) or u.fragment:
+            return False
+        if u.query and u.path != '/verify-link':
+            return False
+        flat = unquote_plus(u.path) + '?' + unquote_plus(u.query)
+        return not (gate is not None and any(v and v in flat for v in gate['secrets']))
 
     def _click_nav(self, page, selector):
         """Click and wait for a possible navigation; returns the Response or None.
@@ -218,7 +244,7 @@ class Engine:
 
     def _open_phase(self, rid, phase, expected, secrets=()):
         gate = self.gates[rid]
-        gate.update(phase=phase, expected=expected, used=False)
+        gate.update(phase=phase, expected=expected, used=False, redirected=False)
         gate['secrets'] |= {x for x in secrets if x}
 
     def _close_phase(self, rid, keep_secrets=False):
@@ -319,14 +345,14 @@ class Engine:
         # Phase gate: no request that changes server state is allowed until the actor
         # itself opens a phase (after stored approval) and the body equals exactly the
         # approved values. Page scripts never open a phase.
-        gate = {'phase': 'idle', 'expected': None, 'used': False, 'secrets': set()}
+        gate = {'phase': 'idle', 'expected': None, 'used': False, 'secrets': set(), 'redirected': False}
         self.gates[run['id']] = gate
         def guard(route):
             request = route.request
             if not p.accepts(request.url) or not self._request_allowed(gate, p, request):
                 return route.abort()
             try:
-                return self._respond(route)
+                return self._respond(route, p, gate)
             except Exception:
                 return route.abort()
         context.route('**/*', guard)
@@ -393,6 +419,8 @@ class Engine:
                 nav = self._click_nav(page, p.submit_selector)
             finally:
                 self._close_phase(rid, keep_secrets=True)
+            if self.gates[rid]['redirected']:
+                return self._state(run, 'unknown', 'gated_request_redirected')
             if nav is None or nav.status >= 400:
                 return self._state(run, 'unknown', 'submission_outcome_unverified')
             if not p.accepts(page.url):
@@ -441,6 +469,8 @@ class Engine:
                     clicked = self._click_nav(page, p.verify_selector)
                 finally:
                     self._close_phase(rid, keep_secrets=True)
+                if self.gates[rid]['redirected']:
+                    return self._state(run, 'unknown', 'gated_request_redirected')
                 if clicked is None:
                     return self._state(run, 'verification', 'verification_outcome_unverified')
             else:
@@ -478,6 +508,8 @@ class Engine:
                 clicked = self._click_nav(page, p.resend_selector)
             finally:
                 self._close_phase(rid, keep_secrets=True)
+            if self.gates[rid]['redirected']:
+                return self._state(run, 'unknown', 'gated_request_redirected')
             if clicked is None:
                 return self._state(run, 'verification', 'resend_outcome_unverified')
             return self._state(run, 'verification', 'code_resent')

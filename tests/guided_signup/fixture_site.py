@@ -19,6 +19,10 @@ class FixtureSite:
         self.submits = 0
         self.requests = []
         self.extra_headers = {}
+        # TEST ONLY: {'status': 307, 'location': '/verify', 'paths': {'/signup'}} answers the
+        # POST after the server has processed it with a redirect instead of a page.
+        self.redirect = None
+        self.get_redirect = None
         site = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -31,6 +35,13 @@ class FixtureSite:
                 return site.sessions.get(sid)
 
             def send_html(self, body, cookie=None):
+                redir = getattr(self, '_redir', None)
+                if redir:
+                    self.send_response(redir['status'])
+                    self.send_header('Location', redir['location'])
+                    self.send_header('Content-Length', '0')
+                    self.end_headers()
+                    return
                 data = ('<!doctype html><html><head><meta charset="utf-8"><title>Local signup fixture</title>'
                         '<style>body{font:18px system-ui;background:#eef2f7;color:#14213d;margin:40px}'
                         'main{max-width:580px;background:white;padding:30px;border-radius:12px}'
@@ -61,6 +72,13 @@ class FixtureSite:
             def do_GET(self):
                 path = urlsplit(self.path).path
                 site.requests.append(('GET', path))
+                gr = site.get_redirect
+                if gr and path == gr['path']:
+                    self.send_response(gr['status'])
+                    self.send_header('Location', gr['location'])
+                    self.send_header('Content-Length', '0')
+                    self.end_headers()
+                    return
                 if path.startswith('/gmail/messages'):
                     self.gmail(path)
                     return
@@ -107,6 +125,7 @@ class FixtureSite:
             def do_POST(self):
                 path = urlsplit(self.path).path
                 site.requests.append(('POST', path))
+                self._redir = site.redirect if site.redirect and path in site.redirect['paths'] else None
                 body = parse_qs(self.rfile.read(int(self.headers['Content-Length'])).decode())
                 s = self.session()
                 if s is None:
