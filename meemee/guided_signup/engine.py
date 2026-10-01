@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import html
 import json
 import re
 import sqlite3
@@ -278,6 +279,12 @@ class Engine:
                 return route.abort()
             return route.continue_()
         context.route('**/*', guard)
+        # context.route does not see WebSockets. Every socket is intercepted at the browser
+        # level by a handler that never calls connect_to_server, so the page talks to a
+        # mock and no connection or frame ever reaches a real server.
+        context.route_web_socket(re.compile(r'.*'), lambda ws: None)
+        # Defence in depth for channels outside request routing; a page cannot redefine these.
+        context.add_init_script(self.CHANNEL_BLOCK_JS)
         page = context.new_page()
         page.set_default_timeout(2000)
         page.on('dialog', lambda dialog: dialog.dismiss())
@@ -432,52 +439,77 @@ class Engine:
             self.sessions.pop(rid)[0].close()
         return self._state(run, 'cancelled', 'local_work_cancelled_account_may_remain')
 
-    # Text visible in a screenshot is limited to these reviewed profile elements.
-    MASK_JS = """(cfg) => {
-      const secrets = cfg.secrets.filter(Boolean);
-      const keep = cfg.keep.map(sel => { try { return [...document.querySelectorAll(sel)]; } catch (e) { return []; } }).flat();
-      const style = document.createElement('style');
-      style.id = '__shot_mask__';
-      style.textContent = '*{color:transparent!important;text-shadow:none!important;caret-color:transparent!important}'
-        + 'input,textarea,select{color:transparent!important;-webkit-text-fill-color:transparent!important}'
-        + 'input::placeholder,textarea::placeholder{color:transparent!important}'
-        + 'canvas,img,svg,video,iframe,object,embed{visibility:hidden!important}'
-        + '[data-shot-keep]{color:#14213d!important;-webkit-text-fill-color:#14213d!important}'
-        + '[data-shot-hide],[data-shot-hide] *{visibility:hidden!important}';
-      document.head.appendChild(style);
-      for (const el of keep) el.setAttribute('data-shot-keep', '1');
-      // Any element whose own text or value carries a secret is hidden even if it is kept.
-      for (const el of document.querySelectorAll('*')) {
-        const own = [...el.childNodes].filter(n => n.nodeType === 3).map(n => n.data).join('');
-        const blob = own + ' ' + (el.value || '') + ' ' + [...el.attributes].map(a => a.value).join(' ');
-        if (secrets.some(x => blob.includes(x))) el.setAttribute('data-shot-hide', '1');
-      }
-    }"""
-    UNMASK_JS = """() => {
-      const s = document.getElementById('__shot_mask__'); if (s) s.remove();
-      for (const a of ['data-shot-keep', 'data-shot-hide'])
-        for (const el of document.querySelectorAll('['+a+']')) el.removeAttribute(a);
-    }"""
+    # Non-route channels are removed from every frame before page scripts run. WebSocket
+    # is additionally intercepted by route_web_socket (the real control; this is backup).
+    CHANNEL_BLOCK_JS = """(() => {
+      const dead = (name) => { try { Object.defineProperty(window, name, {
+        value: undefined, writable: false, configurable: false }); } catch (e) {} };
+      for (const n of ['RTCPeerConnection', 'webkitRTCPeerConnection', 'RTCDataChannel',
+                       'WebTransport', 'EventSource', 'RTCSessionDescription'])
+        dead(n);
+      try { Object.defineProperty(navigator, 'sendBeacon', {
+        value: () => false, writable: false, configurable: false }); } catch (e) {}
+    })();"""
+
+    @staticmethod
+    def _review_html(p, run, seen):
+        """Trusted redraw. No page text, attribute, style, pseudo-element or shadow content is
+        ever copied: every string comes from the reviewed profile or the stored run, and the
+        page only contributes booleans and exact-equality checks."""
+        e = html.escape
+        def row(label, value, note=''):
+            return ('<tr><td class="k">'+e(label)+'</td><td>'+e(value)+'</td><td class="n">'
+                    +e(note)+'</td></tr>')
+        policy_ok = seen['policy'] == p.expected_policy
+        rows = [
+            row('Site', run['site']), row('Origin', run['origin']), row('State', run['state']),
+            row('Reason', run['reason'] or '-'),
+            row('Policy (reviewed text)', p.expected_policy if policy_ok else '[page text differs, not shown]',
+                'matches page' if policy_ok else 'MISMATCH'),
+            row('Account email', run['email'],
+                'page shows this value' if seen['email'] == run['email'] else
+                ('page value differs or absent' if seen['email_present'] else 'not shown by page')),
+            row('Account name', run['name'],
+                'page shows this value' if seen['name'] == run['name'] else
+                ('page value differs or absent' if seen['name_present'] else 'not shown by page')),
+            row('Password field', '[never captured]'), row('Code field', '[never captured]'),
+        ]
+        for label, key in (('Create button', 'submit'), ('Verify button', 'verify'), ('Resend button', 'resend')):
+            rows.append(row(label, 'present' if seen[key] else 'absent'))
+        return ('<!doctype html><html><head><meta charset="utf-8">'
+                '<style>body{font:16px system-ui;background:#eef2f7;color:#14213d;margin:24px}'
+                'table{border-collapse:collapse;background:#fff}td{border:1px solid #c8d0dc;padding:8px 12px}'
+                '.k{font-weight:600}.n{color:#5a6475}</style></head><body>'
+                '<h1>Signup review (redrawn from reviewed data)</h1><table>'+''.join(rows)+'</table></body></html>')
 
     def screenshot(self, owner, rid, path):
+        """Redraw, never mask. The live page is only asked yes/no questions; its text is not
+        rendered, so script-chosen text (spans, pseudo-elements, shadow DOM, encodings) has no
+        route into the image."""
         self._thread()
         run = self.store.get(owner, rid)
         page = self.sessions[rid][1]
         profile = self.profiles[run['site']]
-        # Never capture passwords, OTPs, or page text outside reviewed profile elements.
+        # Never leave passwords or one-time codes in the live fields either.
         for selector in (profile.password_selector, profile.code_selector):
             page.locator(selector).evaluate_all('(els)=>els.forEach(e=>e.value="")')
-        secrets = set(self.gates.get(rid, {}).get('secrets', ()))
+        def text_of(selector):
+            loc = page.locator(selector)
+            return (loc.first.text_content() or '') if loc.count() else None
+        seen = {'policy': text_of(profile.policy_selector)}
+        for key, sel in (('email', profile.account_email_selector), ('name', profile.account_name_selector)):
+            seen[key] = text_of(sel)
+            seen[key+'_present'] = seen[key] is not None
+        for key, sel in (('submit', profile.submit_selector), ('verify', profile.verify_selector),
+                         ('resend', profile.resend_selector)):
+            seen[key] = page.locator(sel).count() > 0
+        doc = self._review_html(profile, run, seen)
+        shot = self.browser.new_context(java_script_enabled=False, service_workers='block',
+                                        accept_downloads=False)
         try:
-            secret = self.vault.get(run['credential_ref'])
-            if secret:
-                secrets.add(secret)
-        except Exception:
-            pass
-        keep = [profile.policy_selector, profile.account_email_selector, profile.account_name_selector,
-                'h1', profile.submit_selector, profile.verify_selector, profile.resend_selector]
-        page.evaluate(self.MASK_JS, {'secrets': sorted(secrets), 'keep': keep})
-        try:
-            page.screenshot(path=str(path), full_page=True)
+            shot.route('**/*', lambda route: route.abort())
+            view = shot.new_page()
+            view.set_content(doc)
+            view.screenshot(path=str(path), full_page=True)
         finally:
-            page.evaluate(self.UNMASK_JS)
+            shot.close()

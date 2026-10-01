@@ -53,13 +53,20 @@ treated as instructions.
   production validation beyond this fixture acceptance.
 - Real Gmail API behavior is covered by a local metadata-first stub contract in
   tests, not by a live Gmail account in this acceptance run.
-- Screenshots: password/code fields are cleared, all page text is made transparent except
-  reviewed profile elements (policy, headings, account email/name, buttons), images,
-  canvas, svg and iframes are hidden, and any element whose text, value or attributes
-  contain the password or a code is hidden. This removes reflected secrets that appear as
-  text. A page that renders a secret in a transformed form (encoded, split) inside a kept
-  element would not be matched by the value check; the kept set is deliberately small.
-  Residual risk: a script could exfiltrate a transformed secret in a same-origin request
-  path; only exact values are matched. Loopback fixture only, nothing tested remotely.
+- Screenshots are redrawn, not masked. The live page is only asked yes/no questions and
+  exact-equality checks (does the policy text equal the reviewed policy, do the account
+  email/name equal the stored run values, do the buttons exist). The image is then drawn
+  in a separate JS-disabled, network-blocked context from reviewed profile data and the
+  stored run, with every string HTML-escaped. No page text, attribute, style,
+  pseudo-element or shadow-root content is copied. Password and code fields are also
+  cleared in the live page. Tested against: per-character spans, ::before/::after content
+  (including attr()), open shadow roots, base64 and reversed text. Consequence: a
+  screenshot is a review card, not a picture of the page. Fixture-verified only.
+- Non-route channels: WebSockets are intercepted with route_web_socket by a handler that
+  never connects to a server (verified: a raw listener on another loopback port gets no
+  connection). RTCPeerConnection, WebTransport, EventSource and sendBeacon are removed or
+  neutralised in every frame by an init script (backup layer; EventSource and beacon are
+  also stopped by request routing). Not verified: WebRTC against a real peer, WebTransport
+  (needs HTTPS), and any channel not listed here.
 - This is a local-fixture release (loopback only). It has not been run against any real
   website or live Gmail and must not be described as real-site signup.
