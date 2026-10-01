@@ -58,12 +58,14 @@ def export_account(data_dir: Path, principal: str, destination: Path) -> dict:
     runs=_rows(data_dir/"runs.sqlite3","SELECT * FROM runs WHERE principal=? ORDER BY created_at,run_id",(principal,))
     entitlements=_rows(data_dir/"entitlements.sqlite3","SELECT principal,plan,updated_at FROM principal_plans WHERE principal=?",(principal,))
     agency=local_agency_rows(data_dir,principal)
-    payload={"format":FORMAT,"principal":principal,"exported_at":datetime.now(timezone.utc).isoformat(),"jobs":jobs,"runs":runs,"entitlements":entitlements,"local_agency":agency}
+    from .devices import LocalDeviceStores
+    local_devices=LocalDeviceStores(data_dir).export_owner(principal)
+    payload={"format":FORMAT,"principal":principal,"exported_at":datetime.now(timezone.utc).isoformat(),"jobs":jobs,"runs":runs,"entitlements":entitlements,"local_agency":agency,"local_devices":local_devices}
     canonical=json.dumps(payload,sort_keys=True,separators=(",",":"))
     envelope={"payload":payload,"sha256":hashlib.sha256(canonical.encode()).hexdigest()}
     destination.parent.mkdir(parents=True,exist_ok=True)
     destination.write_text(json.dumps(envelope,indent=2,sort_keys=True)+"\n")
-    return {"principal":principal,"jobs":len(jobs),"runs":len(runs),"entitlements":len(entitlements),"local_agency":{k:len(v) for k,v in agency.items()},"sha256":envelope["sha256"]}
+    return {"principal":principal,"jobs":len(jobs),"runs":len(runs),"entitlements":len(entitlements),"local_agency":{k:len(v) for k,v in agency.items()},"local_devices":{k:len(v) for k,v in local_devices.items()},"sha256":envelope["sha256"]}
 
 
 def inspect_import(source: Path, target_principal: str | None = None) -> dict:

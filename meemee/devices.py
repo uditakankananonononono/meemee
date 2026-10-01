@@ -22,6 +22,7 @@ class DeviceRegistry:
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.lock = threading.RLock()
+        self.db.execute("PRAGMA secure_delete=ON")
         with self.db:
             self.db.executescript("""
           PRAGMA journal_mode=WAL;
@@ -198,3 +199,113 @@ class DeviceSimulator:
             now=now,
         )
         return self.handlers[command.capability](**command.arguments)
+
+
+class LocalDeviceStores:
+    """Owner-scoped export and hard delete of the local device stores.
+
+    ``devices.sqlite3`` (pairings, devices with their HMAC secret, issued commands with
+    envelopes and results) is keyed by owner. The NativeClient journal
+    ``native-device.sqlite3`` has no owner column; its rows are reached through the
+    owner's device ids. A missing file or table contributes nothing.
+    """
+
+    REGISTRY = "devices.sqlite3"
+    JOURNAL = "native-device.sqlite3"
+
+    def __init__(self, data_dir: Path):
+        self.data_dir = Path(data_dir)
+
+    def _open(self, name: str) -> sqlite3.Connection | None:
+        path = self.data_dir / name
+        if not path.exists():
+            return None
+        db = sqlite3.connect(path, timeout=5, isolation_level=None)
+        db.row_factory = sqlite3.Row
+        db.execute("PRAGMA busy_timeout=5000")
+        db.execute("PRAGMA secure_delete=ON")
+        return db
+
+    @staticmethod
+    def _select(db: sqlite3.Connection, query: str, args: tuple) -> list[dict]:
+        try:
+            return [dict(r) for r in db.execute(query, args).fetchall()]
+        except sqlite3.OperationalError as exc:
+            if "no such table" not in str(exc):
+                raise
+            return []
+
+    def export_owner(self, owner: str) -> dict[str, list[dict]]:
+        out: dict[str, list[dict]] = {"device_pairings": [], "devices": [], "device_commands": [],
+                                      "native_commands": []}
+        reg = self._open(self.REGISTRY)
+        ids: list[str] = []
+        if reg is not None:
+            try:
+                out["device_pairings"] = self._select(reg, "SELECT * FROM device_pairings WHERE owner_id=? ORDER BY id", (owner,))
+                out["devices"] = self._select(reg, "SELECT * FROM devices WHERE owner_id=? ORDER BY device_id", (owner,))
+                ids = [r["device_id"] for r in out["devices"]]
+                out["device_commands"] = self._select(
+                    reg, "SELECT * FROM device_commands WHERE device_id IN (SELECT device_id FROM devices WHERE owner_id=?) ORDER BY id", (owner,))
+            finally:
+                reg.close()
+        jr = self._open(self.JOURNAL)
+        if jr is not None:
+            try:
+                for device_id in ids:
+                    out["native_commands"] += self._select(
+                        jr, "SELECT * FROM native_commands WHERE device_id=? ORDER BY command_id", (device_id,))
+            finally:
+                jr.close()
+        return out
+
+    def delete_owner(self, owner: str) -> dict[str, int]:
+        if not owner:
+            raise ValueError("owner is required")
+        counts = {"device_pairings": 0, "devices": 0, "device_commands": 0, "native_commands": 0}
+        reg = self._open(self.REGISTRY)
+        ids: list[str] = []
+        if reg is not None:
+            try:
+                ids = [r["device_id"] for r in self._select(reg, "SELECT device_id FROM devices WHERE owner_id=?", (owner,))]
+            finally:
+                reg.close()
+        # Journal first: it is reached through the registry's device ids, so a crash between
+        # the two steps leaves the registry intact and the whole step re-runnable.
+        jr = self._open(self.JOURNAL)
+        if jr is not None:
+            try:
+                jr.execute("BEGIN IMMEDIATE")
+                try:
+                    for device_id in ids:
+                        try:
+                            counts["native_commands"] += jr.execute(
+                                "DELETE FROM native_commands WHERE device_id=?", (device_id,)).rowcount
+                        except sqlite3.OperationalError as exc:
+                            if "no such table" not in str(exc):
+                                raise
+                    jr.execute("COMMIT")
+                except Exception:
+                    jr.execute("ROLLBACK")
+                    raise
+                jr.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            finally:
+                jr.close()
+        reg = self._open(self.REGISTRY)
+        if reg is not None:
+            try:
+                reg.execute("BEGIN IMMEDIATE")
+                try:
+                    counts["device_commands"] = reg.execute(
+                        "DELETE FROM device_commands WHERE device_id IN (SELECT device_id FROM devices WHERE owner_id=?)",
+                        (owner,)).rowcount
+                    counts["device_pairings"] = reg.execute("DELETE FROM device_pairings WHERE owner_id=?", (owner,)).rowcount
+                    counts["devices"] = reg.execute("DELETE FROM devices WHERE owner_id=?", (owner,)).rowcount
+                    reg.execute("COMMIT")
+                except Exception:
+                    reg.execute("ROLLBACK")
+                    raise
+                reg.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            finally:
+                reg.close()
+        return counts
