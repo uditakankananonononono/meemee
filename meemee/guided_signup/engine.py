@@ -364,9 +364,10 @@ class Engine:
 
     def screenshot(self, owner, rid, path):
         self._thread()
-        self.store.get(owner, rid)
+        run = self.store.get(owner, rid)
         page = self.sessions[rid][1]
+        profile = self.profiles[run['site']]
         # Never capture passwords, OTPs, or arbitrary remote email bodies.
-        for selector in ('input[type=password]', 'input#code'):
+        for selector in (profile.password_selector, profile.code_selector):
             page.locator(selector).evaluate_all('(els)=>els.forEach(e=>e.value="")')
         page.screenshot(path=str(path), full_page=True)
