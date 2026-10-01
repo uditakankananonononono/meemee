@@ -213,6 +213,8 @@ async def test_default_loader_refuses_to_download_mid_request(monkeypatch):
 
 @respx.mock
 async def test_route_falls_from_local_server_to_in_process_transformers(monkeypatch):
+    # The injected fake loader does not need optional torch/transformers packages.
+    monkeypatch.setattr(providers, "transformers_missing", lambda: None)
     _, _, loader = _fake('{"final": "answered in-process"}')
     monkeypatch.setattr(providers, "_default_loader", loader)
     s = settings(model_base_url=LOCAL, model_routes="agent=local,local-transformers", transformers_model="fake/tiny")
@@ -285,3 +287,21 @@ def test_fugu_defaults_to_the_real_sakana_alias_and_reads_sakana_key(monkeypatch
     assert cat.profiles["fugu"].api_key == "sk_sakana"
     assert "MEEMEE_ALLOW_PAID_MODELS" in cat.chain("chat")[1]["fugu"]  # key alone never enables a paid profile
     assert ModelCatalog.from_settings(settings(fugu_api_key="sk_meemee")).profiles["fugu"].api_key == "sk_meemee"
+
+
+@respx.mock
+async def test_route_skips_transformers_when_optional_dependencies_are_missing(monkeypatch):
+    monkeypatch.setattr(providers, "transformers_missing", lambda: "torch not installed")
+    _, _, loader = _fake('{"final": "must not run"}')
+    monkeypatch.setattr(providers, "_default_loader", loader)
+    s = settings(model_base_url=LOCAL, model_routes="agent=local-transformers,local")
+    respx.post(f"{LOCAL}/chat/completions").mock(return_value=completion('{"final": "http fallback"}'))
+    m = build_role_model(s, "agent")
+    decision = await m.decide([{"role": "user", "content": "hi"}])
+    assert decision.final == "http fallback"
+    assert m.attempts == [
+        {"profile": "local-transformers", "outcome": "skipped: torch not installed"},
+        {"profile": "local", "outcome": "ok"},
+    ]
+    assert "local-transformers" not in m._clients
+    await m.aclose()
