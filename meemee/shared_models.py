@@ -24,12 +24,12 @@ from pathlib import Path
 from typing import Any
 
 from ._vendor.instinct_models import (
+    HermesLocal,
     InklingHFRouter,
     InklingLocal,
-    HermesLocal,
-    OpenClawOwner,
     JevEval,
     NeedleLocal,
+    OpenClawOwner,
     OrnithOpenAICompat,
     Provider,
     Router,
