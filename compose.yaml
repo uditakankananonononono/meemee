@@ -1,0 +1,27 @@
+# Single-host, SQLite API only. No cloud service or paid model fallback.
+services:
+  api:
+    build: .
+    ports:
+      - "127.0.0.1:8787:8787"
+    environment:
+      MEEMEE_VAULT_KEY: ${MEEMEE_VAULT_KEY:?Supply your existing vault key at runtime}
+      MEEMEE_API_TOKEN: ${MEEMEE_API_TOKEN:?Supply your existing bootstrap API token at runtime}
+      MEEMEE_DATA_DIR: /home/meemee/.meemee
+      MEEMEE_PERSISTENCE_BACKEND: sqlite
+      MEEMEE_PUBLIC_URL: http://localhost:8787
+      MEEMEE_TRUSTED_HOSTS: localhost,127.0.0.1
+      MEEMEE_MODEL_BASE_URL: ${MEEMEE_MODEL_BASE_URL:-http://host.docker.internal:11434/v1}
+      MEEMEE_MODEL_NAME: ${MEEMEE_MODEL_NAME:-qwen2.5-coder:14b}
+      MEEMEE_MODEL_API_KEY: local
+      MEEMEE_ALLOW_PAID_MODELS: "false"
+      MEEMEE_HF_FALLBACK: "false"
+      MEEMEE_SHARED_ALLOW_HOSTED: "false"
+      MEEMEE_SIGNUP_ENABLED: "false"
+      MEEMEE_READINESS_REQUIRE_MODEL: ${MEEMEE_READINESS_REQUIRE_MODEL:-false}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - meemee-data:/home/meemee/.meemee
+volumes:
+  meemee-data:
