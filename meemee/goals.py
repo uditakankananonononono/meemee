@@ -168,3 +168,68 @@ class GoalStore:
     def _row(row: sqlite3.Row, dependencies: list[str]) -> dict[str, Any]:
         result = dict(row); result["context"] = json.loads(result["context"]); result["depends_on"] = dependencies
         return result
+
+    def init_execution(self):
+        """Additive local workflow schema; independent of model-generated plans."""
+        with self.lock:
+            self.db.executescript('''
+                PRAGMA busy_timeout=5000;
+                CREATE TABLE IF NOT EXISTS agency_progress(goal_id TEXT PRIMARY KEY, step INTEGER NOT NULL DEFAULT 0);
+                CREATE TABLE IF NOT EXISTS agency_step_grants(goal_id TEXT, step INTEGER, principal TEXT NOT NULL, digest TEXT NOT NULL, PRIMARY KEY(goal_id,step));
+                CREATE TABLE IF NOT EXISTS agency_notes(goal_id TEXT, step INTEGER, principal TEXT NOT NULL, text TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(goal_id,step));
+                CREATE TABLE IF NOT EXISTS agency_execution_events(id INTEGER PRIMARY KEY, goal_id TEXT, principal TEXT NOT NULL, step INTEGER, kind TEXT NOT NULL, detail TEXT NOT NULL, created_at TEXT NOT NULL);
+            ''')
+
+    def approve_step(self, principal, goal_id, step):
+        import hashlib
+        self.init_execution()
+        with self.lock, self.db:
+            self.db.execute('BEGIN IMMEDIATE')
+            try:
+                goal = self._owned(principal, goal_id)
+                plan = json.loads(goal['context'])['steps']
+                action = plan[step]
+                if step < 0 or action['kind'] != 'note' or goal['status'] in _TERMINAL:
+                    raise ValueError('only a live exact note step may be approved')
+                digest = hashlib.sha256(json.dumps(action, sort_keys=True).encode()).hexdigest()
+                self.db.execute('INSERT OR REPLACE INTO agency_step_grants VALUES(?,?,?,?)',
+                                (goal_id, step, principal, digest))
+                self.db.execute("UPDATE agency_goals SET status='pending',lease_owner=NULL,lease_until=NULL WHERE id=? AND status='blocked'", (goal_id,))
+                self.db.execute('COMMIT')
+            except Exception:
+                self.db.execute('ROLLBACK')
+                raise
+
+    def revoke_step(self, principal, goal_id, step):
+        self.init_execution()
+        with self.lock:
+            self._owned(principal, goal_id)
+            self.db.execute('DELETE FROM agency_step_grants WHERE goal_id=? AND step=? AND principal=?', (goal_id, step, principal))
+
+    def wake(self, principal, goal_id):
+        with self.lock:
+            self._owned(principal, goal_id)
+            self.db.execute("UPDATE agency_goals SET status='pending',lease_owner=NULL,lease_until=NULL WHERE id=? AND status='blocked'", (goal_id,))
+
+    def notes(self, principal):
+        self.init_execution()
+        with self.lock:
+            return [dict(row) for row in self.db.execute('SELECT * FROM agency_notes WHERE principal=? ORDER BY created_at,goal_id,step', (principal,))]
+
+    def delete_owner(self, principal):
+        self.init_execution()
+        with self.lock:
+            self.db.execute('BEGIN IMMEDIATE')
+            try:
+                self.db.execute('DELETE FROM agency_goal_dependencies WHERE goal_id IN (SELECT id FROM agency_goals WHERE principal=?)', (principal,))
+                self.db.execute('DELETE FROM agency_progress WHERE goal_id IN (SELECT id FROM agency_goals WHERE principal=?)', (principal,))
+                for table in ('agency_step_grants', 'agency_notes', 'agency_execution_events'):
+                    self.db.execute(f'DELETE FROM {table} WHERE principal=?', (principal,))
+                # Remove child references before deleting the graph.
+                self.db.execute('UPDATE agency_goals SET parent_id=NULL WHERE principal=?', (principal,))
+                count = self.db.execute('DELETE FROM agency_goals WHERE principal=?', (principal,)).rowcount
+                self.db.execute('COMMIT')
+                return count
+            except Exception:
+                self.db.execute('ROLLBACK')
+                raise
