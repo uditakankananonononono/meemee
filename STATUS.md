@@ -3,11 +3,11 @@
 **Current core version:** 0.122.0  
 **Ledger:** verified counts are evidence from the named runs below, not retroactive proof; 1 thin (reflection-worker claim concurrency)  
 **Supported production shape:** SQLite/WAL single-host; PostgreSQL memory and owner-scoped jobs are selectable but require target-environment live verification  
-**Last core verification (branch build/local-agency-20261001, 2026-10-01, Python 3.12.14, Ubuntu 22.04):** 543 core passed, 114 skipped (incl. real-weights transformer checks; optional transformers/torch not installed), 0 failed; SDK 259 passed, 7 skipped; live local PostgreSQL 16.2 (Asia/Kolkata, pgserver) 82 passed, 0 skipped via scripts/pg_live_check.py; core Ruff clean incl. vendored shared-models refreshed to 158c5a6 (upstream lint-only commit); wheel meemee_agent-0.122.0 built. New local monitor/agency/intake/native-device workflows are SQLite-only and unverified on PostgreSQL.  
+**Last core verification (branch build/local-agency-20261001, 2026-10-01, Python 3.12.14, Ubuntu 22.04):** 544 core passed, 114 skipped (incl. real-weights transformer checks; optional transformers/torch not installed), 0 failed; SDK 259 passed, 7 skipped; live local PostgreSQL 16.2 (Asia/Kolkata, pgserver) 82 passed, 0 skipped via scripts/pg_live_check.py; core Ruff clean incl. vendored shared-models refreshed to 158c5a6 (upstream lint-only commit); wheel meemee_agent-0.122.0 built. New local monitor/agency/intake/native-device workflows are SQLite-only and unverified on PostgreSQL.  
 
 ## What is production-usable now
 
-The authoritative detailed list is the 123-item "Verified" section in [README.md](README.md). The main product surfaces are:
+The detailed historical ledger is the "Verified" section in [README.md](README.md). The main product surfaces are:
 
 - Bounded agent loop, typed tools, per-run and persistent exact-tool approvals, deterministic policy, secret scrubbing and safe provenance.
 - Local and scheduled jobs, atomic claims, retries, cooperative cancellation, resumable SSE and idempotent submission.
@@ -19,6 +19,11 @@ The authoritative detailed list is the 123-item "Verified" section in [README.md
 - Companion layer: persistent per-user profiles with validated persona configuration, durable provenanced fact memory with full-text retrieval, per-channel conversation persistence, a persona-conditioned conversational engine with bounded fact extraction, proactive check-ins with timezone-aware quiet hours on a durable delivery queue, and local/webhook/WhatsApp/iMessage channel adapters (provider channels config-gated), exposed over scoped HTTP APIs and the `meemee companion` CLI.
 
 ## Verification evidence
+
+Current branch results are in the header and `evidence/final-core.txt`,
+`evidence/final-lint.txt`, `evidence/pg-live-final.txt`, `evidence/sdk.txt` and
+`evidence/package-audit.txt`. The table below is historical evidence, not a
+new rerun of every product surface.
 
 | Surface | Latest evidence in this tree | Result |
 |---|---|---|
