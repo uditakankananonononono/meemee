@@ -97,7 +97,11 @@ def _ics_time(value: str, tzid: str | None = None, *, default_timezone: str | No
     an inferred instant. The connector marks these as all_day/date_anchor_only.
     Custom VTIMEZONE definitions are not interpreted by this bounded adapter.
     """
-    if re.fullmatch(r"\d{8}", value):
+    # strptime alone accepts single-digit components; require RFC 5545 widths
+    # and ASCII digits before it can normalize a malformed timestamp.
+    if not re.fullmatch(r"[0-9]{8}(?:T[0-9]{6}Z?)?", value):
+        raise ValueError("invalid ICS timestamp grammar: expected YYYYMMDD or YYYYMMDDTHHMMSS[Z]")
+    if len(value) == 8:
         return datetime.strptime(value, "%Y%m%d").replace(tzinfo=timezone.utc).isoformat()
     if value.endswith("Z"):
         if tzid:
