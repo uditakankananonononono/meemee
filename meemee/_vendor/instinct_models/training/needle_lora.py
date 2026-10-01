@@ -14,16 +14,16 @@ import json
 import os
 import shutil
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable
 
 Runner = Callable[[list[str], dict], subprocess.CompletedProcess]
 
 
 def _run(cmd: list[str], env: dict) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=6 * 3600)
+    return subprocess.run(cmd, env=env, capture_output=True, text=True, check=False, timeout=6 * 3600)
 
 
 @dataclass
