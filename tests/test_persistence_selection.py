@@ -28,12 +28,14 @@ def test_postgres_selection_migrates_and_builds_stores(monkeypatch,tmp_path):
         def apply(self): events.append(("migrate",))
     class Store:
         def __init__(self,db): self.db=db
+        def backfill_embeddings(self): events.append(("backfill",))
     monkeypatch.setattr(meemee_persist_pg,"Database",DB)
     monkeypatch.setattr(meemee_persist_pg,"MigrationStore",Migrate)
     monkeypatch.setattr(meemee_persist_pg,"MemoryStore",Store)
     monkeypatch.setattr(meemee_persist_pg,"JobStore",Store)
     selected=build_persistence("postgresql",tmp_path,"postgresql://test")
     assert selected.backend=="postgresql" and ("migrate",) in events
+    assert events.index(("backfill",))>events.index(("migrate",))
     selected.close(); assert events[-1]==("close",)
 
 
@@ -64,6 +66,7 @@ def test_persistence_health_checks_are_backend_neutral(monkeypatch,tmp_path):
         def apply(self): pass
     class Store:
         def __init__(self,db): self.db=db
+        def backfill_embeddings(self): pass
     monkeypatch.setattr(meemee_persist_pg,"Database",DB); monkeypatch.setattr(meemee_persist_pg,"MigrationStore",Migrate)
     monkeypatch.setattr(meemee_persist_pg,"MemoryStore",Store); monkeypatch.setattr(meemee_persist_pg,"JobStore",Store)
     postgres=build_persistence("postgresql",tmp_path,"postgresql://test")

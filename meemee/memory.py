@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .semantic_memory import HashingEmbedder, cosine
+from .semantic_memory import HashingEmbedder, cosine, reciprocal_rank_fusion
 from .sensitive import scrub_text
 
 
@@ -61,24 +61,27 @@ class MemoryStore:
             )
             return memory_id
 
-    def search(self, query: str, limit: int = 8) -> list[dict[str, Any]]:
+    def search(self, query: str, limit: int = 8, run_id: str | None = None) -> list[dict[str, Any]]:
         safe = " OR ".join(f'"{part}"' for part in query.split() if part) or '""'
         with self.lock:
             rows = self.connection.execute(
                 """SELECT m.*, bm25(memories_fts) AS score FROM memories_fts
                    JOIN memories m ON m.id = memories_fts.rowid
-                   WHERE memories_fts MATCH ? ORDER BY score LIMIT ?""",
-                (safe, limit),
+                   WHERE memories_fts MATCH ? AND (? IS NULL OR m.run_id = ?)
+                   ORDER BY score LIMIT ?""",
+                (safe, run_id, run_id, limit),
             ).fetchall()
         return [{**dict(row), "metadata": json.loads(row["metadata"])} for row in rows]
 
-    def semantic_search(self, query: str, limit: int = 8, candidates: int = 200) -> list[dict[str, Any]]:
+    def semantic_search(self, query: str, limit: int = 8, candidates: int = 200,
+                        run_id: str | None = None) -> list[dict[str, Any]]:
         """Rank recent memories by deterministic embedding cosine similarity."""
         target = self.embedder.embed(query)
         with self.lock:
             rows = self.connection.execute(
                 """SELECT m.*,e.embedding FROM memories m JOIN memory_embeddings e ON e.memory_id=m.id
-                   ORDER BY m.id DESC LIMIT ?""", (max(limit, candidates),)
+                   WHERE (? IS NULL OR m.run_id = ?) ORDER BY m.id DESC LIMIT ?""",
+                (run_id, run_id, max(limit, candidates))
             ).fetchall()
         ranked = sorted(
             ((cosine(target, json.loads(row["embedding"])), row) for row in rows),
@@ -87,18 +90,11 @@ class MemoryStore:
         return [{**dict(row), "metadata": json.loads(row["metadata"]), "semantic_score": score}
                 for score, row in ranked]
 
-    def hybrid_search(self, query: str, limit: int = 8) -> list[dict[str, Any]]:
+    def hybrid_search(self, query: str, limit: int = 8, run_id: str | None = None) -> list[dict[str, Any]]:
         """Fuse lexical and semantic ranks with reciprocal-rank fusion."""
-        lexical = self.search(query, max(limit * 3, 20))
-        semantic = self.semantic_search(query, max(limit * 3, 20))
-        by_id: dict[int, dict[str, Any]] = {}
-        scores: dict[int, float] = {}
-        for result_set in (lexical, semantic):
-            for rank, row in enumerate(result_set, 1):
-                ident = int(row["id"]); by_id[ident] = row
-                scores[ident] = scores.get(ident, 0.0) + 1.0 / (60 + rank)
-        ordered = sorted(by_id, key=lambda ident: (-scores[ident], -ident))[:limit]
-        return [{**by_id[ident], "hybrid_score": scores[ident]} for ident in ordered]
+        lexical = self.search(query, max(limit * 3, 20), run_id=run_id)
+        semantic = self.semantic_search(query, max(limit * 3, 20), run_id=run_id)
+        return reciprocal_rank_fusion(lexical, semantic, limit=limit)
 
     def recent(self, limit: int = 20) -> list[dict[str, Any]]:
         with self.lock:

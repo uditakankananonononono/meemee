@@ -12,7 +12,7 @@ REQUIRED_WHEEL_PATHS = (
     "console/__init__.py", "console/mount.py", "console/index.html",
     "console/assets/app.js", "console/assets/app.css", "meemee/api.py",
     "meemee/cli.py", "meemee/py.typed", "meemee_persist_pg/__init__.py",
-    "meemee_persist_pg/sql/001_initial.sql", "meemee_persist_pg/sql/002_job_ownership.sql",
+    "meemee_persist_pg/sql/001_initial.sql", "meemee_persist_pg/sql/002_job_ownership.sql", "meemee_persist_pg/sql/016_memory_vectors.sql",
 )
 
 
