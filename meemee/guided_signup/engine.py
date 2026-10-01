@@ -9,7 +9,7 @@ import threading
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, unquote_plus, urlsplit
 from uuid import uuid4
 
 STOPS = frozenset({'payment', 'card', 'paid_trial', 'subscription', 'fee',
@@ -115,6 +115,7 @@ class Engine:
         self.browser = self.pw.chromium.launch(executable_path=executable, headless=True,
                                               args=['--no-sandbox'])
         self.sessions = {}
+        self.gates = {}
         # Restart never silently resumes or retries a possibly committed action.
         with store.db() as db:
             rows = db.execute('SELECT body FROM signup_runs').fetchall()
@@ -136,6 +137,55 @@ class Engine:
         except Exception:
             page.wait_for_timeout(300)
             return None
+
+    @staticmethod
+    def _request_allowed(gate, p, request):
+        u = urlsplit(request.url)
+        # Secrets and one-time codes never leave in a path or query, even same-origin.
+        flat = unquote_plus(u.path) + '?' + unquote_plus(u.query)
+        if any(v and v in flat for v in gate['secrets']):
+            return False
+        # Only the actor-opened verification link carries a query.
+        if u.query and u.path != '/verify-link':
+            return False
+        if request.method in ('GET', 'HEAD'):
+            return True
+        if request.method != 'POST' or not request.is_navigation_request() or gate['used']:
+            return False
+        expected = gate['expected']
+        if expected is None or gate['phase'] == 'idle':
+            return False
+        phase_path = {'submit': p.signup_path, 'verify': '/verify', 'resend': '/resend'}[gate['phase']]
+        if u.path != phase_path or u.query:
+            return False
+        try:
+            body = parse_qs(request.post_data or '', keep_blank_values=True, strict_parsing=bool(request.post_data))
+        except ValueError:
+            return False
+        if {k: v for k, v in body.items()} != {k: [v] for k, v in expected.items()}:
+            return False
+        gate['used'] = True
+        return True
+
+    def _open_phase(self, rid, phase, expected, secrets=()):
+        gate = self.gates[rid]
+        gate.update(phase=phase, expected=expected, used=False)
+        gate['secrets'] |= {x for x in secrets if x}
+
+    def _close_phase(self, rid, keep_secrets=False):
+        gate = self.gates.get(rid)
+        if gate:
+            gate.update(phase='idle', expected=None, used=False)
+            if not keep_secrets:
+                gate['secrets'] = set()
+
+    def _field_names(self, p, page):
+        names = {}
+        for key, sel in (('email', p.email_selector), ('name', p.name_selector), ('password', p.password_selector)):
+            names[key] = page.locator(sel).get_attribute('name') or ''
+        if not all(names.values()) or len(set(names.values())) != 3:
+            raise ValueError('form field names unavailable')
+        return names
 
     def _thread(self):
         if threading.get_ident() != self.thread:
@@ -217,15 +267,15 @@ class Engine:
         # All resources and redirects are bound to this explicit local origin, and the
         # account-creation POST is allowed exactly once: transparent browser retries
         # after a reset are aborted so one request can never create two submissions.
-        posts = {'count': 0}
+        # Phase gate: no request that changes server state is allowed until the actor
+        # itself opens a phase (after stored approval) and the body equals exactly the
+        # approved values. Page scripts never open a phase.
+        gate = {'phase': 'idle', 'expected': None, 'used': False, 'secrets': set()}
+        self.gates[run['id']] = gate
         def guard(route):
             request = route.request
-            if not p.accepts(request.url):
+            if not p.accepts(request.url) or not self._request_allowed(gate, p, request):
                 return route.abort()
-            if request.method == 'POST' and urlsplit(request.url).path == p.signup_path:
-                posts['count'] += 1
-                if posts['count'] > 1:
-                    return route.abort()
             return route.continue_()
         context.route('**/*', guard)
         page = context.new_page()
@@ -260,22 +310,28 @@ class Engine:
             digest, stop = self._inspection(p, page)
             if stop or digest != run['approved_digest']:
                 return self._state(run, 'stopped', stop or 'inspection_drift')
-            page.locator(p.email_selector).fill(run['email'])
-            page.locator(p.name_selector).fill(run['name'])
+            names = self._field_names(p, page)
             try:
                 secret = self.vault.get(run['credential_ref'])
                 if not secret:
                     raise KeyError('missing')
-                page.locator(p.password_selector).fill(secret)
             except Exception:
                 # A secure provisioning UI owned by the host resolves this reference.
                 return self._state(run, 'ready', 'secure_credentials_required')
-            finally:
-                secret = None
+            # Phase opens only here: approval stored, inspection digest equal, exact values.
+            self._open_phase(rid, 'submit', {names['email']: run['email'], names['name']: run['name'],
+                                             names['password']: secret}, (secret,))
+            page.locator(p.email_selector).fill(run['email'])
+            page.locator(p.name_selector).fill(run['name'])
+            page.locator(p.password_selector).fill(secret)
+            secret = None
             # Precommit write makes crashes/non-returning submits non-retryable.
             run['verification_since'] = time.time()
             self._state(run, 'unknown', 'submission_in_progress')
-            nav = self._click_nav(page, p.submit_selector)
+            try:
+                nav = self._click_nav(page, p.submit_selector)
+            finally:
+                self._close_phase(rid, keep_secrets=True)
             if nav is None or nav.status >= 400:
                 return self._state(run, 'unknown', 'submission_outcome_unverified')
             if not p.accepts(page.url):
@@ -313,9 +369,18 @@ class Engine:
                 if not p.accepts(value) or parsed.path != '/verify-link' or not re.fullmatch(r'token=[A-Za-z0-9_-]{16,128}', parsed.query):
                     return self._state(run, 'verification', 'verification_link_rejected')
                 page.goto(value, wait_until='networkidle')
+                self.gates[rid]['secrets'] |= {parsed.query.split('=', 1)[1]}
             elif kind == 'code' and re.fullmatch(r'[0-9]{6}', value):
+                code_name = page.locator(p.code_selector).get_attribute('name') or ''
+                if not code_name:
+                    return self._state(run, 'verification', 'verification_outcome_unverified')
+                self._open_phase(rid, 'verify', {code_name: value}, (value,))
                 page.locator(p.code_selector).fill(value)
-                if self._click_nav(page, p.verify_selector) is None:
+                try:
+                    clicked = self._click_nav(page, p.verify_selector)
+                finally:
+                    self._close_phase(rid, keep_secrets=True)
+                if clicked is None:
                     return self._state(run, 'verification', 'verification_outcome_unverified')
             else:
                 return self._state(run, 'verification', 'verification_proof_rejected')
@@ -347,7 +412,12 @@ class Engine:
             run['verification_since'] = time.time()
             run['generation'] += 1
             self.store.save(run)
-            if self._click_nav(page, p.resend_selector) is None:
+            self._open_phase(rid, 'resend', {})
+            try:
+                clicked = self._click_nav(page, p.resend_selector)
+            finally:
+                self._close_phase(rid, keep_secrets=True)
+            if clicked is None:
                 return self._state(run, 'verification', 'resend_outcome_unverified')
             return self._state(run, 'verification', 'code_resent')
         except Exception:
@@ -362,12 +432,52 @@ class Engine:
             self.sessions.pop(rid)[0].close()
         return self._state(run, 'cancelled', 'local_work_cancelled_account_may_remain')
 
+    # Text visible in a screenshot is limited to these reviewed profile elements.
+    MASK_JS = """(cfg) => {
+      const secrets = cfg.secrets.filter(Boolean);
+      const keep = cfg.keep.map(sel => { try { return [...document.querySelectorAll(sel)]; } catch (e) { return []; } }).flat();
+      const style = document.createElement('style');
+      style.id = '__shot_mask__';
+      style.textContent = '*{color:transparent!important;text-shadow:none!important;caret-color:transparent!important}'
+        + 'input,textarea,select{color:transparent!important;-webkit-text-fill-color:transparent!important}'
+        + 'input::placeholder,textarea::placeholder{color:transparent!important}'
+        + 'canvas,img,svg,video,iframe,object,embed{visibility:hidden!important}'
+        + '[data-shot-keep]{color:#14213d!important;-webkit-text-fill-color:#14213d!important}'
+        + '[data-shot-hide],[data-shot-hide] *{visibility:hidden!important}';
+      document.head.appendChild(style);
+      for (const el of keep) el.setAttribute('data-shot-keep', '1');
+      // Any element whose own text or value carries a secret is hidden even if it is kept.
+      for (const el of document.querySelectorAll('*')) {
+        const own = [...el.childNodes].filter(n => n.nodeType === 3).map(n => n.data).join('');
+        const blob = own + ' ' + (el.value || '') + ' ' + [...el.attributes].map(a => a.value).join(' ');
+        if (secrets.some(x => blob.includes(x))) el.setAttribute('data-shot-hide', '1');
+      }
+    }"""
+    UNMASK_JS = """() => {
+      const s = document.getElementById('__shot_mask__'); if (s) s.remove();
+      for (const a of ['data-shot-keep', 'data-shot-hide'])
+        for (const el of document.querySelectorAll('['+a+']')) el.removeAttribute(a);
+    }"""
+
     def screenshot(self, owner, rid, path):
         self._thread()
         run = self.store.get(owner, rid)
         page = self.sessions[rid][1]
         profile = self.profiles[run['site']]
-        # Never capture passwords, OTPs, or arbitrary remote email bodies.
+        # Never capture passwords, OTPs, or page text outside reviewed profile elements.
         for selector in (profile.password_selector, profile.code_selector):
             page.locator(selector).evaluate_all('(els)=>els.forEach(e=>e.value="")')
-        page.screenshot(path=str(path), full_page=True)
+        secrets = set(self.gates.get(rid, {}).get('secrets', ()))
+        try:
+            secret = self.vault.get(run['credential_ref'])
+            if secret:
+                secrets.add(secret)
+        except Exception:
+            pass
+        keep = [profile.policy_selector, profile.account_email_selector, profile.account_name_selector,
+                'h1', profile.submit_selector, profile.verify_selector, profile.resend_selector]
+        page.evaluate(self.MASK_JS, {'secrets': sorted(secrets), 'keep': keep})
+        try:
+            page.screenshot(path=str(path), full_page=True)
+        finally:
+            page.evaluate(self.UNMASK_JS)
