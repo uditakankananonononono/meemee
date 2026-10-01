@@ -75,6 +75,32 @@ class ContextStore:
         if not row:return None
         result=dict(row);result["config"]=json.loads(result["config"]);return result
 
+    def sources(self):
+        with self.lock:
+            keys = self.db.execute('SELECT owner_id,source_id FROM context_sources ORDER BY owner_id,source_id').fetchall()
+        return [self.source(row['owner_id'], row['source_id']) for row in keys]
+
+    def reconcile_snapshot(self, owner_id, source_id, records, checkpoint):
+        """Replace one complete local source snapshot and its FTS rows atomically."""
+        if any(r.owner_id != owner_id or r.source_id != source_id for r in records):
+            raise ValueError('snapshot owner/source mismatch')
+        with self.lock, self.db:
+            self.db.execute('BEGIN IMMEDIATE')
+            source = self.source(owner_id, source_id)
+            if source is None or source['config'].get('enabled', True) is not True:
+                raise ValueError('source revoked')
+            rows = self.db.execute('SELECT * FROM context_records WHERE owner_id=? AND source_id=?', (owner_id, source_id)).fetchall()
+            desired = {r.external_id: hashlib.sha256((r.title + "\0" + r.content).encode()).hexdigest() for r in records}
+            for row in rows:
+                if desired.get(row['external_id']) != row['content_hash']:
+                    self.db.execute("INSERT INTO context_fts(context_fts,rowid,title,content) VALUES('delete',?,?,?)", (row['id'], row['title'], row['content']))
+                    self.db.execute('DELETE FROM context_records WHERE id=?', (row['id'],))
+            now = datetime.now(timezone.utc).isoformat()
+            for r in records:
+                self.db.execute('INSERT OR IGNORE INTO context_records(owner_id,source_id,external_id,content_hash,kind,title,content,occurred_at,provenance,visibility,cursor,metadata,ingested_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                                (owner_id, source_id, r.external_id, desired[r.external_id], r.kind, r.title, r.content, r.occurred_at, json.dumps(r.provenance, sort_keys=True), r.visibility, checkpoint, json.dumps(r.metadata or {}, sort_keys=True), now))
+            self.db.execute('UPDATE context_sources SET cursor=?,updated_at=? WHERE owner_id=? AND source_id=?', (checkpoint, now, owner_id, source_id))
+
     def cursor(self, owner_id: str, source_id: str) -> str | None:
         row=self.source(owner_id,source_id);return row["cursor"] if row else None
 

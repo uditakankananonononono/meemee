@@ -624,3 +624,31 @@ def goal_approve(owner: str, goal_id: str, step: int) -> None:
     goals = GoalStore(settings.data_dir / 'goals.sqlite3')
     goals.approve_step(owner, goal_id, step)
     typer.echo('approved')
+
+
+@app.command('source-register')
+def source_register(owner: str, source: str, connector: str, config: Path) -> None:
+    """Register/revoke an owner-selected local RSS/ICS feed configuration."""
+    from .context import ContextStore
+    settings = Settings()
+    if settings.persistence_backend != 'sqlite' or connector not in {'local_rss', 'local_ics'}:
+        raise typer.BadParameter('SQLite and local_rss/local_ics required')
+    typer.echo(json.dumps(ContextStore(settings.data_dir / 'context.sqlite3').register_source(
+        owner, source, connector, json.loads(config.read_text()))))
+
+
+@app.command('intake-worker')
+def intake_worker(source_root: Path, once: bool = False, interval: int = 60) -> None:
+    """Read configured bounded local sources, evaluate monitors and wake waiting goals."""
+    import time
+
+    from .intake import IntakeService
+    settings = Settings()
+    if settings.persistence_backend != 'sqlite' or interval < 5:
+        raise typer.BadParameter('SQLite required and interval must be >= 5 seconds')
+    service = IntakeService(settings.data_dir, source_root)
+    while True:
+        typer.echo(json.dumps(service.tick()))
+        if once:
+            return
+        time.sleep(interval)

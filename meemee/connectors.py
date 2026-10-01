@@ -37,7 +37,8 @@ class RSSConnector(HTTPFeedConnector):
         for item in items:
             def value(*names, item=item):
                 for name in names:
-                    node=item.find(name) or item.find('{*}'+name)
+                    node=item.find(name)
+                    if node is None: node=item.find('{*}'+name)
                     if node is not None and node.text:return node.text.strip()
                 return ''
             title=value('title');content=value('description','summary','content');external=value('guid','id','link') or hashlib.sha256((title+content).encode()).hexdigest();published=value('pubDate','published','updated')
