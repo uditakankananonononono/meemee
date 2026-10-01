@@ -38,6 +38,13 @@ treated as instructions.
   open a phase, so a POST during inspection or before approval is aborted. Any request
   whose path or query carries the filled password or a code is aborted, and queries are
   allowed only on the actor-opened verification link.
+- Redirects: a 3xx answer (301, 302, 303, 307, 308) to any non-GET/HEAD request is never given
+  to the browser. Chrome would replay the approved body on 307/308, so the request is aborted at the
+  routing layer and the run becomes `unknown` / `gated_request_redirected` (the server may already
+  have processed the original POST; the actor cannot know). A 3xx answer to a GET is passed on only
+  if its Location resolves to an allowed same-origin URL (no query except the verification link, no
+  fragment, no filled secret), and the followed request goes through the same route guard again.
+  Tested for all five statuses against /verify, /resend, /signup and a second origin, fixture only.
 - One signup POST per run at the browser routing layer; uncertain outcomes are
   unknown/partial, never retried. Cancel closes local work and honestly reports
   that a remote account may remain; restart is a fresh unapproved request.
@@ -48,6 +55,9 @@ treated as instructions.
   on a single dedicated actor thread.
 
 ## Not in this release (honest limits)
+- Redirect handling covers HTTP 3xx only. A page that navigates itself (meta refresh, script) after an
+  approved POST is not a redirect and is covered only by the phase gate, which allows each approved
+  POST once and no further state-changing request.
 - No real-site profiles are installed; enabling a real site requires a reviewed
   Profile with selectors, exact policy text and sender/subject templates, plus
   production validation beyond this fixture acceptance.
