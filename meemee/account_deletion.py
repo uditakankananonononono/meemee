@@ -201,6 +201,9 @@ class AccountPurger:
                 continue
             counts = step()
             self.ledger.record_step(deletion_id, name, counts)
+            hook = getattr(self.targets.devices, "finish_owner", None) if name == "local_devices" else None
+            if hook is not None:
+                hook(principal)
         self.ledger.complete(deletion_id)
         record = self.ledger.get(deletion_id) or {}
         totals: dict[str, int] = {}
