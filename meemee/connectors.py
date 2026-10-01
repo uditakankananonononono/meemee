@@ -33,7 +33,9 @@ class HTTPFeedConnector:
 class RSSConnector(HTTPFeedConnector):
     name="rss"
     def fetch(self, owner_id: str, source_id: str, cursor: str | None = None) -> list[ContextRecord]:
-        root=ET.fromstring(self.read());items=root.findall('.//item') or root.findall('.//{*}entry');records=[]
+        root=ET.fromstring(self.read())
+        if root.tag.split('}')[-1] not in {'rss', 'feed', 'RDF'}: raise ValueError('not an RSS/Atom feed')
+        items=root.findall('.//item') or root.findall('.//{*}entry');records=[]
         for item in items:
             def value(*names, item=item):
                 for name in names:

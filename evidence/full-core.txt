@@ -1,0 +1,505 @@
+................................F.........s.s.s.s.s.s.s.s.s.s.s......... [ 11%]
+............s.s.s....................s.s.s.s.s.s........................ [ 22%]
+.........s........................................s.sss.............sss. [ 33%]
+....s.s.s.s.s.s......................................................... [ 44%]
+.ss.sssssssssssss........................F..ss..............s........... [ 55%]
+......sss.s.s.s.s....................sss.................s.s.s.s.s...... [ 66%]
+....ss........................s.s.sFs.s.s..s.ss.................s.s.s.s. [ 77%]
+s.s.s.ssss.......................................s.s.s.s.s.sss....sss... [ 88%]
+......sss............s.s.s.s.s.s.s.s..............................sss... [ 99%]
+....                                                                     [100%]
+=================================== FAILURES ===================================
+________________ test_api_loadcheck_has_request_ids_and_no_5xx _________________
+
+    @pytest.mark.asyncio
+    async def test_api_loadcheck_has_request_ids_and_no_5xx():
+        report=await run_api_loadcheck(app,"test-bootstrap-token",requests=90,concurrency=12)
+>       assert report["status"]=="pass" and report["completed"]==90
+E       AssertionError: assert ('fail' == 'pass'
+E         
+E         - pass
+E         + fail)
+
+tests/test_api_loadcheck.py:10: AssertionError
+----------------------------- Captured stderr call -----------------------------
+{"timestamp":"2026-10-01T14:47:05.188646+00:00","level":"ERROR","logger":"meemee.api","message":"unhandled request error","request_id":"e2e6f100da964aaa8386fc536e24494f","exception":"  + Exception Group Traceback (most recent call last):\n  |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/_utils.py\", line 107, in create_collapsing_task_group\n  |     async with anyio.create_task_group() as tg:\n  |                ^^^^^^^^^^^^^^^^^^^^^^^^^\n  |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/anyio/_backends/_asyncio.py\", line 847, in __aexit__\n  |     raise BaseExceptionGroup(\n  | ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)\n  +-+---------------- 1 ----------------\n    | Traceback (most recent call last):\n    |   File \"/home/sandbox/meemee/meemee/api.py\", line 168, in request_context\n    |     response = await call_next(request)\n    |                ^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py\", line 173, in call_next\n    |     raise app_exc from app_exc.__cause__ or app_exc.__context__\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py\", line 149, in coro\n    |     await self.app(scope, receive_or_disconnect, send_no_error)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py\", line 197, in __call__\n    |     response = await self.dispatch_func(request, call_next)\n    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"/home/sandbox/meemee/meemee/rate_limit.py\", line 95, in dispatch\n    |     response = await call_next(request)\n    |                ^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py\", line 173, in call_next\n    |     raise app_exc from app_exc.__cause__ or app_exc.__context__\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py\", line 149, in coro\n    |     await self.app(scope, receive_or_disconnect, send_no_error)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py\", line 197, in __call__\n    |     response = await self.dispatch_func(request, call_next)\n    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"/home/sandbox/meemee/meemee/observability.py\", line 29, in dispatch\n    |     response = await call_next(request)\n    |                ^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py\", line 173, in call_next\n    |     raise app_exc from app_exc.__cause__ or app_exc.__context__\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py\", line 149, in coro\n    |     await self.app(scope, receive_or_disconnect, send_no_error)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/trustedhost.py\", line 57, in __call__\n    |     await self.app(scope, receive, send)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/exceptions.py\", line 63, in __call__\n    |     await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py\", line 53, in wrapped_app\n    |     raise exc\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py\", line 42, in wrapped_app\n    |     await app(scope, receive, sender)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py\", line 18, in __call__\n    |     await self.app(scope, receive, send)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/routing.py\", line 676, in __call__\n    |     await self.middleware_stack(scope, receive, send)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/routing.py\", line 2786, in app\n    |     await route.handle(scope, receive, send)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/routing.py\", line 1310, in handle\n    |     await super().handle(scope, receive, send)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/routing.py\", line 282, in handle\n    |     await self.app(scope, receive, send)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/routing.py\", line 165, in app\n    |     await wrap_app_handling_exceptions(app, request)(scope, receive, send)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py\", line 53, in wrapped_app\n    |     raise exc\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py\", line 42, in wrapped_app\n    |     await app(scope, receive, sender)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/routing.py\", line 151, in app\n    |     response = await f(request)\n    |                ^^^^^^^^^^^^^^^^\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/routing.py\", line 727, in app\n    |     raw_response = await run_endpoint_function(\n    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/routing.py\", line 362, in run_endpoint_function\n    |     return await run_in_threadpool(\n    |            ^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/concurrency.py\", line 34, in run_in_threadpool\n    |     return await anyio.to_thread.run_sync(func)\n    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/anyio/to_thread.py\", line 65, in run_sync\n    |     return await get_async_backend().run_sync_in_worker_thread(\n    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/anyio/_backends/_asyncio.py\", line 2706, in run_sync_in_worker_thread\n    |     return await future\n    |            ^^^^^^^^^^^^\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/anyio/_backends/_asyncio.py\", line 1100, in run\n    |     result = context.run(func, *args)\n    |              ^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/telemetry/_api.py\", line 240, in _run_sync_endpoint\n    |     return function(**arguments)\n    |            ^^^^^^^^^^^^^^^^^^^^^\n    |   File \"/home/sandbox/meemee/meemee/api.py\", line 261, in whoami\n    |     entitlement = entitlements.get(principal.id)\n    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"/home/sandbox/meemee/meemee/entitlements.py\", line 36, in get\n    |     name = self.plan_name(principal)\n    |            ^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"/home/sandbox/meemee/meemee/entitlements.py\", line 32, in plan_name\n    |     row = self.db.execute(\"SELECT plan FROM principal_plans WHERE principal=?\", (principal,)).fetchone()\n    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    | sqlite3.InterfaceError: bad parameter or other API misuse\n    +------------------------------------\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"/home/sandbox/meemee/meemee/api.py\", line 168, in request_context\n    response = await call_next(request)\n               ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py\", line 173, in call_next\n    raise app_exc from app_exc.__cause__ or app_exc.__context__\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py\", line 149, in coro\n    await self.app(scope, receive_or_disconnect, send_no_error)\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py\", line 197, in __call__\n    response = await self.dispatch_func(request, call_next)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/sandbox/meemee/meemee/rate_limit.py\", line 95, in dispatch\n    response = await call_next(request)\n               ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py\", line 173, in call_next\n    raise app_exc from app_exc.__cause__ or app_exc.__context__\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py\", line 149, in coro\n    await self.app(scope, receive_or_disconnect, send_no_error)\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py\", line 197, in __call__\n    response = await self.dispatch_func(request, call_next)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/sandbox/meemee/meemee/observability.py\", line 29, in dispatch\n    response = await call_next(request)\n               ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py\", line 173, in call_next\n    raise app_exc from app_exc.__cause__ or app_exc.__context__\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py\", line 149, in coro\n    await self.app(scope, receive_or_disconnect, send_no_error)\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/trustedhost.py\", line 57, in __call__\n    await self.app(scope, receive, send)\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/exceptions.py\", line 63, in __call__\n    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py\", line 53, in wrapped_app\n    raise exc\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py\", line 42, in wrapped_app\n    await app(scope, receive, sender)\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py\", line 18, in __call__\n    await self.app(scope, receive, send)\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/routing.py\", line 676, in __call__\n    await self.middleware_stack(scope, receive, send)\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/routing.py\", line 2786, in app\n    await route.handle(scope, receive, send)\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/routing.py\", line 1310, in handle\n    await super().handle(scope, receive, send)\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/routing.py\", line 282, in handle\n    await self.app(scope, receive, send)\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/routing.py\", line 165, in app\n    await wrap_app_handling_exceptions(app, request)(scope, receive, send)\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py\", line 53, in wrapped_app\n    raise exc\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py\", line 42, in wrapped_app\n    await app(scope, receive, sender)\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/routing.py\", line 151, in app\n    response = await f(request)\n               ^^^^^^^^^^^^^^^^\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/routing.py\", line 727, in app\n    raw_response = await run_endpoint_function(\n                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/routing.py\", line 362, in run_endpoint_function\n    return await run_in_threadpool(\n           ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/concurrency.py\", line 34, in run_in_threadpool\n    return await anyio.to_thread.run_sync(func)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/anyio/to_thread.py\", line 65, in run_sync\n    return await get_async_backend().run_sync_in_worker_thread(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/anyio/_backends/_asyncio.py\", line 2706, in run_sync_in_worker_thread\n    return await future\n           ^^^^^^^^^^^^\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/anyio/_backends/_asyncio.py\", line 1100, in run\n    result = context.run(func, *args)\n             ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/telemetry/_api.py\", line 240, in _run_sync_endpoint\n    return function(**arguments)\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/sandbox/meemee/meemee/api.py\", line 261, in whoami\n    entitlement = entitlements.get(principal.id)\n                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/sandbox/meemee/meemee/entitlements.py\", line 36, in get\n    name = self.plan_name(principal)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/sandbox/meemee/meemee/entitlements.py\", line 32, in plan_name\n    row = self.db.execute(\"SELECT plan FROM principal_plans WHERE principal=?\", (principal,)).fetchone()\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nsqlite3.InterfaceError: bad parameter or other API misuse"}
+{"timestamp":"2026-10-01T14:47:05.196250+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 500 Internal Server Error\""}
+{"timestamp":"2026-10-01T14:47:05.198763+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.199011+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.199261+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.199525+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.205461+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.208185+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.208444+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.208779+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.208989+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.209195+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.209425+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.218446+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.221640+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.224074+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.224437+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.224647+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.228725+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.228957+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.229115+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.233489+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.236622+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.236909+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.237184+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.238454+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.244943+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.245847+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.249297+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.250172+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.250371+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.254247+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.254535+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.257903+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.258111+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.259077+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.263180+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.263464+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.268944+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.269845+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.270038+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.273754+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.274004+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.274213+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.279253+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.279484+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.285202+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.285758+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.289115+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.289365+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.290892+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.295045+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.295337+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.295655+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.303363+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.303650+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.307456+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.307837+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.308050+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.313101+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.313938+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.318846+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.319131+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.324880+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.328918+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.329220+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.329500+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.337324+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.337713+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.341819+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.342067+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.346154+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.346384+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.346610+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.353402+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.356337+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.356551+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.361085+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.361397+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.362883+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.368299+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.368808+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.370398+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.370853+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.371675+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.371975+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.372521+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.372730+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.373164+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.373414+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/jobs?limit=10 \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-01T14:47:05.374228+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: GET http://testserver/v1/whoami \"HTTP/1.1 200 OK\""}
+------------------------------ Captured log call -------------------------------
+ERROR    meemee.api:api.py:170 unhandled request error
+  + Exception Group Traceback (most recent call last):
+  |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/_utils.py", line 107, in create_collapsing_task_group
+  |     async with anyio.create_task_group() as tg:
+  |                ^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/anyio/_backends/_asyncio.py", line 847, in __aexit__
+  |     raise BaseExceptionGroup(
+  | ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+  +-+---------------- 1 ----------------
+    | Traceback (most recent call last):
+    |   File "/home/sandbox/meemee/meemee/api.py", line 168, in request_context
+    |     response = await call_next(request)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 173, in call_next
+    |     raise app_exc from app_exc.__cause__ or app_exc.__context__
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 149, in coro
+    |     await self.app(scope, receive_or_disconnect, send_no_error)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 197, in __call__
+    |     response = await self.dispatch_func(request, call_next)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/sandbox/meemee/meemee/rate_limit.py", line 95, in dispatch
+    |     response = await call_next(request)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 173, in call_next
+    |     raise app_exc from app_exc.__cause__ or app_exc.__context__
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 149, in coro
+    |     await self.app(scope, receive_or_disconnect, send_no_error)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 197, in __call__
+    |     response = await self.dispatch_func(request, call_next)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/sandbox/meemee/meemee/observability.py", line 29, in dispatch
+    |     response = await call_next(request)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 173, in call_next
+    |     raise app_exc from app_exc.__cause__ or app_exc.__context__
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 149, in coro
+    |     await self.app(scope, receive_or_disconnect, send_no_error)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/trustedhost.py", line 57, in __call__
+    |     await self.app(scope, receive, send)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    |     await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    |     raise exc
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    |     await app(scope, receive, sender)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    |     await self.app(scope, receive, send)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/routing.py", line 676, in __call__
+    |     await self.middleware_stack(scope, receive, send)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 2786, in app
+    |     await route.handle(scope, receive, send)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 1310, in handle
+    |     await super().handle(scope, receive, send)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/routing.py", line 282, in handle
+    |     await self.app(scope, receive, send)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 165, in app
+    |     await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    |     raise exc
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    |     await app(scope, receive, sender)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 151, in app
+    |     response = await f(request)
+    |                ^^^^^^^^^^^^^^^^
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 727, in app
+    |     raw_response = await run_endpoint_function(
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 362, in run_endpoint_function
+    |     return await run_in_threadpool(
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/concurrency.py", line 34, in run_in_threadpool
+    |     return await anyio.to_thread.run_sync(func)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/anyio/to_thread.py", line 65, in run_sync
+    |     return await get_async_backend().run_sync_in_worker_thread(
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/anyio/_backends/_asyncio.py", line 2706, in run_sync_in_worker_thread
+    |     return await future
+    |            ^^^^^^^^^^^^
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/anyio/_backends/_asyncio.py", line 1100, in run
+    |     result = context.run(func, *args)
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/telemetry/_api.py", line 240, in _run_sync_endpoint
+    |     return function(**arguments)
+    |            ^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/sandbox/meemee/meemee/api.py", line 261, in whoami
+    |     entitlement = entitlements.get(principal.id)
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/sandbox/meemee/meemee/entitlements.py", line 36, in get
+    |     name = self.plan_name(principal)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/sandbox/meemee/meemee/entitlements.py", line 32, in plan_name
+    |     row = self.db.execute("SELECT plan FROM principal_plans WHERE principal=?", (principal,)).fetchone()
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    | sqlite3.InterfaceError: bad parameter or other API misuse
+    +------------------------------------
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/sandbox/meemee/meemee/api.py", line 168, in request_context
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 173, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 149, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 197, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sandbox/meemee/meemee/rate_limit.py", line 95, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 173, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 149, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 197, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sandbox/meemee/meemee/observability.py", line 29, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 173, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 149, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/trustedhost.py", line 57, in __call__
+    await self.app(scope, receive, send)
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/routing.py", line 676, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 2786, in app
+    await route.handle(scope, receive, send)
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 1310, in handle
+    await super().handle(scope, receive, send)
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/routing.py", line 282, in handle
+    await self.app(scope, receive, send)
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 165, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 151, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 727, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 362, in run_endpoint_function
+    return await run_in_threadpool(
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/starlette/concurrency.py", line 34, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/anyio/to_thread.py", line 65, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/anyio/_backends/_asyncio.py", line 2706, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/anyio/_backends/_asyncio.py", line 1100, in run
+    result = context.run(func, *args)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/telemetry/_api.py", line 240, in _run_sync_endpoint
+    return function(**arguments)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sandbox/meemee/meemee/api.py", line 261, in whoami
+    entitlement = entitlements.get(principal.id)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sandbox/meemee/meemee/entitlements.py", line 36, in get
+    name = self.plan_name(principal)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sandbox/meemee/meemee/entitlements.py", line 32, in plan_name
+    row = self.db.execute("SELECT plan FROM principal_plans WHERE principal=?", (principal,)).fetchone()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sqlite3.InterfaceError: bad parameter or other API misuse
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 500 Internal Server Error"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/jobs?limit=10 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1740 HTTP Request: GET http://testserver/v1/whoami "HTTP/1.1 200 OK"
+________ test_route_falls_from_local_server_to_in_process_transformers _________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f596225f620>
+
+    @respx.mock
+    async def test_route_falls_from_local_server_to_in_process_transformers(monkeypatch):
+        _, _, loader = _fake('{"final": "answered in-process"}')
+        monkeypatch.setattr(providers, "_default_loader", loader)
+        s = settings(model_base_url=LOCAL, model_routes="agent=local,local-transformers", transformers_model="fake/tiny")
+        respx.post(f"{LOCAL}/chat/completions").mock(side_effect=httpx.ConnectError("ollama not running"))
+        m = build_role_model(s, "agent")
+        m.max_attempts = 1
+>       decision = await m.decide([{"role": "user", "content": "hi"}])
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_model_layer.py:222: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee/model_profiles.py:354: in decide
+    return await self._run("decide", messages)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = RoutedModel(catalog=ModelCatalog(profiles={'local': ModelProfile(name='local', base_url='http://local.test/v1', model=...'admin=admin;operator=runs:write,jobs:read,jobs:write,companion:read,companion:write;viewer=jobs:read,companion:read'))
+op = 'decide', args = ([{'content': 'hi', 'role': 'user'}],), kwargs = {}
+usable = [ModelProfile(name='local', base_url='http://local.test/v1', model='qwen2.5-coder:14b', kind='local', api_key='local',...ault local OpenAI-compatible endpoint (Ollama by default).', source_url='', transport='openai', _instinct_reason=None)]
+skipped = {'local-transformers': "transformers and torch not installed; pip install 'meemee[transformers]'"}
+attempts = [{'outcome': "skipped: transformers and torch not installed; pip install 'meemee[transformers]'", 'profile': 'local-transformers'}, {'outcome': 'failed: model request failed after 1 attempts: ollama not running', 'profile': 'local'}]
+trace = {'attempts': [{'outcome': "skipped: transformers and torch not installed; pip install 'meemee[transformers]'", 'profil...st failed after 1 attempts: ollama not running', 'profile': 'local'}], 'model': None, 'profile': None, 'role': 'agent'}
+errors = ['local: model request failed after 1 attempts: ollama not running']
+profile = ModelProfile(name='local', base_url='http://local.test/v1', model='qwen2.5-coder:14b', kind='local', api_key='local', ...fault local OpenAI-compatible endpoint (Ollama by default).', source_url='', transport='openai', _instinct_reason=None)
+
+    async def _run(self, op: str, *args: Any, **kwargs: Any) -> Any:
+        usable, skipped = self.catalog.chain(self.role)
+        attempts = [{"profile": n, "outcome": f"skipped: {r}"} for n, r in skipped.items()]
+        self.attempts = attempts
+        trace: dict[str, Any] = {"role": self.role, "profile": None, "model": None, "attempts": attempts}
+        _last_trace.set(trace)
+        if not usable:
+            raise ModelError(f"no usable model profile for role {self.role!r}: {skipped}")
+        errors: list[str] = []
+        for profile in usable:
+            try:
+                result = await getattr(self._model_for(profile), op)(*args, **kwargs)
+            except ModelError as exc:
+                errors.append(f"{profile.name}: {exc}")
+                attempts.append({"profile": profile.name, "outcome": f"failed: {str(exc)[:300]}"})
+                continue
+            self.last_profile = profile.name
+            attempts.append({"profile": profile.name, "outcome": "ok"})
+            trace.update(profile=profile.name, model=profile.model)
+            return result
+>       raise ModelError(f"all model profiles failed for role {self.role!r}: " + " | ".join(errors))
+E       meemee.llm.ModelError: all model profiles failed for role 'agent': local: model request failed after 1 attempts: ollama not running
+
+meemee/model_profiles.py:351: ModelError
+__________ test_concurrent_submissions_never_exceed_the_limit[sqlite] __________
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7f5961386660>, jobs=<meemee.jobs.JobStore ...Store object at 0x7f5961384920>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7f5961387e30>)
+
+    def test_concurrent_submissions_never_exceed_the_limit(persistence):  # noqa: F811
+        q = persistence.quotas
+        q.set_limit("race", 10)
+        ok, refused, barrier = [], [], threading.Barrier(30)
+    
+        def submit():
+            barrier.wait()
+            try:
+                q.consume_job("race", NOON); ok.append(1)
+            except QuotaExceeded:
+                refused.append(1)
+    
+        threads = [threading.Thread(target=submit) for _ in range(30)]
+        [t.start() for t in threads]; [t.join() for t in threads]
+>       assert (len(ok), len(refused)) == (10, 20)
+E       assert (10, 19) == (10, 20)
+E         
+E         At index 1 diff: 19 != 20
+E         Use -v to get more diff
+
+tests/test_quota_entitlement_backends.py:58: AssertionError
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /home/sandbox/meemee/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/test_quota_entitlement_backends.py::test_concurrent_submissions_never_exceed_the_limit[sqlite]
+  /home/sandbox/meemee/.venv/lib/python3.12/site-packages/_pytest/threadexception.py:58: PytestUnhandledThreadExceptionWarning: Exception in thread Thread-176 (submit)
+  
+  Traceback (most recent call last):
+    File "/home/sandbox/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1075, in _bootstrap_inner
+      self.run()
+    File "/home/sandbox/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1012, in run
+      self._target(*self._args, **self._kwargs)
+    File "/home/sandbox/meemee/tests/test_quota_entitlement_backends.py", line 52, in submit
+      q.consume_job("race", NOON); ok.append(1)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    File "/home/sandbox/meemee/meemee/quotas.py", line 48, in consume_job
+      maximum = self.limit(principal)
+                ^^^^^^^^^^^^^^^^^^^^^
+    File "/home/sandbox/meemee/meemee/quotas.py", line 37, in limit
+      row = self.db.execute("SELECT daily_jobs FROM quota_limits WHERE principal=?", (principal,)).fetchone()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  sqlite3.InterfaceError: bad parameter or other API misuse
+  
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+    warnings.warn(pytest.PytestUnhandledThreadExceptionWarning(msg))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_api_loadcheck.py::test_api_loadcheck_has_request_ids_and_no_5xx
+FAILED tests/test_model_layer.py::test_route_falls_from_local_server_to_in_process_transformers
+FAILED tests/test_quota_entitlement_backends.py::test_concurrent_submissions_never_exceed_the_limit[sqlite]
+3 failed, 535 passed, 116 skipped, 2 warnings in 56.33s

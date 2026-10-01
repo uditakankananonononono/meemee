@@ -1,0 +1,10 @@
+Resolved 7 packages in 118ms
+Downloading pillow (6.6MiB)
+ Downloaded pillow
+Prepared 1 package in 123ms
+Installed 5 packages in 4ms
+ + hatchling==1.32.4
+ + pathspec==1.1.1
+ + pillow==12.3.0
+ + tomlkit==0.15.1
+ + trove-classifiers==2026.9.21.13

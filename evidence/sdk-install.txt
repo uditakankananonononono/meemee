@@ -1,0 +1,6 @@
+Resolved 19 packages in 15ms
+   Building meemee-client @ file:///home/sandbox/meemee/sdk
+      Built meemee-client @ file:///home/sandbox/meemee/sdk
+Prepared 1 package in 795ms
+Installed 1 package in 0.53ms
+ + meemee-client==0.122.0 (from file:///home/sandbox/meemee/sdk)

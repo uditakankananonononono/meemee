@@ -5,9 +5,9 @@ import hashlib
 import json
 import sqlite3
 import time
-from xml.etree.ElementTree import ParseError
 from dataclasses import asdict
 from pathlib import Path
+from xml.etree.ElementTree import ParseError
 
 from .connectors import ICSConnector, RSSConnector
 from .context import ContextRecord, ContextStore
@@ -33,6 +33,14 @@ class LocalICS(ICSConnector, LocalRSS):
     def __init__(self, path: Path):
         LocalRSS.__init__(self, path)
         self.name = 'local_ics'
+
+    def read(self):
+        payload = LocalRSS.read(self)
+        if not payload.lstrip().startswith(b'BEGIN:VCALENDAR') or b'END:VCALENDAR' not in payload:
+            raise ValueError('not a complete ICS calendar')
+        if payload.count(b'BEGIN:VEVENT') != payload.count(b'END:VEVENT'):
+            raise ValueError('incomplete ICS events')
+        return payload
 
 
 class IntakeService:
