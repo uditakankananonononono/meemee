@@ -62,11 +62,19 @@ treated as instructions.
   cleared in the live page. Tested against: per-character spans, ::before/::after content
   (including attr()), open shadow roots, base64 and reversed text. Consequence: a
   screenshot is a review card, not a picture of the page. Fixture-verified only.
-- Non-route channels: WebSockets are intercepted with route_web_socket by a handler that
-  never connects to a server (verified: a raw listener on another loopback port gets no
-  connection). RTCPeerConnection, WebTransport, EventSource and sendBeacon are removed or
-  neutralised in every frame by an init script (backup layer; EventSource and beacon are
-  also stopped by request routing). Not verified: WebRTC against a real peer, WebTransport
-  (needs HTTPS), and any channel not listed here.
+- Network layer (round 3, the real control): Chrome is launched with
+  `--host-resolver-rules="MAP * ~NOTFOUND, EXCLUDE 127.0.0.1"`, a refusing proxy
+  (`--proxy-server=http://127.0.0.1:1`) and `--proxy-bypass-list=<-loopback>;<reviewed host:port>`,
+  QUIC/HTTP3 off, and WebRTC non-proxied UDP off. Workers, SharedWorkers, importScripts, WebSocket,
+  preconnect, form target=_blank and CSP reports share this network stack, so they cannot reach any
+  other loopback port or hostname. Every fixture response also gets our CSP (worker-src 'none',
+  connect-src 'self', form-action 'self') and loses Report-To, Reporting-Endpoints, NEL,
+  Report-Only CSP and any site CSP (so no site report-uri survives). A second tab is closed. The init
+  script removes Worker, SharedWorker, EventSource, WebRTC, WebTransport and blob URLs (backup only).
+  Tests run each vector twice, the second time with the init script, CSP and WebSocket mock all
+  switched off ('network_only'), so only the launch flags are under test. Verified with raw TCP and
+  UDP canary listeners on other loopback ports. Not verified: WebRTC or WebTransport against a real
+  peer (WebTransport needs HTTPS and a QUIC server; the UDP test shows no datagram leaves, not that
+  a handshake would fail), a Chrome version other than the installed one, and any channel not listed.
 - This is a local-fixture release (loopback only). It has not been run against any real
   website or live Gmail and must not be described as real-site signup.

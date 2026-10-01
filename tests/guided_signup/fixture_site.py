@@ -18,6 +18,7 @@ class FixtureSite:
         self.policy = 'Free local test account. No charges. Cancel any time.'
         self.submits = 0
         self.requests = []
+        self.extra_headers = {}
         site = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -38,6 +39,8 @@ class FixtureSite:
                         '</style></head><body><main>'+body+'</main></body></html>').encode()
                 self.send_response(200)
                 self.send_header('Content-Type', 'text/html; charset=utf-8')
+                for k, v in site.extra_headers.items():
+                    self.send_header(k, v)
                 if cookie:
                     self.send_header('Set-Cookie', 'signup_session='+cookie+'; HttpOnly; SameSite=Strict; Path=/')
                 self.send_header('Content-Length', str(len(data)))
