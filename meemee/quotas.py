@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 import threading
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -33,41 +34,51 @@ class QuotaStore:
             );
         """)
 
+    @contextmanager
+    def _write_transaction(self):
+        # The Python lock protects this shared connection. BEGIN IMMEDIATE
+        # coordinates every connection/process using this same SQLite file.
+        # The connection context commits on success and rolls back on *any*
+        # exception, including a failed statement after an earlier write.
+        with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            yield
+
     def limit(self, principal: str) -> int:
-        row = self.db.execute("SELECT daily_jobs FROM quota_limits WHERE principal=?", (principal,)).fetchone()
+        with self.lock:
+            row = self.db.execute("SELECT daily_jobs FROM quota_limits WHERE principal=?", (principal,)).fetchone()
         return int(row[0]) if row else self.default
 
     def set_limit(self, principal: str, daily_jobs: int) -> None:
         if daily_jobs < 1:
             raise ValueError("daily quota must be positive")
-        with self.lock, self.db:
+        with self._write_transaction():
             self.db.execute("INSERT INTO quota_limits VALUES(?,?) ON CONFLICT(principal) DO UPDATE SET daily_jobs=excluded.daily_jobs", (principal, daily_jobs))
 
     def consume_job(self, principal: str, now: datetime | None = None) -> dict[str, int | str]:
         day = (now or datetime.now(timezone.utc)).astimezone(timezone.utc).date().isoformat()
-        maximum = self.limit(principal)
-        with self.lock, self.db:
-            self.db.execute("BEGIN IMMEDIATE")
+        with self._write_transaction():
+            maximum = self.limit(principal)
             self.db.execute("INSERT INTO quota_usage VALUES(?,?,1) ON CONFLICT(principal,day) DO UPDATE SET jobs=jobs+1", (principal, day))
             used = int(self.db.execute("SELECT jobs FROM quota_usage WHERE principal=? AND day=?", (principal, day)).fetchone()[0])
             if used > maximum:
-                self.db.execute("ROLLBACK")
                 raise QuotaExceeded(f"daily job quota exceeded ({maximum})")
-            self.db.execute("COMMIT")
         return {"day": day, "used": used, "limit": maximum, "remaining": maximum-used}
 
     def status(self, principal: str, now: datetime | None = None) -> dict[str, int | str]:
         day = (now or datetime.now(timezone.utc)).astimezone(timezone.utc).date().isoformat()
-        maximum = self.limit(principal)
-        row = self.db.execute("SELECT jobs FROM quota_usage WHERE principal=? AND day=?", (principal, day)).fetchone()
+        with self.lock:
+            maximum = self.limit(principal)
+            row = self.db.execute("SELECT jobs FROM quota_usage WHERE principal=? AND day=?", (principal, day)).fetchone()
         used = int(row[0]) if row else 0
         return {"day": day, "used": used, "limit": maximum, "remaining": max(maximum-used, 0)}
 
     def ping(self) -> bool:
-        return self.db.execute("SELECT 1").fetchone() is not None
+        with self.lock:
+            return self.db.execute("SELECT 1").fetchone() is not None
 
     def delete_principal(self, principal: str) -> dict[str, int]:
-        with self.lock, self.db:
+        with self._write_transaction():
             usage = self.db.execute("DELETE FROM quota_usage WHERE principal=?", (principal,)).rowcount
             limits = self.db.execute("DELETE FROM quota_limits WHERE principal=?", (principal,)).rowcount
         return {"quota_usage": usage, "quota_limits": limits}
