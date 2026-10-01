@@ -3,11 +3,13 @@ from __future__ import annotations
 import email.utils
 import hashlib
 import json
+import re
 import urllib.request
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Protocol
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .context import ContextRecord
 
@@ -47,25 +49,76 @@ class RSSConnector(HTTPFeedConnector):
         return records
 
 
+@dataclass
 class ICSConnector(HTTPFeedConnector):
-    name="ics"
+    name = "ics"
+    default_timezone: str | None = None
+
     def fetch(self, owner_id: str, source_id: str, cursor: str | None = None) -> list[ContextRecord]:
-        lines=self.read().decode('utf-8','replace').replace('\r\n ','').splitlines();records=[];current=None
-        for line in lines:
-            if line=='BEGIN:VEVENT':current={}
-            elif line=='END:VEVENT' and current is not None:
-                uid=current.get('UID') or hashlib.sha256(json.dumps(current,sort_keys=True).encode()).hexdigest();start=current.get('DTSTART','')
-                occurred=_ics_time(start);records.append(ContextRecord(owner_id,source_id,uid,'event',current.get('SUMMARY','Calendar event'),current.get('DESCRIPTION',''),occurred,{"connector":"ics","url":self.url,"location":current.get('LOCATION')},cursor=uid,metadata={"end":current.get('DTEND')}));current=None
-            elif current is not None and ':' in line:
-                key,value=line.split(':',1);current[key.split(';',1)[0]]=value.replace('\\n','\n')
+        # RFC 5545 folds a content line with CRLF followed by space or tab.
+        text = re.sub(r"\r?\n[ \t]", "", self.read().decode("utf-8", "replace"))
+        records = []
+        current = None
+        params = {}
+        for line in text.splitlines():
+            if line == "BEGIN:VEVENT":
+                current, params = {}, {}
+            elif line == "END:VEVENT" and current is not None:
+                uid = current.get("UID") or hashlib.sha256(json.dumps(current, sort_keys=True).encode()).hexdigest()
+                start = current.get("DTSTART", "")
+                start_tz = params.get("DTSTART", {}).get("TZID")
+                occurred = _ics_time(start, start_tz, default_timezone=self.default_timezone)
+                end_raw = current.get("DTEND")
+                end = (_ics_time(end_raw, params.get("DTEND", {}).get("TZID"),
+                                 default_timezone=self.default_timezone) if end_raw else None)
+                metadata = {"end": end_raw, "end_utc": end, "start_raw": start,
+                            "timezone": start_tz or self.default_timezone,
+                            "all_day": len(start) == 8,
+                            "date_anchor_only": len(start) == 8}
+                records.append(ContextRecord(owner_id, source_id, uid, "event",
+                    current.get("SUMMARY", "Calendar event"), current.get("DESCRIPTION", ""),
+                    occurred, {"connector": "ics", "url": self.url, "location": current.get("LOCATION")},
+                    cursor=uid, metadata=metadata))
+                current = None
+            elif current is not None and ":" in line:
+                key, value = line.split(":", 1)
+                pieces = key.split(";")
+                property_name = pieces[0].upper()
+                params[property_name] = {k.upper(): v.strip('"') for item in pieces[1:]
+                                         if "=" in item for k, v in [item.split("=", 1)]}
+                current[property_name] = value.replace("\\n", "\n")
         return records
 
 
-def _ics_time(value: str) -> str:
-    for pattern in ('%Y%m%dT%H%M%SZ','%Y%m%dT%H%M%S','%Y%m%d'):
-        try:return datetime.strptime(value,pattern).replace(tzinfo=timezone.utc).isoformat()
-        except ValueError:pass
-    return datetime.now(timezone.utc).isoformat()
+def _ics_time(value: str, tzid: str | None = None, *, default_timezone: str | None = None) -> str:
+    """Convert an explicit instant; reject ambiguous floating/invalid timestamps.
+
+    DATE values remain calendar dates represented by a UTC midnight anchor, not
+    an inferred instant. The connector marks these as all_day/date_anchor_only.
+    Custom VTIMEZONE definitions are not interpreted by this bounded adapter.
+    """
+    if re.fullmatch(r"\d{8}", value):
+        return datetime.strptime(value, "%Y%m%d").replace(tzinfo=timezone.utc).isoformat()
+    if value.endswith("Z"):
+        if tzid:
+            raise ValueError("UTC DTSTART/DTEND must not also specify TZID")
+        return datetime.strptime(value, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc).isoformat()
+    naive = datetime.strptime(value, "%Y%m%dT%H%M%S")  # noqa: DTZ007 - local wall time validated with ZoneInfo below
+    zone_name = tzid or default_timezone
+    if not zone_name:
+        raise ValueError("floating ICS time needs an explicit calendar default_timezone")
+    try:
+        zone = ZoneInfo(zone_name)
+    except ZoneInfoNotFoundError as exc:
+        raise ValueError(f"unsupported ICS timezone: {zone_name}") from exc
+    candidates = []
+    for fold in (0, 1):
+        instant = naive.replace(tzinfo=zone, fold=fold).astimezone(timezone.utc)
+        if instant.astimezone(zone).replace(tzinfo=None) == naive and instant not in candidates:
+            candidates.append(instant)
+    if len(candidates) != 1:
+        raise ValueError("ambiguous or nonexistent ICS local time requires an explicit UTC instant")
+    return candidates[0].isoformat()
 
 
 class SignedWebhookConnector:
