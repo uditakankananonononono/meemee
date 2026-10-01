@@ -34,7 +34,8 @@ class QuotaStore:
         """)
 
     def limit(self, principal: str) -> int:
-        row = self.db.execute("SELECT daily_jobs FROM quota_limits WHERE principal=?", (principal,)).fetchone()
+        with self.lock:
+            row = self.db.execute("SELECT daily_jobs FROM quota_limits WHERE principal=?", (principal,)).fetchone()
         return int(row[0]) if row else self.default
 
     def set_limit(self, principal: str, daily_jobs: int) -> None:
@@ -45,8 +46,8 @@ class QuotaStore:
 
     def consume_job(self, principal: str, now: datetime | None = None) -> dict[str, int | str]:
         day = (now or datetime.now(timezone.utc)).astimezone(timezone.utc).date().isoformat()
-        maximum = self.limit(principal)
         with self.lock, self.db:
+            maximum = self.limit(principal)
             self.db.execute("BEGIN IMMEDIATE")
             self.db.execute("INSERT INTO quota_usage VALUES(?,?,1) ON CONFLICT(principal,day) DO UPDATE SET jobs=jobs+1", (principal, day))
             used = int(self.db.execute("SELECT jobs FROM quota_usage WHERE principal=? AND day=?", (principal, day)).fetchone()[0])
@@ -58,13 +59,15 @@ class QuotaStore:
 
     def status(self, principal: str, now: datetime | None = None) -> dict[str, int | str]:
         day = (now or datetime.now(timezone.utc)).astimezone(timezone.utc).date().isoformat()
-        maximum = self.limit(principal)
-        row = self.db.execute("SELECT jobs FROM quota_usage WHERE principal=? AND day=?", (principal, day)).fetchone()
+        with self.lock:
+            maximum = self.limit(principal)
+            row = self.db.execute("SELECT jobs FROM quota_usage WHERE principal=? AND day=?", (principal, day)).fetchone()
         used = int(row[0]) if row else 0
         return {"day": day, "used": used, "limit": maximum, "remaining": max(maximum-used, 0)}
 
     def ping(self) -> bool:
-        return self.db.execute("SELECT 1").fetchone() is not None
+        with self.lock:
+            return self.db.execute("SELECT 1").fetchone() is not None
 
     def delete_principal(self, principal: str) -> dict[str, int]:
         with self.lock, self.db:
