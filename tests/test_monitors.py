@@ -20,8 +20,8 @@ def test_repeating_monitor_respects_fire_budget(tmp_path:Path):
 
 
 def test_monitor_rejects_zero_fire_budget_and_ambiguous_deadline():
- from pydantic import ValidationError
  import pytest
+ from pydantic import ValidationError
  with pytest.raises(ValidationError):MonitorInput(name='bad',source_id='s',field='x',operator='exists',max_fires=0)
  with pytest.raises(ValidationError):MonitorInput(name='bad',source_id='s',field='x',operator='exists',deadline='2026-09-27T12:00:00')
 
