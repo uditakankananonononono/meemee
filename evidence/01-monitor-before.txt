@@ -1,0 +1,73 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+___________________ test_durable_event_delivery_and_restart ____________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-0/test_durable_event_delivery_an0')
+
+    def test_durable_event_delivery_and_restart(tmp_path):
+        path = tmp_path / 'monitors.db'
+        store = MonitorStore(path)
+        monitor = store.create('owner', MonitorInput(name='Ready', source_id='feed',
+                                field='content', operator='contains', expected='ready', max_fires=2))
+>       store.accept_event('owner', 'feed', 'event-1', {'content': 'ready'})
+        ^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'MonitorStore' object has no attribute 'accept_event'
+
+tests/test_monitor_workflow.py:11: AttributeError
+________________ test_competing_evaluators_cancel_and_deadline _________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-0/test_competing_evaluators_canc0')
+
+    def test_competing_evaluators_cancel_and_deadline(tmp_path):
+        path = tmp_path / 'm.db'
+        first, second = MonitorStore(path), MonitorStore(path)
+        monitor = first.create('o', MonitorInput(name='Ready', source_id='s', field='ok',
+                              operator='eq', expected=True, max_fires=3))
+        with ThreadPoolExecutor(2) as pool:
+>           list(pool.map(lambda store: store.accept_event('o', 's', '1', {'ok': True}),
+                          [first, second]))
+
+tests/test_monitor_workflow.py:27: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/concurrent/futures/_base.py:619: in result_iterator
+    yield _result_or_cancel(fs.pop())
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/concurrent/futures/_base.py:317: in _result_or_cancel
+    return fut.result(timeout)
+           ^^^^^^^^^^^^^^^^^^^
+../.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/concurrent/futures/_base.py:449: in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+../.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/concurrent/futures/_base.py:401: in __get_result
+    raise self._exception
+../.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/concurrent/futures/thread.py:59: in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+store = <meemee.monitors.MonitorStore object at 0x7f8bf214f9e0>
+
+>   list(pool.map(lambda store: store.accept_event('o', 's', '1', {'ok': True}),
+                                ^^^^^^^^^^^^^^^^^^
+                  [first, second]))
+E   AttributeError: 'MonitorStore' object has no attribute 'accept_event'
+
+tests/test_monitor_workflow.py:27: AttributeError
+_____________ test_terminal_cancel_before_delivery_and_cross_owner _____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-0/test_terminal_cancel_before_de0')
+
+    def test_terminal_cancel_before_delivery_and_cross_owner(tmp_path):
+        store = MonitorStore(tmp_path / 'm.db')
+        monitor = store.create('o', MonitorInput(name='One', source_id='s', field='ok',
+                              operator='eq', expected=True))
+>       store.accept_event('other', 's', '1', {'ok': True})
+        ^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'MonitorStore' object has no attribute 'accept_event'
+
+tests/test_monitor_workflow.py:43: AttributeError
+=========================== short test summary info ============================
+FAILED tests/test_monitor_workflow.py::test_durable_event_delivery_and_restart
+FAILED tests/test_monitor_workflow.py::test_competing_evaluators_cancel_and_deadline
+FAILED tests/test_monitor_workflow.py::test_terminal_cancel_before_delivery_and_cross_owner
+3 failed in 0.30s
