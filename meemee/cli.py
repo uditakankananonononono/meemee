@@ -548,3 +548,35 @@ def webhook_verify(
     typer.echo(json.dumps({"valid": valid}))
     if not valid:
         raise typer.Exit(1)
+
+
+@app.command('monitor-worker')
+def monitor_worker(once: bool = False, interval: int = 60) -> None:
+    """Expire monitors and deliver durable local notifications (SQLite only)."""
+    import time
+
+    from .monitors import MonitorStore
+    settings = Settings()
+    if settings.persistence_backend != 'sqlite':
+        raise typer.BadParameter('monitor workflow currently requires SQLite')
+    if interval < 5:
+        raise typer.BadParameter('interval must be at least 5 seconds')
+    store = MonitorStore(settings.data_dir / 'monitors.sqlite3')
+    while True:
+        store.expire()
+        typer.echo(json.dumps({'delivered': store.dispatch()}))
+        if once:
+            return
+        time.sleep(interval)
+
+
+@app.command('monitor-event')
+def monitor_event(owner: str, source: str, event_id: str, payload: Path) -> None:
+    """Trusted local operator event intake, not an authorization to act externally."""
+    from .monitors import MonitorStore
+    settings = Settings()
+    if settings.persistence_backend != 'sqlite':
+        raise typer.BadParameter('monitor workflow currently requires SQLite')
+    fired = MonitorStore(settings.data_dir / 'monitors.sqlite3').accept_event(
+        owner, source, event_id, json.loads(payload.read_text()))
+    typer.echo(json.dumps({'fired': fired}))

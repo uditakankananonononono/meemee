@@ -38,6 +38,69 @@ class MonitorStore:
     def __init__(self,path:Path):
         path.parent.mkdir(parents=True,exist_ok=True);self.db=sqlite3.connect(path,check_same_thread=False);self.db.row_factory=sqlite3.Row;self.lock=threading.RLock()
         with self.lock,self.db:self.db.executescript('''PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS monitors(id TEXT PRIMARY KEY,owner_id TEXT NOT NULL,name TEXT NOT NULL,source_id TEXT NOT NULL,predicate TEXT NOT NULL,deadline TEXT,max_fires INTEGER NOT NULL,fire_count INTEGER NOT NULL DEFAULT 0,status TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL); CREATE INDEX IF NOT EXISTS monitors_owner_status ON monitors(owner_id,status,deadline); CREATE TABLE IF NOT EXISTS monitor_events(sequence INTEGER PRIMARY KEY AUTOINCREMENT,monitor_id TEXT NOT NULL,owner_id TEXT NOT NULL,kind TEXT NOT NULL,payload TEXT NOT NULL,created_at TEXT NOT NULL); CREATE INDEX IF NOT EXISTS monitor_events_item ON monitor_events(owner_id,monitor_id,sequence);''')
+        with self.lock, self.db:
+            self.db.executescript("""
+                PRAGMA busy_timeout=5000;
+                CREATE TABLE IF NOT EXISTS monitor_intake(
+                    owner_id TEXT, source_id TEXT, event_id TEXT, payload TEXT NOT NULL,
+                    PRIMARY KEY(owner_id,source_id,event_id));
+                CREATE TABLE IF NOT EXISTS monitor_outbox(
+                    id INTEGER PRIMARY KEY, monitor_id TEXT NOT NULL, owner_id TEXT NOT NULL,
+                    source_id TEXT NOT NULL, event_id TEXT NOT NULL, payload TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    UNIQUE(monitor_id,source_id,event_id));
+                CREATE TABLE IF NOT EXISTS monitor_notifications(
+                    id INTEGER PRIMARY KEY, owner_id TEXT NOT NULL, monitor_id TEXT NOT NULL,
+                    payload TEXT NOT NULL, delivered_at TEXT NOT NULL);
+            """)
+
+    def accept_event(self, owner_id, source_id, event_id, event):
+        """Atomic deduplication, evaluation and local notification outbox insertion."""
+        if not owner_id or not source_id or not event_id:
+            raise ValueError('owner, source and event id are required')
+        encoded = json.dumps(event, sort_keys=True)
+        if len(encoded.encode()) > 256_000:
+            raise ValueError('event too large')
+        with self.lock, self.db:
+            self.db.execute('BEGIN IMMEDIATE')
+            inserted = self.db.execute('INSERT OR IGNORE INTO monitor_intake VALUES(?,?,?,?)',
+                                      (owner_id, source_id, event_id, encoded)).rowcount
+            if not inserted:
+                return []
+            fired = self._evaluate_locked(owner_id, source_id, event)
+            for ident in fired:
+                self.db.execute('INSERT INTO monitor_outbox(monitor_id,owner_id,source_id,event_id,payload) VALUES(?,?,?,?,?)',
+                                (ident, owner_id, source_id, event_id, encoded))
+            return fired
+
+    def dispatch(self):
+        """Exactly-once local inbox delivery. This never sends externally or runs actions."""
+        count = 0
+        with self.lock, self.db:
+            self.db.execute('BEGIN IMMEDIATE')
+            rows = self.db.execute("SELECT o.*,m.status monitor_status FROM monitor_outbox o JOIN monitors m ON m.id=o.monitor_id WHERE o.status='pending'").fetchall()
+            for row in rows:
+                if row['monitor_status'] == 'cancelled':
+                    self.db.execute("UPDATE monitor_outbox SET status='cancelled' WHERE id=?", (row['id'],))
+                    continue
+                self.db.execute('INSERT OR IGNORE INTO monitor_notifications VALUES(?,?,?,?,?)',
+                                (row['id'], row['owner_id'], row['monitor_id'], row['payload'], datetime.now(timezone.utc).isoformat()))
+                self.db.execute("UPDATE monitor_outbox SET status='delivered' WHERE id=?", (row['id'],))
+                count += 1
+        return count
+
+    def notifications(self, owner_id):
+        with self.lock:
+            rows = self.db.execute('SELECT * FROM monitor_notifications WHERE owner_id=? ORDER BY id', (owner_id,)).fetchall()
+        return [{**dict(row), 'payload': json.loads(row['payload'])} for row in rows]
+
+    def expire(self):
+        with self.lock, self.db:
+            self.db.execute('BEGIN IMMEDIATE')
+            rows = self.db.execute("SELECT DISTINCT owner_id,source_id FROM monitors WHERE status='active'").fetchall()
+            for row in rows:
+                self._evaluate_locked(row['owner_id'], row['source_id'], {}, deadlines_only=True)
+
     def ping(self)->bool:
         with self.lock:return self.db.execute('SELECT 1').fetchone() is not None
     def create(self,owner_id:str,item:MonitorInput)->dict:
@@ -65,22 +128,34 @@ class MonitorStore:
         try:
             return {'gt':value>expected,'gte':value>=expected,'lt':value<expected,'lte':value<=expected}[op]
         except (TypeError,KeyError):return False
-    def evaluate(self,owner_id,source_id,event,at=None):
-        instant=datetime.fromisoformat(at.replace('Z','+00:00')) if at else datetime.now(timezone.utc)
-        if instant.tzinfo is None:raise ValueError('evaluation time must include a timezone')
-        clock=instant.astimezone(timezone.utc).isoformat();fired=[]
-        with self.lock,self.db:
-            rows=self.db.execute("SELECT * FROM monitors WHERE owner_id=? AND source_id=? AND status='active'",(owner_id,source_id)).fetchall()
-            for row in rows:
-                if row['deadline'] and row['deadline']<=clock:self.db.execute("UPDATE monitors SET status='timed_out',updated_at=? WHERE id=?",(clock,row['id']));self._event(row['id'],owner_id,'timed_out',{});continue
-                predicate=json.loads(row['predicate'])
-                if self.matches(predicate,event):
-                    count=row['fire_count']+1;status='completed' if count>=row['max_fires'] else 'active';self.db.execute('UPDATE monitors SET fire_count=?,status=?,updated_at=? WHERE id=?',(count,status,clock,row['id']));self._event(row['id'],owner_id,'triggered',event);fired.append(row['id'])
+    def evaluate(self, owner_id, source_id, event, at=None):
+        with self.lock, self.db:
+            self.db.execute('BEGIN IMMEDIATE')
+            return self._evaluate_locked(owner_id, source_id, event, at)
+
+    def _evaluate_locked(self, owner_id, source_id, event, at=None, deadlines_only=False):
+        instant = datetime.fromisoformat(at.replace('Z', '+00:00')) if at else datetime.now(timezone.utc)
+        if instant.tzinfo is None:
+            raise ValueError('evaluation time must include a timezone')
+        clock = instant.astimezone(timezone.utc).isoformat()
+        fired = []
+        rows = self.db.execute("SELECT * FROM monitors WHERE owner_id=? AND source_id=? AND status='active'", (owner_id, source_id)).fetchall()
+        for row in rows:
+            if row['deadline'] and row['deadline'] <= clock:
+                self.db.execute("UPDATE monitors SET status='timed_out',updated_at=? WHERE id=?", (clock, row['id']))
+                self._event(row['id'], owner_id, 'timed_out', {})
+                continue
+            if not deadlines_only and self.matches(json.loads(row['predicate']), event):
+                count = row['fire_count'] + 1
+                status = 'completed' if count >= row['max_fires'] else 'active'
+                self.db.execute('UPDATE monitors SET fire_count=?,status=?,updated_at=? WHERE id=?', (count, status, clock, row['id']))
+                self._event(row['id'], owner_id, 'triggered', event)
+                fired.append(row['id'])
         return fired
     def cancel(self,owner_id,ident):
         now=datetime.now(timezone.utc).isoformat()
         with self.lock,self.db:
-            changed=self.db.execute("UPDATE monitors SET status='cancelled',updated_at=? WHERE owner_id=? AND id=? AND status='active'",(now,owner_id,ident)).rowcount
+            changed=self.db.execute("UPDATE monitors SET status='cancelled',updated_at=? WHERE owner_id=? AND id=? AND status IN ('active','completed')",(now,owner_id,ident)).rowcount
             if changed:self._event(ident,owner_id,'cancelled',{})
         return bool(changed)
     def events(self,owner_id,ident):
@@ -91,6 +166,8 @@ class MonitorStore:
         """Hard-delete every monitor and monitor event owned by an account."""
         if not owner_id: raise ValueError('owner is required')
         with self.lock, self.db:
+            for table in ('monitor_notifications', 'monitor_outbox', 'monitor_intake'):
+                self.db.execute(f'DELETE FROM {table} WHERE owner_id=?', (owner_id,))
             events = self.db.execute('DELETE FROM monitor_events WHERE owner_id=?', (owner_id,)).rowcount
             monitors = self.db.execute('DELETE FROM monitors WHERE owner_id=?', (owner_id,)).rowcount
         return {"monitors": monitors, "monitor_events": events}
