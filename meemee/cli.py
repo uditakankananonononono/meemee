@@ -580,3 +580,47 @@ def monitor_event(owner: str, source: str, event_id: str, payload: Path) -> None
     fired = MonitorStore(settings.data_dir / 'monitors.sqlite3').accept_event(
         owner, source, event_id, json.loads(payload.read_text()))
     typer.echo(json.dumps({'fired': fired}))
+
+
+@app.command('agency-worker')
+def agency_worker(owner: str, once: bool = False, interval: int = 60) -> None:
+    """Consume explicit local goal plans; no remote effects or paid models."""
+    import time
+    import uuid
+
+    from .agency import AgencyWorker
+    from .context import ContextStore
+    from .goals import GoalStore
+    settings = Settings()
+    if settings.persistence_backend != 'sqlite' or interval < 5:
+        raise typer.BadParameter('SQLite required and interval must be >= 5 seconds')
+    worker = AgencyWorker(GoalStore(settings.data_dir / 'goals.sqlite3'),
+                          ContextStore(settings.data_dir / 'context.sqlite3'), uuid.uuid4().hex)
+    while True:
+        typer.echo(json.dumps({'state': worker.tick(owner)}))
+        if once:
+            return
+        time.sleep(interval)
+
+
+@app.command('goal-create')
+def goal_create(owner: str, description: str, plan: Path) -> None:
+    """Create a goal from a JSON object with an explicit steps array."""
+    from .goals import GoalStore
+    settings = Settings()
+    if settings.persistence_backend != 'sqlite':
+        raise typer.BadParameter('local goal workflows require SQLite')
+    typer.echo(json.dumps(GoalStore(settings.data_dir / 'goals.sqlite3').create(
+        owner, description, context=json.loads(plan.read_text()))))
+
+
+@app.command('goal-approve')
+def goal_approve(owner: str, goal_id: str, step: int) -> None:
+    """Approve an exact local note step after inspecting the plan."""
+    from .goals import GoalStore
+    settings = Settings()
+    if settings.persistence_backend != 'sqlite':
+        raise typer.BadParameter('local goal workflows require SQLite')
+    goals = GoalStore(settings.data_dir / 'goals.sqlite3')
+    goals.approve_step(owner, goal_id, step)
+    typer.echo('approved')
