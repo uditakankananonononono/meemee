@@ -58,3 +58,20 @@ def test_competition_dependencies_revocation_cancel_and_atomic_recovery(tmp_path
     assert workers[1].tick('o') == 'idle'
     assert len(goals.notes('o')) == 1
     with pytest.raises(KeyError): goals.approve_step('other', goal['id'], 0)
+
+
+def test_effect_failure_rolls_back_progress_and_recovers_without_duplicate(tmp_path):
+    import sqlite3
+    goals = GoalStore(tmp_path/'g.db')
+    worker = AgencyWorker(goals, ContextStore(tmp_path/'c.db'), 'w')
+    goal = goals.create('o','atomic',context={'steps':[{'kind':'note','text':'only once'}]})
+    goals.approve_step('o',goal['id'],0)
+    # A real DB failure after INSERT of the effect, before acknowledgement.
+    goals.db.execute("CREATE TRIGGER force_failure BEFORE UPDATE ON agency_progress BEGIN SELECT RAISE(ABORT, 'disk failure'); END")
+    with pytest.raises(sqlite3.IntegrityError): worker.tick('o')
+    assert goals.notes('o') == []
+    assert goals.db.execute('SELECT step FROM agency_progress WHERE goal_id=?',(goal['id'],)).fetchone() is None
+    goals.db.execute('DROP TRIGGER force_failure')
+    goals.db.execute("UPDATE agency_goals SET lease_until='2000-01-01T00:00:00+00:00' WHERE id=?",(goal['id'],))
+    assert AgencyWorker(GoalStore(tmp_path/'g.db'), worker.context, 'restart').tick('o') == 'completed'
+    assert len(goals.notes('o')) == 1

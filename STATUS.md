@@ -1,9 +1,9 @@
 # Meemee status
 
 **Current core version:** 0.122.0  
-**Ledger:** 163 verified, 0 thin  
+**Ledger:** verified counts are evidence from the named runs below, not retroactive proof; 1 thin (reflection-worker claim concurrency)  
 **Supported production shape:** SQLite/WAL single-host; PostgreSQL memory and owner-scoped jobs are selectable but require target-environment live verification  
-**Last core verification (main, PostgreSQL-backed tokens, accounts and audit chain + pb7 494dda0 merge):** 525 core + `tests_pg` passed against live PostgreSQL 16.2 (1 skipped: opt-in live HF router check); 266 SDK passed including live PostgreSQL SDK runs; core Ruff clean  
+**Last core verification (branch build/local-agency-20261001, 2026-10-01, Python 3.12.14, Ubuntu 22.04):** 543 core passed, 114 skipped (incl. real-weights transformer checks; optional transformers/torch not installed), 0 failed; SDK 259 passed, 7 skipped; live local PostgreSQL 16.2 (Asia/Kolkata, pgserver) 82 passed, 0 skipped via scripts/pg_live_check.py; core Ruff clean incl. vendored shared-models refreshed to 158c5a6 (upstream lint-only commit); wheel meemee_agent-0.122.0 built. New local monitor/agency/intake/native-device workflows are SQLite-only and unverified on PostgreSQL.  
 
 ## What is production-usable now
 
@@ -38,9 +38,9 @@ The authoritative detailed list is the 123-item "Verified" section in [README.md
 
 Counts are evidence from the named run, not a promise that unrun optional infrastructure works. Run every relevant suite in your target environment before release.
 
-## Thin (0)
+## Thin (1)
 
-Nothing is classified as thin. A capability is either verified at a stated boundary or listed below.
+Simultaneous reflection workers can both reflect one owner once (no claim lock; claims dedupe on evidence). The previous thin item (no production caller for MonitorStore.evaluate) is resolved for the local SQLite path by the intake and monitor workers; the PostgreSQL path still has no event caller.
 
 ## Missing, not claimed
 
@@ -49,7 +49,7 @@ Nothing is classified as thin. A capability is either verified at a stated bound
 - Browser takeover across processes: live sessions are held by the API server process; `meemee run` (CLI) and separate `meemee worker` processes do not get the session tools, and open sessions are marked `lost` on restart.
 - Live WhatsApp/iMessage delivery over real provider networks: adapters and the delivery queue are implemented and config-gated, but no provider account exists to verify against. Console screens for the companion layer are not built; the surface is HTTP API, CLI, SDK and the console companion view.
 - Live PostgreSQL test run against a managed or HA production server (network TLS, replicas). A live run on local PostgreSQL 16.2 is verified on branch pb7 (see evidence table). Checksummed SQLite-to-PostgreSQL copy/import tooling is implemented.
-- Built-in account deletion covers customer identity and companion content; product-wide jobs/runs remain covered by the existing portable export and retention tools rather than immediate destructive deletion. External OIDC remains optional.
+- Product-wide account deletion covers the stores listed above; the NEW local workflow stores added on this branch (goals execution tables, intake snapshots, native-device journal) are not yet wired into the automatic purger/export and must be deleted explicitly per their docs. External OIDC remains optional.
 - Interactive browser human takeover after explicit challenge detection/handoff.
 - Forced interruption for tools that are not marked for process isolation or cannot be pickled; those still rely on cooperative cancellation. Opt-in isolated tools are force-killable (branch pb7, `meemee/isolation.py`).
 - Multi-region failover, online dual-write database migration and logical replication.

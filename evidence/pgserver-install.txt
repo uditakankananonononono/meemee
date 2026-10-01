@@ -1,0 +1,9 @@
+Resolved 4 packages in 108ms
+Downloading pgserver (10.7MiB)
+ Downloaded pgserver
+Prepared 4 packages in 180ms
+Installed 4 packages in 19ms
+ + fasteners==0.20
+ + pgserver==0.1.4
+ + platformdirs==4.12.2
+ + psutil==7.2.2

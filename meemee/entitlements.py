@@ -29,7 +29,8 @@ class EntitlementStore:
         register_schema(self.db, "entitlements", 1, ["principal plan assignment"])
 
     def plan_name(self, principal: str) -> str:
-        row = self.db.execute("SELECT plan FROM principal_plans WHERE principal=?", (principal,)).fetchone()
+        with self.lock:
+            row = self.db.execute("SELECT plan FROM principal_plans WHERE principal=?", (principal,)).fetchone()
         return row[0] if row else self.default_plan
 
     def get(self, principal: str) -> dict:
@@ -50,7 +51,8 @@ class EntitlementStore:
         return current < int(PLANS[self.plan_name(principal)][resource])
 
     def ping(self) -> bool:
-        return self.db.execute("SELECT 1").fetchone() is not None
+        with self.lock:
+            return self.db.execute("SELECT 1").fetchone() is not None
 
     def delete_principal(self, principal: str) -> int:
         with self.lock, self.db:
