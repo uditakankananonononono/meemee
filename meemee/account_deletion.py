@@ -10,6 +10,9 @@ transaction is impossible. Instead every step is idempotent and recorded in a du
 ledger: a deletion is opened before the first step, each finished step is written with
 its counts, and ``resume_incomplete`` re-runs unfinished deletions after a crash. The
 tamper-evident audit log is deliberately retained; it records actions, not content.
+``account-deletions.sqlite3`` also deliberately retains the deleted principal id (plus
+who asked and when) as proof of deletion and to resume interrupted deletions; it holds
+no account content.
 """
 from __future__ import annotations
 
@@ -46,6 +49,7 @@ class PurgeTargets:
     goals: Any = None
     intake: Any = None
     source_health: Any = None
+    devices: Any = None
 
 
 class DeletionLedger:
@@ -176,6 +180,7 @@ class AccountPurger:
             ("agency_goals", t.goals, "delete_owner", "agency_goals"),
             ("intake_snapshots", t.intake, "delete_owner", "intake_snapshots"),
             ("source_health", t.source_health, "purge_owner", "source_health"),
+            ("local_devices", t.devices, "delete_owner", "device_rows"),
         ]
         for name, store, method, key in optional:
             if store is not None:
@@ -224,6 +229,7 @@ def build_account_purger(settings: Any, persistence: Any) -> AccountPurger:
     from .browser_sessions import BrowserSessionStore
     from .companion.store import CompanionStore
     from .context import ContextStore
+    from .devices import LocalDeviceStores
     from .entitlements import EntitlementStore
     from .goals import GoalStore
     from .idempotency import IdempotencyStore
@@ -252,5 +258,6 @@ def build_account_purger(settings: Any, persistence: Any) -> AccountPurger:
         reflection_schedule=persistence.reflection_schedule or ReflectionSchedule(root / "reflection-schedule.sqlite3"),
         goals=GoalStore(root / "goals.sqlite3"), intake=IntakeSnapshotStore(root / "intake.sqlite3"),
         source_health=SourceHealthStore(root / "source-health.sqlite3"),
+        devices=LocalDeviceStores(root),
     )
     return AccountPurger(targets, persistence.deletion_ledger or DeletionLedger(root / "account-deletions.sqlite3"))

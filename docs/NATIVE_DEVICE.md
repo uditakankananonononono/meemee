@@ -69,4 +69,20 @@ only after preserving necessary audit records. Window capture output is local
 and has no automatic retention/deletion policy. No secrets are placed in command
 arguments or audit results by this adapter, but titles themselves may be private.
 Back up registry and journal together with workers stopped. There is no PG
-migration or automatic account-delete integration for these local stores.
+migration for these local stores.
+
+Account export and deletion: `export_account` adds a `local_devices` section
+(pairings, devices including `secret_hex`, issued commands with envelopes and results,
+and the NativeClient journal rows) inside the checksummed payload. The importer does
+not restore it. Account deletion (`local_devices` step) hard-deletes the owner's rows
+from `devices.sqlite3` and, through the owner's device ids, from `native-device.sqlite3`
+(that table has no owner column), with `secure_delete` on and a WAL checkpoint
+(TRUNCATE) after each file. Pre-existing database files only gain `secure_delete` for
+deletes made after this change; the purge itself enables it before deleting. Copies
+you made yourself (backups, window screenshots) are not touched. Window ids are
+bounded to 1..4294967295 (X11 XIDs and Win32 HWNDs are 32-bit significant values).
+
+Deliberately retained after deletion: `account-deletions.sqlite3` keeps the deleted
+principal id, who requested it and when (proof of deletion, crash resume), and the
+tamper-evident audit log is retained. Neither holds account content, but the principal
+id remains identifying.

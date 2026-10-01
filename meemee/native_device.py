@@ -19,10 +19,13 @@ class OSAdapter(Protocol):
     def screenshot(self, destination: Path) -> None: ...
 
 
+MAX_WINDOW_ID = 0xFFFFFFFF  # X11 XIDs and Win32 HWNDs are 32-bit significant values
+
+
 def _window_id(value):
     # bool is an int subclass; True would silently pin window 1.
-    if type(value) is not int or value <= 0:
-        raise ValueError('window id must be a positive integer')
+    if type(value) is not int or not 0 < value <= MAX_WINDOW_ID:
+        raise ValueError(f'window id must be an integer in 1..{MAX_WINDOW_ID}')
     return value
 
 
@@ -134,6 +137,7 @@ class NativeClient:
         journal.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(journal, isolation_level=None)
         self.db.row_factory = sqlite3.Row
+        self.db.execute('PRAGMA secure_delete=ON')
         self.db.executescript('''PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;
             CREATE TABLE IF NOT EXISTS native_commands(command_id TEXT PRIMARY KEY,
                 nonce TEXT UNIQUE NOT NULL, device_id TEXT NOT NULL, status TEXT NOT NULL,

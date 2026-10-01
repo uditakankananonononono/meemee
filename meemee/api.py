@@ -25,6 +25,7 @@ from .browser_sessions import BrowserSessionManager
 from .companion.api import build_companion_router
 from .companion.runtime import build_companion
 from .config import Settings
+from .devices import LocalDeviceStores
 from .email_verification import ResendMailer
 from .entitlements import public_catalog
 from .goals import GoalStore
@@ -138,6 +139,7 @@ account_purger = AccountPurger(PurgeTargets(
     reflection_schedule=persistence.reflection_schedule,
     goals=GoalStore(settings.data_dir / "goals.sqlite3"), intake=IntakeSnapshotStore(settings.data_dir / "intake.sqlite3"),
     source_health=SourceHealthStore(settings.data_dir / "source-health.sqlite3"),
+    devices=LocalDeviceStores(settings.data_dir),
 ), deletion_ledger)
 for _resumed in account_purger.resume_incomplete():
     log.warning("resumed interrupted account deletion", extra={"deletion_id": _resumed["deletion_id"]})
