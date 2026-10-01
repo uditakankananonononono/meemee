@@ -20,8 +20,9 @@ guessing. A profile declaring commitments is stopped before any submission.
 The inbox adapter (GmailInbox) reads the USER'S OWN Gmail via an OAuth token held
 in the vault. Every lookup is bound to one request: exact sender, exact recipient,
 exact subject, internalDate within [verification_since, deadline], metadata-first
-(no bodies of unrelated mail), DKIM-pass required via Gmail's
-Authentication-Results header, exact plain-text templates only, each message id
+(no bodies of unrelated mail), exactly one Authentication-Results header from mx.google.com, parsed result by result:
+a dkim=pass whose header.i is exactly @<approved sender domain> is required and any
+other dkim result for that domain rejects (a pass for another domain never counts), exact plain-text templates only, each message id
 consumed once (no replay). Links must match the request origin and path/token
 shape; wrong domains are rejected without being opened. Message content is never
 treated as instructions.
@@ -30,6 +31,13 @@ treated as instructions.
 - Secrets exist only inside the vault database (AES-GCM, same record schema as
   meemee SecretVault). Runs store a whitelisted public field set; tests assert the
   database contains no password, token or code bytes.
+- Request gate at the browser routing layer: every non-GET request is aborted unless the
+  actor itself opened a phase (submit/verify/resend) after stored approval, it is a
+  top-level form navigation, the path matches the phase, and the body equals exactly the
+  approved values (email, name, vault password; or the proof code). Page scripts cannot
+  open a phase, so a POST during inspection or before approval is aborted. Any request
+  whose path or query carries the filled password or a code is aborted, and queries are
+  allowed only on the actor-opened verification link.
 - One signup POST per run at the browser routing layer; uncertain outcomes are
   unknown/partial, never retried. Cancel closes local work and honestly reports
   that a remote account may remain; restart is a fresh unapproved request.
@@ -45,4 +53,13 @@ treated as instructions.
   production validation beyond this fixture acceptance.
 - Real Gmail API behavior is covered by a local metadata-first stub contract in
   tests, not by a live Gmail account in this acceptance run.
-- Screenshots blank password/code fields before capture.
+- Screenshots: password/code fields are cleared, all page text is made transparent except
+  reviewed profile elements (policy, headings, account email/name, buttons), images,
+  canvas, svg and iframes are hidden, and any element whose text, value or attributes
+  contain the password or a code is hidden. This removes reflected secrets that appear as
+  text. A page that renders a secret in a transformed form (encoded, split) inside a kept
+  element would not be matched by the value check; the kept set is deliberately small.
+  Residual risk: a script could exfiltrate a transformed secret in a same-origin request
+  path; only exact values are matched. Loopback fixture only, nothing tested remotely.
+- This is a local-fixture release (loopback only). It has not been run against any real
+  website or live Gmail and must not be described as real-site signup.
