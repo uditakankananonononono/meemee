@@ -652,3 +652,21 @@ def intake_worker(source_root: Path, once: bool = False, interval: int = 60) -> 
         if once:
             return
         time.sleep(interval)
+
+
+@app.command('native-device-execute')
+def native_device_execute(owner: str, device_id: str, platform: str, window_id: int,
+                          secret_file: Path, envelope_file: Path) -> None:
+    """Execute one signed locally-issued command against one pinned native window."""
+    from .devices import DeviceRegistry
+    from .native_device import NativeClient, WindowsAdapter, X11Adapter
+    settings = Settings()
+    if settings.persistence_backend != 'sqlite':
+        raise typer.BadParameter('native local registry requires SQLite')
+    adapters = {'windows': WindowsAdapter, 'x11': X11Adapter}
+    if platform not in adapters:
+        raise typer.BadParameter('supported platforms: windows, x11; Mac adapter not implemented')
+    client = NativeClient(DeviceRegistry(settings.data_dir / 'devices.sqlite3'), owner, device_id,
+                          secret_file.read_text().strip(), adapters[platform](window_id),
+                          settings.data_dir / 'native-device.sqlite3')
+    typer.echo(json.dumps(client.execute(json.loads(envelope_file.read_text()))))
