@@ -114,7 +114,7 @@ class Engine:
         self.thread = threading.get_ident()
         self.pw = sync_playwright().start()
         self.browser = self.pw.chromium.launch(executable_path=executable, headless=True,
-                                              args=['--no-sandbox'])
+                                              args=self._launch_args(profiles))
         self.sessions = {}
         self.gates = {}
         # Restart never silently resumes or retries a possibly committed action.
@@ -124,6 +124,54 @@ class Engine:
             run = json.loads(row[0])
             if run['state'] in {'inspection', 'ready', 'verification'}:
                 self._state(run, 'unknown', 'process_restart_requires_reconciliation')
+
+    @staticmethod
+    def _launch_args(profiles):
+        """Network-layer lock. Page JavaScript cannot undo any of this.
+
+        * DNS: every hostname resolves to NOTFOUND (only 127.0.0.1 literal is exempt, since the
+          reviewed origins are loopback IP literals), so no name can reach another host.
+        * Proxy: every request, including workers, SharedWorkers, preconnect, form targets,
+          WebSocket, importScripts and CSP reports, goes to a local proxy that refuses
+          (127.0.0.1:1). '<-loopback>' removes Chrome's implicit loopback bypass, so other
+          loopback ports are denied too. The only bypass entries are the reviewed
+          host:port origins.
+        * UDP: QUIC/HTTP3 (WebTransport) is off, WebRTC may not use non-proxied UDP.
+        """
+        bypass = sorted({'127.0.0.1:%d' % urlsplit(p.origin).port for p in profiles})
+        return ['--no-sandbox',
+                '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1',
+                '--proxy-server=http://127.0.0.1:1',
+                '--proxy-bypass-list=<-loopback>;' + ';'.join(bypass),
+                '--disable-quic',
+                '--disable-http3',
+                '--disable-features=WebRtcHideLocalIpsWithMdns,NetworkPrediction,Prefetch',
+                '--force-webrtc-ip-handling-policy=disable_non_proxied_udp',
+                '--webrtc-ip-handling-policy=disable_non_proxied_udp',
+                '--dns-prefetch-disable',
+                '--no-pings']
+
+    # Injected into every fixture response in the route handler. Server-chosen reporting
+    # directives are stripped first; a page cannot loosen this because multiple CSP headers
+    # intersect. Backup only: the launch arguments above are the control.
+    INTERCEPT_WS = True
+    CSP = "worker-src 'none'; child-src 'none'; connect-src 'self'; form-action 'self'; object-src 'none'; base-uri 'self'"
+    DROP_HEADERS = frozenset({'report-to', 'reporting-endpoints', 'nel', 'content-security-policy-report-only',
+                              'content-security-policy', 'content-length', 'content-encoding',
+                              'transfer-encoding', 'link'})
+
+    def _respond(self, route):
+        """Fetch with the context's cookies, no redirect following, then rewrite headers."""
+        response = route.fetch(max_redirects=0)
+        headers = {}
+        for h in response.headers_array:
+            name = h['name'].lower()
+            if name in self.DROP_HEADERS:
+                continue
+            headers[h['name']] = headers[h['name']] + '\n' + h['value'] if h['name'] in headers else h['value']
+        if self.CSP:
+            headers['Content-Security-Policy'] = self.CSP
+        route.fulfill(response=response, headers=headers)
 
     def _click_nav(self, page, selector):
         """Click and wait for a possible navigation; returns the Response or None.
@@ -277,12 +325,18 @@ class Engine:
             request = route.request
             if not p.accepts(request.url) or not self._request_allowed(gate, p, request):
                 return route.abort()
-            return route.continue_()
+            try:
+                return self._respond(route)
+            except Exception:
+                return route.abort()
         context.route('**/*', guard)
+        # A form target=_blank, window.open or link click never gets a second tab.
+        context.on('page', lambda extra: extra.close() if extra is not self.sessions.get(run['id'], (None, extra))[1] else None)
         # context.route does not see WebSockets. Every socket is intercepted at the browser
         # level by a handler that never calls connect_to_server, so the page talks to a
         # mock and no connection or frame ever reaches a real server.
-        context.route_web_socket(re.compile(r'.*'), lambda ws: None)
+        if self.INTERCEPT_WS:
+            context.route_web_socket(re.compile(r'.*'), lambda ws: None)
         # Defence in depth for channels outside request routing; a page cannot redefine these.
         context.add_init_script(self.CHANNEL_BLOCK_JS)
         page = context.new_page()
@@ -447,6 +501,9 @@ class Engine:
       for (const n of ['RTCPeerConnection', 'webkitRTCPeerConnection', 'RTCDataChannel',
                        'WebTransport', 'EventSource', 'RTCSessionDescription'])
         dead(n);
+      for (const n of ['Worker', 'SharedWorker', 'Worklet', 'AudioWorklet', 'PaintWorklet'])
+        dead(n);
+      try { URL.createObjectURL = () => { throw new Error('blocked'); }; } catch (e) {}
       try { Object.defineProperty(navigator, 'sendBeacon', {
         value: () => false, writable: false, configurable: false }); } catch (e) {}
     })();"""
