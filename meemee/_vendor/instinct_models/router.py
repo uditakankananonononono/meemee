@@ -11,8 +11,17 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .config import ProductConfig
-from .providers import (HOSTED, ChatResult, InklingHFRouter, InklingLocal, NeedleLocal, OrnithOpenAICompat, HermesLocal, Provider,
-                        ProviderError)
+from .providers import (
+    HOSTED,
+    ChatResult,
+    HermesLocal,
+    InklingHFRouter,
+    InklingLocal,
+    NeedleLocal,
+    OrnithOpenAICompat,
+    Provider,
+    ProviderError,
+)
 
 
 @dataclass
@@ -45,7 +54,7 @@ class Router:
         self.providers = providers
 
     @classmethod
-    def from_config(cls, cfg: ProductConfig) -> "Router":
+    def from_config(cls, cfg: ProductConfig) -> Router:
         chain: list[Provider] = [NeedleLocal(cfg.needle_weights),
                                  OrnithOpenAICompat(cfg.ornith_url, cfg.ornith_model),
                                  InklingLocal(cfg.inkling_local_url, cfg.inkling_local_model)]
