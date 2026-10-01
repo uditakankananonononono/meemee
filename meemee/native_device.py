@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import ctypes
+import hashlib
 import json
 import os
 import sqlite3
@@ -142,7 +143,10 @@ class NativeClient:
             CREATE TABLE IF NOT EXISTS native_commands(command_id TEXT PRIMARY KEY,
                 nonce TEXT UNIQUE NOT NULL, device_id TEXT NOT NULL, status TEXT NOT NULL,
                 result TEXT, observed_at TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS purge_flags(key TEXT PRIMARY KEY, set_at TEXT NOT NULL);
         ''')
+        self.db.create_function('purge_key', 2, lambda o, d: hashlib.sha256(f'{o}\0{d}'.encode()).hexdigest(),
+                                deterministic=True)
 
     @staticmethod
     def manifest():
@@ -164,10 +168,17 @@ class NativeClient:
         if command.capability == 'window.set_title':
             _title(command.arguments['title'])
         try:
-            self.db.execute('INSERT INTO native_commands VALUES(?,?,?,\'started\',NULL,?)',
-                            (command.command_id, command.nonce, self.device_id, datetime.now(timezone.utc).isoformat()))
+            # One statement: no row is journaled once an account purge flagged this device
+            # (flag newer than this device's pairing), so a purge cannot leave orphan rows.
+            inserted = self.db.execute(
+                "INSERT INTO native_commands SELECT ?,?,?,'started',NULL,? WHERE NOT EXISTS "
+                "(SELECT 1 FROM purge_flags WHERE key=purge_key(?,?) AND set_at>=?)",
+                (command.command_id, command.nonce, self.device_id, datetime.now(timezone.utc).isoformat(),
+                 self.owner, self.device_id, device['paired_at'])).rowcount
         except sqlite3.IntegrityError as exc:
             raise ValueError('command/nonce already attempted; reconcile, never blindly retry') from exc
+        if not inserted:
+            raise PermissionError('device owner account is being deleted; command not journaled')
         try:
             result = self.adapter.observe() if command.capability == 'window.observe' else self.adapter.set_title(command.arguments['title'])
             self.db.execute("UPDATE native_commands SET status='completed',result=? WHERE command_id=?", (json.dumps(result, sort_keys=True), command.command_id))

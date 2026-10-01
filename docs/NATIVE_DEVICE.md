@@ -74,13 +74,29 @@ migration for these local stores.
 Account export and deletion: `export_account` adds a `local_devices` section
 (pairings, devices including `secret_hex`, issued commands with envelopes and results,
 and the NativeClient journal rows) inside the checksummed payload. The importer does
-not restore it. Account deletion (`local_devices` step) hard-deletes the owner's rows
-from `devices.sqlite3` and, through the owner's device ids, from `native-device.sqlite3`
-(that table has no owner column), with `secure_delete` on and a WAL checkpoint
-(TRUNCATE) after each file. Pre-existing database files only gain `secure_delete` for
-deletes made after this change; the purge itself enables it before deleting. Copies
-you made yourself (backups, window screenshots) are not touched. Window ids are
-bounded to 1..4294967295 (X11 XIDs and Win32 HWNDs are 32-bit significant values).
+not restore it. The checksum is a plain unkeyed sha256: it detects accidental damage
+only and does not authenticate the file against someone who can rewrite it.
+
+Account deletion (`local_devices` step) works in this order, each part re-runnable:
+revoke the owner's devices and record a progress row of hashed keys; write a purge flag
+per device in the journal (a live NativeClient inserts a journal row only when no flag
+newer than its device pairing exists, decided inside the same SQL statement, so a
+command cannot be journaled after the purge); delete the journal rows through the
+owner's device ids; delete the registry rows; sweep the journal again (also rows whose
+device is no longer in the registry but was flagged by this owner's purge); then
+`VACUUM` both files and truncate the WAL. Journal rows with a device id that no purge
+ever flagged are not attributable to an owner and are left alone. Window ids are
+bounded to 1..4294967295.
+
+Old free pages: databases created before this change had `secure_delete` off, so rows
+deleted earlier by other means can still sit in free pages of the file. They stay
+there until the file is vacuumed; the purge's `VACUUM` rewrites both files and so
+removes them. Copies you made yourself (backups, window screenshots) are not touched.
+If a live reader blocks the vacuum or WAL truncation the step fails and is retried on
+resume; it is not reported as done.
+
+The journal keeps one small flag row per purged device: a sha256 of owner and device id
+and a timestamp (no names, secrets, or command content). It is what stops late writes.
 
 Deliberately retained after deletion: `account-deletions.sqlite3` keeps the deleted
 principal id, who requested it and when (proof of deletion, crash resume), and the
