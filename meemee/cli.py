@@ -315,7 +315,7 @@ def account_export(principal: str, destination: Path) -> None:
         report = export_account(settings.data_dir, principal, destination)
     else:
         from meemee_persist_pg.operator_tools import export_account as export_pg
-        try: report = export_pg(database, principal, destination)
+        try: report = export_pg(database, principal, destination, settings.data_dir)
         finally: database.close()
     typer.echo(json.dumps(report, indent=2))
 

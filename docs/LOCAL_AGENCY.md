@@ -31,7 +31,6 @@ proof of the human-like or better-than-you claims.
 
 Schema is additive on goals.sqlite3. Backup/restore the whole DB with context;
 GoalStore.delete_owner deletes graph, grants, events, progress and local notes.
-The existing account-deletion API/export does not yet include this new store;
-operators must explicitly delete it. PostgreSQL migration parity, HTTP goal
+Account deletion (`meemee account-delete`, API) removes goals and all execution tables, and `account-export` includes them; import does not restore them. PostgreSQL migration parity, HTTP goal
 routes and a goal UI remain missing. Tests prove restart, fresh observation,
 approval, effects, follow-up, dependency, competition, revocation and cancellation.

@@ -57,7 +57,7 @@ def _json_value(value: Any) -> Any:
 
 # ---------------------------------------------------------------- account export / import
 
-def export_account(db: Database, principal: str, destination: Path) -> dict[str, Any]:
+def export_account(db: Database, principal: str, destination: Path, data_dir: Path | None = None) -> dict[str, Any]:
     if destination.exists():
         raise FileExistsError(destination)
     with db.transaction(isolation="REPEATABLE READ") as c:
@@ -75,11 +75,17 @@ def export_account(db: Database, principal: str, destination: Path) -> dict[str,
     entitlements = [{**row, "updated_at": _iso(row["updated_at"])} for row in plan_rows]
     payload = {"format": FORMAT, "principal": principal, "exported_at": datetime.now(timezone.utc).isoformat(),
                "jobs": jobs, "runs": runs, "entitlements": entitlements}
+    agency = None
+    if data_dir is not None:  # local agency stores are SQLite files even in PostgreSQL mode
+        from meemee.account_export import local_agency_rows
+        agency = local_agency_rows(data_dir, principal)
+        payload["local_agency"] = agency
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     envelope = {"payload": payload, "sha256": hashlib.sha256(canonical.encode()).hexdigest()}
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(envelope, indent=2, sort_keys=True) + "\n")
     return {"principal": principal, "jobs": len(jobs), "runs": len(runs), "entitlements": len(entitlements),
+            **({"local_agency": {k: len(v) for k, v in agency.items()}} if agency is not None else {}),
             "sha256": envelope["sha256"]}
 
 

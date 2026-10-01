@@ -27,8 +27,10 @@ from .companion.runtime import build_companion
 from .config import Settings
 from .email_verification import ResendMailer
 from .entitlements import public_catalog
+from .goals import GoalStore
 from .health import ReadinessChecker
 from .idempotency import IdempotencyConflict
+from .intake import IntakeSnapshotStore
 from .model_profiles import ModelCatalog, build_role_model, probe_profile, uses_routing
 from .monitors import MonitorInput
 from .observability import (
@@ -50,6 +52,7 @@ from .rate_limit import RateLimitMiddleware, SQLiteRateLimiter
 from .reflection import PersonalModelReflector
 from .runtime import build_agent
 from .shutdown import RunGate
+from .source_health import SourceHealthStore
 from .streaming import job_event_stream
 from .web_login import WebLogin, WebLoginConfig
 from .webhooks import (
@@ -133,6 +136,8 @@ account_purger = AccountPurger(PurgeTargets(
     context=persistence.context, webhooks=webhooks, companion=companion.store,
     browser_sessions=browser_sessions.store, browser_notices=browser_sessions.notices,
     reflection_schedule=persistence.reflection_schedule,
+    goals=GoalStore(settings.data_dir / "goals.sqlite3"), intake=IntakeSnapshotStore(settings.data_dir / "intake.sqlite3"),
+    source_health=SourceHealthStore(settings.data_dir / "source-health.sqlite3"),
 ), deletion_ledger)
 for _resumed in account_purger.resume_incomplete():
     log.warning("resumed interrupted account deletion", extra={"deletion_id": _resumed["deletion_id"]})

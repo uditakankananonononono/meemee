@@ -53,3 +53,22 @@ def test_real_x11_window_control_pair_audit_replay_revoke(tmp_path):
 def test_windows_fails_explicitly_off_platform():
     if os.name != 'nt':
         with pytest.raises(OSError): WindowsAdapter(1)
+
+
+@pytest.mark.parametrize('bad', [True, False, 0, -1, '5', 5.0, None])
+def test_x11_rejects_non_int_or_non_positive_window_ids(bad, monkeypatch):
+    monkeypatch.setenv('DISPLAY', ':99')
+    with pytest.raises((OSError, TypeError, ValueError)):
+        X11Adapter(bad)
+
+
+def test_windows_adapter_fails_closed_unless_explicitly_opted_in(monkeypatch):
+    # Even on a real Windows host the adapter is unverified: it must refuse by default.
+    monkeypatch.delenv('MEEMEE_WINDOWS_ADAPTER_UNVERIFIED_OK', raising=False)
+    monkeypatch.setattr(os, 'name', 'nt')
+    with pytest.raises(OSError, match='unverified'):
+        WindowsAdapter(1)
+    for bad in (True, 0, -3, '7'):
+        monkeypatch.setenv('MEEMEE_WINDOWS_ADAPTER_UNVERIFIED_OK', '1')
+        with pytest.raises((OSError, TypeError, ValueError)):
+            WindowsAdapter(bad)

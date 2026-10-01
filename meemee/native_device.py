@@ -19,6 +19,13 @@ class OSAdapter(Protocol):
     def screenshot(self, destination: Path) -> None: ...
 
 
+def _window_id(value):
+    # bool is an int subclass; True would silently pin window 1.
+    if type(value) is not int or value <= 0:
+        raise ValueError('window id must be a positive integer')
+    return value
+
+
 def _title(value):
     if not isinstance(value, str) or not 1 <= len(value) <= 240 or any(ord(c) < 32 for c in value):
         raise ValueError('title must be 1..240 printable characters')
@@ -27,7 +34,8 @@ def _title(value):
 
 class X11Adapter:
     def __init__(self, window_id: int, display: str | None = None):
-        if os.name != 'posix' or window_id <= 0:
+        window_id = _window_id(window_id)
+        if os.name != 'posix':
             raise OSError('Linux/X11 and a positive target window required')
         self.window_id = str(window_id)
         self.env = dict(os.environ)
@@ -59,10 +67,19 @@ class X11Adapter:
 
 
 class WindowsAdapter:
-    """Win32 window observation and bounded title mutation. Untested off Windows."""
+    """Win32 window observation and bounded title mutation.
+
+    UNVERIFIED: this code has never run on Windows. It fails closed: construction is
+    refused unless the operator sets MEEMEE_WINDOWS_ADAPTER_UNVERIFIED_OK=1 on a real
+    Windows host, accepting that nothing here has been tested there.
+    """
     def __init__(self, window_id: int):
+        window_id = _window_id(window_id)
         if os.name != 'nt':
             raise OSError('Windows adapter requires Windows')
+        if os.environ.get('MEEMEE_WINDOWS_ADAPTER_UNVERIFIED_OK') != '1':
+            raise OSError('Windows adapter is unverified (never run on Windows); refusing. '
+                          'Set MEEMEE_WINDOWS_ADAPTER_UNVERIFIED_OK=1 only to test it on a real Windows host')
         from ctypes import wintypes
         self.window = wintypes.HWND(window_id)
         self.user32 = ctypes.WinDLL('user32', use_last_error=True)

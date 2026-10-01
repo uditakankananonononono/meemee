@@ -38,6 +38,7 @@ class GoalStore:
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False, isolation_level=None)
         self.db.row_factory = sqlite3.Row
+        self.db.execute('PRAGMA secure_delete=ON')
         self.lock = threading.RLock()
         self.db.executescript("""
             PRAGMA journal_mode=WAL;
@@ -229,6 +230,7 @@ class GoalStore:
                 self.db.execute('UPDATE agency_goals SET parent_id=NULL WHERE principal=?', (principal,))
                 count = self.db.execute('DELETE FROM agency_goals WHERE principal=?', (principal,)).rowcount
                 self.db.execute('COMMIT')
+                self.db.execute('PRAGMA wal_checkpoint(TRUNCATE)')
                 return count
             except Exception:
                 self.db.execute('ROLLBACK')

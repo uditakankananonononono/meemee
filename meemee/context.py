@@ -36,6 +36,7 @@ class ContextStore:
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
+        self.db.execute('PRAGMA secure_delete=ON')
         self.lock = threading.RLock()
         with self.lock, self.db:
             self.db.executescript("""
@@ -156,6 +157,11 @@ class ContextStore:
                 )
             records = self.db.execute("DELETE FROM context_records WHERE owner_id=?", (owner_id,)).rowcount
             sources = self.db.execute("DELETE FROM context_sources WHERE owner_id=?", (owner_id,)).rowcount
+        with self.lock:
+            # FTS5 keeps deleted terms in old index segments until merged; rewrite them (freed pages are zeroed).
+            self.db.execute("INSERT INTO context_fts(context_fts) VALUES('optimize')")
+            self.db.commit()
+            self.db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
         return {"context_records": records, "context_sources": sources}
 
 

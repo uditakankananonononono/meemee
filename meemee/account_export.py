@@ -16,17 +16,54 @@ def _rows(path: Path, query: str, parameters: tuple) -> list[dict]:
     finally: db.close()
 
 
+_AGENCY = (  # key, file, query (one ? = principal)
+    ("goals","goals.sqlite3","SELECT * FROM agency_goals WHERE principal=? ORDER BY created_at,id"),
+    ("goal_dependencies","goals.sqlite3","SELECT * FROM agency_goal_dependencies WHERE goal_id IN (SELECT id FROM agency_goals WHERE principal=?) ORDER BY goal_id,dependency_id"),
+    ("progress","goals.sqlite3","SELECT * FROM agency_progress WHERE goal_id IN (SELECT id FROM agency_goals WHERE principal=?) ORDER BY goal_id"),
+    ("step_grants","goals.sqlite3","SELECT * FROM agency_step_grants WHERE principal=? ORDER BY goal_id,step"),
+    ("notes","goals.sqlite3","SELECT * FROM agency_notes WHERE principal=? ORDER BY created_at,goal_id,step"),
+    ("execution_events","goals.sqlite3","SELECT * FROM agency_execution_events WHERE principal=? ORDER BY id"),
+    ("context_sources","context.sqlite3","SELECT * FROM context_sources WHERE owner_id=? ORDER BY source_id"),
+    ("context_records","context.sqlite3","SELECT * FROM context_records WHERE owner_id=? ORDER BY id"),
+    ("intake_snapshots","intake.sqlite3","SELECT * FROM intake_snapshots WHERE owner=? ORDER BY source"),
+    ("source_health","source-health.sqlite3","SELECT * FROM source_health WHERE owner_id=? ORDER BY source_id"),
+    ("source_health_checks","source-health.sqlite3","SELECT * FROM source_health_checks WHERE owner_id=? ORDER BY id"),
+    ("monitors","monitors.sqlite3","SELECT * FROM monitors WHERE owner_id=? ORDER BY id"),
+    ("monitor_events","monitors.sqlite3","SELECT * FROM monitor_events WHERE owner_id=?"),
+    ("monitor_intake","monitors.sqlite3","SELECT * FROM monitor_intake WHERE owner_id=? ORDER BY source_id,event_id"),
+    ("monitor_outbox","monitors.sqlite3","SELECT * FROM monitor_outbox WHERE owner_id=? ORDER BY id"),
+    ("monitor_notifications","monitors.sqlite3","SELECT * FROM monitor_notifications WHERE owner_id=? ORDER BY id"),
+)
+
+
+def local_agency_rows(data_dir: Path, principal: str) -> dict[str, list[dict]]:
+    """Owner-scoped rows of the local agency stores (goals, intake, source records, monitors).
+
+    A store file or table that does not exist yet contributes no rows. Export only: the
+    importer does not restore this section (see docs/NATIVE_DEVICE.md / STATUS.md).
+    """
+    out = {}
+    for key, filename, query in _AGENCY:
+        try:
+            out[key] = _rows(data_dir / filename, query, (principal,))
+        except sqlite3.OperationalError as exc:
+            if "no such table" not in str(exc): raise
+            out[key] = []
+    return out
+
+
 def export_account(data_dir: Path, principal: str, destination: Path) -> dict:
     if destination.exists(): raise FileExistsError(destination)
     jobs=_rows(data_dir/"jobs.sqlite3","SELECT * FROM jobs WHERE principal=? ORDER BY created_at,id",(principal,))
     runs=_rows(data_dir/"runs.sqlite3","SELECT * FROM runs WHERE principal=? ORDER BY created_at,run_id",(principal,))
     entitlements=_rows(data_dir/"entitlements.sqlite3","SELECT principal,plan,updated_at FROM principal_plans WHERE principal=?",(principal,))
-    payload={"format":FORMAT,"principal":principal,"exported_at":datetime.now(timezone.utc).isoformat(),"jobs":jobs,"runs":runs,"entitlements":entitlements}
+    agency=local_agency_rows(data_dir,principal)
+    payload={"format":FORMAT,"principal":principal,"exported_at":datetime.now(timezone.utc).isoformat(),"jobs":jobs,"runs":runs,"entitlements":entitlements,"local_agency":agency}
     canonical=json.dumps(payload,sort_keys=True,separators=(",",":"))
     envelope={"payload":payload,"sha256":hashlib.sha256(canonical.encode()).hexdigest()}
     destination.parent.mkdir(parents=True,exist_ok=True)
     destination.write_text(json.dumps(envelope,indent=2,sort_keys=True)+"\n")
-    return {"principal":principal,"jobs":len(jobs),"runs":len(runs),"entitlements":len(entitlements),"sha256":envelope["sha256"]}
+    return {"principal":principal,"jobs":len(jobs),"runs":len(runs),"entitlements":len(entitlements),"local_agency":{k:len(v) for k,v in agency.items()},"sha256":envelope["sha256"]}
 
 
 def inspect_import(source: Path, target_principal: str | None = None) -> dict:

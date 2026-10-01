@@ -49,7 +49,16 @@ reads the changed title, checks durable registry audit, rejects replay after
 restart and refuses a revoked pairing without changing the window. Screenshot
 is inspected directly. This proves a bounded test-app action on Linux/X11,
 not Windows, the owner's Dell, a polished native app or whole-computer agency.
-Windows ctypes source compiles on Linux and fails explicitly off Windows;
+WindowsAdapter is UNVERIFIED and fails closed: it refuses to construct (even on
+Windows) unless MEEMEE_WINDOWS_ADAPTER_UNVERIFIED_OK=1 is set, so nothing runs
+there by accident. Window ids must be positive integers (a bool is rejected).
+If the owner's Dell turns out to be Windows, what a real Windows run must show
+before the opt-in can be dropped: (1) pair a device and run window.observe on a
+Notepad window, matching title and rect; (2) window.set_title on Notepad with
+readback; (3) set_title on a protected/elevated window is refused and reported,
+not silently ignored; (4) a screenshot with Pillow captures the right rectangle;
+(5) replay refusal after restart; (6) revoked pairing refuses. None of this has been done.
+The Windows ctypes source compiles on Linux and fails explicitly off Windows;
 actual Windows execution, permission denial and screenshot behavior remain
 UNVERIFIED until tested on Windows. Windows SetWindowTextW may refuse cross-
 process application windows; the client reports denial/readback mismatch.
