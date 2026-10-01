@@ -12,7 +12,9 @@ def test_docs_versions_and_ledger_are_current():
     assert f"Verified in v{__version__}" in readme
     assert f"Current core version:** {__version__}" in status
     assert f"## {__version__}" in changelog
-    assert "## Thin (0)" in readme and "## Thin (0)" in status
+    assert "## Thin (1)" in readme and "## Thin (1)" in status
+    assert "reflection" in readme.split("## Thin (1)")[1].split("## Missing")[0]
+    assert "reflection" in status.split("## Thin (1)")[1].split("## Missing")[0]
     assert "## Missing, not claimed" in readme and "## Missing, not claimed" in status
 
 
