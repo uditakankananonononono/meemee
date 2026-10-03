@@ -41,7 +41,7 @@ class GmailInbox:
 
     def _get(self, url, headers=None, params=None):
         if not hasattr(self.client, 'stream'):
-            return self.client.get(url, headers=headers, params=params)
+            raise ValueError('gmail client must support bounded streaming')
         with self.client.stream('GET', url, headers=headers, params=params) as response:
             raw = b''
             for chunk in response.iter_bytes():

@@ -18,6 +18,11 @@ HOP = {'connection', 'keep-alive', 'proxy-connection', 'te', 'trailer', 'transfe
        'host', 'content-length', 'accept-encoding'}
 
 
+NAT64 = ipaddress.ip_network('64:ff9b::/96')
+NAT64_LOCAL = ipaddress.ip_network('64:ff9b:1::/48')
+SITE_LOCAL = ipaddress.ip_network('fec0::/10')
+
+
 class TransportError(Exception):
     pass
 
@@ -26,8 +31,12 @@ def public(address):
     ip = ipaddress.ip_address(address.split('%')[0])
     if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
         ip = ip.ipv4_mapped
-    if isinstance(ip, ipaddress.IPv6Address) and ip.sixtofour:
-        ip = ip.sixtofour
+    if isinstance(ip, ipaddress.IPv6Address):
+        # NAT64 (embeds an arbitrary IPv4, e.g. 64:ff9b::7f00:1) and deprecated site-local are never reviewed targets.
+        if ip in NAT64 or ip in NAT64_LOCAL or ip in SITE_LOCAL:
+            return False
+        if ip.sixtofour:
+            ip = ip.sixtofour
     return ip.is_global and not ip.is_multicast
 
 
@@ -59,6 +68,7 @@ def fetch(method, url, headers, body=None, *, resolver=socket.getaddrinfo, pin=N
     ctx.check_hostname = True
     ctx.verify_mode = ssl.CERT_REQUIRED
     last = None
+    raw = None
     for family, addr in targets:
         try:
             raw = socket.socket(family, socket.SOCK_STREAM)
@@ -68,7 +78,9 @@ def fetch(method, url, headers, body=None, *, resolver=socket.getaddrinfo, pin=N
             break
         except (OSError, ssl.SSLError) as e:
             last = e
-            raw.close()
+            if raw is not None:
+                raw.close()
+            raw = None
     else:
         raise TransportError('connection or TLS verification failed')
     try:
