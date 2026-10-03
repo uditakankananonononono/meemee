@@ -154,3 +154,16 @@ def test_concurrent_refresh_makes_one_call(parts):
     ts = [threading.Thread(target=oauth.access_token) for _ in range(8)]
     [t.start() for t in ts]; [t.join() for t in ts]
     assert len(stub.calls) - before == 1
+
+
+def test_gmail_inbox_response_is_bounded(tmp_path):
+    from app.guided_signup import inbox as ib
+    import httpx
+    big = b'{"messages": [' + b'{"id":"x"},' * 40000 + b'{"id":"y"}]}'
+    client = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, content=big)), trust_env=False)
+    vault = LocalVault(tmp_path / 'v.sqlite', LocalVault.key()); vault.put('t', 'tok')
+    box = ib.GmailInbox(vault, 't', client=client)
+    with pytest.raises(ValueError):
+        box.proof({'sender': 'a@b.example', 'recipient': 'o@x.example', 'since': 0, 'until': 9e9})
+    ok = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, json={})), trust_env=False)
+    assert ib.GmailInbox(vault, 't', client=ok).proof({'sender': 'a@b.example', 'recipient': 'o@x.example', 'since': 0, 'until': 9e9}) is None

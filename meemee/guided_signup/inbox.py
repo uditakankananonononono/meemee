@@ -10,6 +10,23 @@ import re
 import httpx
 
 
+MAX_RESPONSE = 262144      # bytes; metadata/list/full JSON from the fixed Gmail host
+
+
+class _Bounded:
+    """Minimal response with the same .raise_for_status()/.json() the inbox uses."""
+    def __init__(self, status, raw):
+        self.status, self.raw = status, raw
+
+    def raise_for_status(self):
+        if self.status >= 400:
+            raise httpx.HTTPStatusError('gmail request failed', request=None, response=None)
+
+    def json(self):
+        import json
+        return json.loads(self.raw)
+
+
 class GmailInbox:
     def __init__(self, vault, token_ref, client=None, base='https://gmail.googleapis.com/gmail/v1/users/me', local_test=False, token_provider=None):
         if base != 'https://gmail.googleapis.com/gmail/v1/users/me':
@@ -22,13 +39,24 @@ class GmailInbox:
         self.client = client or httpx.Client(timeout=5, follow_redirects=False, trust_env=False)
         self.used = set()
 
+    def _get(self, url, headers=None, params=None):
+        if not hasattr(self.client, 'stream'):
+            return self.client.get(url, headers=headers, params=params)
+        with self.client.stream('GET', url, headers=headers, params=params) as response:
+            raw = b''
+            for chunk in response.iter_bytes():
+                raw += chunk
+                if len(raw) > MAX_RESPONSE:
+                    raise ValueError('gmail response too large')
+            return _Bounded(response.status_code, raw)
+
     def proof(self, scope):
         # Bound all queries to user-owned Gmail; no app mailbox is used.
         token = self.token_provider() if self.token_provider else self.vault.get(self.token_ref)
         headers = {'Authorization': 'Bearer '+token}
         # Exact address/subject checks below backstop Gmail query syntax.
         q = f'from:{scope["sender"]} to:{scope["recipient"]} after:{int(scope["since"])} before:{int(scope["until"])+1}'
-        listing = self.client.get(self.base+'/messages', headers=headers,
+        listing = self._get(self.base+'/messages', headers=headers,
                                   params={'q': q, 'maxResults': 10})
         listing.raise_for_status()
         for item in listing.json().get('messages', [])[:10]:
@@ -36,13 +64,13 @@ class GmailInbox:
             if mid in self.used:
                 continue
             # Read metadata first. Do not retrieve bodies from unrelated messages.
-            metadata = self.client.get(self.base+'/messages/'+mid, headers=headers,
+            metadata = self._get(self.base+'/messages/'+mid, headers=headers,
                                        params={'format': 'metadata'})
             metadata.raise_for_status()
             data = metadata.json()
             if not self._match(data, scope):
                 continue
-            response = self.client.get(self.base+'/messages/'+mid, headers=headers,
+            response = self._get(self.base+'/messages/'+mid, headers=headers,
                                        params={'format': 'full'})
             response.raise_for_status()
             data = response.json()
