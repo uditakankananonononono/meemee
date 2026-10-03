@@ -68,4 +68,14 @@ def test_strict_hybrid_parity_assumption_fails():
     assert result.returncode == 1
     report = json.loads(result.stdout)
     assert report["passed"] is True  # native contract still holds
+    assert report["selected_mode"] == "strict-hybrid-parity"
+    assert report["selected_mode_passed"] is False
     assert [row["hybrid_equal"] for row in report["queries"]] == [False, False, True]
+
+
+def test_strict_text_summary_marks_selected_mode_failure():
+    script = Path(__file__).resolve().parents[1] / "scripts" / "repro_pg_semantic_parity.py"
+    result = subprocess.run([sys.executable, str(script), "--require-hybrid-parity"], capture_output=True, text=True, check=False)
+    assert result.returncode == 1
+    assert "Native contract: PASS" in result.stdout
+    assert result.stdout.rstrip().endswith("Strict hybrid parity: FAIL")

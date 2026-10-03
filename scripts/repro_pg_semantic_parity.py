@@ -89,6 +89,10 @@ def main():
     parser.add_argument("--require-hybrid-parity", action="store_true", help="Fail on the stronger cross-backend equality assumption")
     args = parser.parse_args()
     report = reproduce()
+    parity = all(r["hybrid_equal"] for r in report["queries"])
+    selected_passed = report["passed"] and (not args.require_hybrid_parity or parity)
+    report["selected_mode"] = "strict-hybrid-parity" if args.require_hybrid_parity else "native-contract"
+    report["selected_mode_passed"] = selected_passed
     if args.json:
         print(json.dumps(report, indent=2))
     else:
@@ -101,9 +105,10 @@ def main():
                 a, b = ([r["id"] for r in row[backend][path]] for backend in ("sqlite", "postgres"))
                 print(f"  {path:8} sqlite={a} postgres={b} {'SAME' if a == b else 'DIFFERENT'}")
             print(f"  hash-vector parity={row['semantic_equal']} native RRF valid={row['native_rrf_valid']}")
-        print("Contract:", "PASS" if report["passed"] else "FAIL")
-    parity = all(r["hybrid_equal"] for r in report["queries"])
-    return 0 if report["passed"] and (not args.require_hybrid_parity or parity) else 1
+        print("Native contract:", "PASS" if report["passed"] else "FAIL")
+        if args.require_hybrid_parity:
+            print("Strict hybrid parity:", "PASS" if selected_passed else "FAIL")
+    return 0 if selected_passed else 1
 
 
 if __name__ == "__main__":

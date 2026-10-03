@@ -58,3 +58,16 @@ Feature hashing is a lexical-feature similarity heuristic, not learned semantic
 intelligence, model training, arbitrary-query parity, deployment or a whole-build
 completion claim. Only Linux local execution was exercised. Main is unchanged;
 this branch is local and unaudited, with no remote push performed.
+
+## Narrow follow-up after independent review
+
+The prior strict text mode correctly exited 1 but ended "Contract: PASS", which
+was misleading without the native-versus-selected-mode distinction. A new output
+test failed first on that wording. Text now states "Native contract: PASS" then,
+in strict mode, ends "Strict hybrid parity: FAIL". JSON preserves `passed` as
+the native-contract result and adds `selected_mode` and `selected_mode_passed`.
+The strict-mode JSON regression also asserts selected_mode_passed is false.
+No scoring or ranking changed. Combined suite now has 57 passing tests (one new
+output test). See strict-summary-failing-first.txt, strict-summary-fixed.txt and
+final-tests-r2.txt. The original evidence logs are preserved as historical runs.
+This follow-up needs narrow independent re-review.

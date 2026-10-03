@@ -1,0 +1,20 @@
+hash-vector parity; backend-native lexical and hybrid rankings
+PostgreSQL 16.2 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 10.2.1 20210130 (Red Hat 10.2.1-11), 64-bit
+SQLite 3.37.2
+'database restore'
+  lexical  sqlite=[4, 1, 2] postgres=[4, 2, 1] DIFFERENT
+  semantic sqlite=[4, 1, 2, 5, 3] postgres=[4, 1, 2, 5, 3] SAME
+  hybrid   sqlite=[4, 1, 2, 5, 3] postgres=[4, 2, 1, 5, 3] DIFFERENT
+  hash-vector parity=True native RRF valid=True
+'database backup restore dump'
+  lexical  sqlite=[1, 2, 4] postgres=[2, 1, 4] DIFFERENT
+  semantic sqlite=[1, 4, 2, 5, 3] postgres=[1, 4, 2, 5, 3] SAME
+  hybrid   sqlite=[1, 4, 2, 5, 3] postgres=[1, 2, 4, 5, 3] DIFFERENT
+  hash-vector parity=True native RRF valid=True
+'zzz unrelated'
+  lexical  sqlite=[] postgres=[] SAME
+  semantic sqlite=[3, 5, 4, 1, 2] postgres=[3, 5, 4, 1, 2] SAME
+  hybrid   sqlite=[3, 5, 4, 1, 2] postgres=[3, 5, 4, 1, 2] SAME
+  hash-vector parity=True native RRF valid=True
+Native contract: PASS
+Strict hybrid parity: FAIL
