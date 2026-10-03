@@ -248,6 +248,15 @@ class Engine:
         flat = unquote_plus(u.path) + '?' + unquote_plus(u.query)
         return not (gate is not None and any(v and v in flat for v in gate['secrets']))
 
+    def _settle(self, rid, page, limit=3.0):
+        """Pump the event loop until no route handler is in flight, so a redirect verdict set by a
+        handler is never missed by the caller (the old race returned an 'unverified' reason instead)."""
+        gate = self.gates[rid]
+        end = time.time() + limit
+        while gate['inflight'] > 0 and time.time() < end:
+            page.wait_for_timeout(50)
+        page.wait_for_timeout(50)
+
     def _click_nav(self, page, selector):
         """Click and wait for a possible navigation; returns the Response or None.
 
@@ -395,16 +404,20 @@ class Engine:
         # Phase gate: no request that changes server state is allowed until the actor
         # itself opens a phase (after stored approval) and the body equals exactly the
         # approved values. Page scripts never open a phase.
-        gate = {'phase': 'idle', 'expected': None, 'used': False, 'secrets': set(), 'redirected': False}
+        gate = {'phase': 'idle', 'expected': None, 'used': False, 'secrets': set(), 'redirected': False, 'inflight': 0}
         self.gates[run['id']] = gate
         def guard(route):
-            request = route.request
-            if not p.accepts(request.url) or not self._request_allowed(gate, p, request):
-                return route.abort()
+            gate['inflight'] += 1                    # lets the actor wait for a handler still deciding
             try:
-                return self._respond(route, p, gate)
-            except Exception:
-                return route.abort()
+                request = route.request
+                if not p.accepts(request.url) or not self._request_allowed(gate, p, request):
+                    return route.abort()
+                try:
+                    return self._respond(route, p, gate)
+                except Exception:
+                    return route.abort()
+            finally:
+                gate['inflight'] -= 1
         context.route('**/*', guard)
         # A form target=_blank, window.open or link click never gets a second tab.
         context.on('page', lambda extra: extra.close() if extra is not self.sessions.get(run['id'], (None, extra))[1] else None)
@@ -469,6 +482,7 @@ class Engine:
                 nav = self._click_nav(page, p.submit_selector)
             finally:
                 self._close_phase(rid, keep_secrets=True)
+            self._settle(rid, page)
             if self.gates[rid]['redirected']:
                 return self._state(run, 'unknown', 'gated_request_redirected')
             if nav is None or nav.status >= 400:
@@ -519,6 +533,7 @@ class Engine:
                     clicked = self._click_nav(page, p.verify_selector)
                 finally:
                     self._close_phase(rid, keep_secrets=True)
+                    self._settle(rid, page)
                 if self.gates[rid]['redirected']:
                     return self._state(run, 'unknown', 'gated_request_redirected')
                 if clicked is None:
@@ -558,6 +573,7 @@ class Engine:
                 clicked = self._click_nav(page, p.resend_selector)
             finally:
                 self._close_phase(rid, keep_secrets=True)
+                self._settle(rid, page)
             if self.gates[rid]['redirected']:
                 return self._state(run, 'unknown', 'gated_request_redirected')
             if clicked is None:
