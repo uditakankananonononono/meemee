@@ -100,13 +100,11 @@ def test_inbox_uses_oauth_token_provider(parts):
     stub, vault, oauth = parts
     oauth.finish(begin(stub, oauth), 'good')
     seen = []
-    class C:
-        def get(self, url, headers=None, params=None):
-            seen.append(headers['Authorization'])
-            class R:
-                def raise_for_status(self): pass
-                def json(self): return {}
-            return R()
+    import httpx
+    def handler(request):
+        seen.append(request.headers['Authorization'])
+        return httpx.Response(200, json={})
+    C = lambda: httpx.Client(transport=httpx.MockTransport(handler), trust_env=False)
     inbox = GmailInbox(vault, 'unused', client=C(), token_provider=oauth.access_token)
     inbox.proof({'sender': 'a@b.example', 'recipient': 'o@x.example', 'since': 0, 'until': 9e9})
     assert seen and seen[0].startswith('Bearer A')
@@ -167,3 +165,13 @@ def test_gmail_inbox_response_is_bounded(tmp_path):
         box.proof({'sender': 'a@b.example', 'recipient': 'o@x.example', 'since': 0, 'until': 9e9})
     ok = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, json={})), trust_env=False)
     assert ib.GmailInbox(vault, 't', client=ok).proof({'sender': 'a@b.example', 'recipient': 'o@x.example', 'since': 0, 'until': 9e9}) is None
+
+
+def test_gmail_inbox_rejects_client_without_bounded_stream(tmp_path):
+    from meemee.guided_signup import inbox as ib
+    class Unbounded:
+        def get(self, *a, **k):
+            raise AssertionError('unbounded get must never be called')
+    vault = LocalVault(tmp_path / 'v.sqlite', LocalVault.key()); vault.put('t', 'tok')
+    with pytest.raises(ValueError):
+        ib.GmailInbox(vault, 't', client=Unbounded()).proof({'sender': 'a@b.example', 'recipient': 'o@x.example', 'since': 0, 'until': 9e9})

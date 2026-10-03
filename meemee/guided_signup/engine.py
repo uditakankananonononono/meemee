@@ -253,9 +253,10 @@ class Engine:
         handler is never missed by the caller (the old race returned an 'unverified' reason instead)."""
         gate = self.gates[rid]
         end = time.time() + limit
-        while gate['inflight'] > 0 and time.time() < end:
-            page.wait_for_timeout(50)
-        page.wait_for_timeout(50)
+        quiet = 0
+        while quiet < 3 and time.time() < end:          # three consecutive idle polls, so a handler that has
+            page.wait_for_timeout(50)                    # not started yet cannot slip between two reads
+            quiet = quiet + 1 if gate['inflight'] == 0 else 0
 
     def _click_nav(self, page, selector):
         """Click and wait for a possible navigation; returns the Response or None.

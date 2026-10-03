@@ -18,7 +18,7 @@ def resolver_for(*addrs):
 @pytest.mark.parametrize('addr', [
     '127.0.0.1', '127.1.2.3', '::1', '10.0.0.5', '172.16.0.1', '192.168.1.1', '169.254.169.254', '100.64.0.1',
     '0.0.0.0', '224.0.0.1', 'fe80::1', 'fc00::1', 'fd00::5', '::ffff:127.0.0.1', '::ffff:169.254.169.254',
-    '2002:7f00:1::', '::', '192.0.2.1', '198.51.100.7', '255.255.255.255'])
+    '2002:7f00:1::', '64:ff9b::7f00:1', '64:ff9b::a9fe:a9fe', '64:ff9b:1::1', 'fec0::1', 'feff::1', '::', '192.0.2.1', '198.51.100.7', '255.255.255.255'])
 def test_non_public_addresses_refused(addr):
     with pytest.raises(t.TransportError):
         t.fetch('GET', 'https://example.org/', {}, resolver=resolver_for(addr))
@@ -93,3 +93,11 @@ def test_reviewed_https_profile_never_uses_route_fetch():
     from meemee.guided_signup.engine import Engine
     src = inspect.getsource(Engine._respond)
     assert src.count('route.fetch') == 1 and "u.hostname == '127.0.0.1'" in src.split('route.fetch')[0]
+
+
+def test_socket_creation_failure_does_not_raise_unbound(monkeypatch):
+    def boom(*a, **k):
+        raise OSError('no sockets')
+    monkeypatch.setattr(t.socket, 'socket', boom)
+    with pytest.raises(t.TransportError):
+        t.fetch('GET', 'https://example.org/', {}, resolver=resolver_for('93.184.216.34'))
