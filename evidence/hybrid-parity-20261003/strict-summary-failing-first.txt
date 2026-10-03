@@ -1,0 +1,16 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_____________ test_strict_text_summary_marks_selected_mode_failure _____________
+
+    def test_strict_text_summary_marks_selected_mode_failure():
+        script = Path(__file__).resolve().parents[1] / "scripts" / "repro_pg_semantic_parity.py"
+        result = subprocess.run([sys.executable, str(script), "--require-hybrid-parity"], capture_output=True, text=True, check=False)
+        assert result.returncode == 1
+>       assert "Native contract: PASS" in result.stdout
+E       AssertionError: assert 'Native contract: PASS' in 'hash-vector parity; backend-native lexical and hybrid rankings\nPostgreSQL 16.2 on x86_64-pc-linux-gnu, compiled by g...qlite=[3, 5, 4, 1, 2] postgres=[3, 5, 4, 1, 2] SAME\n  hash-vector parity=True native RRF valid=True\nContract: PASS\n'
+E        +  where 'hash-vector parity; backend-native lexical and hybrid rankings\nPostgreSQL 16.2 on x86_64-pc-linux-gnu, compiled by g...qlite=[3, 5, 4, 1, 2] postgres=[3, 5, 4, 1, 2] SAME\n  hash-vector parity=True native RRF valid=True\nContract: PASS\n' = CompletedProcess(args=['/home/sandbox/venv/bin/python3', '/home/sandbox/meemee/scripts/repro_pg_semantic_parity.py', '...timeDirWarning: XDG_RUNTIME_DIR is not set, falling back to /tmp/runtime-1001\n  return Path(self.user_runtime_dir)\n').stdout
+
+tests_pg/test_memory_hybrid_contract_pg.py:78: AssertionError
+=========================== short test summary info ============================
+FAILED tests_pg/test_memory_hybrid_contract_pg.py::test_strict_text_summary_marks_selected_mode_failure
+1 failed in 1.65s
