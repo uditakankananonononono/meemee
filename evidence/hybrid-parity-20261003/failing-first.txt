@@ -1,0 +1,40 @@
+...F                                                                     [100%]
+=================================== FAILURES ===================================
+_______________ test_repro_reports_contract_and_backend_evidence _______________
+
+    def test_repro_reports_contract_and_backend_evidence():
+        script = Path(__file__).resolve().parents[1] / "scripts" / "repro_pg_semantic_parity.py"
+        result = subprocess.run([sys.executable, str(script), "--json"], capture_output=True, text=True, check=True)
+>       report = json.loads(result.stdout)
+
+tests_pg/test_memory_hybrid_contract_pg.py:55: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.10/json/__init__.py:346: in loads
+    return _default_decoder.decode(s)
+/usr/lib/python3.10/json/decoder.py:337: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <json.decoder.JSONDecoder object at 0x7f58ef853d60>
+s = "semantic_search  'database restore'                 sqlite=[4, 1, 2, 5, 3] pg=[4, 1, 2, 5, 3] SAME\nhybrid_search    ...5, 4, 1, 2] SAME\nhybrid_search    'zzz unrelated'                    sqlite=[3, 5, 4, 1, 2] pg=[3, 5, 4, 1, 2] SAME\n"
+idx = 0
+
+    def raw_decode(self, s, idx=0):
+        """Decode a JSON document from ``s`` (a ``str`` beginning with
+        a JSON document) and return a 2-tuple of the Python
+        representation and the index in ``s`` where the document ended.
+    
+        This can be used to decode a JSON document from a string that may
+        have extraneous data at the end.
+    
+        """
+        try:
+            obj, end = self.scan_once(s, idx)
+        except StopIteration as err:
+>           raise JSONDecodeError("Expecting value", s, err.value) from None
+E           json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+/usr/lib/python3.10/json/decoder.py:355: JSONDecodeError
+=========================== short test summary info ============================
+FAILED tests_pg/test_memory_hybrid_contract_pg.py::test_repro_reports_contract_and_backend_evidence
+1 failed, 3 passed in 2.98s

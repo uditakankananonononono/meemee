@@ -1,0 +1,6 @@
+semantic_search  'database restore'                 sqlite=[4, 1, 2, 5, 3] pg=[4, 1, 2, 5, 3] SAME
+hybrid_search    'database restore'                 sqlite=[4, 1, 2, 5, 3] pg=[4, 2, 1, 5, 3] DIFFERENT
+semantic_search  'database backup restore dump'     sqlite=[1, 4, 2, 5, 3] pg=[1, 4, 2, 5, 3] SAME
+hybrid_search    'database backup restore dump'     sqlite=[1, 4, 2, 5, 3] pg=[1, 2, 4, 5, 3] DIFFERENT
+semantic_search  'zzz unrelated'                    sqlite=[3, 5, 4, 1, 2] pg=[3, 5, 4, 1, 2] SAME
+hybrid_search    'zzz unrelated'                    sqlite=[3, 5, 4, 1, 2] pg=[3, 5, 4, 1, 2] SAME
