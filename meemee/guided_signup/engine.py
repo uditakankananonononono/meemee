@@ -249,14 +249,17 @@ class Engine:
         return not (gate is not None and any(v and v in flat for v in gate['secrets']))
 
     def _settle(self, rid, page, limit=3.0):
-        """Pump the event loop until no route handler is in flight, so a redirect verdict set by a
-        handler is never missed by the caller (the old race returned an 'unverified' reason instead)."""
+        """Wait on browser-reported completion, not on time: every request the browser announced must
+        have finished or failed (which only happens after its route handler answered) and no handler
+        may be running. Returns False if that is not reached within the limit; callers then treat the
+        outcome as unverified, never as success."""
         gate = self.gates[rid]
         end = time.time() + limit
-        quiet = 0
-        while quiet < 3 and time.time() < end:          # three consecutive idle polls, so a handler that has
-            page.wait_for_timeout(50)                    # not started yet cannot slip between two reads
-            quiet = quiet + 1 if gate['inflight'] == 0 else 0
+        while time.time() < end:
+            page.wait_for_timeout(25)                 # pumps the event loop so events and handlers are delivered
+            if gate['inflight'] == 0 and not gate['pending']:
+                return True
+        return False
 
     def _click_nav(self, page, selector):
         """Click and wait for a possible navigation; returns the Response or None.
@@ -405,7 +408,7 @@ class Engine:
         # Phase gate: no request that changes server state is allowed until the actor
         # itself opens a phase (after stored approval) and the body equals exactly the
         # approved values. Page scripts never open a phase.
-        gate = {'phase': 'idle', 'expected': None, 'used': False, 'secrets': set(), 'redirected': False, 'inflight': 0}
+        gate = {'phase': 'idle', 'expected': None, 'used': False, 'secrets': set(), 'redirected': False, 'inflight': 0, 'pending': set()}
         self.gates[run['id']] = gate
         def guard(route):
             gate['inflight'] += 1                    # lets the actor wait for a handler still deciding
@@ -420,6 +423,11 @@ class Engine:
             finally:
                 gate['inflight'] -= 1
         context.route('**/*', guard)
+        # Evidence synchronisation: a request is pending from the browser's `request` event until its
+        # `requestfinished`/`requestfailed` event, and those only follow the route handler's fulfil/abort.
+        context.on('request', lambda r: gate['pending'].add(id(r)))
+        context.on('requestfinished', lambda r: gate['pending'].discard(id(r)))
+        context.on('requestfailed', lambda r: gate['pending'].discard(id(r)))
         # A form target=_blank, window.open or link click never gets a second tab.
         context.on('page', lambda extra: extra.close() if extra is not self.sessions.get(run['id'], (None, extra))[1] else None)
         # context.route does not see WebSockets. Every socket is intercepted at the browser
@@ -483,10 +491,10 @@ class Engine:
                 nav = self._click_nav(page, p.submit_selector)
             finally:
                 self._close_phase(rid, keep_secrets=True)
-            self._settle(rid, page)
+            settled = self._settle(rid, page)
             if self.gates[rid]['redirected']:
                 return self._state(run, 'unknown', 'gated_request_redirected')
-            if nav is None or nav.status >= 400:
+            if not settled or nav is None or nav.status >= 400:
                 return self._state(run, 'unknown', 'submission_outcome_unverified')
             if not p.accepts(page.url):
                 return self._state(run, 'unknown', 'origin_changed')
@@ -534,10 +542,10 @@ class Engine:
                     clicked = self._click_nav(page, p.verify_selector)
                 finally:
                     self._close_phase(rid, keep_secrets=True)
-                    self._settle(rid, page)
+                    settled = self._settle(rid, page)
                 if self.gates[rid]['redirected']:
                     return self._state(run, 'unknown', 'gated_request_redirected')
-                if clicked is None:
+                if clicked is None or not settled:
                     return self._state(run, 'verification', 'verification_outcome_unverified')
             else:
                 return self._state(run, 'verification', 'verification_proof_rejected')
@@ -574,10 +582,10 @@ class Engine:
                 clicked = self._click_nav(page, p.resend_selector)
             finally:
                 self._close_phase(rid, keep_secrets=True)
-                self._settle(rid, page)
+                settled = self._settle(rid, page)
             if self.gates[rid]['redirected']:
                 return self._state(run, 'unknown', 'gated_request_redirected')
-            if clicked is None:
+            if clicked is None or not settled:
                 return self._state(run, 'verification', 'resend_outcome_unverified')
             return self._state(run, 'verification', 'code_resent')
         except Exception:
