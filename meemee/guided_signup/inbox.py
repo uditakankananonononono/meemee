@@ -11,19 +11,20 @@ import httpx
 
 
 class GmailInbox:
-    def __init__(self, vault, token_ref, client=None, base='https://gmail.googleapis.com/gmail/v1/users/me', local_test=False):
+    def __init__(self, vault, token_ref, client=None, base='https://gmail.googleapis.com/gmail/v1/users/me', local_test=False, token_provider=None):
         if base != 'https://gmail.googleapis.com/gmail/v1/users/me':
             from urllib.parse import urlsplit
             p = urlsplit(base)
             if not local_test or p.scheme != 'http' or p.hostname != '127.0.0.1':
                 raise ValueError('Gmail endpoint is fixed outside local testing')
         self.vault, self.token_ref, self.base = vault, token_ref, base
-        self.client = client or httpx.Client(timeout=5, follow_redirects=False)
+        self.token_provider = token_provider   # e.g. GmailOAuth.access_token; else a vault-held bearer token
+        self.client = client or httpx.Client(timeout=5, follow_redirects=False, trust_env=False)
         self.used = set()
 
     def proof(self, scope):
         # Bound all queries to user-owned Gmail; no app mailbox is used.
-        token = self.vault.get(self.token_ref)
+        token = self.token_provider() if self.token_provider else self.vault.get(self.token_ref)
         headers = {'Authorization': 'Bearer '+token}
         # Exact address/subject checks below backstop Gmail query syntax.
         q = f'from:{scope["sender"]} to:{scope["recipient"]} after:{int(scope["since"])} before:{int(scope["until"])+1}'
