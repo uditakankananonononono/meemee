@@ -60,34 +60,61 @@ class ICSConnector(HTTPFeedConnector):
         records = []
         current = None
         params = {}
+        depth = 0  # nested components (VALARM etc.) inside the current VEVENT
         for line in text.splitlines():
-            if line == "BEGIN:VEVENT":
-                current, params = {}, {}
-            elif line == "END:VEVENT" and current is not None:
-                uid = current.get("UID") or hashlib.sha256(json.dumps(current, sort_keys=True).encode()).hexdigest()
-                start = current.get("DTSTART", "")
-                start_tz = params.get("DTSTART", {}).get("TZID")
-                occurred = _ics_time(start, start_tz, default_timezone=self.default_timezone)
-                end_raw = current.get("DTEND")
-                end = (_ics_time(end_raw, params.get("DTEND", {}).get("TZID"),
-                                 default_timezone=self.default_timezone) if end_raw else None)
-                metadata = {"end": end_raw, "end_utc": end, "start_raw": start,
-                            "timezone": start_tz or self.default_timezone,
-                            "all_day": len(start) == 8,
-                            "date_anchor_only": len(start) == 8}
-                records.append(ContextRecord(owner_id, source_id, uid, "event",
-                    current.get("SUMMARY", "Calendar event"), current.get("DESCRIPTION", ""),
-                    occurred, {"connector": "ics", "url": self.url, "location": current.get("LOCATION")},
-                    cursor=uid, metadata=metadata))
+            upper = line.upper()
+            if current is None:
+                if line == "BEGIN:VEVENT":
+                    current, params, depth = {}, {}, 0
+                continue
+            if upper.startswith("BEGIN:"):
+                depth += 1
+                continue
+            if upper.startswith("END:"):
+                if depth > 0:
+                    depth -= 1
+                    continue
+                if line != "END:VEVENT":
+                    raise ValueError(f"unexpected {line} inside VEVENT; nested component not closed")
+                records.append(self._record(owner_id, source_id, current, params))
                 current = None
-            elif current is not None and ":" in line:
-                key, value = line.split(":", 1)
-                pieces = key.split(";")
-                property_name = pieces[0].upper()
-                params[property_name] = {k.upper(): v.strip('"') for item in pieces[1:]
-                                         if "=" in item for k, v in [item.split("=", 1)]}
-                current[property_name] = value.replace("\\n", "\n")
+                continue
+            if depth > 0 or ":" not in line:
+                continue  # properties of nested components never describe the event
+            key, value = line.split(":", 1)
+            pieces = key.split(";")
+            property_name = pieces[0].upper()
+            params[property_name] = {k.upper(): v.strip('"') for item in pieces[1:]
+                                     if "=" in item for k, v in [item.split("=", 1)]}
+            current[property_name] = value.replace("\\n", "\n")
+        if current is not None:
+            raise ValueError("unterminated VEVENT or nested component in ICS feed")
         return records
+
+    def _record(self, owner_id, source_id, current, params):
+        uid = current.get("UID") or hashlib.sha256(json.dumps(current, sort_keys=True).encode()).hexdigest()
+        start = current.get("DTSTART", "")
+        start_tz = params.get("DTSTART", {}).get("TZID")
+        occurred = _ics_time(start, start_tz, default_timezone=self.default_timezone)
+        end_raw = current.get("DTEND")
+        end = None
+        if end_raw is not None:
+            if end_raw == "":
+                raise ValueError("DTEND is present but empty")
+            if (len(end_raw) == 8) != (len(start) == 8):
+                raise ValueError("DTSTART and DTEND mix DATE and DATE-TIME values")
+            end = _ics_time(end_raw, params.get("DTEND", {}).get("TZID"),
+                            default_timezone=self.default_timezone)
+            if datetime.fromisoformat(end) < datetime.fromisoformat(occurred):
+                raise ValueError("DTEND is before DTSTART")
+        metadata = {"end": end_raw, "end_utc": end, "start_raw": start,
+                    "timezone": start_tz or self.default_timezone,
+                    "all_day": len(start) == 8,
+                    "date_anchor_only": len(start) == 8}
+        return ContextRecord(owner_id, source_id, uid, "event",
+            current.get("SUMMARY", "Calendar event"), current.get("DESCRIPTION", ""),
+            occurred, {"connector": "ics", "url": self.url, "location": current.get("LOCATION")},
+            cursor=uid, metadata=metadata)
 
 
 def _ics_time(value: str, tzid: str | None = None, *, default_timezone: str | None = None) -> str:
