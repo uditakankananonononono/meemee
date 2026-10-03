@@ -109,3 +109,95 @@ def test_connector_rejects_wrong_width_start_or_end(
     monkeypatch.setattr(connector, 'read', lambda: body)
     with pytest.raises(ValueError, match='invalid ICS timestamp grammar'):
         connector.fetch('owner', 'calendar')
+
+
+# --- parser defects reproduced from source (nested components, end validation) ---
+
+def _feed(monkeypatch, body, **kw):
+    c = ICSConnector('ics', 'https://example.org/feed', **kw)
+    monkeypatch.setattr(c, 'read', lambda: body.encode())
+    return c
+
+
+def _event(*lines):
+    return 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\n' + ''.join(l + '\r\n' for l in lines) + 'END:VEVENT\r\nEND:VCALENDAR'
+
+
+def test_nested_valarm_does_not_overwrite_event_summary_or_description(monkeypatch):
+    body = _event('UID:a', 'DTSTART:20261001T150000Z', 'SUMMARY:Real title', 'DESCRIPTION:Real body',
+                  'BEGIN:VALARM', 'ACTION:DISPLAY', 'SUMMARY:Alarm title', 'DESCRIPTION:Alarm body',
+                  'TRIGGER:-PT15M', 'END:VALARM', 'LOCATION:Room 1')
+    r = _feed(monkeypatch, body).fetch('o', 's')[0]
+    assert r.title == 'Real title'
+    assert r.content == 'Real body'
+
+
+def test_property_after_nested_component_still_belongs_to_event(monkeypatch):
+    body = _event('UID:a', 'DTSTART:20261001T150000Z',
+                  'BEGIN:VALARM', 'TRIGGER:-PT15M', 'END:VALARM', 'SUMMARY:After alarm')
+    assert _feed(monkeypatch, body).fetch('o', 's')[0].title == 'After alarm'
+
+
+def test_nested_component_dtstart_is_ignored(monkeypatch):
+    body = _event('UID:a', 'DTSTART:20261001T150000Z',
+                  'BEGIN:VALARM', 'DTSTART:20200101T000000Z', 'END:VALARM')
+    assert _feed(monkeypatch, body).fetch('o', 's')[0].occurred_at == '2026-10-01T15:00:00+00:00'
+
+
+def test_unbalanced_nested_component_fails_closed(monkeypatch):
+    body = _event('UID:a', 'DTSTART:20261001T150000Z', 'BEGIN:VALARM', 'SUMMARY:x')
+    with pytest.raises(ValueError, match='nested'):
+        _feed(monkeypatch, body).fetch('o', 's')
+
+
+def test_dtend_before_dtstart_rejected(monkeypatch):
+    body = _event('UID:a', 'DTSTART:20261001T160000Z', 'DTEND:20261001T150000Z')
+    with pytest.raises(ValueError, match='before DTSTART'):
+        _feed(monkeypatch, body).fetch('o', 's')
+
+
+def test_dtend_before_dtstart_rejected_across_timezones(monkeypatch):
+    # 15:00 IST is 09:30Z, which is before 10:00Z although 15:00 > 10:00 textually.
+    body = _event('UID:a', 'DTSTART:20261001T100000Z', 'DTEND;TZID=Asia/Kolkata:20261001T150000')
+    with pytest.raises(ValueError, match='before DTSTART'):
+        _feed(monkeypatch, body).fetch('o', 's')
+
+
+def test_dtend_equal_to_dtstart_allowed(monkeypatch):
+    body = _event('UID:a', 'DTSTART:20261001T150000Z', 'DTEND:20261001T150000Z')
+    assert _feed(monkeypatch, body).fetch('o', 's')[0].metadata['end_utc'] == '2026-10-01T15:00:00+00:00'
+
+
+@pytest.mark.parametrize('start,end', [('20261001', '20261002T000000Z'), ('20261001T150000Z', '20261002')])
+def test_date_datetime_mismatch_rejected(monkeypatch, start, end):
+    body = _event('UID:a', 'DTSTART:' + start, 'DTEND:' + end)
+    with pytest.raises(ValueError, match='DATE and DATE-TIME'):
+        _feed(monkeypatch, body).fetch('o', 's')
+
+
+def test_all_day_with_date_end_ok(monkeypatch):
+    body = _event('UID:a', 'DTSTART;VALUE=DATE:20261001', 'DTEND;VALUE=DATE:20261002')
+    r = _feed(monkeypatch, body).fetch('o', 's')[0]
+    assert r.metadata['all_day'] is True
+    assert r.metadata['end_utc'] == '2026-10-02T00:00:00+00:00'
+
+
+@pytest.mark.parametrize('line', ['DTEND:', 'DTEND;TZID=Asia/Kolkata:'])
+def test_empty_dtend_rejected_not_silently_none(monkeypatch, line):
+    body = _event('UID:a', 'DTSTART:20261001T150000Z', line)
+    with pytest.raises(ValueError, match='DTEND is present but empty'):
+        _feed(monkeypatch, body).fetch('o', 's')
+
+
+def test_missing_dtend_still_allowed(monkeypatch):
+    r = _feed(monkeypatch, _event('UID:a', 'DTSTART:20261001T150000Z')).fetch('o', 's')[0]
+    assert r.metadata['end_utc'] is None
+
+
+@pytest.mark.parametrize('lines', [[], ['DTSTART:']])
+def test_missing_or_empty_dtstart_aborts_whole_feed(monkeypatch, lines):
+    """Documented policy: one bad event fails the whole feed (no silent skipping)."""
+    good = 'BEGIN:VEVENT\r\nUID:g\r\nDTSTART:20261001T150000Z\r\nEND:VEVENT\r\n'
+    bad = 'BEGIN:VEVENT\r\nUID:b\r\n' + ''.join(l + '\r\n' for l in lines) + 'END:VEVENT\r\n'
+    with pytest.raises(ValueError):
+        _feed(monkeypatch, 'BEGIN:VCALENDAR\r\n' + good + bad + 'END:VCALENDAR').fetch('o', 's')
