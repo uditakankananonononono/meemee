@@ -106,7 +106,7 @@ Items 164-166, 172 and 174 are unreleased pb7 work, items 167-171 are unreleased
 95. Backend-neutral persistence lifecycle with one shared composition per API/worker process, SQLite/PostgreSQL readiness probes, shared worker memory and clean pooled-database shutdown.
 96. PostgreSQL production preflight that fails on missing DSNs, connection/pool errors or unapplied migrations and reports the exact selected deployment boundary.
 97. PostgreSQL-backed atomic fixed-window rate limiting shared across hosts/pods, selected automatically with the PostgreSQL backend and retaining compatible headers, cleanup and token/IP identity semantics.
-98. PostgreSQL agent-memory contract parity for secret-scrubbed writes and hybrid/semantic retrieval calls, using ranked native full-text fallback until an optional vector extension is configured.
+98. PostgreSQL agent-memory secret-scrubbed writes, deterministic hash-vector cosine retrieval and reciprocal-rank fusion with native full-text ranking. Hash vectors measure lexical-feature overlap, not learned semantics. PostgreSQL stores float8[] without pgvector; lexical and hybrid rankings can differ from SQLite (see docs/PG.md).
 99. Fail-closed readiness disk probing that handles not-yet-created data directories and disk-stat failures without crashing the health endpoint.
 100. Cancellation propagation through delegated agent teams, preventing new child work after cancellation and passing the shared signal into active child agents and async tools.
 101. PostgreSQL runtime package and bundled SQL migrations included in the commercial wheel, enforced by package audit and a real wheel-build regression test.

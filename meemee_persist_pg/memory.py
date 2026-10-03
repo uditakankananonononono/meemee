@@ -17,14 +17,15 @@ class EmbeddingIndexError(RuntimeError):
 
 
 class MemoryStore:
-    """PostgreSQL event memory with the same retrieval semantics as the SQLite store.
+    """PostgreSQL event memory with hash-vector parity and backend-native lexical ranking.
 
     - `search`: lexical, any query token may match (OR), ranked by `ts_rank_cd` (SQLite ranks by bm25),
       ties newest id first.
     - `semantic_search`: deterministic hash-vector cosine (not learned semantics) over the newest
       `max(limit, candidates)` memories, ties newest id first. Vectors are stored as float8[] with
       model/version/dimensions and computed by the same `HashingEmbedder` as SQLite.
-    - `hybrid_search`: reciprocal-rank fusion (k=60) of the two lists, as in SQLite.
+    - `hybrid_search`: the same reciprocal-rank fusion algorithm (k=60) as SQLite, applied
+      to backend-native lexical ranks. Hybrid order and scores need not equal SQLite.
     A search that cannot be served honestly (index missing or built by another embedder) raises
     `EmbeddingIndexError`; call `backfill_embeddings()` to repair.
     """
@@ -124,7 +125,7 @@ class MemoryStore:
         return [{**{k: v for k, v in r.items() if k not in drop}, "semantic_score": score} for score, r in ranked]
 
     def hybrid_search(self, query: str, limit: int = 8, run_id: str | None = None) -> list[dict[str, Any]]:
-        """Reciprocal-rank fusion (k=60) of lexical and hash-vector rankings, as in SQLite."""
+        """RRF (k=60) of native lexical and hash-vector ranks; not SQLite ranking parity."""
         lexical = self._lexical(query, max(limit * 3, 20), run_id)
         semantic = self.semantic_search(query, max(limit * 3, 20), run_id=run_id)
         return reciprocal_rank_fusion(lexical, semantic, limit=limit)
