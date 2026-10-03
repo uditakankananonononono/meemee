@@ -210,8 +210,33 @@ def test_tzdata_declared_as_base_dependency_and_importable():
     import re
     root = pathlib.Path(__file__).resolve().parents[1]
     text = (root / 'pyproject.toml').read_text(encoding='utf-8')
-    deps = re.search(r'^dependencies = \[(.*?)^\]', text, re.S | re.M).group(1)
+    deps = re.search(r'^dependencies = \[(.*?)^\]', text, re.DOTALL | re.MULTILINE).group(1)
     assert re.search(r'"tzdata\b', deps), 'tzdata must be a base dependency'
     assert '"tzdata' in (root / 'uv.lock').read_text(encoding='utf-8')
     assert importlib.util.find_spec('tzdata') is not None
     assert importlib.util.find_spec('tzdata.zoneinfo.Asia') is not None
+
+
+@pytest.mark.parametrize('inner', [
+    ['BEGIN:VALARM', 'END:VTODO'],
+    ['BEGIN:VALARM', 'BEGIN:VTODO', 'END:VALARM', 'END:VTODO'],
+    ['END:VALARM'],
+    ['BEGIN:VEVENT', 'DTSTART:20200101T000000Z', 'END:VEVENT'],
+    ['begin:VEVENT', 'END:VEVENT'],
+])
+def test_mismatched_or_nested_vevent_boundaries_fail_closed(monkeypatch, inner):
+    body = _event('UID:a', 'DTSTART:20261001T150000Z', *inner)
+    with pytest.raises(ValueError):
+        _feed(monkeypatch, body).fetch('o', 's')
+
+
+def test_component_names_are_case_insensitive(monkeypatch):
+    body = ('BEGIN:VCALENDAR\r\nbegin:vevent\r\nUID:a\r\nDTSTART:20261001T150000Z\r\n'
+            'Begin:Valarm\r\nSUMMARY:alarm\r\nEnd:VALARM\r\nSUMMARY:Real\r\nend:vevent\r\nEND:VCALENDAR')
+    r = _feed(monkeypatch, body).fetch('o', 's')
+    assert len(r) == 1 and r[0].title == 'Real'
+
+
+def test_stray_end_vevent_fails_closed(monkeypatch):
+    with pytest.raises(ValueError, match='without matching BEGIN'):
+        _feed(monkeypatch, 'BEGIN:VCALENDAR\r\nEND:VEVENT\r\nEND:VCALENDAR').fetch('o', 's')
