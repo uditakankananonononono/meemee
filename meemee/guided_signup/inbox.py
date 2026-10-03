@@ -80,14 +80,16 @@ class GmailInbox:
         # Gmail's receiver-authentication header, not body claims. Each result is parsed on
         # its own: one dkim=pass whose signing identity is exactly the approved sender
         # domain, and no failing dkim result for that domain.
-        domain = scope['sender'].split('@')[-1].lower()
+        domains = tuple(d.lower() for d in scope.get('dkim_domains') or ()) or (scope['sender'].split('@')[-1].lower(),)
         auths = [h['value'] for h in hs if h['name'].lower() == 'authentication-results']
         if len(auths) != 1:
             return False
-        return GmailInbox._aligned_dkim(auths[0], domain)
+        return GmailInbox._aligned_dkim(auths[0], domains)
 
     @staticmethod
-    def _aligned_dkim(header, domain):
+    def _aligned_dkim(header, domains):
+        if isinstance(domains, str):
+            domains = (domains,)
         parts = [x.strip() for x in header.split(';')]
         if not parts or parts[0].lower() != 'mx.google.com':
             return False
@@ -100,7 +102,7 @@ class GmailInbox:
             if method.lower() != 'dkim':
                 continue
             ident = [t.split('=', 1)[1] for t in tokens[1:] if t.lower().startswith('header.i=')]
-            if len(ident) != 1 or ident[0].lower() != '@'+domain:
+            if len(ident) != 1 or ident[0].lower() not in {'@'+d for d in domains}:
                 continue
             if verdict.lower() == 'pass':
                 passed = True
