@@ -6,7 +6,7 @@ Safety changes: invalid timestamps, unknown timezone names, contradictory UTC+TZ
 
 Parser behavior (follow-up fixes):
 
-- Properties inside nested components (for example `VALARM`) are ignored; they no longer overwrite the event's SUMMARY, DESCRIPTION, DTSTART or DTEND. A nested component that is never closed, or an `END:` that does not match, raises ValueError.
+- Properties inside nested components (for example `VALARM`) are ignored; they no longer overwrite the event's SUMMARY, DESCRIPTION, DTSTART or DTEND. Nested components are tracked with a name stack, matched case-insensitively. An `END:` whose name does not match the open component (for example `BEGIN:VALARM` ... `END:VTODO`), a stray `END:VEVENT` outside an event, a nested `VEVENT` inside a `VEVENT`, or a component left open raises ValueError. Top-level `BEGIN:VEVENT`/`END:VEVENT` are also case-insensitive. Only this component nesting is checked: VCALENDAR/VTIMEZONE structure outside a VEVENT is not validated.
 - A `VEVENT` that is never closed now raises ValueError instead of being silently dropped.
 - `DTEND` earlier than `DTSTART` (compared as UTC instants) raises ValueError. Equal values are accepted.
 - `DTSTART` and `DTEND` must both be DATE or both be DATE-TIME; a mix raises ValueError.
@@ -17,4 +17,4 @@ Packaging: `tzdata` is now a base dependency in `pyproject.toml` and `uv.lock` b
 
 Limitations: this is not a complete RFC 5545 parser. Custom VTIMEZONE definitions, recurrence expansion and timezone aliases outside the installed IANA database are not implemented. Upstream ingestion should surface conversion errors to the owner rather than swallowing them.
 
-Evidence: `tests/test_ics_timezone_regression.py` (78 parametrized cases from 23 test functions: 62 from the earlier timezone/grammar fix, 16 added for the parser fixes) plus `tests/test_connectors.py` (3 cases) passed on Linux, Python 3.10.12. The original fix commit was recorded as 12 tests; that counted test functions, not parametrized cases. Covered Kolkata start/end, unchanged UTC, all-day anchors, explicit floating defaults, bad/unknown zones, DST gaps/ambiguity and winter/summer offsets. Four pre-existing RSS Element truthiness warnings remain unrelated to this fix.
+Evidence: `tests/test_ics_timezone_regression.py` (85 parametrized cases from 26 test functions: 62 from the earlier timezone/grammar fix, 23 added for the parser fixes) plus `tests/test_connectors.py` (3 cases) passed on Linux, Python 3.10.12. The original fix commit was recorded as 12 tests; that counted test functions, not parametrized cases. Covered Kolkata start/end, unchanged UTC, all-day anchors, explicit floating defaults, bad/unknown zones, DST gaps/ambiguity and winter/summer offsets. Four pre-existing RSS Element truthiness warnings remain unrelated to this fix.

@@ -60,26 +60,33 @@ class ICSConnector(HTTPFeedConnector):
         records = []
         current = None
         params = {}
-        depth = 0  # nested components (VALARM etc.) inside the current VEVENT
+        stack: list[str] = []  # nested components (VALARM etc.) inside the current VEVENT
         for line in text.splitlines():
-            upper = line.upper()
+            upper = line.upper()  # RFC 5545 component names are case-insensitive
             if current is None:
-                if line == "BEGIN:VEVENT":
-                    current, params, depth = {}, {}, 0
+                if upper == "BEGIN:VEVENT":
+                    current, params, stack = {}, {}, []
+                elif upper == "END:VEVENT":
+                    raise ValueError("END:VEVENT without matching BEGIN:VEVENT")
                 continue
             if upper.startswith("BEGIN:"):
-                depth += 1
+                name = upper[6:]
+                if name == "VEVENT":
+                    raise ValueError("nested VEVENT inside VEVENT is not supported")
+                stack.append(name)
                 continue
             if upper.startswith("END:"):
-                if depth > 0:
-                    depth -= 1
+                name = upper[4:]
+                if stack:
+                    if stack.pop() != name:
+                        raise ValueError(f"mismatched {line} inside VEVENT; nested component not closed")
                     continue
-                if line != "END:VEVENT":
-                    raise ValueError(f"unexpected {line} inside VEVENT; nested component not closed")
+                if name != "VEVENT":
+                    raise ValueError(f"mismatched {line} inside VEVENT")
                 records.append(self._record(owner_id, source_id, current, params))
                 current = None
                 continue
-            if depth > 0 or ":" not in line:
+            if stack or ":" not in line:
                 continue  # properties of nested components never describe the event
             key, value = line.split(":", 1)
             pieces = key.split(";")
