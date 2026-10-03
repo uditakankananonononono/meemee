@@ -250,7 +250,7 @@ class Engine:
 
     def _settle(self, rid, page, limit=3.0):
         """Wait on browser-reported completion, not on time: every request the browser announced must
-        have finished or failed (which only happens after its route handler answered) and no handler
+        have finished or failed (which only happens after its route handler answered); background GET polling is not tracked and no handler
         may be running. Returns False if that is not reached within the limit; callers then treat the
         outcome as unverified, never as success."""
         gate = self.gates[rid]
@@ -408,7 +408,7 @@ class Engine:
         # Phase gate: no request that changes server state is allowed until the actor
         # itself opens a phase (after stored approval) and the body equals exactly the
         # approved values. Page scripts never open a phase.
-        gate = {'phase': 'idle', 'expected': None, 'used': False, 'secrets': set(), 'redirected': False, 'inflight': 0, 'pending': set()}
+        gate = {'phase': 'idle', 'expected': None, 'used': False, 'secrets': set(), 'redirected': False, 'inflight': 0, 'pending': {}}
         self.gates[run['id']] = gate
         def guard(route):
             gate['inflight'] += 1                    # lets the actor wait for a handler still deciding
@@ -425,9 +425,15 @@ class Engine:
         context.route('**/*', guard)
         # Evidence synchronisation: a request is pending from the browser's `request` event until its
         # `requestfinished`/`requestfailed` event, and those only follow the route handler's fulfil/abort.
-        context.on('request', lambda r: gate['pending'].add(id(r)))
-        context.on('requestfinished', lambda r: gate['pending'].discard(id(r)))
-        context.on('requestfailed', lambda r: gate['pending'].discard(id(r)))
+        # Only action-relevant requests are tracked (navigations and anything that is not GET/HEAD), and the
+        # request OBJECT is held until its terminal event, so object identity cannot be reused. Background
+        # GET polling (long-poll, chatty pages) never blocks a settle and never counts as success.
+        def started(r):
+            if r.is_navigation_request() or r.method not in ('GET', 'HEAD'):
+                gate['pending'][r] = True
+        context.on('request', started)
+        context.on('requestfinished', lambda r: gate['pending'].pop(r, None))
+        context.on('requestfailed', lambda r: gate['pending'].pop(r, None))
         # A form target=_blank, window.open or link click never gets a second tab.
         context.on('page', lambda extra: extra.close() if extra is not self.sessions.get(run['id'], (None, extra))[1] else None)
         # context.route does not see WebSockets. Every socket is intercepted at the browser
