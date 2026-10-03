@@ -157,7 +157,7 @@ def test_concurrent_refresh_makes_one_call(parts):
 
 
 def test_gmail_inbox_response_is_bounded(tmp_path):
-    from app.guided_signup import inbox as ib
+    from meemee.guided_signup import inbox as ib
     import httpx
     big = b'{"messages": [' + b'{"id":"x"},' * 40000 + b'{"id":"y"}]}'
     client = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, content=big)), trust_env=False)
