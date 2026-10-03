@@ -18,6 +18,9 @@ STOPS = frozenset({'payment', 'card', 'paid_trial', 'subscription', 'fee',
                    'unsupported_auth', 'unknown'})
 
 
+FQDN = r'(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}'
+
+
 @dataclass(frozen=True)
 class Profile:
     site: str
@@ -43,14 +46,30 @@ class Profile:
     expected_policy: str = 'Free local test account. No charges. Cancel any time.'
     sender: str = 'verify@fixture.invalid'
     subject: str = 'Verify your local test account'
+    # Exact reviewed DKIM signing domains (header.i) accepted for the verification mail.
+    # Empty means the From address domain only. Never suffix/wildcard matched.
+    dkim_domains: tuple[str, ...] = ()
+    # Reviewed per-site phase paths (defaults are the fixture's) and honest automation label.
+    verify_path: str = '/verify'
+    resend_path: str = '/resend'
+    link_path: str = '/verify-link'
+    user_agent: str = ''
 
     def __post_init__(self):
         p = urlsplit(self.origin)
-        # Deliberate shipping boundary. No remote signup is enabled in this release.
-        if p.scheme != 'http' or p.hostname != '127.0.0.1' or not p.port or p.path or p.query or p.fragment or p.username:
-            raise ValueError('local fixture origin must be http://127.0.0.1:PORT')
-        if not re.fullmatch(r'/[A-Za-z0-9/_-]*', self.signup_path):
-            raise ValueError('invalid signup path')
+        loopback = (p.scheme == 'http' and p.hostname == '127.0.0.1' and p.port)
+        # Real site: https, one exact reviewed DNS name, default port, no IP literal, no userinfo.
+        real = (p.scheme == 'https' and p.port is None and p.hostname == p.netloc
+                and re.fullmatch(FQDN, p.hostname or '') and not re.fullmatch(r'[0-9.]+', p.hostname or ''))
+        if not (loopback or real) or p.path or p.query or p.fragment or p.username:
+            raise ValueError('origin must be http://127.0.0.1:PORT (fixture) or https://reviewed.host.name')
+        if any(not re.fullmatch(FQDN, d) for d in self.dkim_domains):
+            raise ValueError('dkim_domains must be exact lowercase DNS names')
+        for path in (self.signup_path, self.verify_path, self.resend_path, self.link_path):
+            if not re.fullmatch(r'/[A-Za-z0-9/_-]*', path):
+                raise ValueError('invalid reviewed path')
+        if self.user_agent and not re.fullmatch(r'[\x20-\x7e]{1,200}', self.user_agent):
+            raise ValueError('invalid user agent')
         if any(c not in STOPS for c in self.commitments):
             raise ValueError('unknown commitment classification')
 
@@ -107,10 +126,14 @@ class Engine:
     Credentials are resolved only at the fill boundary; never returned or persisted.
     Exceptions from pages, vaults and mail are replaced by fixed redacted outcomes.
     """
-    def __init__(self, store, vault, inbox, profiles, executable='/usr/bin/google-chrome'):
+    def __init__(self, store, vault, inbox, profiles, executable='/usr/bin/google-chrome', test_origin_map=None):
         from playwright.sync_api import sync_playwright
         self.store, self.vault, self.inbox = store, vault, inbox
         self.profiles = {p.site: p for p in profiles}
+        # TEST ONLY seam: {'https://reviewed.host': 'https://127.0.0.1:PORT'}. The route handler
+        # fetches the mapped backend (TLS still verified, against a test CA given to the driver via
+        # NODE_EXTRA_CA_CERTS) with the reviewed Host header. Production leaves this empty.
+        self.test_origin_map = dict(test_origin_map or {})
         self.thread = threading.get_ident()
         self.pw = sync_playwright().start()
         self.browser = self.pw.chromium.launch(executable_path=executable, headless=True,
@@ -138,7 +161,10 @@ class Engine:
           host:port origins.
         * UDP: QUIC/HTTP3 (WebTransport) is off, WebRTC may not use non-proxied UDP.
         """
-        bypass = sorted({'127.0.0.1:%d' % urlsplit(p.origin).port for p in profiles})
+        # Only loopback fixtures need a bypass. https profiles are served through the route
+        # handler (route.fetch), never by Chrome's own network stack, so DNS stays blocked.
+        bypass = sorted({'127.0.0.1:%d' % urlsplit(p.origin).port for p in profiles
+                         if urlsplit(p.origin).hostname == '127.0.0.1'}) or ['127.0.0.1:1']
         return ['--no-sandbox',
                 '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1',
                 '--proxy-server=http://127.0.0.1:1',
@@ -168,7 +194,8 @@ class Engine:
         aborted and the gate is marked; the actor then reports an unknown outcome. A 3xx answer to
         GET/HEAD is passed on only if its Location resolves to an allowed same-origin URL, which is
         then re-checked by the route guard like any other request."""
-        response = route.fetch(max_redirects=0)
+        mapped = self._mapped_fetch(route)
+        response = route.fetch(max_redirects=0, **mapped)
         if 300 <= response.status < 400:
             if route.request.method not in ('GET', 'HEAD'):
                 if gate is not None:
@@ -187,6 +214,16 @@ class Engine:
             headers['Content-Security-Policy'] = self.CSP
         route.fulfill(response=response, headers=headers)
 
+    def _mapped_fetch(self, route):
+        if not self.test_origin_map:
+            return {}
+        u = urlsplit(route.request.url)
+        backend = self.test_origin_map.get(f'{u.scheme}://{u.netloc}')
+        if not backend:
+            return {}
+        url = backend + u.path + ('?' + u.query if u.query else '')
+        return {'url': url, 'headers': {**route.request.headers, 'host': u.netloc}}
+
     @staticmethod
     def _location_allowed(gate, p, base, location):
         from urllib.parse import urljoin
@@ -194,7 +231,7 @@ class Engine:
         u = urlsplit(target)
         if not p.accepts(target) or u.fragment:
             return False
-        if u.query and u.path != '/verify-link':
+        if u.query and u.path != p.link_path:
             return False
         flat = unquote_plus(u.path) + '?' + unquote_plus(u.query)
         return not (gate is not None and any(v and v in flat for v in gate['secrets']))
@@ -221,7 +258,7 @@ class Engine:
         if any(v and v in flat for v in gate['secrets']):
             return False
         # Only the actor-opened verification link carries a query.
-        if u.query and u.path != '/verify-link':
+        if u.query and u.path != p.link_path:
             return False
         if request.method in ('GET', 'HEAD'):
             return True
@@ -230,7 +267,7 @@ class Engine:
         expected = gate['expected']
         if expected is None or gate['phase'] == 'idle':
             return False
-        phase_path = {'submit': p.signup_path, 'verify': '/verify', 'resend': '/resend'}[gate['phase']]
+        phase_path = {'submit': p.signup_path, 'verify': p.verify_path, 'resend': p.resend_path}[gate['phase']]
         if u.path != phase_path or u.query:
             return False
         try:
@@ -338,7 +375,8 @@ class Engine:
                    deadline=now+lifetime, profile_digest=p.digest, inspection_digest='',
                    approved_digest='', verification_since=now, generation=0, reason='')
         self.store.save(run)
-        context = self.browser.new_context(service_workers='block', accept_downloads=False)
+        context = self.browser.new_context(service_workers='block', accept_downloads=False,
+                                          **({'user_agent': p.user_agent} if p.user_agent else {}))
         # All resources and redirects are bound to this explicit local origin, and the
         # account-creation POST is allowed exactly once: transparent browser retries
         # after a reset are aborted so one request can never create two submissions.
@@ -444,7 +482,7 @@ class Engine:
         if run['state'] != 'verification':
             return dict(run)
         scope = {'request_id': rid, 'recipient': run['email'], 'sender': p.sender,
-                 'subject': p.subject, 'since': run['verification_since'],
+                 'subject': p.subject, 'dkim_domains': p.dkim_domains, 'since': run['verification_since'],
                  'until': min(time.time(), run['deadline']), 'origin': p.origin,
                  'generation': run['generation']}
         try:
@@ -455,7 +493,7 @@ class Engine:
             kind, value = proof
             if kind == 'link':
                 parsed = urlsplit(value)
-                if not p.accepts(value) or parsed.path != '/verify-link' or not re.fullmatch(r'token=[A-Za-z0-9_-]{16,128}', parsed.query):
+                if not p.accepts(value) or parsed.path != p.link_path or not re.fullmatch(r'token=[A-Za-z0-9_-]{16,128}', parsed.query):
                     return self._state(run, 'verification', 'verification_link_rejected')
                 page.goto(value, wait_until='networkidle')
                 self.gates[rid]['secrets'] |= {parsed.query.split('=', 1)[1]}

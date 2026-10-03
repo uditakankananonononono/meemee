@@ -12,7 +12,7 @@ from urllib.parse import parse_qs, urlsplit
 
 
 class FixtureSite:
-    def __init__(self):
+    def __init__(self, tls=None):
         self.accounts, self.sessions, self.mail = {}, {}, []
         self.mode = ''
         self.policy = 'Free local test account. No charges. Cancel any time.'
@@ -170,7 +170,14 @@ class FixtureSite:
                     self.send_error(404)
 
         self.server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
-        self.origin = 'http://127.0.0.1:'+str(self.server.server_port)
+        if tls:
+            import ssl
+            ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            ctx.load_cert_chain(*tls)
+            self.server.socket = ctx.wrap_socket(self.server.socket, server_side=True)
+            self.origin = 'https://127.0.0.1:'+str(self.server.server_port)
+        else:
+            self.origin = 'http://127.0.0.1:'+str(self.server.server_port)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
 

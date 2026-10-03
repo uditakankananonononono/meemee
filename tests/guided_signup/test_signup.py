@@ -202,7 +202,7 @@ def test_owner_isolation_and_origin_restriction(env):
     with pytest.raises(KeyError):
         e.approve('other-owner', run['id'], run['inspection_digest'])
     with pytest.raises(ValueError):
-        Profile('real', 'https://example.com')
+        Profile('real', 'http://example.com')  # plain http to a real host is never allowed
     p = env[3]
     assert not p.accepts(p.origin+'.evil.invalid/signup')
     assert not p.accepts(p.origin+'/signup#token')
