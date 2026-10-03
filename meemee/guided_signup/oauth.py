@@ -6,6 +6,7 @@ token that grants more or less is refused. The OAuth client id belongs to the ac
 Cloud project; nothing here ships a shared client. Not exercised against real Google in tests."""
 import base64
 import hashlib
+import json
 import secrets
 import threading
 import time
@@ -80,10 +81,18 @@ class GmailOAuth:
     def _post(self, data):
         if self.client_secret_ref:
             data = {**data, 'client_secret': self.vault.get(self.client_secret_ref)}
-        response = self.client.post(self.token_endpoint, data=data)
-        if response.status_code != 200:
-            raise OAuthError('token endpoint refused the request')   # body never echoed (may hold secrets)
-        return response.json()
+        with self.client.stream('POST', self.token_endpoint, data=data) as response:
+            if response.status_code != 200:
+                raise OAuthError('token endpoint refused the request')   # body never echoed (may hold secrets)
+            raw = b''
+            for chunk in response.iter_bytes():
+                raw += chunk
+                if len(raw) > 65536:
+                    raise OAuthError('token response too large')
+        try:
+            return json.loads(raw)
+        except ValueError:
+            raise OAuthError('token response is not JSON')
 
     def _remember(self, body):
         if set(body.get('scope', '').split()) != {SCOPE}:

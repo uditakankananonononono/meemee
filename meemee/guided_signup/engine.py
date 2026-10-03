@@ -126,14 +126,18 @@ class Engine:
     Credentials are resolved only at the fill boundary; never returned or persisted.
     Exceptions from pages, vaults and mail are replaced by fixed redacted outcomes.
     """
-    def __init__(self, store, vault, inbox, profiles, executable='/usr/bin/google-chrome', test_origin_map=None):
+    def __init__(self, store, vault, inbox, profiles, executable='/usr/bin/google-chrome', test_origin_map=None, test_ca=None):
         from playwright.sync_api import sync_playwright
         self.store, self.vault, self.inbox = store, vault, inbox
         self.profiles = {p.site: p for p in profiles}
-        # TEST ONLY seam: {'https://reviewed.host': 'https://127.0.0.1:PORT'}. The route handler
-        # fetches the mapped backend (TLS still verified, against a test CA given to the driver via
-        # NODE_EXTRA_CA_CERTS) with the reviewed Host header. Production leaves this empty.
+        # TEST ONLY seam: {'https://reviewed.host': ('127.0.0.1', PORT)} pins the connection address;
+        # TLS is still verified against the reviewed host name using the throwaway CA in test_ca.
+        # It never relaxes the public-address rule for unmapped hosts. Production leaves both empty.
         self.test_origin_map = dict(test_origin_map or {})
+        self._test_ctx = None
+        if test_ca:
+            import ssl
+            self._test_ctx = ssl.create_default_context(cafile=test_ca)
         self.thread = threading.get_ident()
         self.pw = sync_playwright().start()
         self.browser = self.pw.chromium.launch(executable_path=executable, headless=True,
@@ -194,35 +198,43 @@ class Engine:
         aborted and the gate is marked; the actor then reports an unknown outcome. A 3xx answer to
         GET/HEAD is passed on only if its Location resolves to an allowed same-origin URL, which is
         then re-checked by the route guard like any other request."""
-        mapped = self._mapped_fetch(route)
-        response = route.fetch(max_redirects=0, **mapped)
-        if 300 <= response.status < 400:
-            if route.request.method not in ('GET', 'HEAD'):
+        request = route.request
+        u = urlsplit(request.url)
+        if u.scheme == 'http' and u.hostname == '127.0.0.1':
+            # Loopback fixture literal: reviewed in Profile, never a name, so no resolver is involved.
+            response = route.fetch(max_redirects=0)
+            status, pairs, body = response.status, [(h['name'], h['value']) for h in response.headers_array], None
+        else:
+            # Real hosts never use Playwright's driver-side fetch (it ignores Chrome's DNS/proxy lock).
+            from . import transport
+            origin = f'{u.scheme}://{u.netloc}'
+            pin = self.test_origin_map.get(origin)
+            data = request.post_data_buffer
+            try:
+                headers = request.all_headers()
+                status, pairs, body = transport.fetch(
+                    request.method, request.url, headers, data, pin=pin,
+                    context=self._test_ctx if pin else None)
+            except transport.TransportError:
+                return route.abort()
+        if 300 <= status < 400:
+            if request.method not in ('GET', 'HEAD'):
                 if gate is not None:
                     gate['redirected'] = True
                 return route.abort()
-            location = response.headers.get('location')
-            if p is None or not location or not self._location_allowed(gate, p, route.request.url, location):
+            location = next((v for k, v in pairs if k.lower() == 'location'), None)
+            if p is None or not location or not self._location_allowed(gate, p, request.url, location):
                 return route.abort()
         headers = {}
-        for h in response.headers_array:
-            name = h['name'].lower()
-            if name in self.DROP_HEADERS:
+        for name, value in pairs:
+            if name.lower() in self.DROP_HEADERS:
                 continue
-            headers[h['name']] = headers[h['name']] + '\n' + h['value'] if h['name'] in headers else h['value']
+            headers[name] = headers[name] + '\n' + value if name in headers else value
         if self.CSP:
             headers['Content-Security-Policy'] = self.CSP
-        route.fulfill(response=response, headers=headers)
-
-    def _mapped_fetch(self, route):
-        if not self.test_origin_map:
-            return {}
-        u = urlsplit(route.request.url)
-        backend = self.test_origin_map.get(f'{u.scheme}://{u.netloc}')
-        if not backend:
-            return {}
-        url = backend + u.path + ('?' + u.query if u.query else '')
-        return {'url': url, 'headers': {**route.request.headers, 'host': u.netloc}}
+        if body is None:
+            return route.fulfill(response=response, headers=headers)
+        route.fulfill(status=status, headers=headers, body=body)
 
     @staticmethod
     def _location_allowed(gate, p, base, location):

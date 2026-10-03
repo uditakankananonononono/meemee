@@ -1,7 +1,7 @@
 """Real Chrome against an https reviewed FQDN served through the engine's route handler.
 
 The backend is a local TLS server (127.0.0.1) whose certificate chains to a throwaway test CA with a
-SAN for the reviewed name. The driver trusts that CA via NODE_EXTRA_CA_CERTS; TLS verification is NOT
+SAN for the reviewed name. The engine's own transport trusts that CA only through the test_ca seam; TLS verification is NOT
 disabled anywhere. The mapping seam exists only on Engine(test_origin_map=...). Chrome itself runs with
 DNS blocked, so any request that is not fulfilled by the route handler cannot leave the browser."""
 import secrets
@@ -43,7 +43,7 @@ def tenv(tmp_path, monkeypatch):
     vault.put('gmail-token', secrets.token_urlsafe(32))
     inbox = GmailInbox(vault, 'gmail-token', base=mail.origin + '/gmail', local_test=True)
     profile = Profile('real-like', ORIGIN)
-    engine = Engine(Store(tmp_path / 'runs.sqlite'), vault, inbox, [profile], test_origin_map={ORIGIN: site.origin})
+    engine = Engine(Store(tmp_path / 'runs.sqlite'), vault, inbox, [profile], test_origin_map={ORIGIN: ('127.0.0.1', int(site.origin.rsplit(':', 1)[1]))}, test_ca=ca)
     yield site, engine, profile
     engine.close()
     mail.close()
@@ -109,7 +109,7 @@ def test_negative_control_untrusted_ca_fails_closed(tmp_path, monkeypatch):
     vault = LocalVault(tmp_path / 'vault.sqlite', LocalVault.key())
     vault.put('signup-password', secrets.token_urlsafe(32))
     engine = Engine(Store(tmp_path / 'runs.sqlite'), vault, None, [Profile('real-like', ORIGIN)],
-                    test_origin_map={ORIGIN: site.origin})
+                    test_origin_map={ORIGIN: ('127.0.0.1', int(site.origin.rsplit(':', 1)[1]))}, test_ca=None)
     try:
         run = engine.start('owner', 'real-like', 'owner@example.test', 'Fixture Owner', 'signup-password')
         assert run['state'] == 'stopped'
