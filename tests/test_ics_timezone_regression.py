@@ -201,3 +201,17 @@ def test_missing_or_empty_dtstart_aborts_whole_feed(monkeypatch, lines):
     bad = 'BEGIN:VEVENT\r\nUID:b\r\n' + ''.join(l + '\r\n' for l in lines) + 'END:VEVENT\r\n'
     with pytest.raises(ValueError):
         _feed(monkeypatch, 'BEGIN:VCALENDAR\r\n' + good + bad + 'END:VCALENDAR').fetch('o', 's')
+
+
+def test_tzdata_declared_as_base_dependency_and_importable():
+    """Windows and slim images have no system IANA database; zoneinfo needs the tzdata wheel."""
+    import importlib.util
+    import pathlib
+    import re
+    root = pathlib.Path(__file__).resolve().parents[1]
+    text = (root / 'pyproject.toml').read_text(encoding='utf-8')
+    deps = re.search(r'^dependencies = \[(.*?)^\]', text, re.S | re.M).group(1)
+    assert re.search(r'"tzdata\b', deps), 'tzdata must be a base dependency'
+    assert '"tzdata' in (root / 'uv.lock').read_text(encoding='utf-8')
+    assert importlib.util.find_spec('tzdata') is not None
+    assert importlib.util.find_spec('tzdata.zoneinfo.Asia') is not None
