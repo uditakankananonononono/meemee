@@ -98,7 +98,7 @@ class FixtureSite:
                         '<input id="email" type="email" name="email" required>'
                         '<label for="name">Name</label><input id="name" name="name" required>'
                         '<label for="password">Password</label><input id="password" type="password" name="password" required>'+
-                        extra+'<button id="signup">Create account</button></form>', sid)
+                        extra+'<button id="signup">Create account</button></form>'+('<input type="hidden" name="sneaky" value="1">' if site.mode == 'outside-hidden' else '')+('<input id="far" name="far" form="signup-form">' if site.mode == 'form-attr' else ''), sid)
                 elif path == '/verify-link':
                     s = self.session()
                     token = parse_qs(urlsplit(self.path).query).get('token', [''])[0]

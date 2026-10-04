@@ -375,8 +375,10 @@ class Engine:
         if page.locator(p.policy_selector).inner_text().strip() != p.expected_policy:
             return None, 'consequential_terms'
         # Unexpected controls require review, not inferred intent. Exact form contract.
-        hidden = sorted(page.locator('form input[type=hidden]').evaluate_all('(els) => els.map(e => e.name)'))
-        if hidden != sorted(p.hidden_fields):
+        hidden = sorted(page.locator('input[type=hidden]').evaluate_all('(els) => els.map(e => e.name)'))
+        # Document-wide: a hidden input outside the <form>, or any control bound by a form= attribute, is not reviewed.
+        if page.locator('[form]').count() or page.locator('form').count() != 1 or hidden != sorted(p.hidden_fields) or \
+                page.locator('form input[type=hidden]').count() != len(hidden):
             return None, 'unknown_form_controls'
         controls = page.locator('form input:not([type=hidden]), form select, form textarea').evaluate_all(
             '(els) => els.map(e => ({id:e.id,type:e.type,required:e.required})).sort((a,b)=>a.id.localeCompare(b.id))')
