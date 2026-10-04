@@ -54,6 +54,9 @@ class Profile:
     resend_path: str = '/resend'
     link_path: str = '/verify-link'
     user_agent: str = ''
+    # Reviewed names of hidden form inputs (e.g. a CSRF token). Names are exact; values are opaque, read from the
+    # inspected page at submit time and then held to the exact-body gate. Any other hidden input stops the run.
+    hidden_fields: tuple[str, ...] = ()
 
     def __post_init__(self):
         p = urlsplit(self.origin)
@@ -65,6 +68,8 @@ class Profile:
             raise ValueError('origin must be http://127.0.0.1:PORT (fixture) or https://reviewed.host.name')
         if any(not re.fullmatch(FQDN, d) for d in self.dkim_domains):
             raise ValueError('dkim_domains must be exact lowercase DNS names')
+        if any(not re.fullmatch(r'[A-Za-z0-9_.\[\]-]{1,64}', h) for h in self.hidden_fields) or len(set(self.hidden_fields)) != len(self.hidden_fields):
+            raise ValueError('hidden_fields must be unique plain input names')
         for path in (self.signup_path, self.verify_path, self.resend_path, self.link_path):
             if not re.fullmatch(r'/[A-Za-z0-9/_-]*', path):
                 raise ValueError('invalid reviewed path')
@@ -370,7 +375,10 @@ class Engine:
         if page.locator(p.policy_selector).inner_text().strip() != p.expected_policy:
             return None, 'consequential_terms'
         # Unexpected controls require review, not inferred intent. Exact form contract.
-        controls = page.locator('form input, form select, form textarea').evaluate_all(
+        hidden = sorted(page.locator('form input[type=hidden]').evaluate_all('(els) => els.map(e => e.name)'))
+        if hidden != sorted(p.hidden_fields):
+            return None, 'unknown_form_controls'
+        controls = page.locator('form input:not([type=hidden]), form select, form textarea').evaluate_all(
             '(els) => els.map(e => ({id:e.id,type:e.type,required:e.required})).sort((a,b)=>a.id.localeCompare(b.id))')
         expected = sorted([
             {'id': p.email_selector.removeprefix('#'), 'type': 'email', 'required': True},
@@ -484,8 +492,13 @@ class Engine:
                 # A secure provisioning UI owned by the host resolves this reference.
                 return self._state(run, 'ready', 'secure_credentials_required')
             # Phase opens only here: approval stored, inspection digest equal, exact values.
-            self._open_phase(rid, 'submit', {names['email']: run['email'], names['name']: run['name'],
-                                             names['password']: secret}, (secret,))
+            expected = {names['email']: run['email'], names['name']: run['name'], names['password']: secret}
+            for hname, hvalue in page.locator('form input[type=hidden]').evaluate_all(
+                    '(els) => els.map(e => [e.name, e.value])'):
+                if hname in expected:
+                    return self._state(run, 'stopped', 'unknown_form_controls')
+                expected[hname] = hvalue
+            self._open_phase(rid, 'submit', expected, (secret,))
             page.locator(p.email_selector).fill(run['email'])
             page.locator(p.name_selector).fill(run['name'])
             page.locator(p.password_selector).fill(secret)

@@ -88,6 +88,11 @@ class FixtureSite:
                     extra = ('<div id="'+site.mode+'">User step required</div>') if site.mode in {'payment', 'card', 'paid-trial', 'subscription', 'fee', 'identity', 'phone', 'captcha', 'bot-wall', 'unsupported-auth'} else ''
                     if site.mode == 'unknown-controls':
                         extra += '<input id="unexpected" name="unexpected">'
+                    if site.mode in ('csrf', 'csrf-extra'):
+                        site.sessions[sid]['csrf'] = secrets.token_urlsafe(16)
+                        extra += '<input type="hidden" name="authenticity_token" value="'+site.sessions[sid]['csrf']+'">'
+                    if site.mode == 'csrf-extra':
+                        extra += '<input type="hidden" name="sneaky" value="1">'
                     self.send_html('<h1>Create a local test account</h1><p id="policy">'+html.escape(site.policy)+'</p>'
                         '<form method="post" action="/signup"><label for="email">Email</label>'
                         '<input id="email" type="email" name="email" required>'
@@ -129,6 +134,9 @@ class FixtureSite:
                 body = parse_qs(self.rfile.read(int(self.headers['Content-Length'])).decode())
                 s = self.session()
                 if s is None:
+                    self.send_error(403)
+                    return
+                if path == '/signup' and site.mode == 'csrf' and body.get('authenticity_token', [''])[0] != s.get('csrf'):
                     self.send_error(403)
                     return
                 if path == '/signup':
