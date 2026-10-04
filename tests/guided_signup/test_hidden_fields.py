@@ -45,3 +45,12 @@ def test_hidden_field_names_validated():
         Profile('x', 'http://127.0.0.1:9', hidden_fields=('a b',))
     with pytest.raises(ValueError):
         Profile('x', 'http://127.0.0.1:9', hidden_fields=('t', 't'))
+
+
+@pytest.mark.parametrize('mode', ['outside-hidden', 'form-attr'])
+def test_hidden_or_form_bound_controls_outside_the_form_stop(env, mode):
+    site = env[0]
+    site.mode = mode
+    run = start(env)
+    assert run['state'] == 'stopped' and run['reason'] == 'unknown_form_controls'
+    assert site.submits == 0
