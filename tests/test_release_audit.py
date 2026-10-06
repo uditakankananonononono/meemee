@@ -10,7 +10,7 @@ def valid_tree(root: Path) -> None:
         path.write_text("0.37.0\n")
     package = root / "meemee" / "__init__.py"; package.parent.mkdir(); package.write_text('__version__ = "0.37.0"\n')
     (root / "pyproject.toml").write_text('[project]\nversion = "0.37.0"\n')
-    (root / "README.md").write_text("0.37.0\n## Verified in v0.37.0 (1)\n1. capability\n")
+    (root / "README.md").write_text("0.37.0\n## Historical feature inventory in v0.37.0 (1 claims, not an independent verification)\n1. capability\n")
 
 
 def test_release_audit_accepts_complete_aligned_tree(tmp_path):
@@ -50,8 +50,8 @@ def test_release_audit_rejects_sdk_drift_and_stale_capability_claims(tmp_path):
 
 def test_release_audit_rejects_verified_heading_count_drift(tmp_path):
     valid_tree(tmp_path)
-    (tmp_path/"README.md").write_text("0.37.0\n## Verified in v0.37.0 (2)\n1. one\n")
-    assert "verified_ledger_drift" in {item["code"] for item in audit_tree(tmp_path)["findings"]}
+    (tmp_path/"README.md").write_text("0.37.0\n## Historical feature inventory in v0.37.0 (2 claims, not an independent verification)\n1. one\n")
+    assert "capability_ledger_drift" in {item["code"] for item in audit_tree(tmp_path)["findings"]}
 
 
 def test_release_audit_rejects_stale_sdk_contract_label(tmp_path):
@@ -63,3 +63,21 @@ def test_release_audit_rejects_stale_sdk_contract_label(tmp_path):
     target.write_text(target.read_text().replace(f"v{__version__}", "v0.1.0"))
     report = audit_tree(tmp_path, __version__)
     assert "sdk_contract_version_drift" in {item["code"] for item in report["findings"]}
+
+
+
+def test_release_audit_accepts_honest_source_table_and_checks_unique_coverage(tmp_path):
+    valid_tree(tmp_path)
+    readme = tmp_path / "README.md"
+    text = "0.37.0\n## Source audit in v0.37.0 (2 items)\n| 1 | partial | claim | source | limit |\n| 2 | false | claim | source | limit |\n"
+    readme.write_text(text)
+    assert audit_tree(tmp_path)["status"] == "pass"
+    readme.write_text(text.replace("| 2 |", "| 1 |"))
+    assert "capability_ledger_drift" in {f["code"] for f in audit_tree(tmp_path)["findings"]}
+
+
+def test_release_audit_does_not_require_blanket_verified_label(tmp_path):
+    valid_tree(tmp_path)
+    readme = tmp_path / "README.md"
+    readme.write_text("0.37.0\n## Verified in v0.37.0 (1)\n1. capability\n")
+    assert "capability_ledger_drift" in {f["code"] for f in audit_tree(tmp_path)["findings"]}
