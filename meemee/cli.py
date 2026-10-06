@@ -96,6 +96,16 @@ def models_pull(name: str = typer.Argument(..., help="A transport=transformers p
     typer.echo(json.dumps({"name": name, "model": profile.model, "path": path}, indent=2))
 
 
+@models_app.command("pull-embeddings")
+def models_pull_embeddings(directory: Path = typer.Argument(...)) -> None:
+    """Download/check the pinned free MiniLM encoder for offline semantic memory."""
+    from .semantic_memory import MiniLMEmbedder, pull_minilm
+    path = pull_minilm(directory)
+    encoder = MiniLMEmbedder(path)
+    typer.echo(json.dumps({"path": str(path), "space_id": encoder.space_id,
+                           "dimensions": len(encoder.embed("local model readiness"))}))
+
+
 @models_app.command("inkling-local")
 def models_inkling_local(
     plan: str = typer.Option("auto", help="auto or one of: vllm-nvfp4, vllm-bf16, llamacpp-q4, llamacpp-q3, llamacpp-q2"),

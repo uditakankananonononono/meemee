@@ -27,7 +27,7 @@ def test_postgres_selection_migrates_and_builds_stores(monkeypatch,tmp_path):
         def __init__(self,db): events.append(("migrate-init",db))
         def apply(self): events.append(("migrate",))
     class Store:
-        def __init__(self,db): self.db=db
+        def __init__(self,db,embedder=None): self.db=db
     monkeypatch.setattr(meemee_persist_pg,"Database",DB)
     monkeypatch.setattr(meemee_persist_pg,"MigrationStore",Migrate)
     monkeypatch.setattr(meemee_persist_pg,"MemoryStore",Store)
@@ -63,7 +63,7 @@ def test_persistence_health_checks_are_backend_neutral(monkeypatch,tmp_path):
         def __init__(self,db): pass
         def apply(self): pass
     class Store:
-        def __init__(self,db): self.db=db
+        def __init__(self,db,embedder=None): self.db=db
     monkeypatch.setattr(meemee_persist_pg,"Database",DB); monkeypatch.setattr(meemee_persist_pg,"MigrationStore",Migrate)
     monkeypatch.setattr(meemee_persist_pg,"MemoryStore",Store); monkeypatch.setattr(meemee_persist_pg,"JobStore",Store)
     postgres=build_persistence("postgresql",tmp_path,"postgresql://test")

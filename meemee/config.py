@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     model_base_url: str = "http://127.0.0.1:11434/v1"
     model_name: str = "qwen2.5-coder:14b"
     model_api_key: str = "local"
+    embedding_model_dir: Path | None = None
     model_routes: str | None = None
     model_profiles: str | None = None
     allow_paid_models: bool = False

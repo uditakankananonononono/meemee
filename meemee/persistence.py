@@ -104,11 +104,12 @@ def _sqlite_deletion_ledger(data_dir: Path) -> Any:
 
 def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = None, *,
                       default_daily_jobs: int = 100, default_plan: str = "starter",
-                      vault_key: str | None = None, webhook_max_payload_bytes: int = 256_000) -> Persistence:
+                      vault_key: str | None = None, webhook_max_payload_bytes: int = 256_000,
+                      memory_embedder: Any = None) -> Persistence:
     """Select and initialize the supported persistence composition root."""
     normalized = backend.strip().lower()
     if normalized == "sqlite":
-        return Persistence("sqlite", SQLiteMemoryStore(data_dir / "meemee.sqlite3"), SQLiteJobStore(data_dir / "jobs.sqlite3"), lambda: None,
+        return Persistence("sqlite", SQLiteMemoryStore(data_dir / "meemee.sqlite3", memory_embedder), SQLiteJobStore(data_dir / "jobs.sqlite3"), lambda: None,
                            approvals=SQLiteApprovalStore(data_dir / "approvals.sqlite3"),
                            tokens=SQLiteTokenStore(data_dir / "auth.sqlite3"), audit=SQLiteAuditLog(data_dir / "audit.sqlite3"),
                            email_verifications=SQLiteEmailVerificationStore(data_dir / "email-verifications.sqlite3"),
@@ -153,7 +154,7 @@ def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = N
     )
     database = Database(postgres_dsn)
     MigrationStore(database).apply()
-    return Persistence("postgresql", MemoryStore(database), JobStore(database), database.close, database,
+    return Persistence("postgresql", MemoryStore(database, memory_embedder), JobStore(database), database.close, database,
                        approvals=ApprovalStore(database), tokens=TokenStore(database), audit=AuditLog(database),
                        email_verifications=EmailVerificationStore(database),
                        quotas=QuotaStore(database, default_daily_jobs), entitlements=EntitlementStore(database, default_plan),
@@ -168,6 +169,8 @@ def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = N
 
 def persistence_from_settings(settings: Any) -> Persistence:
     """``build_persistence`` with the product defaults (quota, plan) taken from settings."""
+    from .semantic_memory import embedder_from_settings
     return build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn,
                              default_daily_jobs=settings.default_daily_jobs, default_plan=settings.default_plan,
-                             vault_key=settings.vault_key, webhook_max_payload_bytes=settings.webhook_max_payload_bytes)
+                             vault_key=settings.vault_key, webhook_max_payload_bytes=settings.webhook_max_payload_bytes,
+                             memory_embedder=embedder_from_settings(settings))

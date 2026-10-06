@@ -213,6 +213,7 @@ async def test_default_loader_refuses_to_download_mid_request(monkeypatch):
 
 @respx.mock
 async def test_route_falls_from_local_server_to_in_process_transformers(monkeypatch):
+    monkeypatch.setattr(providers, "transformers_missing", lambda: None)
     _, _, loader = _fake('{"final": "answered in-process"}')
     monkeypatch.setattr(providers, "_default_loader", loader)
     s = settings(model_base_url=LOCAL, model_routes="agent=local,local-transformers", transformers_model="fake/tiny")
