@@ -14,8 +14,8 @@ def test_memory_tokens_audit_and_migration_idempotency():
     from meemee_persist_pg import MemoryStore,TokenStore,AuditLog,MigrationStore
     value=db()
     try:
-        memory=MemoryStore(value); ident=memory.add("run-i","fact","alpha beta",{"safe":True})
-        assert memory.search("alpha")[0]["id"]==ident
+        memory=MemoryStore(value); ident=memory.add("run-i","fact","alpha beta",{"safe":True}, owner_id="test-owner")
+        assert memory.search("alpha", owner_id="test-owner")[0]["id"]==ident
         tokens=TokenStore(value); token_id,raw=tokens.create("integration",{"jobs:read"})
         assert tokens.authenticate(raw).id==token_id; assert tokens.revoke(token_id); assert tokens.authenticate(raw) is None
         audit=AuditLog(value); audit.append("test","write",str(ident),"success",{"x":1}); assert audit.verify()==(True,None)

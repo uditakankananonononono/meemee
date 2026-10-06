@@ -27,14 +27,14 @@ def test_pg_purge_principal_idle_running_and_memory():
         done = jobs.enqueue("alice finished", principal=alice)
         claimed = jobs.claim(); assert claimed["id"] == done
         jobs.finish(done, {"run_id": f"run-{alice}"}, claimed["lease_token"])
-        memory.add(f"run-{alice}", "final", f"{alice} {word} memory")
-        memory.add(f"run-{bob}", "final", f"{bob} {word} memory")
+        memory.add(f"run-{alice}", "final", f"{alice} {word} memory", owner_id=alice)
+        memory.add(f"run-{bob}", "final", f"{bob} {word} memory", owner_id=bob)
         queued = jobs.enqueue("alice queued", principal=alice)
         running = jobs.claim(); assert running["id"] == queued
         idle_bob = jobs.enqueue("bob keeps this", principal=bob)
 
         assert jobs.run_ids_for_principal(alice) == [f"run-{alice}"]
-        assert memory.delete_runs(jobs.run_ids_for_principal(alice)) == 1
+        assert memory.delete_runs(jobs.run_ids_for_principal(alice), owner_id=alice) == 1
         counts = jobs.purge_principal(alice)
         assert counts["jobs_deleted"] == 1 and counts["running_tombstoned"] == 1 and counts["job_events_deleted"] >= 4
 
@@ -47,7 +47,7 @@ def test_pg_purge_principal_idle_running_and_memory():
         assert jobs.finish(queued, {"run_id": "late"}, running["lease_token"]) is True
         assert jobs.get(queued) is None
         assert jobs.get(idle_bob)["status"] == "queued" and jobs.get(idle_bob)["principal"] == bob
-        assert [m["run_id"] for m in memory.search(word)] == [f"run-{bob}"]
+        assert [m["run_id"] for m in memory.search(word, owner_id=bob)] == [f"run-{bob}"]
     finally:
         value.close()
 

@@ -52,12 +52,12 @@ def test_memory_full_text_and_recent(database):
     from meemee_persist_pg import MemoryStore
 
     memory = MemoryStore(database)
-    first = memory.add("run-1", "fact", "Udita prefers green tea in the morning", {"src": "chat"})
-    memory.add("run-1", "fact", "The build server runs Ubuntu", None)
-    hits = memory.search("tea")
+    first = memory.add("run-1", "fact", "Udita prefers green tea in the morning", {"src": "chat"}, owner_id="test-owner")
+    memory.add("run-1", "fact", "The build server runs Ubuntu", None, owner_id="test-owner")
+    hits = memory.search("tea", owner_id="test-owner")
     assert hits and hits[0]["id"] == first
-    assert [row["id"] for row in memory.recent(1)] != []
-    assert memory.search("nonexistentword") == []
+    assert [row["id"] for row in memory.recent(1, owner_id="test-owner")] != []
+    assert memory.search("nonexistentword", owner_id="test-owner") == []
 
 
 def test_tokens_expiry_and_revocation(database):
