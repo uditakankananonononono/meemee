@@ -101,3 +101,25 @@ def test_legacy_sqlite_session_file_gains_host_column(tmp_path):
     db.commit(); db.close()
     store = SQLiteSessions(path, "host-a")
     assert store.mark_open_sessions_lost() == 1 and store.get_session("old")["state"] == "lost"
+
+
+def test_notice_delivery_rejects_foreign_local_address_on_both_backends(make, tmp_path):
+    from meemee.companion.channels import LocalChannel
+    from meemee.companion.models import CheckInPreferences, UserProfile
+    from meemee.companion.store import CompanionStore
+
+    sessions, notices = make("host-a")
+    companion = CompanionStore(tmp_path / "companion.db")
+    victim = companion.start_conversation("victim", "local")
+    # Legacy bad state is intentionally inserted below the HTTP save validator.
+    companion.upsert_user(UserProfile(user_id="attacker", display_name="Attacker",
+        checkins=CheckInPreferences(address=victim["id"])))
+    sessions.create_session("s1", "attacker", None, [])
+    expires = datetime.now(timezone.utc) + timedelta(minutes=5)
+    sessions.create_takeover("t1", "s1", "tok", "captcha", "attacker", expires)
+    notices.enqueue({"takeover_id": "t1", "reason": "attacker text", "expires_at": expires.isoformat(),
+        "url": "https://example.com/takeover"}, "s1", "attacker")
+    result = asyncio.run(notices.deliver_pending(sessions, companion, {"local": LocalChannel(companion)}))
+    assert result[0]["status"] in {"queued", "failed"}
+    assert "unknown local conversation" in result[0]["error"]
+    assert companion.history(victim["id"]) == []

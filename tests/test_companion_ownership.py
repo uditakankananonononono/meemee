@@ -118,3 +118,25 @@ def test_browser_notice_cannot_target_another_user():
         json={"url": "https://example.com/", "notify_user_id": "victim-owner"},
     )
     assert response.status_code == 403, response.text
+
+
+def test_foreign_local_address_rejected_at_profile_and_preferences_save():
+    seed_victim()
+    victim = companion.store.start_conversation("victim-owner", "local")
+    owner = "delivery-attacker"
+    headers = attacker_headers(owner)
+    prefs = {"enabled": True, "channel": "local", "address": victim["id"]}
+    rejected = client.put(f"/v1/companion/users/{owner}", headers=headers,
+                          json={"display_name": "Attacker", "checkins": prefs})
+    assert rejected.status_code == 422
+    assert companion.store.get_user(owner) is None
+    assert client.put(f"/v1/companion/users/{owner}", headers=headers,
+                      json={"display_name": "Attacker"}).status_code == 200
+    rejected = client.put(f"/v1/companion/users/{owner}/checkins", headers=headers,
+                          json={"checkins": prefs})
+    assert rejected.status_code == 422
+    assert companion.store.profile(owner).checkins.address is None
+    mine = companion.store.start_conversation(owner, "local")
+    prefs["address"] = mine["id"]
+    assert client.put(f"/v1/companion/users/{owner}/checkins", headers=headers,
+                      json={"checkins": prefs}).status_code == 200

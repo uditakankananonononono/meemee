@@ -20,6 +20,18 @@ class ChannelNotConfiguredError(ChannelError):
     """The channel's provider credentials or endpoint are not configured."""
 
 
+def validate_delivery_address(store, user_id: str, channel: str, address: str | None) -> None:
+    """Local conversation ids are destinations, never ownership capabilities.
+
+    External provider addresses cannot be bound to users by the local store.
+    Their ownership is not verified by this helper.
+    """
+    if channel == "local" and address:
+        conversation = store.get_conversation(address)
+        if conversation is None or conversation["user_id"] != user_id:
+            raise ChannelError("unknown local conversation for check-in user")
+
+
 @dataclass
 class DeliveryResult:
     channel: str
