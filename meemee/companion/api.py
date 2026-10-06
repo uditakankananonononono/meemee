@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from .channels import ChannelError, validate_delivery_address
 from .checkins import CheckInScheduler
 from .engine import CompanionEngine
 from .models import ChatRequest, CheckInPreferences, FactInput, PersonaConfig, UserProfile
@@ -79,6 +80,10 @@ def build_companion_router(
             )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+        try:
+            validate_delivery_address(store, user_id, profile.checkins.channel, profile.checkins.address)
+        except ChannelError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         saved = store.upsert_user(profile)
         if not profile.checkins.enabled:
             store.cancel_pending_checkins(user_id)
@@ -109,6 +114,10 @@ def build_companion_router(
         profile = store.profile(user_id)
         if profile is None:
             raise HTTPException(status_code=404, detail="unknown companion user")
+        try:
+            validate_delivery_address(store, user_id, request.checkins.channel, request.checkins.address)
+        except ChannelError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         profile.checkins = request.checkins
         updated = store.upsert_user(profile)
         if not request.checkins.enabled:

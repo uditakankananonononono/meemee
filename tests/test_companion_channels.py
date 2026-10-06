@@ -120,3 +120,14 @@ async def test_provider_channel_surfaces_provider_errors():
     )
     with pytest.raises(ChannelError, match="HTTP 429"):
         await channel.send("+1", "hi")
+
+
+def test_nonlocal_destination_ownership_is_not_verified(tmp_path: Path):
+    from meemee.companion.channels import validate_delivery_address
+
+    store = CompanionStore(tmp_path / "destinations.db")
+    # Explicit limitation canary: these are accepted destinations, not proven
+    # owner-bound identities. HTTPS validation happens in the adapter separately.
+    for channel, address in (("whatsapp", "+15555550123"), ("imessage", "+15555550124"),
+                             ("webhook", "https://external.example.com/hook")):
+        validate_delivery_address(store, "owner", channel, address)

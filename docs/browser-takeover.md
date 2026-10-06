@@ -51,3 +51,19 @@ WebSocket messages from the viewer: `{"takeover_id","token"}` first, then `{"typ
 - Live pages live in the API server process. The CLI (`meemee run`) and separate worker processes do not register the session tools, because the person's viewer must reach the process that holds the page. After a restart, open sessions are marked `lost`.
 - The viewer streams screenshots, not video. It is fine for challenges and sign-ins, not for animation-heavy pages.
 - Drags are replayed as a straight 25-step mouse path from press to release, not the exact hand-drawn path.
+
+### Delivery-address boundary
+
+Local takeover notices and check-ins share an owner check: an explicit local
+conversation address must belong to the notice/check-in user. The profile and
+check-in HTTP save routes reject foreign or nonexistent local addresses; delivery
+also checks legacy stored addresses. This applies to SQLite and PostgreSQL queues.
+
+External destinations are not ownership-verified. The built-in registry contains
+local, webhook, WhatsApp and iMessage, not Telegram. A user can configure another
+phone number or webhook URL and, when a provider is configured, delivery targets
+that supplied address. HTTPS/SSRF validation protects network destinations but
+is not proof that a person owns an endpoint or number. No provider challenge or
+verified-destination binding exists. Do not treat these adapters as safe automated
+owner-only delivery until that verification is implemented. Missing provider
+credentials still fail closed. This limitation covers notices and check-ins alike.

@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .companion.channels import ChannelError
+from .companion.channels import ChannelError, validate_delivery_address
 
 
 def _now() -> str:
@@ -123,6 +123,7 @@ async def deliver_notices(queue, sessions_store, companion_store, channels: dict
                     raise ChannelError(f"no delivery address for channel {channel_name}")
                 conversation = companion_store.latest_conversation(notice["user_id"], "local") or companion_store.start_conversation(notice["user_id"], "local")
                 address = conversation["id"]
+            validate_delivery_address(companion_store, notice["user_id"], channel_name, address)
             result = await adapter.send(address, notice["text"])
             queue._finish(notice["id"], "delivered", result.detail, channel_name)
             results.append({"id": notice["id"], "status": "delivered", "channel": channel_name})
