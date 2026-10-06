@@ -9,9 +9,10 @@ Training pipelines are shared; datasets stay per product.
 from .config import ProductConfig, load_config
 from .providers import (ChatResult, InklingHFRouter, InklingLocal, HermesLocal, OpenClawOwner, JevEval, JevStatusError, NeedleLocal,
                         OrnithOpenAICompat, Provider, ProviderError, ProviderUnavailable, validate_questions)
+from .lexical import LexicalLocal, LexicalToolModel
 from .router import Router, Task
 
 __all__ = ["ProductConfig", "load_config", "Provider", "ProviderError", "ProviderUnavailable", "ChatResult",
            "InklingLocal", "InklingHFRouter", "HermesLocal", "OpenClawOwner", "OrnithOpenAICompat", "NeedleLocal", "JevEval", "JevStatusError",
-           "validate_questions", "Router", "Task"]
+           "validate_questions", "Router", "Task", "LexicalLocal", "LexicalToolModel"]
 __version__ = "0.1.0"
