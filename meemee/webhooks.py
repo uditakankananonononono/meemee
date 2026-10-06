@@ -53,6 +53,10 @@ def validate_webhook_url(url: str) -> str:
     parsed = urlparse(url)
     if parsed.scheme != "https" or not parsed.hostname:
         raise ValueError("webhook URL must use HTTPS")
+    if parsed.username is not None or parsed.password is not None:
+        # Reject rather than silently changing the caller's endpoint. httpx
+        # would turn userinfo into Basic auth and the URL can enter metadata.
+        raise ValueError("webhook URL must not contain credentials")
     if private_hosts_allowed():
         return url
     for address in socket.getaddrinfo(parsed.hostname, parsed.port or 443):
