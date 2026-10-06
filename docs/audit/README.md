@@ -7,8 +7,8 @@ Original README inventory said 186, but actually contains 187 distinct numbered
 items: item 187 occurs before 186. `readme-original-186-claims.csv` preserves 1-186;
 the original item 187 remains in the README and must receive an additional verdict.
 
-`readme-audit-progress.csv` currently holds 60 of 186 item-level source-read findings.
-The remaining 126 are unreviewed, not real/partial/false by inference. The README has
+`readme-audit-progress.csv` currently holds 123 of 186 item-level source-read findings.
+The remaining 63 are unreviewed, not real/partial/false by inference. The README has
 NOT been replaced by a finished verdict table. Each CSV row preserves original
 wording, a pessimistic real/partial/false finding, source function and a one-line
 limit. Some rows cite behavior already reproduced in the current full suite; some
@@ -30,4 +30,4 @@ Source-read partials needing next work include initial-only browser address chec
 non-enforced PlanStore status transitions, non-bounded synchronous readiness probes,
 cross-process SQLite audit-chain append ordering, webhook timestamp/upgrade/header
 limits, and deployment/UI/SDK reproduction gaps. These are findings, not permission
-to turn them into hidden completion claims. Continue source reads from item 61.
+to turn them into hidden completion claims. Continue source reads from item 124.
