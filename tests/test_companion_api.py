@@ -50,7 +50,8 @@ def test_companion_scope_enforced():
     assert response.status_code == 403
     reader = client.post("/v1/tokens", headers=headers, json={"name": "companion-reader", "scopes": ["companion:read"]})
     token = reader.json()["token"]
-    assert client.get("/v1/companion/users", headers={"Authorization": f"Bearer {token}"}).status_code == 200
+    # The all-users inventory is admin-only; a non-admin companion token cannot enumerate users.
+    assert client.get("/v1/companion/users", headers={"Authorization": f"Bearer {token}"}).status_code == 403
     denied = client.put("/v1/companion/users/x", headers={"Authorization": f"Bearer {token}"},
                         json={"display_name": "X"})
     assert denied.status_code == 403
