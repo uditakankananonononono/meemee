@@ -13,13 +13,12 @@ interpreted; words are matched as plain terms. Ranking uses ``ts_rank_cd`` retur
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from meemee.context import ContextRecord
+from meemee.context import ContextRecord, context_record_hash
 from meemee.personal_model import PersonalItemInput, PersonalKind
 
 from ._db import Database
@@ -169,7 +168,7 @@ class ContextStore:
             raise ValueError("source is not registered for owner")
         if record.visibility not in {"private", "agent", "shared"}:
             raise ValueError("invalid visibility")
-        digest = hashlib.sha256((record.title + "\0" + record.content).encode()).hexdigest(); now = _now()
+        digest = context_record_hash(record); now = _now()
         with self.db.transaction() as c:
             inserted = c.execute("""INSERT INTO meemee_context_records(owner_id,source_id,external_id,content_hash,kind,title,content,
                 occurred_at,provenance,visibility,cursor,metadata,ingested_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)

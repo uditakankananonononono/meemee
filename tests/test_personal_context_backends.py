@@ -128,3 +128,18 @@ def test_sqlite_legacy_personal_file_is_upgraded(tmp_path):
     store.upsert("o", _item("3", title="t", kind="goal"))
     store.upsert("o", _item("4", title="t", kind="goal"))
     assert [r["value"] for r in store.list("o")] == ["4"] and len(store.list("o", include_history=True)) == 4
+
+
+def test_context_time_only_and_permission_changes_are_not_dropped(stores):
+    from dataclasses import replace
+    _, context = stores()
+    context.register_source("o", "mail", "ics", {})
+    original = _rec("same", "Call", "Same body", "2026-10-07T04:00:00+00:00")
+    assert context.ingest(original)
+    moved = replace(original, occurred_at="2026-10-07T05:00:00+00:00")
+    assert context.ingest(moved)
+    assert not context.ingest(moved)
+    shared = replace(moved, visibility="shared")
+    assert context.ingest(shared)
+    assert len(context.recent("o", allowed={"private", "shared"})) == 3
+    assert len(context.recent("o")) == 2
