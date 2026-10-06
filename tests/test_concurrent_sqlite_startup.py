@@ -21,5 +21,5 @@ for _ in range(5):
     workers = [subprocess.Popen([sys.executable, "-c", script, str(tmp_path)],
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE) for _ in range(6)]
     for worker in workers:
-        out, err = worker.communicate(timeout=20)
+        _out, err = worker.communicate(timeout=20)
         assert worker.returncode == 0, err.decode()
