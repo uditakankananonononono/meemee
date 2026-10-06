@@ -35,14 +35,21 @@ class JobStore:
             );
             CREATE INDEX IF NOT EXISTS job_events_job ON job_events(job_id, sequence);
         """)
-        columns = {row[1] for row in self.db.execute("PRAGMA table_info(jobs)")}
-        if "principal" not in columns:
-            self.db.execute("ALTER TABLE jobs ADD COLUMN principal TEXT")
-        if "purge_pending" not in columns:
-            self.db.execute("ALTER TABLE jobs ADD COLUMN purge_pending INTEGER NOT NULL DEFAULT 0")
-        self.db.execute(
-            "CREATE INDEX IF NOT EXISTS jobs_principal_updated ON jobs(principal,updated_at DESC,id DESC)"
-        )
+        # Serialize check-and-alter across API/worker/dispatcher processes.
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            columns = {row[1] for row in self.db.execute("PRAGMA table_info(jobs)")}
+            if "principal" not in columns:
+                self.db.execute("ALTER TABLE jobs ADD COLUMN principal TEXT")
+            if "purge_pending" not in columns:
+                self.db.execute("ALTER TABLE jobs ADD COLUMN purge_pending INTEGER NOT NULL DEFAULT 0")
+            self.db.execute(
+                "CREATE INDEX IF NOT EXISTS jobs_principal_updated ON jobs(principal,updated_at DESC,id DESC)"
+            )
+            self.db.execute("COMMIT")
+        except Exception:
+            self.db.execute("ROLLBACK")
+            raise
         register_schema(self.db, "jobs", 3, [
             "jobs principal ownership", "job events", "principal updated index",
             "account purge tombstones"

@@ -38,7 +38,7 @@ The authoritative detailed list is the 123-item "Verified" section in [README.md
 
 Counts are evidence from the named run, not a promise that unrun optional infrastructure works. Run every relevant suite in your target environment before release.
 
-## Thin (0)
+## Historical thin count (unverified)
 
 Nothing is classified as thin. A capability is either verified at a stated boundary or listed below.
 

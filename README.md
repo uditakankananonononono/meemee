@@ -5,7 +5,37 @@ Monitor deadline guard (2026-09-27): explicit timezone and positive fire budgets
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.122.0 (186)
+## Historical feature inventory in v0.122.0 (186 claims, not an independent verification)
+
+The 186 numbered items below are historical builder claims. They have not all been
+independently audited sentence by sentence. Passing tests or code existence alone does
+not prove their full wording. Meemee is a local-first runtime, not a proven replacement
+for any other assistant or an AGI. Planning remains rule-based unless explicitly changed;
+generative reasoning requires separately loaded or served model weights.
+
+### October 7 semantic-memory repair
+
+A trained, pinned English MiniLM sentence encoder now runs locally through ONNX on CPU.
+Its 384-dimensional vectors are stored and searched on both SQLite and PostgreSQL, with
+model-space identifiers, resumable reindexing of old data, and exact cosine ranking over
+all stored vectors (no recent-200 cutoff). No paid API, remote inference, pgvector, or
+untrained random weights are involved. This is short-text semantic retrieval, not
+personal intelligence or generative reasoning. The 256-wordpiece input limit and
+English-only evaluation still apply. Hybrid retrieval uses reciprocal-rank fusion and
+can be affected by generic-word full-text matches; it is not a relevance guarantee.
+
+```sh
+pip install '.[embeddings]'
+meemee models pull-embeddings ./models/minilm
+export MEEMEE_EMBEDDING_MODEL_DIR="$PWD/models/minilm"
+```
+
+Weight download is explicit and pinned/checksummed. Requests never download weights;
+missing/corrupt selected weights fail closed. Without this setting SQLite retains an
+explicit lexical feature-hashing encoder and PostgreSQL uses lexical-only retrieval.
+PostgreSQL `semantic_search` now refuses to pretend full-text search is semantic search
+when no encoder is configured. See `docs/semantic-memory.md` for reproduced tests and limits.
+
 
 Items 164-166, 172 and 174 are unreleased pb7 work, items 167-171 are unreleased pb4 work, items 173 and 175 are unreleased main-lane work item 176 is unreleased model-layer work item 177 is unreleased pg-email-verification work item 178 is unreleased pg-quotas-entitlements work item 179 is unreleased pg-runs work item 180 is unreleased pg-webhooks work item 181 is unreleased pg-companion work item 182 is unreleased pg-personal-context work item 183 is unreleased pg-monitors-reflection work item 184 is unreleased pg-deletion-browser work and item 185 is unreleased pg-vault-rotation work, all verified in this tree; the rest shipped in v0.122.0.
 
@@ -90,7 +120,7 @@ Items 164-166, 172 and 174 are unreleased pb7 work, items 167-171 are unreleased
 79. Externally storable HMAC-SHA256 audit-chain head checkpoints with no-overwrite creation, pre-anchor chain validation, historical-head verification and tamper/wrong-key detection.
 80. Bounded model-driven replanning after evidence invalidates the active plan, with strict structured requests, validated replacement DAGs, a three-revision ceiling, model feedback and durable run-memory provenance.
 81. Signed-checkpoint-gated audit prefix pruning that refuses invalid or stale checkpoints, retains a cryptographic chain base, verifies the surviving suffix and keeps historical anchors verifiable.
-82. Local deterministic semantic memory embeddings with durable vectors, cosine reranking and reciprocal-rank fusion with FTS, automatically used for agent context without a network dependency.
+82. Historical correction: the original default encoder was deterministic lexical feature hashing, not trained semantic understanding. The optional pinned local MiniLM encoder now provides learned short-text embeddings, durable vectors, cosine search and reciprocal-rank fusion. The lexical default remains named as such.
 83. Approval-gated GitHub branch push and pull-request tools with token-required API mutations, exact commit targeting, optimistic remote-head protection, structured errors and canonical result URLs.
 84. Browser per-run domain policy, workspace-confined managed downloads, and explicit CAPTCHA/security-challenge detection that returns a human-required handoff signal without attempting bypass.
 85. Argument-scoped persistent tool approvals with exact constraint-subset matching, API grant/list visibility, runtime enforcement and safe regrant/revoke behavior, enabling repository- or command-specific permissions.
@@ -106,7 +136,7 @@ Items 164-166, 172 and 174 are unreleased pb7 work, items 167-171 are unreleased
 95. Backend-neutral persistence lifecycle with one shared composition per API/worker process, SQLite/PostgreSQL readiness probes, shared worker memory and clean pooled-database shutdown.
 96. PostgreSQL production preflight that fails on missing DSNs, connection/pool errors or unapplied migrations and reports the exact selected deployment boundary.
 97. PostgreSQL-backed atomic fixed-window rate limiting shared across hosts/pods, selected automatically with the PostgreSQL backend and retaining compatible headers, cleanup and token/IP identity semantics.
-98. PostgreSQL agent-memory contract parity for secret-scrubbed writes and hybrid/semantic retrieval calls, using ranked native full-text fallback until an optional vector extension is configured.
+98. Historical correction: PostgreSQL full-text fallback was not semantic retrieval. With a configured local encoder, PostgreSQL now persists learned vectors and runs exact cosine retrieval and hybrid rank fusion. Without it, hybrid returns retrieval_mode=lexical-only and semantic_search raises a configuration error.
 99. Fail-closed readiness disk probing that handles not-yet-created data directories and disk-stat failures without crashing the health endpoint.
 100. Cancellation propagation through delegated agent teams, preventing new child work after cancellation and passing the shared signal into active child agents and async tools.
 101. PostgreSQL runtime package and bundled SQL migrations included in the commercial wheel, enforced by package audit and a real wheel-build regression test.
@@ -233,7 +263,7 @@ Items 164-166, 172 and 174 are unreleased pb7 work, items 167-171 are unreleased
 187. PostgreSQL operator tools (branch pg-operator-tools, unreleased): in PostgreSQL mode `meemee account-export`, `account-import`, `retention-run`, `audit-anchor`, `audit-anchor-verify` and `audit-prune` now act on the shared database from any host (new `meemee_persist_pg/operator_tools.py`, no new migration) instead of refusing to run; this supersedes the refusals noted in items 178 and 179 and the audit-anchor refusal on main. Exports keep the `meemee.account.v1` envelope and field encodings, so an export from either backend imports into either backend (job IDs change to the dashed UUID form in PostgreSQL). Import runs collision checks and all inserts in one transaction, so a collision or error writes nothing. Retention applies the same windows to the shared tables in one transaction (and also removes the attempt rows of pruned webhook deliveries); the audit chain is never touched. Anchors take the head and verify the chain from one snapshot; `audit-prune` holds the audit append lock, so no host can append between the prefix delete and the chain-base update, and re-checks the anchored entry under that lock. An anchor made on SQLite still verifies and prunes after cutover. Verified by `tests_pg/test_operator_tools_pg.py` (SQLite -> PostgreSQL -> SQLite export round trip, one-transaction import, per-table retention, tamper and stale-anchor refusal, SQLite anchor after cutover), and across two API servers by `tests/test_operator_tools_multihost_e2e.py` (operator on a third host with an empty data dir exports jobs/runs made on both hosts, retention removes a run both hosts then 404, prune while both hosts append 16 entries leaves one verified chain), which fails both on main's refusing CLI and on the per-host SQLite paths.
 186. Shared model layer (branch shared-model-layer, unreleased): Meemee now uses the same `instinct_models` package as Atlas and Sugarcode (https://github.com/uditakankananonononono/shared-models), vendored under `meemee/_vendor/instinct_models` and pinned by commit in `meemee/_vendor/INSTINCT_MODELS_PIN` (refresh with `scripts/sync_instinct_models.sh <commit>`). A new `shared` model profile (`transport: "instinct"`) routes Needle -> Ornith -> Inkling and can sit in any route, e.g. `MEEMEE_MODEL_ROUTES="chat=shared,local"`; it reports unavailable until `MEEMEE_SHARED_ORNITH_URL`/`MEEMEE_SHARED_ORNITH_MODEL` or `MEEMEE_SHARED_INKLING_URL` is set. Shared-layer calls are private by default and never reach the hosted (metered) Hugging Face router unless `MEEMEE_SHARED_ALLOW_HOSTED=true`. The shared layer also carries an optional Jev evaluation provider (TypeSafe AI's hosted System One model, key-gated and paid, OFF by default): `meemee.shared_models.build_jev()` enables it with `MEEMEE_JEV_API_KEY` or `JEV_API_KEY`; see docs/models.md. `meemee.shared_models.MeemeeDataset` and `train_meemee_needle` train a Meemee-only Needle LoRA adapter from owner-confirmed examples (unconfirmed rows and rows tagged for another product are dropped). Verified by `tests/test_shared_models.py` with fake transports; no live Ornith, Inkling or Needle model was run (no GPU or server here, and the cactus-needle engine download returned 404 at check time).
 
-## Thin (0)
+## Historical thin count (unverified)
 
 Nothing is classified as thin. A capability is either implemented and tested at its stated boundary below, or listed as missing.
 

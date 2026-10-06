@@ -14,4 +14,5 @@ def test_real_wheel_contains_postgres_package_and_migrations(tmp_path):
     assert "meemee_persist_pg/__init__.py" in names
     assert "meemee_persist_pg/sql/001_initial.sql" in names
     assert "meemee_persist_pg/sql/002_job_ownership.sql" in names
+    assert "meemee_persist_pg/sql/016_memory_embeddings.sql" in names
     assert any(name.endswith(".dist-info/licenses/LICENSE") for name in names)
