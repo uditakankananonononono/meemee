@@ -42,12 +42,33 @@ def build_companion_router(
         if audit is not None:
             audit.append(getattr(principal, "id", "unknown"), action, resource, "success", detail)
 
+    def owned(principal, user_id: str) -> None:
+        """Fail closed unless the authenticated principal owns this companion user.
+
+        Every companion resource belongs to exactly one principal. Admin scope
+        (operator console, bootstrap) may manage any user; any other principal
+        may only address user_ids equal to its own principal id. Cross-owner
+        access returns 404, the same as a nonexistent user, so a caller cannot
+        enumerate which companion users exist.
+        """
+        principal_id = getattr(principal, "id", "")
+        scopes = getattr(principal, "scopes", frozenset())
+        if not principal_id:
+            raise HTTPException(status_code=403, detail="unknown principal")
+        if "admin" in scopes:
+            return
+        if principal_id != user_id:
+            raise HTTPException(status_code=404, detail="unknown companion user")
+
     @router.get("/users")
     def list_users(limit: int = 100, principal=read):
+        if "admin" not in getattr(principal, "scopes", frozenset()):
+            raise HTTPException(status_code=403, detail="user inventory requires the admin scope")
         return {"users": store.list_users(limit)}
 
     @router.put("/users/{user_id}")
     def upsert_user(user_id: str, request: ProfileUpsert, principal=write):
+        owned(principal, user_id)
         try:
             profile = UserProfile(
                 user_id=user_id,
@@ -66,6 +87,7 @@ def build_companion_router(
 
     @router.get("/users/{user_id}")
     def get_user(user_id: str, principal=read):
+        owned(principal, user_id)
         record = store.get_user(user_id)
         if record is None:
             raise HTTPException(status_code=404, detail="unknown companion user")
@@ -73,6 +95,7 @@ def build_companion_router(
 
     @router.put("/users/{user_id}/persona")
     def update_persona(user_id: str, request: PersonaUpdate, principal=write):
+        owned(principal, user_id)
         profile = store.profile(user_id)
         if profile is None:
             raise HTTPException(status_code=404, detail="unknown companion user")
@@ -82,6 +105,7 @@ def build_companion_router(
 
     @router.put("/users/{user_id}/checkins")
     def update_checkins(user_id: str, request: CheckInUpdate, principal=write):
+        owned(principal, user_id)
         profile = store.profile(user_id)
         if profile is None:
             raise HTTPException(status_code=404, detail="unknown companion user")
@@ -96,6 +120,7 @@ def build_companion_router(
 
     @router.get("/users/{user_id}/facts")
     def list_facts(user_id: str, query: str | None = None, limit: int = 200, principal=read):
+        owned(principal, user_id)
         if store.get_user(user_id) is None:
             raise HTTPException(status_code=404, detail="unknown companion user")
         if query:
@@ -104,6 +129,7 @@ def build_companion_router(
 
     @router.post("/users/{user_id}/facts", status_code=201)
     def add_fact(user_id: str, fact: FactInput, principal=write):
+        owned(principal, user_id)
         if store.get_user(user_id) is None:
             raise HTTPException(status_code=404, detail="unknown companion user")
         created = store.add_fact(user_id, fact, source=f"api:{getattr(principal, 'id', 'unknown')}")
@@ -112,6 +138,7 @@ def build_companion_router(
 
     @router.delete("/users/{user_id}/facts/{fact_id}")
     def retire_fact(user_id: str, fact_id: int, principal=write):
+        owned(principal, user_id)
         fact = store.get_fact(fact_id)
         if fact is None or fact["user_id"] != user_id:
             raise HTTPException(status_code=404, detail="unknown fact for user")
@@ -121,6 +148,7 @@ def build_companion_router(
 
     @router.post("/chat")
     async def chat(request: ChatRequest, principal=write):
+        owned(principal, request.user_id)
         try:
             return await engine.reply(
                 request.user_id, request.text, request.channel, request.conversation_id
@@ -130,18 +158,22 @@ def build_companion_router(
 
     @router.get("/users/{user_id}/conversations")
     def list_conversations(user_id: str, limit: int = 50, principal=read):
+        owned(principal, user_id)
         if store.get_user(user_id) is None:
             raise HTTPException(status_code=404, detail="unknown companion user")
         return {"conversations": store.list_conversations(user_id, limit)}
 
     @router.get("/conversations/{conversation_id}/messages")
     def conversation_messages(conversation_id: str, limit: int = 100, principal=read):
-        if store.get_conversation(conversation_id) is None:
+        conversation = store.get_conversation(conversation_id)
+        if conversation is None:
             raise HTTPException(status_code=404, detail="unknown conversation")
+        owned(principal, conversation["user_id"])
         return {"messages": store.history(conversation_id, limit)}
 
     @router.post("/users/{user_id}/checkins/plan", status_code=201)
     def plan_checkin(user_id: str, principal=write):
+        owned(principal, user_id)
         if store.get_user(user_id) is None:
             raise HTTPException(status_code=404, detail="unknown companion user")
         row = CheckInScheduler(store).plan_user(user_id)
@@ -151,6 +183,7 @@ def build_companion_router(
 
     @router.get("/users/{user_id}/checkins")
     def list_checkins(user_id: str, status: str | None = None, limit: int = 50, principal=read):
+        owned(principal, user_id)
         if store.get_user(user_id) is None:
             raise HTTPException(status_code=404, detail="unknown companion user")
         return {"checkins": store.list_checkins(user_id, status, limit)}
