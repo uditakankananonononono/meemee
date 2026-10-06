@@ -22,10 +22,9 @@ Historical IDs remain stable, even when later work superseded an earlier claim.
 
 Verdicts: 91 real, 91 partial, 4 false, 1 blocked-on-model.
 
-Reproduction during this audit: root suite at 06a6471: 686 passed, 9 skipped;
+Reproduction during this audit: final root suite at 1d1e43d: 699 passed, 9 skipped;
 full SDK suite: 266 passed; separate PostgreSQL suite: 47 passed on an expendable
-local server. Later security fixes have targeted tests and are awaiting a fresh
-root-suite result. Browser/visual tests and real transformer-weight tests skip in
+local server. The final root run includes the security fixes and audit guards. Browser/visual tests and real transformer-weight tests skip in
 this environment. Scripted model responses verify wiring, not reasoning quality.
 No paid model calls or real messages to provider accounts were made.
 

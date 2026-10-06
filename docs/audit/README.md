@@ -19,8 +19,7 @@ say so. Local notice/check-in/browser owner failures also shipped as separate
 security fixes. External provider destination ownership remains unverified and
 documented; providers ship unconfigured.
 
-Root suite at06a6471:686 passed/9 skipped. Full SDK:266 passed. Separate local PG:
-47 passed after test-owner contract repairs. Later changes await one final root
-suite. Browser/real-transformer tests skip. Tests using scripted models prove
+Final root suite at1d1e43d:699 passed/9 skipped. Full SDK:266 passed. Separate local PG:
+47 passed after test-owner contract repairs. The final root run includes all security fixes and audit guards. Browser/real-transformer tests skip. Tests using scripted models prove
 plumbing, not intelligence. Source baseline began at63e66d6 and subsequent repair
 commits are cited in the rows where relevant.
