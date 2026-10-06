@@ -37,6 +37,10 @@ async def deliver_due_once(
             if conversation is None:
                 conversation = store.start_conversation(checkin["user_id"], "local")
             address = conversation["id"]
+        if channel_name == "local":
+            conversation = store.get_conversation(address)
+            if conversation is None or conversation["user_id"] != checkin["user_id"]:
+                raise ChannelError("unknown local conversation for check-in user")
         result = await adapter.send(address, message)
         store.finish_checkin(checkin["id"], message)
         return {
