@@ -59,7 +59,7 @@ class Agent:
         run_id = run_id or uuid.uuid4().hex
         goal = scrub_text(goal)
         plan = self.planner.plan(goal)
-        prior = self.memory.hybrid_search(goal, limit=5)
+        prior = self.memory.hybrid_search(goal, limit=5, owner_id=owner_id)
         personal_context = self.context.assemble(owner_id, goal, 8) if self.context else {"records": []}
         personal_model = self.personal_model.list(owner_id) if self.personal_model else []
         messages = [
@@ -73,19 +73,19 @@ class Agent:
                 "evidence_backed_personal_model": personal_model,
             }, default=str)},
         ]
-        self.memory.add(run_id, "goal", goal, {"plan": plan.model_dump()})
+        self.memory.add(run_id, "goal", goal, {"plan": plan.model_dump()}, owner_id=owner_id)
         events: list[dict] = []
         refusals: list[ApprovalRefusal] = []
         revisions = 0
         for step_number in range(1, self.max_steps + 1):
             if cancel is not None and cancel.is_set():
                 final = "Cancelled before the next agent step."
-                self.memory.add(run_id, "cancelled", final)
+                self.memory.add(run_id, "cancelled", final, owner_id=owner_id)
                 return RunReport(run_id=run_id, goal=goal, final=final, steps_used=step_number - 1, tool_results=events, approvals_required=refusals)
             decision = await self.model.decide(messages)
             messages.append({"role": "assistant", "content": decision.model_dump_json()})
             if decision.final is not None:
-                self.memory.add(run_id, "final", decision.final)
+                self.memory.add(run_id, "final", decision.final, owner_id=owner_id)
                 return RunReport(run_id=run_id, goal=goal, final=decision.final,
                                  steps_used=step_number, tool_results=events, approvals_required=refusals)
             if decision.replan is not None:
@@ -96,7 +96,7 @@ class Agent:
                     plan = self.planner.revise(plan, decision.replan.steps)
                     event = {"replan": True, "revision": revisions, "reason": scrub_text(decision.replan.reason), "plan": plan.model_dump()}
                 events.append(event)
-                self.memory.add(run_id, "replan", json.dumps(event, default=str))
+                self.memory.add(run_id, "replan", json.dumps(event, default=str), owner_id=owner_id)
                 messages.append({"role": "tool", "content": json.dumps(event, default=str)})
                 continue
             call = decision.tool_call
@@ -114,11 +114,11 @@ class Agent:
                     result = {"ok": False, "error": f"approval denied for {tool.risk.value} tool"}
                     refusals.append(refusal(step_number, call.name, tool.risk, "approval_required", result["error"], call.arguments))
                 else:
-                    result = (await self.tools.execute(call.name, call.arguments, cancel=cancel)).model_dump()
+                    result = (await self.tools.execute(call.name, call.arguments, cancel=cancel, owner_id=owner_id)).model_dump()
             event = {"tool": call.name, "arguments": redact(call.arguments), "result": redact(result)}
             events.append(event)
-            self.memory.add(run_id, "tool", json.dumps(event, default=str))
+            self.memory.add(run_id, "tool", json.dumps(event, default=str), owner_id=owner_id)
             messages.append({"role": "tool", "content": json.dumps(event, default=str)})
         final = f"Stopped after {self.max_steps} steps without a final answer. Last tool event: {events[-1] if events else 'none'}"
-        self.memory.add(run_id, "limit", final)
+        self.memory.add(run_id, "limit", final, owner_id=owner_id)
         return RunReport(run_id=run_id, goal=goal, final=final, steps_used=self.max_steps, tool_results=events, approvals_required=refusals)

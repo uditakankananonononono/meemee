@@ -52,7 +52,7 @@ class ToolRegistry:
     def schemas(self) -> list[dict[str, Any]]:
         return [tool.schema() for tool in self._tools.values()]
 
-    async def execute(self, name: str, arguments: dict[str, Any], cancel=None) -> ToolResult:
+    async def execute(self, name: str, arguments: dict[str, Any], cancel=None, owner_id: str = "default") -> ToolResult:
         started = time.perf_counter()
         try:
             tool = self.get(name)
@@ -65,7 +65,12 @@ class ToolRegistry:
                 return ToolResult(ok=False, error=outcome.error, elapsed_ms=elapsed)
             try:
                 parameters = inspect.signature(tool.run).parameters
-                value = tool.run(parsed, cancel=cancel) if "cancel" in parameters else tool.run(parsed)
+                options = {}
+                if "cancel" in parameters:
+                    options["cancel"] = cancel
+                if "owner_id" in parameters:
+                    options["owner_id"] = owner_id
+                value = tool.run(parsed, **options)
             except (TypeError, ValueError):
                 value = tool.run(parsed)
             if inspect.isawaitable(value):
