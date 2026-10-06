@@ -77,3 +77,24 @@ async def test_future_checkin_not_claimed(tmp_path: Path):
     queue_checkin(store, minutes=60)
     summary = await deliver_due_once(store, engine, channels)
     assert summary == {"claimed": False}
+
+
+@pytest.mark.asyncio
+async def test_local_checkin_cannot_target_another_users_conversation(tmp_path: Path):
+    store, engine, channels = setup(tmp_path)
+    victim = store.start_conversation("victim", "local")
+    queue_checkin(store, user="attacker", address=victim["id"])
+    summary = await deliver_due_once(store, engine, channels)
+    assert not summary["delivered"]
+    assert "unknown local conversation for check-in user" in summary["detail"]
+    assert store.history(victim["id"]) == []
+
+
+@pytest.mark.asyncio
+async def test_local_checkin_explicit_owned_address_works(tmp_path: Path):
+    store, engine, channels = setup(tmp_path)
+    mine = store.start_conversation("udita", "local")
+    queue_checkin(store, address=mine["id"])
+    summary = await deliver_due_once(store, engine, channels)
+    assert summary["delivered"]
+    assert len(store.history(mine["id"])) == 1
