@@ -77,3 +77,55 @@ def test_browser_session_open_tool_cannot_target_notices_and_owns_sessions():
     assert calls == {"owner_id": "principal-p", "notify_user_id": None}
     # Even if an injected goal smuggles the field in, it never reaches the manager.
     assert not hasattr(OpenArgs(url="https://example.com/", notify_user_id="victim"), "notify_user_id")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("name,extra", [
+    ("browser.session_act", {"actions": [{"kind": "wait", "milliseconds": 1}]}),
+    ("browser.session_snapshot", {}),
+    ("browser.session_wait_human", {"timeout_seconds": 1}),
+    ("browser.session_request_human", {"reason": "need help"}),
+    ("browser.session_close", {}),
+])
+async def test_session_tools_check_owner_before_action(name, extra):
+    from meemee.tools.browser_session import session_tools
+
+    sid = "bs_" + "a" * 32
+    calls = []
+
+    class Store:
+        def get_session(self, session_id):
+            return {"owner_id": "victim"} if session_id == sid else None
+
+    class Manager:
+        store = Store()
+
+        async def act(self, *args):
+            calls.append(("act", args)); return {}
+
+        async def snapshot(self, *args):
+            calls.append(("snapshot", args)); return {}
+
+        async def wait_for_human(self, *args):
+            calls.append(("wait", args)); return {}
+
+        async def request_takeover(self, *args):
+            calls.append(("request", args)); return {"token": "secret"}
+
+        async def close(self, *args):
+            calls.append(("close", args)); return {}
+
+    registry = ToolRegistry()
+    for tool in session_tools(Manager()):
+        registry.register(tool)
+    denied = await registry.execute(name, {"session_id": sid, "owner_id": "victim", **extra}, owner_id="attacker")
+    assert not denied.ok and denied.error == "unknown browser session"
+    assert calls == []
+    missing = await registry.execute(name, {"session_id": "bs_" + "0" * 32, **extra}, owner_id="victim")
+    assert not missing.ok and missing.error == denied.error
+    assert calls == []
+    allowed = await registry.execute(name, {"session_id": sid, **extra}, owner_id="victim")
+    assert allowed.ok and len(calls) == 1
+    if name in {"browser.session_request_human", "browser.session_close"}:
+        assert calls[0][1][-1] == "victim"
+    assert "token" not in allowed.content

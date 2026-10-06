@@ -56,6 +56,12 @@ class _SessionTool(Tool):
     def __init__(self, manager: BrowserSessionManager):
         self.manager = manager
 
+    def require_owner(self, session_id: str, owner_id: str) -> None:
+        # Session ids are identifiers, not authorization capabilities.
+        record = self.manager.store.get_session(session_id)
+        if not owner_id or record is None or record["owner_id"] != owner_id:
+            raise ValueError("unknown browser session")
+
 
 class BrowserSessionOpen(_SessionTool):
     name = "browser.session_open"
@@ -79,7 +85,8 @@ class BrowserSessionAct(_SessionTool):
     risk = Risk.WRITE
     arguments_model = ActArgs
 
-    async def run(self, arguments: ActArgs):
+    async def run(self, arguments: ActArgs, *, owner_id: str):
+        self.require_owner(arguments.session_id, owner_id)
         actions = [a.model_dump() for a in arguments.actions]
         return _public(await self.manager.act(arguments.session_id, actions, arguments.auto_takeover))
 
@@ -90,8 +97,9 @@ class BrowserSessionRequestHuman(_SessionTool):
     risk = Risk.WRITE
     arguments_model = HumanArgs
 
-    async def run(self, arguments: HumanArgs):
-        takeover = await self.manager.request_takeover(arguments.session_id, arguments.reason, "agent")
+    async def run(self, arguments: HumanArgs, *, owner_id: str):
+        self.require_owner(arguments.session_id, owner_id)
+        takeover = await self.manager.request_takeover(arguments.session_id, arguments.reason, owner_id)
         return {k: v for k, v in takeover.items() if k != "token"}
 
 
@@ -101,7 +109,8 @@ class BrowserSessionWaitHuman(_SessionTool):
     risk = Risk.READ
     arguments_model = WaitArgs
 
-    async def run(self, arguments: WaitArgs):
+    async def run(self, arguments: WaitArgs, *, owner_id: str):
+        self.require_owner(arguments.session_id, owner_id)
         return await self.manager.wait_for_human(arguments.session_id, arguments.timeout_seconds)
 
 
@@ -111,7 +120,8 @@ class BrowserSessionSnapshot(_SessionTool):
     risk = Risk.READ
     arguments_model = SessionArgs
 
-    async def run(self, arguments: SessionArgs):
+    async def run(self, arguments: SessionArgs, *, owner_id: str):
+        self.require_owner(arguments.session_id, owner_id)
         return await self.manager.snapshot(arguments.session_id)
 
 
@@ -121,8 +131,9 @@ class BrowserSessionClose(_SessionTool):
     risk = Risk.WRITE
     arguments_model = SessionArgs
 
-    async def run(self, arguments: SessionArgs):
-        return await self.manager.close(arguments.session_id, "agent")
+    async def run(self, arguments: SessionArgs, *, owner_id: str):
+        self.require_owner(arguments.session_id, owner_id)
+        return await self.manager.close(arguments.session_id, owner_id)
 
 
 def session_tools(manager: BrowserSessionManager) -> list[Tool]:
