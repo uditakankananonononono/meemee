@@ -151,7 +151,7 @@ class AccountPurger:
 
         def memory_step() -> dict[str, int]:
             run_ids = list(t.runs.run_ids(principal)) + list(t.jobs.run_ids_for_principal(principal))
-            return {"memories": int(t.memory.delete_runs(run_ids)), "runs_scanned": len(set(run_ids))}
+            return {"memories": int(t.memory.delete_runs(run_ids, owner_id=principal)), "runs_scanned": len(set(run_ids))}
 
         # memory must run before jobs/runs: it reads their run IDs.
         steps.append(("memory", memory_step))
@@ -207,7 +207,7 @@ class AccountPurger:
         """Drop a synchronous run whose owner deleted their account while it was running."""
         if not self.ledger.deleted_since(principal, started_at):
             return False
-        self.targets.memory.delete_runs([report.run_id])
+        self.targets.memory.delete_runs([report.run_id], owner_id=principal)
         return True
 
 

@@ -52,7 +52,7 @@ class ToolRegistry:
     def schemas(self) -> list[dict[str, Any]]:
         return [tool.schema() for tool in self._tools.values()]
 
-    async def execute(self, name: str, arguments: dict[str, Any], cancel=None, owner_id: str = "default") -> ToolResult:
+    async def execute(self, name: str, arguments: dict[str, Any], cancel=None, *, owner_id: str) -> ToolResult:
         started = time.perf_counter()
         try:
             tool = self.get(name)
@@ -90,7 +90,7 @@ class ToolRegistry:
                 content=content,
                 elapsed_ms=round((time.perf_counter() - started) * 1000),
             )
-        except (KeyError, ValidationError, ValueError, OSError) as exc:
+        except (KeyError, TypeError, ValidationError, ValueError, OSError) as exc:
             return ToolResult(
                 ok=False,
                 error=str(exc),

@@ -175,7 +175,8 @@ def run(goal: str, approve_writes: bool = typer.Option(False, "--approve-writes"
     """Run an agent goal. Writes require --approve-writes."""
     async def execute():
         agent = build_agent()
-        report = await agent.run(goal, approve=lambda _n, _a, _r: approve_writes)
+        # Local single-user CLI runs intentionally use the legacy "default" owner bucket.
+        report = await agent.run(goal, approve=lambda _n, _a, _r: approve_writes, owner_id="default")
         typer.echo(report.model_dump_json(indent=2))
     asyncio.run(execute())
 

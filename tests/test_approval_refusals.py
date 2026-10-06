@@ -32,7 +32,7 @@ WRITE = {"tool_call": {"name": "workspace.write_file", "arguments": {"path": "a.
 
 
 async def test_unapproved_write_is_listed_with_the_grant_that_would_allow_it(tmp_path):
-    report = await _agent(tmp_path, WRITE, {"final": "All done!"}).run("write a file")
+    report = await _agent(tmp_path, WRITE, {"final": "All done!"}).run("write a file", owner_id="default")
     assert report.final == "All done!"  # the model's words can be wrong; the list is the truth
     [refusal] = report.approvals_required
     assert refusal.step == 1 and refusal.tool == "workspace.write_file" and refusal.risk == "write"
@@ -44,13 +44,13 @@ async def test_unapproved_write_is_listed_with_the_grant_that_would_allow_it(tmp
 
 
 async def test_approved_write_leaves_the_list_empty(tmp_path):
-    report = await _agent(tmp_path, WRITE, {"final": "ok"}).run("write", approve=lambda *_: True)
+    report = await _agent(tmp_path, WRITE, {"final": "ok"}).run("write", approve=lambda *_: True, owner_id="default")
     assert report.approvals_required == [] and (tmp_path / "a.txt").read_text() == "hi"
 
 
 async def test_policy_denial_is_listed_as_not_grantable(tmp_path):
     policy = PolicyEngine({"deny_tools": ["workspace.write_file"]})
-    report = await _agent(tmp_path, WRITE, {"final": "done"}, policy=policy).run("write", approve=lambda *_: True)
+    report = await _agent(tmp_path, WRITE, {"final": "done"}, policy=policy).run("write", approve=lambda *_: True, owner_id="default")
     [refusal] = report.approvals_required
     assert refusal.reason == "policy_denied" and refusal.grantable is False
     assert refusal.per_run is None and refusal.persistent_grant is None
@@ -59,12 +59,12 @@ async def test_policy_denial_is_listed_as_not_grantable(tmp_path):
 async def test_secret_and_long_arguments_are_not_pinned_in_the_grant(tmp_path):
     big = "x" * 600
     call = {"tool_call": {"name": "workspace.write_file", "arguments": {"path": "b.txt", "content": big}}}
-    report = await _agent(tmp_path, call, {"final": "done"}).run("write big")
+    report = await _agent(tmp_path, call, {"final": "done"}).run("write big", owner_id="default")
     assert report.approvals_required[0].persistent_grant["argument_constraints"] == {"path": "b.txt"}
 
 
 async def test_refusals_survive_the_run_store_and_old_databases(tmp_path):
-    report = await _agent(tmp_path, WRITE, {"final": "done"}).run("write")
+    report = await _agent(tmp_path, WRITE, {"final": "done"}).run("write", owner_id="default")
     store = RunStore(tmp_path / "runs.sqlite3")
     store.add("p", report)
     stored = store.get("p", report.run_id)
@@ -86,14 +86,14 @@ async def test_refusals_survive_the_run_store_and_old_databases(tmp_path):
 
 
 async def test_blocked_flag_follows_refusals_and_is_serialized(tmp_path):
-    blocked = await _agent(tmp_path, WRITE, {"final": "All done!"}).run("write a file")
+    blocked = await _agent(tmp_path, WRITE, {"final": "All done!"}).run("write a file", owner_id="default")
     assert blocked.blocked is True and blocked.model_dump()["blocked"] is True
-    clean = await _agent(tmp_path, WRITE, {"final": "ok"}).run("write", approve=lambda *_: True)
+    clean = await _agent(tmp_path, WRITE, {"final": "ok"}).run("write", approve=lambda *_: True, owner_id="default")
     assert clean.blocked is False and json.loads(clean.model_dump_json())["blocked"] is False
 
 
 async def test_stored_run_carries_blocked_flag(tmp_path):
-    report = await _agent(tmp_path, WRITE, {"final": "done"}).run("write")
+    report = await _agent(tmp_path, WRITE, {"final": "done"}).run("write", owner_id="default")
     store = RunStore(tmp_path / "runs.sqlite3")
     store.add("alice", report)
     assert store.get("alice", report.run_id)["blocked"] is True

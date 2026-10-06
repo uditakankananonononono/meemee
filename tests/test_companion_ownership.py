@@ -103,3 +103,18 @@ def test_owner_can_manage_own_companion_user():
         assert client.get("/v1/companion/users/self-serve-customer/facts", headers=headers).status_code == 200
     finally:
         companion.engine.model = original
+
+
+def test_browser_notice_cannot_target_another_user():
+    """A non-admin principal must not aim takeover notices (one-time links plus
+    attacker-controlled reason text) at a victim's companion inbox. The 403
+    must fire before any browser work starts."""
+    from meemee.api import tokens
+
+    _, raw = tokens.create("notice-attacker", {"runs:write"}, owner_id="attacker-owner", token_kind="api")
+    response = client.post(
+        "/v1/browser/sessions",
+        headers={"Authorization": f"Bearer {raw}"},
+        json={"url": "https://example.com/", "notify_user_id": "victim-owner"},
+    )
+    assert response.status_code == 403, response.text

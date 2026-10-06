@@ -43,11 +43,11 @@ def store(request, tmp_path):
 def test_all_retrieval_methods_filter_before_ranking(store):
     alice = store.add("a", "fact", "private telescope discovery", owner_id="alice")
     bob = store.add("b", "fact", "private telescope discovery", owner_id="bob")
-    legacy = store.add("legacy", "fact", "private telescope discovery")
+    legacy = store.add("legacy", "fact", "private telescope discovery", owner_id="default")
     for method in (store.search, store.semantic_search, store.hybrid_search):
         assert [row["id"] for row in method("telescope discovery", 10, owner_id="alice")] == [alice]
         assert [row["id"] for row in method("telescope discovery", 10, owner_id="bob")] == [bob]
-        assert [row["id"] for row in method("telescope discovery", 10)] == [legacy]
+        assert [row["id"] for row in method("telescope discovery", 10, owner_id="default")] == [legacy]
         assert method("telescope discovery", 10, owner_id="charlie") == []
     assert [row["id"] for row in store.recent(owner_id="alice")] == [alice]
 
@@ -79,8 +79,8 @@ def test_sqlite_legacy_owner_migration_quarantines_old_rows(tmp_path):
     connection.close()
     memory = MemoryStore(path)
     assert memory.search("legacy", owner_id="alice") == []
-    assert memory.recent()[0]["id"] == 1
-    assert memory.semantic_search("legacy")[0]["id"] == 1
+    assert memory.recent(owner_id="default")[0]["id"] == 1
+    assert memory.semantic_search("legacy", owner_id="default")[0]["id"] == 1
 
 
 def test_learned_semantic_memory_is_owner_scoped(store):
@@ -116,7 +116,7 @@ async def test_delegation_tool_propagates_owner_to_child_memory(tmp_path):
     report = await Agent(ParentModel(), tools, memory).run("parent goal", owner_id="alice")
     assert report.tool_results[0]["result"]["ok"]
     assert any(row["content"] == "child goal" for row in memory.recent(owner_id="alice"))
-    assert memory.recent() == []
+    assert memory.recent(owner_id="default") == []
     assert memory.recent(owner_id="bob") == []
 
 

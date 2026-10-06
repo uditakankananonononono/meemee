@@ -62,20 +62,20 @@ def test_trained_encoder_needs_no_network_after_explicit_pull(encoder):
 def test_sqlite_reindexes_hash_space_and_finds_old_paraphrase_memory(tmp_path, encoder):
     path = tmp_path / "memory.db"
     old = MemoryStore(path, HashingEmbedder())
-    ident = old.add("r", "fact", "My automobile needs fixing")
+    ident = old.add("r", "fact", "My automobile needs fixing", owner_id="default")
     for _ in range(215):
-        old.add("r", "fact", "The beach sand is warm")
+        old.add("r", "fact", "The beach sand is warm", owner_id="default")
     old.connection.close()
     store = MemoryStore(path, encoder)
-    assert store.search("car requires repairs") == []
+    assert store.search("car requires repairs", owner_id="default") == []
     assert store.reindex(batch_size=17) == 216
     assert store.reindex() == 0
-    hit = store.semantic_search("The car requires repairs", limit=1)[0]
+    hit = store.semantic_search("The car requires repairs", limit=1, owner_id="default")[0]
     assert hit["id"] == ident and hit["semantic_score"] > 0.7
-    assert store.hybrid_search("car requires repairs", limit=1)[0]["id"] == ident
-    assert store.semantic_search("", 1) == []
-    assert store.hybrid_search("car", 0) == []
-    assert store.delete_runs(["r"]) == 216
+    assert store.hybrid_search("car requires repairs", limit=1, owner_id="default")[0]["id"] == ident
+    assert store.semantic_search("", 1, owner_id="default") == []
+    assert store.hybrid_search("car", 0, owner_id="default") == []
+    assert store.delete_runs(["r"], owner_id="default") == 216
     assert store.connection.execute("SELECT count(*) FROM memory_embeddings").fetchone()[0] == 0
 
 
@@ -85,8 +85,8 @@ def test_settings_wire_real_encoder_into_sqlite_runtime(tmp_path, encoder):
     settings = Settings(data_dir=tmp_path, embedding_model_dir=Path(os.environ["MEEMEE_TEST_EMBEDDING_DIR"]))
     persistence = persistence_from_settings(settings)
     assert persistence.memory.embedder.space_id == encoder.space_id
-    ident = persistence.memory.add("r", "fact", "My automobile needs fixing")
-    assert persistence.memory.semantic_search("The car requires repairs", 1)[0]["id"] == ident
+    ident = persistence.memory.add("r", "fact", "My automobile needs fixing", owner_id="default")
+    assert persistence.memory.semantic_search("The car requires repairs", 1, owner_id="default")[0]["id"] == ident
 
 
 def test_real_postgres_persisted_paraphrase_vectors_reindex_delete(encoder):
@@ -107,20 +107,33 @@ def test_real_postgres_persisted_paraphrase_vectors_reindex_delete(encoder):
     try:
         MigrationStore(db).apply()
         lexical = PGMemory(db)
-        ident = lexical.add("r", "fact", "My automobile needs fixing")
+        ident = lexical.add("r", "fact", "My automobile needs fixing", owner_id="default")
         store = PGMemory(db, encoder)
         assert store.reindex(batch_size=1) == 1
-        store.add("r", "fact", "The beach sand is warm")
-        assert store.search("car requires repairs") == []
-        assert store.semantic_search("The car requires repairs", 1)[0]["id"] == ident
-        assert store.hybrid_search("The car requires repairs", 1)[0]["retrieval_mode"] == "learned-hybrid"
+        store.add("r", "fact", "The beach sand is warm", owner_id="default")
+        assert store.search("car requires repairs", owner_id="default") == []
+        assert store.semantic_search("The car requires repairs", 1, owner_id="default")[0]["id"] == ident
+        assert store.hybrid_search("The car requires repairs", 1, owner_id="default")[0]["retrieval_mode"] == "learned-hybrid"
         reopened = PGMemory(db, encoder)
-        assert reopened.semantic_search("The car requires repairs", 1)[0]["id"] == ident
+        assert reopened.semantic_search("The car requires repairs", 1, owner_id="default")[0]["id"] == ident
         assert reopened.reindex() == 0
-        assert store.delete_runs(["r"]) == 2
+        assert store.delete_runs(["r"], owner_id="other-owner") == 0
+        assert store.delete_runs(["r"], owner_id="default") == 2
         with db.transaction() as conn:
             assert conn.execute("SELECT count(*) AS n FROM meemee_memory_embeddings").fetchone()["n"] == 0
     finally:
         db.close()
         with psycopg.connect(dsn, autocommit=True) as admin:
             admin.execute(f'DROP DATABASE "{name}" WITH (FORCE)')
+
+
+def test_delete_runs_never_crosses_owners(tmp_path):
+    store = MemoryStore(tmp_path / "memory.db")
+    store.add("shared-run-id", "fact", "alice memory", owner_id="alice")
+    store.add("shared-run-id", "fact", "bob memory", owner_id="bob")
+    assert store.delete_runs(["shared-run-id"], owner_id="alice") == 1
+    assert store.recent(owner_id="alice") == []
+    bob = store.recent(owner_id="bob")
+    assert len(bob) == 1 and bob[0]["content"] == "bob memory"
+    with pytest.raises(ValueError):
+        store.delete_runs(["shared-run-id"], owner_id=" ")

@@ -17,7 +17,7 @@ class AgentTeam:
         self.factory = factory
         self.limit = asyncio.Semaphore(max_concurrency)
 
-    async def delegate(self, goals: list[str], cancel=None, owner_id: str = "default") -> list[dict[str, Any]]:
+    async def delegate(self, goals: list[str], cancel=None, *, owner_id: str) -> list[dict[str, Any]]:
         if not goals or len(goals) > 32:
             raise ValueError("delegate between 1 and 32 goals")
 

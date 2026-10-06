@@ -177,7 +177,7 @@ async def test_registry_cancels_blocking_tool_and_loop_stays_responsive(tmp_path
     pid_file = tmp_path / "pid"
     cancel = threading.Event()
     task = asyncio.create_task(registry.execute(
-        "test.block", {"seconds": 60, "pid_file": str(pid_file)}, cancel=cancel))
+        "test.block", {"seconds": 60, "pid_file": str(pid_file)}, cancel=cancel, owner_id="default"))
     ticks = 0
     while not (pid_file.exists() and pid_file.read_text()):
         await asyncio.sleep(0.01)
@@ -192,10 +192,10 @@ async def test_registry_cancels_blocking_tool_and_loop_stays_responsive(tmp_path
 async def test_registry_isolated_success_and_timeout():
     registry = ToolRegistry()
     registry.register(SleepingNativeTool())
-    ok = await registry.execute("test.block", {"value": 5})
+    ok = await registry.execute("test.block", {"value": 5}, owner_id="default")
     assert ok.ok and ok.content["value"] == 10
     registry.register(QuickTimeoutTool())
-    timed_out = await registry.execute("test.quick", {"seconds": 30})
+    timed_out = await registry.execute("test.quick", {"seconds": 30}, owner_id="default")
     assert timed_out.ok is False and "hard timeout" in timed_out.error
 
 

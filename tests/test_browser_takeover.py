@@ -179,15 +179,15 @@ def test_agent_tools_hide_token_but_return_link(manager, site):
     registry = ToolRegistry()
     for tool in session_tools(manager):
         registry.register(tool)
-    result = run(registry.execute("browser.session_open", {"url": site + "/challenge"}))
+    result = run(registry.execute("browser.session_open", {"url": site + "/challenge"}, owner_id="default"))
     assert result.ok, result.error
     content = result.content
     assert content["state"] == "awaiting_human"
     assert "token" not in content["takeover"]
     assert "#" + content["takeover"]["takeover_id"] + "." in content["takeover"]["url"]
-    waited = run(registry.execute("browser.session_wait_human", {"session_id": content["session_id"], "timeout_seconds": 1}))
+    waited = run(registry.execute("browser.session_wait_human", {"session_id": content["session_id"], "timeout_seconds": 1}, owner_id="default"))
     assert waited.ok and waited.content["takeover_outcome"] == "pending"
-    closed = run(registry.execute("browser.session_close", {"session_id": content["session_id"]}))
+    closed = run(registry.execute("browser.session_close", {"session_id": content["session_id"]}, owner_id="default"))
     assert closed.content["state"] == "closed"
 
 
@@ -321,3 +321,4 @@ def test_account_deletion_purges_browser_stores(tmp_path):
     assert queue.delete_user("gone") == {"browser_notices": 1}
     assert store.get_session("bs_gone") is None and store.get_session("bs_stays") is not None
     assert [n["user_id"] for n in queue.list()] == ["stays"]
+

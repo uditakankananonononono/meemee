@@ -32,7 +32,7 @@ class FakeAgent:
 
 @pytest.mark.asyncio
 async def test_team_preserves_order():
-    reports = await AgentTeam(FakeAgent, max_concurrency=2).delegate(["a", "b"])
+    reports = await AgentTeam(FakeAgent, max_concurrency=2).delegate(["a", "b"], owner_id="default")
     assert [r["report"]["final"] for r in reports] == ["A", "B"]
 
 @pytest.mark.asyncio
@@ -45,12 +45,12 @@ async def test_team_propagates_cancellation_to_children():
             from meemee.types import RunReport
             return RunReport(run_id=goal,goal=goal,final="done",steps_used=1,tool_results=[])
     cancel=Event()
-    reports=await AgentTeam(Child,max_concurrency=1).delegate(["a","b"],cancel=cancel)
+    reports=await AgentTeam(Child,max_concurrency=1).delegate(["a","b"],cancel=cancel,owner_id="default")
     assert all(item["ok"] for item in reports) and seen==[cancel,cancel]
 
 @pytest.mark.asyncio
 async def test_team_refuses_new_child_after_cancel():
     from threading import Event
     cancel=Event(); cancel.set()
-    reports=await AgentTeam(FakeAgent,max_concurrency=1).delegate(["a"],cancel=cancel)
+    reports=await AgentTeam(FakeAgent,max_concurrency=1).delegate(["a"],cancel=cancel,owner_id="default")
     assert reports[0]["error"]=="delegation cancelled"
