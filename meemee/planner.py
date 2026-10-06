@@ -6,11 +6,19 @@ from .types import Plan, PlanStep
 
 
 class TaskPlanner:
-    """Creates deterministic, inspectable plans without requiring a second model call."""
+    """Lexical task splitter, not an intelligent planner or goal decomposition model.
+
+    Explicit sequence punctuation creates a provisional checklist. Only the execution
+    model can request evidence-based revisions; this class does not reason about tools.
+    """
 
     ACTIONS = re.compile(r"\b(?:then|after that|next|and then|finally)\b|[.;]\s+", re.IGNORECASE)
 
     def plan(self, goal: str, max_steps: int = 8) -> Plan:
+        if not goal.strip():
+            raise ValueError("goal must be non-empty")
+        if max_steps < 1:
+            raise ValueError("max_steps must be positive")
         chunks = [chunk.strip(" -") for chunk in self.ACTIONS.split(goal) if chunk.strip(" -")]
         if not chunks:
             chunks = [goal.strip()]
