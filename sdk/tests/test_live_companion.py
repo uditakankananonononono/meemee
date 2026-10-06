@@ -183,7 +183,10 @@ def test_live_companion_scope_enforced(live_server: str, admin: MeemeeClient) ->
     with MeemeeClient(live_server, auth=minted.token) as scoped, pytest.raises(PermissionDeniedError):
         scoped.companion.list_users()
     reader = admin.tokens.create("companion-reader-live", {"companion:read"})
+    admin.companion.upsert_user(reader.id, "Scoped Reader")
     with MeemeeClient(live_server, auth=reader.token) as scoped:
-        assert scoped.companion.list_users() is not None
+        with pytest.raises(PermissionDeniedError):
+            scoped.companion.list_users()
+        assert scoped.companion.get_user(reader.id).display_name == "Scoped Reader"
         with pytest.raises(PermissionDeniedError):
             scoped.companion.upsert_user("denied", "Denied")
