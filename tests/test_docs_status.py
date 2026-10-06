@@ -9,12 +9,12 @@ def test_docs_versions_and_ledger_are_current():
     readme = (ROOT / "README.md").read_text()
     status = (ROOT / "STATUS.md").read_text()
     changelog = (ROOT / "CHANGELOG.md").read_text()
-    assert f"Historical feature inventory in v{__version__}" in readme
+    assert f"Source audit in v{__version__} (187 items)" in readme
     assert "not an independent verification" in readme
     assert f"Current core version:** {__version__}" in status
     assert f"## {__version__}" in changelog
-    assert "## Historical thin count (unverified)" in readme and "## Historical thin count (unverified)" in status
-    assert "## Missing, not claimed" in readme and "## Missing, not claimed" in status
+    assert "## Current limits" in readme and "## Historical thin count (unverified)" in status
+    assert "No production/multi-region deployment or full product constitution closeout" in readme and "## Missing, not claimed" in status
 
 
 def test_docs_bound_postgres_wiring_to_verified_contract():
