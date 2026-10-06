@@ -29,6 +29,15 @@ class ContextRecord:
     metadata: dict[str, Any] | None = None
 
 
+def context_record_hash(record: ContextRecord) -> str:
+    """Version identity includes changed event time and metadata, not just prose."""
+    values = {"title": record.title, "content": record.content, "kind": record.kind,
+              "occurred_at": record.occurred_at, "metadata": record.metadata or {},
+              "visibility": record.visibility, "provenance": record.provenance}
+    return hashlib.sha256(json.dumps(values, sort_keys=True, separators=(",", ":"),
+                                     ensure_ascii=False).encode()).hexdigest()
+
+
 class ContextStore:
     """Owner-scoped source/event ledger and unified context index."""
 
@@ -81,7 +90,7 @@ class ContextStore:
     def ingest(self, record: ContextRecord) -> bool:
         if self.source(record.owner_id,record.source_id) is None: raise ValueError("source is not registered for owner")
         if record.visibility not in {"private","agent","shared"}: raise ValueError("invalid visibility")
-        digest=hashlib.sha256((record.title+"\0"+record.content).encode()).hexdigest();now=datetime.now(timezone.utc).isoformat()
+        digest=context_record_hash(record);now=datetime.now(timezone.utc).isoformat()
         with self.lock,self.db:
             inserted=self.db.execute("INSERT OR IGNORE INTO context_records(owner_id,source_id,external_id,content_hash,kind,title,content,occurred_at,provenance,visibility,cursor,metadata,ingested_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",(record.owner_id,record.source_id,record.external_id,digest,record.kind,record.title,record.content,record.occurred_at,json.dumps(record.provenance,sort_keys=True),record.visibility,record.cursor,json.dumps(record.metadata or {},sort_keys=True),now)).rowcount
             if record.cursor is not None:self.db.execute("UPDATE context_sources SET cursor=?,updated_at=? WHERE owner_id=? AND source_id=?",(record.cursor,now,record.owner_id,record.source_id))

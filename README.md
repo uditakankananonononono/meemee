@@ -13,6 +13,17 @@ not prove their full wording. Meemee is a local-first runtime, not a proven repl
 for any other assistant or an AGI. Planning remains rule-based unless explicitly changed;
 generative reasoning requires separately loaded or served model weights.
 
+### October 7 connector fidelity repair
+
+RSS/Atom now retains href identifiers, ISO timestamps and nested content, rejects XML
+external entities and refuses silently truncated feeds. ICS uses a real RFC5545 parser
+with timezone conversion, folded text, detached recurrence identifiers, all-day dates
+and explicit refusal of unresolved floating times. Gmail follows pages, walks nested
+MIME/plain-text body attachments, overlaps the cursor second, and sorts before cursor
+ingestion. Context versioning includes time/metadata changes. Real HTTP feed tests and
+mock-transport Gmail tests prove these narrow behaviors, not live account connection,
+automatic sync or unrestricted social ingestion. See `docs/connector-fidelity.md`.
+
 ### October 7 event-memory owner isolation repair
 
 Event memory previously ignored Agent.run's owner_id. This was a cross-account recall
