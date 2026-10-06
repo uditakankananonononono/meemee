@@ -52,3 +52,28 @@ async def test_github_rate_limit_message():
     client = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(403)))
     with pytest.raises(ValueError, match="GITHUB_TOKEN"):
         await GitHubRepoSearch(client=client).run(GitHubSearchArgs(query="agents"))
+
+
+def test_browser_session_open_tool_cannot_target_notices_and_owns_sessions():
+    """Canary for the live tool-path IDOR: the tool schema carries no
+    notify_user_id (a prompt-injected goal cannot aim a takeover link at a
+    victim's companion inbox), and the session owner is the calling principal,
+    never a shared "agent" bucket."""
+    from meemee.tools.browser_session import BrowserSessionOpen, OpenArgs
+
+    assert "notify_user_id" not in OpenArgs.model_fields
+
+    calls = {}
+
+    class FakeManager:
+        async def open(self, url, owner_id, allowed_domains, profile, auto_takeover, notify_user_id=None):
+            calls.update(owner_id=owner_id, notify_user_id=notify_user_id)
+            return {"session_id": "bs_" + "0" * 32, "state": "open"}
+
+    tool = BrowserSessionOpen(FakeManager())
+    args = OpenArgs(url="https://example.com/")
+    import asyncio
+    asyncio.run(tool.run(args, owner_id="principal-p"))
+    assert calls == {"owner_id": "principal-p", "notify_user_id": None}
+    # Even if an injected goal smuggles the field in, it never reaches the manager.
+    assert not hasattr(OpenArgs(url="https://example.com/", notify_user_id="victim"), "notify_user_id")
