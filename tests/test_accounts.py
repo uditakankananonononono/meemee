@@ -66,3 +66,36 @@ def test_email_bridge_status_exposes_gmail_connection_requirement(monkeypatch, t
     assert response.status_code==200
     assert response.json()['gmail_connection_required'] is True
     assert response.json()['gmail_required_scope'].endswith('gmail.readonly')
+
+
+def test_read_only_key_cannot_mint_write_credentials(monkeypatch, tmp_path: Path):
+    store = TokenStore(tmp_path / "key-escalation.db")
+    monkeypatch.setattr(api, "tokens", store)
+    monkeypatch.setattr(api.auth, "store", store)
+    _, raw = store.create("reader", {"jobs:read"}, owner_id="owner")
+    client = TestClient(api.app)
+    response = client.post("/v1/account/api-keys", headers={"Authorization": f"Bearer {raw}"},
+                           json={"name": "escalated", "scopes": ["runs:write", "jobs:write", "companion:write"]})
+    assert response.status_code == 403
+    assert "token" not in response.json()
+    assert store.list_metadata(owner_id="owner")[0][0]["name"] == "reader"
+    assert len(store.list_metadata(owner_id="owner")[0]) == 1
+
+
+def test_account_keys_cannot_amplify_writer_scopes(monkeypatch, tmp_path: Path):
+    store = TokenStore(tmp_path / "key-subsets.db")
+    monkeypatch.setattr(api, "tokens", store)
+    monkeypatch.setattr(api.auth, "store", store)
+    _, raw = store.create("writer", {"jobs:read", "jobs:write"}, owner_id="owner")
+    client = TestClient(api.app)
+    headers = {"Authorization": f"Bearer {raw}"}
+    denied = client.post("/v1/account/api-keys", headers=headers,
+                        json={"name": "amplified", "scopes": ["runs:write", "companion:write"]})
+    assert denied.status_code == 403 and "token" not in denied.json()
+    allowed = client.post("/v1/account/api-keys", headers=headers,
+                         json={"name": "subset", "scopes": ["jobs:read"]})
+    assert allowed.status_code == 201
+    minted = store.authenticate(allowed.json()["token"])
+    assert minted.id == "owner" and minted.scopes == frozenset({"jobs:read"})
+    assert client.post("/v1/jobs", headers={"Authorization": f"Bearer {allowed.json()['token']}"},
+                       json={"goal": "should not run"}).status_code == 403
