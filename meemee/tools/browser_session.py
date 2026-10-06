@@ -22,8 +22,6 @@ class OpenArgs(BaseModel):
     allowed_domains: list[str] = Field(default_factory=list, max_length=100)
     profile: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_.-]{1,64}$")
     auto_takeover: bool = True
-    notify_user_id: str | None = Field(default=None, min_length=1, max_length=120,
-                                       description="Companion user to notify with the takeover link on their configured channel")
 
 
 class ActArgs(BaseModel):
@@ -67,8 +65,12 @@ class BrowserSessionOpen(_SessionTool):
     risk = Risk.WRITE
     arguments_model = OpenArgs
 
-    async def run(self, arguments: OpenArgs):
-        return _public(await self.manager.open(arguments.url, "agent", arguments.allowed_domains, arguments.profile, arguments.auto_takeover, arguments.notify_user_id))
+    async def run(self, arguments: OpenArgs, *, owner_id: str):
+        # The session belongs to the calling principal, never a shared "agent"
+        # bucket. Tool callers cannot aim takeover notices at another user: the
+        # notify_user_id field is intentionally absent from this schema; only
+        # the HTTP API (principal-bound, admin override) may set it.
+        return _public(await self.manager.open(arguments.url, owner_id, arguments.allowed_domains, arguments.profile, arguments.auto_takeover))
 
 
 class BrowserSessionAct(_SessionTool):

@@ -59,7 +59,13 @@ async def work_forever(settings: Settings | None = None) -> None:
         watcher.start()
         run_id = uuid.uuid4().hex
         try:
-            owner = job.get("principal") or "default"
+            owner = job.get("principal")
+            if not owner:
+                # Fail closed: every creation path sets a principal, so a
+                # principal-less job is legacy or corrupt. Running it under the
+                # shared "default" bucket would leak its memory across owners.
+                jobs.fail(job["id"], "job has no principal owner; refusing to run unowned work")
+                continue
             report = await build_agent(settings, memory=persistence.memory, persistence=persistence).run(
                 job["goal"], approve=job_approval(approvals, owner), cancel=cancel, owner_id=owner, run_id=run_id)
             if cancel.is_set():
