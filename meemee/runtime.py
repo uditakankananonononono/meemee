@@ -2,7 +2,7 @@ from .agent import Agent
 from .config import Settings
 from .context import ContextStore
 from .model_profiles import build_role_model
-from .persistence import build_persistence
+from .persistence import persistence_from_settings
 from .personal_model import PersonalModelStore
 from .policy import PolicyEngine
 from .team import AgentTeam
@@ -41,7 +41,7 @@ def build_agent(settings: Settings | None = None, include_delegation: bool = Tru
         registry.register(DelegateTasks(lambda: AgentTeam(lambda: build_agent(settings, False, browser_sessions=browser_sessions, persistence=persistence))))
     model = build_role_model(settings, "agent")
     if persistence is None and (memory is None or settings.persistence_backend.strip().lower() == "postgresql"):
-        persistence = build_persistence(settings.persistence_backend, settings.data_dir, settings.postgres_dsn)
+        persistence = persistence_from_settings(settings)
     selected_memory = memory or persistence.memory
     # PostgreSQL mode: the shared personal model and context index, not per-host files.
     context = persistence.context if persistence is not None else ContextStore(settings.data_dir / "context.sqlite3")

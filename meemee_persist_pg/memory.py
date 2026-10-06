@@ -13,25 +13,27 @@ from ._db import Database
 class MemoryStore:
     def __init__(self, db: Database, embedder: Embedder | None = None):
         self.db, self.embedder = db, embedder
-    def add(self, run_id: str, kind: str, content: str, metadata: dict[str, Any] | None = None) -> int:
+    def add(self, run_id: str, kind: str, content: str, metadata: dict[str, Any] | None = None, *, owner_id: str = "default") -> int:
+        if not owner_id.strip():
+            raise ValueError("owner_id is required")
         if not run_id or not kind or not content: raise ValueError("run_id, kind and content are required")
         with self.db.transaction() as c:
-            row = c.execute("INSERT INTO meemee_memories(run_id,kind,content,metadata) VALUES(%s,%s,%s,%s) RETURNING id", (run_id,kind,scrub_text(content),Jsonb(metadata or {}))).fetchone()
+            row = c.execute("INSERT INTO meemee_memories(run_id,kind,content,metadata,owner_id) VALUES(%s,%s,%s,%s,%s) RETURNING id", (run_id,kind,scrub_text(content),Jsonb(metadata or {}),owner_id)).fetchone()
             ident = int(row["id"])
             if self.embedder:
                 vector = self.embedder.embed(scrub_text(content))
                 c.execute("INSERT INTO meemee_memory_embeddings(memory_id,space_id,dimensions,embedding) VALUES(%s,%s,%s,%s)",
                           (ident, embedding_space(self.embedder), len(vector), Jsonb(vector)))
             return ident
-    def search(self, query: str, limit: int = 8) -> list[dict[str,Any]]:
+    def search(self, query: str, limit: int = 8, *, owner_id: str = "default") -> list[dict[str,Any]]:
         if not query.strip(): return []
         with self.db.transaction() as c:
             rows=c.execute("""SELECT id,run_id,kind,content,metadata,created_at,
              ts_rank_cd(search,websearch_to_tsquery('simple',%s)) AS score FROM meemee_memories
-             WHERE search @@ websearch_to_tsquery('simple',%s) ORDER BY score DESC,id DESC LIMIT %s""",(query,query,max(1,min(limit,100)))).fetchall()
+             WHERE search @@ websearch_to_tsquery('simple',%s) AND owner_id=%s ORDER BY score DESC,id DESC LIMIT %s""",(query,query,owner_id,max(1,min(limit,100)))).fetchall()
             return list(rows)
-    def recent(self, limit: int = 20) -> list[dict[str,Any]]:
-        with self.db.transaction() as c: return list(c.execute("SELECT id,run_id,kind,content,metadata,created_at FROM meemee_memories ORDER BY id DESC LIMIT %s",(max(1,min(limit,500)),)).fetchall())
+    def recent(self, limit: int = 20, *, owner_id: str = "default") -> list[dict[str,Any]]:
+        with self.db.transaction() as c: return list(c.execute("SELECT id,run_id,kind,content,metadata,created_at FROM meemee_memories WHERE owner_id=%s ORDER BY id DESC LIMIT %s",(owner_id,max(1,min(limit,500)))).fetchall())
 
     def reindex(self, batch_size: int = 32) -> int:
         if self.embedder is None:
@@ -58,7 +60,7 @@ class MemoryStore:
                         (row["id"], space, len(vector), Jsonb(vector)))
                 count += len(rows)
 
-    def semantic_search(self, query: str, limit: int = 8) -> list[dict[str,Any]]:
+    def semantic_search(self, query: str, limit: int = 8, *, owner_id: str = "default") -> list[dict[str,Any]]:
         """Exact cosine across persisted learned vectors, not a full-text alias."""
         if not query.strip() or limit <= 0:
             return []
@@ -66,20 +68,20 @@ class MemoryStore:
         target = self.embedder.embed(query)
         with self.db.transaction() as c:
             rows = c.execute("""SELECT m.*, e.embedding FROM meemee_memories m
-                JOIN meemee_memory_embeddings e ON m.id=e.memory_id WHERE e.space_id=%s""",
-                (embedding_space(self.embedder),)).fetchall()
+                JOIN meemee_memory_embeddings e ON m.id=e.memory_id WHERE e.space_id=%s AND m.owner_id=%s""",
+                (embedding_space(self.embedder), owner_id)).fetchall()
         ranked = sorted(((cosine(target, row["embedding"]), row) for row in rows),
                         key=lambda item: (-item[0], -item[1]["id"]))[:limit]
         return [{**row, "semantic_score": score, "embedding_space": embedding_space(self.embedder)} for score, row in ranked]
 
-    def hybrid_search(self, query: str, limit: int = 8) -> list[dict[str,Any]]:
+    def hybrid_search(self, query: str, limit: int = 8, *, owner_id: str = "default") -> list[dict[str,Any]]:
         """Explicit lexical-only mode without an encoder; otherwise rank fusion."""
         if limit <= 0 or not query.strip():
             return []
-        lexical = self.search(query, max(limit * 3, 20))
+        lexical = self.search(query, max(limit * 3, 20), owner_id=owner_id)
         if self.embedder is None:
             return [{**row, "retrieval_mode": "lexical-only"} for row in lexical[:limit]]
-        semantic = self.semantic_search(query, max(limit * 3, 20))
+        semantic = self.semantic_search(query, max(limit * 3, 20), owner_id=owner_id)
         rows, scores = {}, {}
         for results in (lexical, semantic):
             for rank, row in enumerate(results, 1):

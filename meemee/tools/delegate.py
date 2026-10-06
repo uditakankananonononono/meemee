@@ -20,5 +20,5 @@ class DelegateTasks(Tool):
     def __init__(self, team_factory: Callable[[], AgentTeam]):
         self.team_factory = team_factory
 
-    async def run(self, arguments: DelegateArgs, cancel=None):
-        return await self.team_factory().delegate(arguments.goals, cancel=cancel)
+    async def run(self, arguments: DelegateArgs, cancel=None, owner_id: str = "default"):
+        return await self.team_factory().delegate(arguments.goals, cancel=cancel, owner_id=owner_id)

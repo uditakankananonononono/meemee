@@ -13,6 +13,15 @@ not prove their full wording. Meemee is a local-first runtime, not a proven repl
 for any other assistant or an AGI. Planning remains rule-based unless explicitly changed;
 generative reasoning requires separately loaded or served model weights.
 
+### October 7 event-memory owner isolation repair
+
+Event memory previously ignored Agent.run's owner_id. This was a cross-account recall
+risk, not merely a missing feature. Both stores now filter lexical, vector, hybrid and
+recent memory by owner, the agent scopes writes/reads, and delegated children inherit
+owner identity. Legacy rows are quarantined to the local default identity, not guessed
+or shared. See `tests/test_memory_tenant_isolation.py` and schema migration 017. This
+is not a claim that every other tenant boundary has been audited.
+
 ### October 7 semantic-memory repair
 
 A trained, pinned English MiniLM sentence encoder now runs locally through ONNX on CPU.

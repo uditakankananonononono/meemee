@@ -73,3 +73,22 @@ so it is not a relevance guarantee. This model is primarily English short-text r
 It does not reason, chat, copy the owner's mind, train itself, or make Meemee AGI.
 The scan costs O(number of memories * 384) and loads vectors into memory. Large-scale
 approximate indexing and multilingual evaluation are not implemented in this repair.
+
+## Owner isolation repair
+
+An additional source read found that Agent.run's `owner_id` was not passed to event
+memory: one account's prior events could enter another account's model prompt. Memory
+now stores a separate owner identifier and filters lexical, vector, hybrid and recent
+retrieval before ranking. The agent passes the authenticated owner for every memory
+write and read. Delegated children inherit the owner through the tool registry and
+team executor; children that cannot accept an owner are refused for non-default owners.
+
+SQLite upgrades existing memory rows into `default`. PostgreSQL migration 017 does the
+same. Unknown legacy ownership is not guessed from metadata or disclosed to every
+account. Such rows are only accessible from the local default identity; no retrospective
+claim of isolation is made. Explicit tests use identical text under Alice/Bob/default
+and verify both classic and real trained semantic retrieval, model-prompt canaries,
+and delegated child writes. The CLI composition root now honors the configured encoder
+too, rather than bypassing the settings-aware persistence constructor.
+
+This is a repair to the event-memory boundary, not an audit of every product data path.

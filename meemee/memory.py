@@ -48,6 +48,10 @@ class MemoryStore:
             """)
             self.connection.execute("BEGIN IMMEDIATE")
             columns = {row["name"] for row in self.connection.execute("PRAGMA table_info(memory_embeddings)")}
+            memory_columns = {row["name"] for row in self.connection.execute("PRAGMA table_info(memories)")}
+            if "owner_id" not in memory_columns:
+                self.connection.execute("ALTER TABLE memories ADD COLUMN owner_id TEXT NOT NULL DEFAULT 'default'")
+            self.connection.execute("CREATE INDEX IF NOT EXISTS memories_owner_recent ON memories(owner_id,id DESC)")
             if "space_id" not in columns:
                 self.connection.execute("ALTER TABLE memory_embeddings ADD COLUMN space_id TEXT NOT NULL DEFAULT ''")
 
@@ -76,11 +80,13 @@ class MemoryStore:
                 count += len(rows)
         return count
 
-    def add(self, run_id: str, kind: str, content: str, metadata: dict[str, Any] | None = None) -> int:
+    def add(self, run_id: str, kind: str, content: str, metadata: dict[str, Any] | None = None, *, owner_id: str = "default") -> int:
+        if not owner_id.strip():
+            raise ValueError("owner_id is required")
         with self.lock, self.connection:
             cursor = self.connection.execute(
-                "INSERT INTO memories(run_id, kind, content, metadata, created_at) VALUES (?, ?, ?, ?, ?)",
-                (run_id, kind, scrub_text(content), json.dumps(metadata or {}), datetime.now(timezone.utc).isoformat()),
+                "INSERT INTO memories(run_id, kind, content, metadata, created_at, owner_id) VALUES (?, ?, ?, ?, ?, ?)",
+                (run_id, kind, scrub_text(content), json.dumps(metadata or {}), datetime.now(timezone.utc).isoformat(), owner_id),
             )
             memory_id = int(cursor.lastrowid)
             embedding = self.embedder.embed(scrub_text(content))
@@ -90,18 +96,18 @@ class MemoryStore:
             )
             return memory_id
 
-    def search(self, query: str, limit: int = 8) -> list[dict[str, Any]]:
+    def search(self, query: str, limit: int = 8, *, owner_id: str = "default") -> list[dict[str, Any]]:
         safe = " OR ".join(f'"{part}"' for part in query.split() if part) or '""'
         with self.lock:
             rows = self.connection.execute(
                 """SELECT m.*, bm25(memories_fts) AS score FROM memories_fts
                    JOIN memories m ON m.id = memories_fts.rowid
-                   WHERE memories_fts MATCH ? ORDER BY score LIMIT ?""",
-                (safe, limit),
+                   WHERE memories_fts MATCH ? AND m.owner_id=? ORDER BY score LIMIT ?""",
+                (safe, owner_id, limit),
             ).fetchall()
         return [{**dict(row), "metadata": json.loads(row["metadata"])} for row in rows]
 
-    def semantic_search(self, query: str, limit: int = 8, candidates: int = 200) -> list[dict[str, Any]]:
+    def semantic_search(self, query: str, limit: int = 8, candidates: int = 200, *, owner_id: str = "default") -> list[dict[str, Any]]:
         """Exact cosine retrieval across all persisted vectors in the selected model space.
 
         ``candidates`` is retained for API compatibility, not a recency cutoff.
@@ -113,7 +119,7 @@ class MemoryStore:
         with self.lock:
             rows = self.connection.execute(
                 """SELECT m.*,e.embedding FROM memories m JOIN memory_embeddings e ON e.memory_id=m.id
-                   WHERE e.space_id=? ORDER BY m.id DESC""", (embedding_space(self.embedder),)
+                   WHERE e.space_id=? AND m.owner_id=? ORDER BY m.id DESC""", (embedding_space(self.embedder), owner_id)
             ).fetchall()
         ranked = sorted(
             ((cosine(target, json.loads(row["embedding"])), row) for row in rows),
@@ -122,12 +128,12 @@ class MemoryStore:
         return [{**dict(row), "metadata": json.loads(row["metadata"]), "semantic_score": score, "embedding_space": embedding_space(self.embedder)}
                 for score, row in ranked]
 
-    def hybrid_search(self, query: str, limit: int = 8) -> list[dict[str, Any]]:
+    def hybrid_search(self, query: str, limit: int = 8, *, owner_id: str = "default") -> list[dict[str, Any]]:
         """Fuse lexical and encoder ranks with reciprocal-rank fusion."""
         if limit <= 0 or not query.strip():
             return []
-        lexical = self.search(query, max(limit * 3, 20))
-        semantic = self.semantic_search(query, max(limit * 3, 20))
+        lexical = self.search(query, max(limit * 3, 20), owner_id=owner_id)
+        semantic = self.semantic_search(query, max(limit * 3, 20), owner_id=owner_id)
         by_id: dict[int, dict[str, Any]] = {}
         scores: dict[int, float] = {}
         for result_set in (lexical, semantic):
@@ -138,10 +144,10 @@ class MemoryStore:
         return [{**by_id[ident], "hybrid_score": scores[ident],
                  "retrieval_mode": "lexical-hashing" if isinstance(self.embedder, HashingEmbedder) else "learned-hybrid"} for ident in ordered]
 
-    def recent(self, limit: int = 20) -> list[dict[str, Any]]:
+    def recent(self, limit: int = 20, *, owner_id: str = "default") -> list[dict[str, Any]]:
         with self.lock:
             rows = self.connection.execute(
-                "SELECT * FROM memories ORDER BY id DESC LIMIT ?", (limit,)
+                "SELECT * FROM memories WHERE owner_id=? ORDER BY id DESC LIMIT ?", (owner_id, limit)
             ).fetchall()
         return [{**dict(row), "metadata": json.loads(row["metadata"])} for row in rows]
 
