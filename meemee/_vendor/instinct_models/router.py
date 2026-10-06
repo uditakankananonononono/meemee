@@ -4,6 +4,8 @@
   or errors, escalate to Ornith (local) then Inkling local, then the HF router.
 - Generation tasks skip Needle (it does not generate prose).
 - private=True never reaches a hosted route: the chain stops instead.
+- Optional built-in floor: LexicalLocal (naive Bayes tool picker, tool calls only, abstains when unsure).
+- With no model configured the router returns result=None: it is a router/client, not a model.
 - No paid route exists in this package.
 """
 from __future__ import annotations
@@ -11,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .config import ProductConfig
+from .lexical import LexicalLocal, LexicalToolModel
 from .providers import (HOSTED, ChatResult, InklingHFRouter, InklingLocal, NeedleLocal, OrnithOpenAICompat, HermesLocal, Provider,
                         ProviderError)
 
@@ -51,6 +54,8 @@ class Router:
                                  InklingLocal(cfg.inkling_local_url, cfg.inkling_local_model)]
         if cfg.hermes_url and cfg.hermes_model:
             chain.append(HermesLocal(cfg.hermes_url, cfg.hermes_model))
+        if cfg.lexical_train_jsonl:
+            chain.append(LexicalLocal(LexicalToolModel.from_jsonl(cfg.lexical_train_jsonl)))
         if cfg.allow_hosted:
             chain.append(InklingHFRouter(cfg.hf_model))
         return cls(chain)
