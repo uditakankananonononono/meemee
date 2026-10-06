@@ -92,3 +92,13 @@ and delegated child writes. The CLI composition root now honors the configured e
 too, rather than bypassing the settings-aware persistence constructor.
 
 This is a repair to the event-memory boundary, not an audit of every product data path.
+
+## Execution safety found during owner propagation
+
+The previous tool dispatch code caught TypeError/ValueError from both signature
+inspection and synchronous tool execution in one block, then called the tool again.
+A tool that wrote before raising could therefore run twice. Two deliberately
+side-effecting regression tools reproduced two calls before this fix. Dispatch now
+inspects the signature before calling once; internal failures never replay the action.
+The team executor follows the same no-replay rule. These tests prove dispatch behavior,
+not that every external service is idempotent.

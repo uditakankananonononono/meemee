@@ -63,16 +63,15 @@ class ToolRegistry:
                 if outcome.ok:
                     return ToolResult(ok=True, content=outcome.value, elapsed_ms=elapsed)
                 return ToolResult(ok=False, error=outcome.error, elapsed_ms=elapsed)
-            try:
-                parameters = inspect.signature(tool.run).parameters
-                options = {}
-                if "cancel" in parameters:
-                    options["cancel"] = cancel
-                if "owner_id" in parameters:
-                    options["owner_id"] = owner_id
-                value = tool.run(parsed, **options)
-            except (TypeError, ValueError):
-                value = tool.run(parsed)
+            # Signature errors occur before invoking the action. An internal TypeError/
+            # ValueError may follow a side effect and must never trigger a replay.
+            parameters = inspect.signature(tool.run).parameters
+            options = {}
+            if "cancel" in parameters:
+                options["cancel"] = cancel
+            if "owner_id" in parameters:
+                options["owner_id"] = owner_id
+            value = tool.run(parsed, **options)
             if inspect.isawaitable(value):
                 task = asyncio.create_task(value)
                 if cancel is not None:
