@@ -397,10 +397,12 @@ def get_account_deletion(deletion_id: str):
 
 
 @app.post("/v1/account/api-keys", status_code=201)
-def create_account_api_key(request: AccountTokenRequest, principal=jobs_read_dependency):
+def create_account_api_key(request: AccountTokenRequest, principal=jobs_write_dependency):
     allowed = {"runs:write", "jobs:read", "jobs:write", "companion:read", "companion:write"}
     if not request.scopes <= allowed:
         raise HTTPException(422, f"unknown or privileged scopes: {sorted(request.scopes - allowed)}")
+    if not request.scopes <= principal.scopes:
+        raise HTTPException(403, "requested key scopes exceed the caller's scopes")
     ident, token = tokens.create(request.name, request.scopes, request.expires_at, principal.id, "api")
     audit.append(principal.id, "account.api_key.create", ident, "success", {"scopes": sorted(request.scopes)})
     return {"id": ident, "token": token, "warning": "shown once; store it securely"}
