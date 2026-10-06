@@ -102,3 +102,11 @@ side-effecting regression tools reproduced two calls before this fix. Dispatch n
 inspects the signature before calling once; internal failures never replay the action.
 The team executor follows the same no-replay rule. These tests prove dispatch behavior,
 not that every external service is idempotent.
+
+## No-generation-model regression tests
+
+`tests/test_no_model_honesty.py` selects the unconfigured local-only shared provider
+without ambient hosted keys. Agent, companion and reflection calls raise ModelError.
+The agent records the request, not a fabricated final; companion records the user's
+message, not a fake reply or extracted facts; reflection writes no personal claims.
+This is verified unavailable behavior, not a claim that a generation model ran.
