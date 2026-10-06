@@ -131,3 +131,24 @@ def test_nonlocal_destination_ownership_is_not_verified(tmp_path: Path):
     for channel, address in (("whatsapp", "+15555550123"), ("imessage", "+15555550124"),
                              ("webhook", "https://external.example.com/hook")):
         validate_delivery_address(store, "owner", channel, address)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url", ["https://user:p@example.com/hook", "https://user@example.com/hook"])
+async def test_webhook_userinfo_never_reaches_delivery(url):
+    sent = []
+    channel = WebhookChannel(client=make_client(lambda request: sent.append(request) or httpx.Response(200)))
+    with pytest.raises(ValueError, match="must not contain credentials"):
+        await channel.send(url, "hi")
+    assert sent == []
+
+
+def test_builtin_provider_channels_ship_unconfigured(tmp_path: Path):
+    from meemee.companion.channels import build_channels
+    from meemee.config import Settings
+
+    settings = Settings(_env_file=None, whatsapp_provider_url=None, whatsapp_provider_token=None,
+                        imessage_provider_url=None, imessage_provider_token=None)
+    channels = build_channels(settings, CompanionStore(tmp_path / "defaults.db"))
+    assert not channels["whatsapp"].configured()
+    assert not channels["imessage"].configured()

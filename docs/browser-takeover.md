@@ -67,3 +67,11 @@ is not proof that a person owns an endpoint or number. No provider challenge or
 verified-destination binding exists. Do not treat these adapters as safe automated
 owner-only delivery until that verification is implemented. Missing provider
 credentials still fail closed. This limitation covers notices and check-ins alike.
+
+WhatsApp and iMessage ship unconfigured: both provider URL and token default to
+None. A deployment that enables either accepts a spam/phishing-relay risk until
+recipient-address verification is implemented: a tenant can supply another
+person's number and cause the deployer's provider account to deliver text or a
+link there. The current feature does not prove recipient ownership. Webhook URLs
+with embedded username/password are rejected before sending or saving, so HTTP
+Basic-auth credentials cannot enter delivery metadata or be sent implicitly.
