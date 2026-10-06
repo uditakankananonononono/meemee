@@ -57,10 +57,21 @@ def audit_tree(root: Path, expected_version: str | None = None) -> dict:
     readme = root / "README.md"
     if readme.exists() and pyproject.exists():
         text = readme.read_text()
-        heading = re.search(r"^## Verified in v([^ ]+) \((\d+)\)$", text, re.MULTILINE)
-        numbered = [int(value) for value in re.findall(r"^(\d+)\. ", text, re.MULTILINE)]
-        if not heading or heading.group(1) != _version(pyproject) or not numbered or int(heading.group(2)) != max(numbered):
-            findings.append({"code":"verified_ledger_drift","path":"README.md"})
+        # A release gate checks documentation consistency, not capability truth.
+        # Accept the honest inventory during an audit and the completed source
+        # table after it; never require a blanket "Verified" claim.
+        historical = re.search(r"^## Historical feature inventory in v([^ ]+) \((\d+) claims, not an independent verification\)$", text, re.MULTILINE)
+        audited = re.search(r"^## Source audit in v([^ ]+) \((\d+) items\)$", text, re.MULTILINE)
+        heading = audited or historical
+        if audited:
+            entries = re.findall(r"^\| (\d+) \| (real|partial|false|blocked-on-model) \|", text, re.MULTILINE)
+            numbered = [int(value) for value, _verdict in entries]
+        else:
+            numbered = [int(value) for value in re.findall(r"^(\d+)\. ", text, re.MULTILINE)]
+        expected = int(heading.group(2)) if heading else 0
+        if (not heading or heading.group(1) != _version(pyproject)
+                or len(numbered) != expected or set(numbered) != set(range(1, expected + 1))):
+            findings.append({"code": "capability_ledger_drift", "path": "README.md"})
     if pyproject.exists():
         version = _version(pyproject)
         for relative in ("sdk/README.md", "sdk/src/meemee_client/__init__.py", "sdk/src/meemee_client/auth.py", "sdk/tests/test_live_integration.py"):
