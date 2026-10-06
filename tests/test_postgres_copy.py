@@ -10,7 +10,7 @@ from meemee.postgres_copy import export_sqlite, import_postgresql, verify_export
 
 
 def test_deterministic_checked_export_covers_core_stores(tmp_path):
-    MemoryStore(tmp_path/"meemee.sqlite3").add("r","fact","safe")
+    MemoryStore(tmp_path/"meemee.sqlite3").add("r","fact","safe", owner_id="default")
     JobStore(tmp_path/"jobs.sqlite3").enqueue("work",principal="u")
     TokenStore(tmp_path/"auth.sqlite3").create("reader",{"jobs:read"})
     AuditLog(tmp_path/"audit.sqlite3").append("u","x","r","ok")

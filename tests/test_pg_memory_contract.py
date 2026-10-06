@@ -22,10 +22,10 @@ class DB:
 
 def test_pg_memory_matches_agent_hybrid_contract_and_scrubs_secrets():
     db=DB(); store=MemoryStore(db)
-    store.add("r","fact","token ghp_abcdefghijklmnopqrstuvwxyz123456")
+    store.add("r","fact","token ghp_abcdefghijklmnopqrstuvwxyz123456", owner_id="default")
     assert "ghp_" not in db.connection.last[1][2]
-    assert store.hybrid_search("database restore",5)[0]["id"]==1
+    assert store.hybrid_search("database restore",5, owner_id="default")[0]["id"]==1
     import pytest
-    assert store.hybrid_search("database restore",5)[0]["retrieval_mode"] == "lexical-only"
+    assert store.hybrid_search("database restore",5, owner_id="default")[0]["retrieval_mode"] == "lexical-only"
     with pytest.raises(RuntimeError, match="semantic encoder not configured"):
-        store.semantic_search("database restore",5)
+        store.semantic_search("database restore",5, owner_id="default")

@@ -19,7 +19,7 @@ def cancellation_watcher(jobs, job_id: str, event: threading.Event, stop: thread
             return
 
 
-def purge_if_deleted(jobs, memory, job_id: str, run_id: str) -> bool:
+def purge_if_deleted(jobs, memory, job_id: str, run_id: str, owner_id: str) -> bool:
     """After a terminal call, finish account deletion for a job purged mid-run.
 
     The job row is gone when its owner deleted their account while it ran; the run's
@@ -27,7 +27,7 @@ def purge_if_deleted(jobs, memory, job_id: str, run_id: str) -> bool:
     """
     if jobs.get(job_id) is not None:
         return False
-    memory.delete_runs([run_id])
+    memory.delete_runs([run_id], owner_id=owner_id)
     return True
 
 
@@ -64,15 +64,15 @@ async def work_forever(settings: Settings | None = None) -> None:
                 job["goal"], approve=job_approval(approvals, owner), cancel=cancel, owner_id=owner, run_id=run_id)
             if cancel.is_set():
                 jobs.cancel_running(job["id"])
-                if not purge_if_deleted(jobs, persistence.memory, job["id"], run_id):
+                if not purge_if_deleted(jobs, persistence.memory, job["id"], run_id, owner):
                     webhooks.enqueue(f"job:{job['id']}:cancelled", "job.cancelled", {"job_id": job["id"], "status": "cancelled"}, principal=owner)
             else:
                 jobs.finish(job["id"], report.model_dump())
-                if not purge_if_deleted(jobs, persistence.memory, job["id"], run_id):
+                if not purge_if_deleted(jobs, persistence.memory, job["id"], run_id, owner):
                     webhooks.enqueue(f"job:{job['id']}:done", "job.done", {"job_id": job["id"], "status": "done", "blocked": report.blocked, "result": report.model_dump()}, principal=owner)
         except (OSError, ValueError, RuntimeError) as exc:
             jobs.fail(job["id"], str(exc))
-            if not purge_if_deleted(jobs, persistence.memory, job["id"], run_id):
+            if not purge_if_deleted(jobs, persistence.memory, job["id"], run_id, owner):
                 state = jobs.get(job["id"])["status"]
                 if state == "failed":
                     webhooks.enqueue(f"job:{job['id']}:failed", "job.failed", {"job_id": job["id"], "status": "failed", "error": str(exc)}, principal=owner)

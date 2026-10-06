@@ -14,7 +14,7 @@ for _ in range(5):
     store = JobStore(root / 'jobs.sqlite3')
     assert store.enqueue('work', principal='owner')
     memory = MemoryStore(root / 'memory.sqlite3', HashingEmbedder())
-    assert memory.add('r','fact','startup concurrency')
+    assert memory.add('r','fact','startup concurrency', owner_id="default")
     memory.connection.close()
     store.db.close()
 """

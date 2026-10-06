@@ -46,14 +46,14 @@ def seed(t: PurgeTargets, who: str) -> dict:
     job = t.jobs.enqueue(f"{who} secret job goal", principal=who)
     report = RunReport(run_id=f"run-{who}", goal=f"{who} goal", final="done", steps_used=1, tool_results=[])
     t.runs.add(who, report)
-    t.memory.add(report.run_id, "goal", f"{who}zebra private memory")
+    t.memory.add(report.run_id, "goal", f"{who}zebra private memory", owner_id=who)
     done = t.jobs.enqueue(f"{who} finished job", principal=who)
     claimed = t.jobs.claim()
     while claimed and claimed["id"] != done:
         t.jobs.finish(claimed["id"], {"run_id": f"jobrun-{claimed['principal']}-{claimed['id'][:4]}"})
         claimed = t.jobs.claim()
     t.jobs.finish(done, {"run_id": f"jobrun-{who}"})
-    t.memory.add(f"jobrun-{who}", "final", f"{who}yak job memory")
+    t.memory.add(f"jobrun-{who}", "final", f"{who}yak job memory", owner_id=who)
     t.idempotency.put(who, "/v1/jobs", "k1", {"goal": "x"}, 202, {"id": job})
     t.quotas.consume_job(who)
     t.quotas.set_limit(who, 7)
@@ -87,7 +87,7 @@ def test_purge_removes_every_store_for_one_principal_only(tmp_path, monkeypatch)
 
     assert t.jobs.list_for_principal("alice")[0] == []
     assert t.runs.run_ids("alice") == []
-    assert t.memory.search("alicezebra") == [] and t.memory.search("aliceyak") == []
+    assert t.memory.search("alicezebra", owner_id="alice") == [] and t.memory.search("aliceyak", owner_id="alice") == []
     assert t.idempotency.get("alice", "/v1/jobs", "k1", {"goal": "x"}) is None
     assert t.quotas.limit("alice") == t.quotas.default
     assert t.approvals.list("alice") == []
@@ -100,7 +100,7 @@ def test_purge_removes_every_store_for_one_principal_only(tmp_path, monkeypatch)
     # bob is untouched everywhere
     assert len(t.jobs.list_for_principal("bob")[0]) == 2
     assert t.runs.get("bob", "run-bob") is not None
-    assert t.memory.search("bobzebra") and t.memory.search("bobyak")
+    assert t.memory.search("bobzebra", owner_id="bob") and t.memory.search("bobyak", owner_id="bob")
     assert t.approvals.allows("bob", "shell.run")
     assert len(t.monitors.list("bob")) == 1
     assert t.personal_model.list("bob")
@@ -122,11 +122,11 @@ def test_running_job_is_tombstoned_cancelled_and_deleted_when_worker_settles(tmp
     cancellation_watcher(t.jobs, ident, cancel, stop)
     assert cancel.is_set()
 
-    t.memory.add("late-run", "tool", "alicequokka written after purge")
+    t.memory.add("late-run", "tool", "alicequokka written after purge", owner_id="default")
     assert t.jobs.cancel_running(ident) is True
-    assert purge_if_deleted(t.jobs, t.memory, ident, "late-run") is True
+    assert purge_if_deleted(t.jobs, t.memory, ident, "late-run", "default") is True
     assert t.jobs.get(ident) is None and t.jobs.events(ident) == []
-    assert t.memory.search("alicequokka") == []
+    assert t.memory.search("alicequokka", owner_id="default") == []
 
 
 def test_failed_tombstone_is_deleted_not_requeued(tmp_path, monkeypatch):
@@ -146,7 +146,7 @@ def test_finish_on_tombstone_returns_purged_and_normal_job_unaffected(tmp_path, 
     other = t.jobs.enqueue("bob", principal="bob"); t.jobs.claim()
     assert t.jobs.finish(other, {"run_id": "r2"}) is False
     assert t.jobs.get(other)["status"] == "done"
-    assert purge_if_deleted(t.jobs, t.memory, other, "r2") is False
+    assert purge_if_deleted(t.jobs, t.memory, other, "r2", "bob") is False
 
 
 def test_sweep_removes_abandoned_tombstones(tmp_path, monkeypatch):
@@ -196,9 +196,9 @@ def test_late_synchronous_run_is_discarded_only_after_a_deletion(tmp_path, monke
     report = RunReport(run_id="sync-run", goal="g", final="f", steps_used=1, tool_results=[])
     assert purger.discard_late_run("alice", report, started) is False
     purger.purge("alice", requested_by="alice")
-    t.memory.add("sync-run", "final", "alicenarwhal")
+    t.memory.add("sync-run", "final", "alicenarwhal", owner_id="alice")
     assert purger.discard_late_run("alice", report, started) is True
-    assert t.memory.search("alicenarwhal") == []
+    assert t.memory.search("alicenarwhal", owner_id="alice") == []
     later = datetime.now(timezone.utc).isoformat()
     assert purger.discard_late_run("alice", report, later) is False
 
@@ -258,13 +258,13 @@ def test_cli_account_delete_requires_confirmation_and_purges(monkeypatch, tmp_pa
     persistence = build_persistence("sqlite", tmp_path)
     persistence.jobs.enqueue("cli secret", principal="zed")
     RunStore(tmp_path / "runs.sqlite3").add("zed", RunReport(run_id="rz", goal="g", final="f", steps_used=1, tool_results=[]))
-    persistence.memory.add("rz", "goal", "zedplatypus")
+    persistence.memory.add("rz", "goal", "zedplatypus", owner_id="zed")
     runner = CliRunner()
     refused = runner.invoke(app, ["account-delete", "zed"])
     assert refused.exit_code != 0 and persistence.jobs.list_for_principal("zed")[0]
     done = runner.invoke(app, ["account-delete", "zed", "--yes"])
     assert done.exit_code == 0, done.output
     assert '"jobs_deleted": 1' in done.output and '"memories": 1' in done.output
-    assert persistence.jobs.list_for_principal("zed")[0] == [] and persistence.memory.search("zedplatypus") == []
+    assert persistence.jobs.list_for_principal("zed")[0] == [] and persistence.memory.search("zedplatypus", owner_id="zed") == []
     resumed = runner.invoke(app, ["account-delete-resume"])
     assert resumed.exit_code == 0 and '"resumed": []' in resumed.output

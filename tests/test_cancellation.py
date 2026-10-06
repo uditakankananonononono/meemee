@@ -17,7 +17,7 @@ class Model:
 @pytest.mark.asyncio
 async def test_agent_honors_cancel_before_model(tmp_path: Path):
     cancel = Event(); cancel.set()
-    report = await Agent(Model(), ToolRegistry(), MemoryStore(tmp_path / "m.db")).run("work", cancel=cancel)
+    report = await Agent(Model(), ToolRegistry(), MemoryStore(tmp_path / "m.db")).run("work", cancel=cancel, owner_id="default")
     assert report.steps_used == 0 and report.final.startswith("Cancelled")
 
 
@@ -68,7 +68,7 @@ async def test_cancellation_interrupts_running_async_tool(tmp_path: Path):
     registry=ToolRegistry(); slow=Slow(); registry.register(slow)
     cancel=Event()
     async def trigger(): await asyncio.sleep(.1); cancel.set()
-    task=asyncio.create_task(Agent(Calls(),registry,MemoryStore(tmp_path/"m.db")).run("work",cancel=cancel))
+    task=asyncio.create_task(Agent(Calls(),registry,MemoryStore(tmp_path/"m.db")).run("work",cancel=cancel,owner_id="default"))
     await trigger(); report=await task
     assert slow.cleaned and report.tool_results[0]["result"]["error"]=="tool cancelled"
     assert report.final.startswith("Cancelled")

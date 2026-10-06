@@ -13,7 +13,7 @@ from ._db import Database
 class MemoryStore:
     def __init__(self, db: Database, embedder: Embedder | None = None):
         self.db, self.embedder = db, embedder
-    def add(self, run_id: str, kind: str, content: str, metadata: dict[str, Any] | None = None, *, owner_id: str = "default") -> int:
+    def add(self, run_id: str, kind: str, content: str, metadata: dict[str, Any] | None = None, *, owner_id: str) -> int:
         if not owner_id.strip():
             raise ValueError("owner_id is required")
         if not run_id or not kind or not content: raise ValueError("run_id, kind and content are required")
@@ -25,14 +25,14 @@ class MemoryStore:
                 c.execute("INSERT INTO meemee_memory_embeddings(memory_id,space_id,dimensions,embedding) VALUES(%s,%s,%s,%s)",
                           (ident, embedding_space(self.embedder), len(vector), Jsonb(vector)))
             return ident
-    def search(self, query: str, limit: int = 8, *, owner_id: str = "default") -> list[dict[str,Any]]:
+    def search(self, query: str, limit: int = 8, *, owner_id: str) -> list[dict[str,Any]]:
         if not query.strip(): return []
         with self.db.transaction() as c:
             rows=c.execute("""SELECT id,run_id,kind,content,metadata,created_at,
              ts_rank_cd(search,websearch_to_tsquery('simple',%s)) AS score FROM meemee_memories
              WHERE search @@ websearch_to_tsquery('simple',%s) AND owner_id=%s ORDER BY score DESC,id DESC LIMIT %s""",(query,query,owner_id,max(1,min(limit,100)))).fetchall()
             return list(rows)
-    def recent(self, limit: int = 20, *, owner_id: str = "default") -> list[dict[str,Any]]:
+    def recent(self, limit: int = 20, *, owner_id: str) -> list[dict[str,Any]]:
         with self.db.transaction() as c: return list(c.execute("SELECT id,run_id,kind,content,metadata,created_at FROM meemee_memories WHERE owner_id=%s ORDER BY id DESC LIMIT %s",(owner_id,max(1,min(limit,500)))).fetchall())
 
     def reindex(self, batch_size: int = 32) -> int:
@@ -60,7 +60,7 @@ class MemoryStore:
                         (row["id"], space, len(vector), Jsonb(vector)))
                 count += len(rows)
 
-    def semantic_search(self, query: str, limit: int = 8, *, owner_id: str = "default") -> list[dict[str,Any]]:
+    def semantic_search(self, query: str, limit: int = 8, *, owner_id: str) -> list[dict[str,Any]]:
         """Exact cosine across persisted learned vectors, not a full-text alias."""
         if not query.strip() or limit <= 0:
             return []
@@ -74,7 +74,7 @@ class MemoryStore:
                         key=lambda item: (-item[0], -item[1]["id"]))[:limit]
         return [{**row, "semantic_score": score, "embedding_space": embedding_space(self.embedder)} for score, row in ranked]
 
-    def hybrid_search(self, query: str, limit: int = 8, *, owner_id: str = "default") -> list[dict[str,Any]]:
+    def hybrid_search(self, query: str, limit: int = 8, *, owner_id: str) -> list[dict[str,Any]]:
         """Explicit lexical-only mode without an encoder; otherwise rank fusion."""
         if limit <= 0 or not query.strip():
             return []
@@ -92,9 +92,11 @@ class MemoryStore:
         return [{**rows[ident], "hybrid_score": scores[ident], "retrieval_mode": "learned-hybrid"}
                 for ident in ordered]
 
-    def delete_runs(self, run_ids: list[str]) -> int:
-        """Hard-delete memories written by the given runs."""
+    def delete_runs(self, run_ids: list[str], *, owner_id: str) -> int:
+        """Hard-delete one owner's memories written by the given runs (embeddings cascade)."""
+        if not owner_id.strip():
+            raise ValueError("owner_id is required")
         ids = list(dict.fromkeys(run_ids))
         if not ids: return 0
         with self.db.transaction() as c:
-            return c.execute("DELETE FROM meemee_memories WHERE run_id=ANY(%s)", (ids,)).rowcount
+            return c.execute("DELETE FROM meemee_memories WHERE run_id=ANY(%s) AND owner_id=%s", (ids, owner_id)).rowcount

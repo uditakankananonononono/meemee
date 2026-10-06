@@ -24,7 +24,7 @@ async def test_workspace_rejects_escape(tmp_path: Path):
 @pytest.mark.asyncio
 async def test_registry_validation(tmp_path: Path):
     registry = ToolRegistry(); registry.register(ReadFile(tmp_path))
-    result = await registry.execute("workspace.read_file", {})
+    result = await registry.execute("workspace.read_file", {}, owner_id="default")
     assert not result.ok and "path" in result.error
 
 

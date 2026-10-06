@@ -80,7 +80,7 @@ class MemoryStore:
                 count += len(rows)
         return count
 
-    def add(self, run_id: str, kind: str, content: str, metadata: dict[str, Any] | None = None, *, owner_id: str = "default") -> int:
+    def add(self, run_id: str, kind: str, content: str, metadata: dict[str, Any] | None = None, *, owner_id: str) -> int:
         if not owner_id.strip():
             raise ValueError("owner_id is required")
         with self.lock, self.connection:
@@ -96,7 +96,7 @@ class MemoryStore:
             )
             return memory_id
 
-    def search(self, query: str, limit: int = 8, *, owner_id: str = "default") -> list[dict[str, Any]]:
+    def search(self, query: str, limit: int = 8, *, owner_id: str) -> list[dict[str, Any]]:
         safe = " OR ".join(f'"{part}"' for part in query.split() if part) or '""'
         with self.lock:
             rows = self.connection.execute(
@@ -107,7 +107,7 @@ class MemoryStore:
             ).fetchall()
         return [{**dict(row), "metadata": json.loads(row["metadata"])} for row in rows]
 
-    def semantic_search(self, query: str, limit: int = 8, candidates: int = 200, *, owner_id: str = "default") -> list[dict[str, Any]]:
+    def semantic_search(self, query: str, limit: int = 8, candidates: int = 200, *, owner_id: str) -> list[dict[str, Any]]:
         """Exact cosine retrieval across all persisted vectors in the selected model space.
 
         ``candidates`` is retained for API compatibility, not a recency cutoff.
@@ -128,7 +128,7 @@ class MemoryStore:
         return [{**dict(row), "metadata": json.loads(row["metadata"]), "semantic_score": score, "embedding_space": embedding_space(self.embedder)}
                 for score, row in ranked]
 
-    def hybrid_search(self, query: str, limit: int = 8, *, owner_id: str = "default") -> list[dict[str, Any]]:
+    def hybrid_search(self, query: str, limit: int = 8, *, owner_id: str) -> list[dict[str, Any]]:
         """Fuse lexical and encoder ranks with reciprocal-rank fusion."""
         if limit <= 0 or not query.strip():
             return []
@@ -144,21 +144,29 @@ class MemoryStore:
         return [{**by_id[ident], "hybrid_score": scores[ident],
                  "retrieval_mode": "lexical-hashing" if isinstance(self.embedder, HashingEmbedder) else "learned-hybrid"} for ident in ordered]
 
-    def recent(self, limit: int = 20, *, owner_id: str = "default") -> list[dict[str, Any]]:
+    def recent(self, limit: int = 20, *, owner_id: str) -> list[dict[str, Any]]:
         with self.lock:
             rows = self.connection.execute(
                 "SELECT * FROM memories WHERE owner_id=? ORDER BY id DESC LIMIT ?", (owner_id, limit)
             ).fetchall()
         return [{**dict(row), "metadata": json.loads(row["metadata"])} for row in rows]
 
-    def delete_runs(self, run_ids: list[str]) -> int:
-        """Hard-delete memories (and embeddings/full-text rows) written by the given runs."""
+    def delete_runs(self, run_ids: list[str], *, owner_id: str) -> int:
+        """Hard-delete one owner's memories (and embeddings/full-text rows) for the given runs.
+
+        owner_id is required and filters both the embedding and memory deletes: a
+        run_id from another owner must never remove their rows.
+        """
+        if not owner_id.strip():
+            raise ValueError("owner_id is required")
         deleted = 0
         with self.lock, self.connection:
             for run_id in dict.fromkeys(run_ids):
-                ids = [row[0] for row in self.connection.execute("SELECT id FROM memories WHERE run_id=?", (run_id,))]
+                ids = [row[0] for row in self.connection.execute(
+                    "SELECT id FROM memories WHERE run_id=? AND owner_id=?", (run_id, owner_id))]
                 for memory_id in ids:
                     self.connection.execute("DELETE FROM memory_embeddings WHERE memory_id=?", (memory_id,))
-                deleted += self.connection.execute("DELETE FROM memories WHERE run_id=?", (run_id,)).rowcount
+                deleted += self.connection.execute(
+                    "DELETE FROM memories WHERE run_id=? AND owner_id=?", (run_id, owner_id)).rowcount
         return deleted
 

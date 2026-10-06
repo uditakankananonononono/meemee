@@ -23,8 +23,10 @@ async def test_synchronous_tool_internal_typeerror_never_replays_action():
     tool = SideEffectThenTypeError()
     registry = ToolRegistry()
     registry.register(tool)
-    with pytest.raises(TypeError, match="internal failure"):
-        await registry.execute(tool.name, {})
+    # An internal TypeError after a side effect must not crash the whole run and
+    # must not replay the action: the tool result records the failure once.
+    result = await registry.execute(tool.name, {}, owner_id="default")
+    assert not result.ok and "internal failure" in result.error
     assert tool.calls == 1
 
 
@@ -37,7 +39,7 @@ async def test_synchronous_tool_valueerror_never_replays_action():
     tool = ValueErrorTool()
     registry = ToolRegistry()
     registry.register(tool)
-    result = await registry.execute(tool.name, {})
+    result = await registry.execute(tool.name, {}, owner_id="default")
     assert not result.ok and "validation failed" in result.error
     assert tool.calls == 1
 

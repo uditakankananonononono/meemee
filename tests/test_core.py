@@ -33,17 +33,17 @@ def test_decision_requires_one_action():
 
 def test_memory_add_search_recent(tmp_path: Path):
     memory = MemoryStore(tmp_path / "m.db")
-    ident = memory.add("run", "fact", "Python agents are useful", {"source": "test"})
+    ident = memory.add("run", "fact", "Python agents are useful", {"source": "test"}, owner_id="default")
     assert ident > 0
-    assert memory.search("Python agents")[0]["metadata"]["source"] == "test"
-    assert memory.recent(1)[0]["kind"] == "fact"
+    assert memory.search("Python agents", owner_id="default")[0]["metadata"]["source"] == "test"
+    assert memory.recent(1, owner_id="default")[0]["kind"] == "fact"
 
 
 @pytest.mark.asyncio
 async def test_agent_finishes(tmp_path: Path):
     model = FakeModel([AgentDecision(final="done")])
     agent = Agent(model, ToolRegistry(), MemoryStore(tmp_path / "m.db"))
-    report = await agent.run("say done")
+    report = await agent.run("say done", owner_id="default")
     assert report.final == "done" and report.steps_used == 1
 
 
@@ -55,7 +55,7 @@ async def test_agent_executes_approved_write(tmp_path: Path):
         AgentDecision(final="written"),
     ])
     report = await Agent(model, registry, MemoryStore(tmp_path / "m.db")).run(
-        "write", approve=lambda *_: True
+        "write", approve=lambda *_: True, owner_id="default"
     )
     assert report.tool_results[0]["result"]["ok"]
     assert (tmp_path / "x").read_text() == "yes"
@@ -68,7 +68,7 @@ async def test_agent_denies_unapproved_write(tmp_path: Path):
         AgentDecision(tool_call=ToolCall(name="workspace.write_file", arguments={"path":"x","content":"no"})),
         AgentDecision(final="blocked"),
     ])
-    report = await Agent(model, registry, MemoryStore(tmp_path / "m.db")).run("write")
+    report = await Agent(model, registry, MemoryStore(tmp_path / "m.db")).run("write", owner_id="default")
     assert "approval denied" in report.tool_results[0]["result"]["error"]
     assert not (tmp_path / "x").exists()
 
@@ -76,7 +76,7 @@ async def test_agent_denies_unapproved_write(tmp_path: Path):
 @pytest.mark.asyncio
 async def test_agent_step_limit(tmp_path: Path):
     decisions = [AgentDecision(tool_call=ToolCall(name="missing")) for _ in range(2)]
-    report = await Agent(FakeModel(decisions), ToolRegistry(), MemoryStore(tmp_path / "m.db"), max_steps=2).run("loop")
+    report = await Agent(FakeModel(decisions), ToolRegistry(), MemoryStore(tmp_path / "m.db"), max_steps=2).run("loop", owner_id="default")
     assert "Stopped after 2" in report.final
 
 @pytest.mark.asyncio
@@ -87,10 +87,10 @@ async def test_agent_model_driven_replan_is_bounded_and_recorded(tmp_path: Path)
         AgentDecision(final="adapted"),
     ])
     memory = MemoryStore(tmp_path / "m.db")
-    report = await Agent(model, ToolRegistry(), memory).run("research premise")
+    report = await Agent(model, ToolRegistry(), memory).run("research premise", owner_id="default")
     assert report.final == "adapted" and report.tool_results[0]["replan"]
     assert report.tool_results[0]["plan"]["steps"][1]["depends_on"] == ["revision-step-1"]
-    assert any(row["kind"] == "replan" for row in memory.recent())
+    assert any(row["kind"] == "replan" for row in memory.recent(owner_id="default"))
 
 
 def test_decision_requires_exactly_one_replan_tool_or_final():
@@ -107,5 +107,5 @@ async def test_agent_receives_unified_context(tmp_path: Path):
         async def decide(self,messages): self.messages=messages; return AgentDecision(final='done')
     model=Capture([]);context=ContextStore(tmp_path/'context.db');context.register_source('default','feed','rss',{})
     context.ingest(ContextRecord('default','feed','n1','document','Release','Meemee release Friday','2026-09-22T10:00:00Z',{'url':'https://example.com'}))
-    await Agent(model,ToolRegistry(),MemoryStore(tmp_path/'m.db'),context=context).run('When release?')
+    await Agent(model,ToolRegistry(),MemoryStore(tmp_path/'m.db'),context=context).run('When release?',owner_id='default')
     assert 'Meemee release Friday' in model.messages[1]['content']

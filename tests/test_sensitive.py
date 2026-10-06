@@ -35,7 +35,7 @@ class CaptureModel:
 async def test_agent_never_passes_or_persists_raw_goal_secret(tmp_path: Path):
     model = CaptureModel(); memory = MemoryStore(tmp_path / "m.db")
     secret = "ghp_abcdefghijklmnopqrstuvwxyz123456"
-    report = await Agent(model, ToolRegistry(), memory).run(f"use {secret}")
+    report = await Agent(model, ToolRegistry(), memory).run(f"use {secret}", owner_id="default")
     assert secret not in report.goal
     assert secret not in str(model.messages)
-    assert secret not in str(memory.recent())
+    assert secret not in str(memory.recent(owner_id="default"))

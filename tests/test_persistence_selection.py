@@ -6,7 +6,7 @@ from meemee.persistence import build_persistence
 def test_sqlite_composition_selects_core_stores(tmp_path):
     selected=build_persistence("sqlite",tmp_path)
     assert selected.backend=="sqlite"
-    assert selected.memory.add("r","fact","works") > 0
+    assert selected.memory.add("r","fact","works", owner_id="default") > 0
     assert selected.jobs.enqueue("work")
 
 

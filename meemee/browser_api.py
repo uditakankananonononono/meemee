@@ -109,6 +109,12 @@ def build_browser_router(manager: BrowserSessionManager, auth, audit=None, frame
 
     @router.post("/v1/browser/sessions", status_code=201)
     async def open_session(request: OpenSessionRequest, principal=write):
+        # The takeover notice is delivered into the *notify* user's companion
+        # conversation, so a caller may only address notices to itself. Without
+        # this check an attacker could push attacker-controlled takeover links
+        # and reason text into a victim's companion inbox.
+        if request.notify_user_id and request.notify_user_id != principal.id and "admin" not in principal.scopes:
+            raise HTTPException(status_code=403, detail="notify_user_id must be your own user id")
         try:
             state = await manager.open(request.url, principal.id, request.allowed_domains, None, request.auto_takeover, request.notify_user_id)
         except BrowserSessionError as exc:

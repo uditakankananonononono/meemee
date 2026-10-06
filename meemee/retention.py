@@ -36,6 +36,26 @@ class RetentionManager:
         finally:
             db.close()
 
+    def _delete_memories(self, path: Path, cutoff: str) -> int:
+        """Delete expired memories without orphaning their embedding vectors.
+
+        The FK ON DELETE CASCADE only fires when the connection enables foreign
+        keys, so do both explicitly in one transaction.
+        """
+        if not path.exists():
+            return 0
+        db = sqlite3.connect(path, timeout=5)
+        try:
+            with db:
+                db.execute("PRAGMA foreign_keys=ON")
+                db.execute(
+                    "DELETE FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memories WHERE created_at<?)",
+                    (cutoff,),
+                )
+                return db.execute("DELETE FROM memories WHERE created_at<?", (cutoff,)).rowcount
+        finally:
+            db.close()
+
     def run(self, now: datetime | None = None, jobs_days: int = 30, memory_days: int = 90, audit_days: int = 365, runs_days: int = 90) -> RetentionReport:
         if min(jobs_days, memory_days, audit_days, runs_days) < 1:
             raise ValueError("retention windows must be at least one day")
@@ -54,7 +74,7 @@ class RetentionManager:
             "DELETE FROM jobs WHERE status IN ('done','failed','cancelled') AND updated_at<?",
             (jobs_cutoff,),
         )
-        memories = self.delete(self.data_dir / "meemee.sqlite3", "DELETE FROM memories WHERE created_at<?", (memory_cutoff,))
+        memories = self._delete_memories(self.data_dir / "meemee.sqlite3", memory_cutoff)
         runs = self.delete(self.data_dir / "runs.sqlite3", "DELETE FROM runs WHERE created_at<?", (runs_cutoff,))
         # Tamper-evident audit chains are intentionally retained; pruning needs signed anchors.
         audit_entries = 0
