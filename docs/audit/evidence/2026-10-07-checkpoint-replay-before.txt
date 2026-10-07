@@ -1,0 +1,96 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___________ test_corrupt_idempotent_replay_preserves_checksum_error ____________
+
+self = <meemee.checkpoints.CheckpointStore object at 0x7f933cc2e740>
+principal = 'owner', run_id = 'run', goal_id = 'goal', phase = 'plan'
+state = {'step': 1}
+
+    def save(self, principal: str, run_id: str, goal_id: str, phase: str,
+             state: dict[str, Any], *, expected_sequence: int | None = None,
+             idempotency_key: str | None = None) -> dict[str, Any]:
+        if not all(x.strip() for x in (principal, run_id, goal_id, phase)):
+            raise ValueError("principal, run, goal and phase are required")
+        document = _canonical(state); digest = hashlib.sha256(document.encode()).hexdigest()
+        now, ident = datetime.now(timezone.utc).isoformat(), uuid.uuid4().hex
+        with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            try:
+                if idempotency_key:
+                    existing = self.db.execute("""SELECT * FROM agency_checkpoints
+                        WHERE principal=? AND run_id=? AND idempotency_key=?""",
+                        (principal, run_id, idempotency_key)).fetchone()
+                    if existing:
+                        if (existing["goal_id"], existing["phase"], existing["state_sha256"]) != (goal_id, phase, digest):
+                            raise CheckpointConflict("idempotency key was used for different checkpoint content")
+>                       self.db.execute("COMMIT"); return self._row(existing)
+
+meemee/checkpoints.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+row = <sqlite3.Row object at 0x7f933cc2ebc0>
+
+    @staticmethod
+    def _row(row: sqlite3.Row) -> dict[str, Any]:
+        result = dict(row)
+        digest = hashlib.sha256(result["state"].encode()).hexdigest()
+        if not hmac.compare_digest(digest, result["state_sha256"]):
+>           raise ValueError("checkpoint state checksum mismatch")
+E           ValueError: checkpoint state checksum mismatch
+
+meemee/checkpoints.py:109: ValueError
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-364/test_corrupt_idempotent_replay0')
+
+    def test_corrupt_idempotent_replay_preserves_checksum_error(tmp_path):
+        store = CheckpointStore(tmp_path / 'checkpoints.sqlite3')
+        saved = store.save('owner', 'run', 'goal', 'plan', {'step': 1}, idempotency_key='same')
+        store.db.execute('UPDATE agency_checkpoints SET state=? WHERE id=?', ('{"step":2}', saved['id']))
+        with pytest.raises(ValueError, match='checksum'):
+>           store.save('owner', 'run', 'goal', 'plan', {'step': 1}, idempotency_key='same')
+
+tests/test_checkpoint_corrupt_replay.py:13: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <meemee.checkpoints.CheckpointStore object at 0x7f933cc2e740>
+principal = 'owner', run_id = 'run', goal_id = 'goal', phase = 'plan'
+state = {'step': 1}
+
+    def save(self, principal: str, run_id: str, goal_id: str, phase: str,
+             state: dict[str, Any], *, expected_sequence: int | None = None,
+             idempotency_key: str | None = None) -> dict[str, Any]:
+        if not all(x.strip() for x in (principal, run_id, goal_id, phase)):
+            raise ValueError("principal, run, goal and phase are required")
+        document = _canonical(state); digest = hashlib.sha256(document.encode()).hexdigest()
+        now, ident = datetime.now(timezone.utc).isoformat(), uuid.uuid4().hex
+        with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            try:
+                if idempotency_key:
+                    existing = self.db.execute("""SELECT * FROM agency_checkpoints
+                        WHERE principal=? AND run_id=? AND idempotency_key=?""",
+                        (principal, run_id, idempotency_key)).fetchone()
+                    if existing:
+                        if (existing["goal_id"], existing["phase"], existing["state_sha256"]) != (goal_id, phase, digest):
+                            raise CheckpointConflict("idempotency key was used for different checkpoint content")
+                        self.db.execute("COMMIT"); return self._row(existing)
+                latest = self.db.execute("""SELECT sequence FROM agency_checkpoints
+                    WHERE principal=? AND run_id=? ORDER BY sequence DESC LIMIT 1""",
+                    (principal, run_id)).fetchone()
+                current = latest["sequence"] if latest else 0
+                if expected_sequence is not None and expected_sequence != current:
+                    raise CheckpointConflict(f"sequence conflict: expected {expected_sequence}, actual {current}")
+                sequence = current + 1
+                self.db.execute("INSERT INTO agency_checkpoints VALUES(?,?,?,?,?,?,?,?,?,?)",
+                    (ident, principal, run_id, goal_id, sequence, phase, document, digest, idempotency_key, now))
+                self.db.execute("COMMIT")
+            except Exception:
+>               self.db.execute("ROLLBACK"); raise
+E               sqlite3.OperationalError: cannot rollback - no transaction is active
+
+meemee/checkpoints.py:73: OperationalError
+=========================== short test summary info ============================
+FAILED tests/test_checkpoint_corrupt_replay.py::test_corrupt_idempotent_replay_preserves_checksum_error
+1 failed in 0.06s

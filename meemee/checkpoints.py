@@ -58,7 +58,9 @@ class CheckpointStore:
                     if existing:
                         if (existing["goal_id"], existing["phase"], existing["state_sha256"]) != (goal_id, phase, digest):
                             raise CheckpointConflict("idempotency key was used for different checkpoint content")
-                        self.db.execute("COMMIT"); return self._row(existing)
+                        checkpoint = self._row(existing)
+                        self.db.execute("COMMIT")
+                        return checkpoint
                 latest = self.db.execute("""SELECT sequence FROM agency_checkpoints
                     WHERE principal=? AND run_id=? ORDER BY sequence DESC LIMIT 1""",
                     (principal, run_id)).fetchone()
