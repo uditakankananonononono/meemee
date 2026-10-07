@@ -18,7 +18,7 @@ class BackupManager:
         files: list[dict[str, object]] = []
         for source in sorted(self.data_dir.glob("*.sqlite3")):
             target = destination / source.name
-            source_db = sqlite3.connect(f"file:{source}?mode=ro", uri=True)
+            source_db = sqlite3.connect(source.resolve().as_uri() + "?mode=ro", uri=True)
             target_db = sqlite3.connect(target)
             try:
                 source_db.backup(target_db)
@@ -58,7 +58,7 @@ class BackupManager:
                 raise RuntimeError(f"backup file missing or wrong size: {expected['name']}")
             if hashlib.sha256(path.read_bytes()).hexdigest() != expected["sha256"]:
                 raise RuntimeError(f"backup checksum mismatch: {expected['name']}")
-            db = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+            db = sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)
             try:
                 if db.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
                     raise RuntimeError(f"backup database corrupt: {expected['name']}")
@@ -81,7 +81,7 @@ class BackupManager:
             for expected in manifest["files"]:
                 source=BackupManager._file(directory, expected["name"]); target=BackupManager._file(destination, expected["name"])
                 started.append(expected["name"])
-                source_db=sqlite3.connect(f"file:{source}?mode=ro",uri=True); target_db=sqlite3.connect(target)
+                source_db=sqlite3.connect(source.resolve().as_uri() + "?mode=ro",uri=True); target_db=sqlite3.connect(target)
                 try:
                     source_db.backup(target_db)
                     if target_db.execute("PRAGMA integrity_check").fetchone()[0] != "ok":

@@ -1,0 +1,61 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_ test_backup_and_restore_preserve_uri_special_filename[tenant?mode=rw.sqlite3] _
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-391/test_backup_and_restore_preser0')
+name = 'tenant?mode=rw.sqlite3'
+
+    @pytest.mark.parametrize('name', ['tenant?mode=rw.sqlite3', 'tenant#section.sqlite3'])
+    def test_backup_and_restore_preserve_uri_special_filename(tmp_path, name):
+        source = tmp_path / 'source'
+        source.mkdir()
+        with sqlite3.connect(source / name) as db:
+            db.execute('CREATE TABLE evidence(value TEXT)')
+            db.execute("INSERT INTO evidence VALUES('preserved')")
+        backup = tmp_path / 'backup'
+        manager = BackupManager(source)
+>       manifest = manager.create(backup)
+
+tests/test_backup_filename_uri.py:19: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <meemee.backup.BackupManager object at 0x7f1ba758aa70>
+destination = PosixPath('/tmp/pytest-of-sandbox/pytest-391/test_backup_and_restore_preser0/backup')
+
+    def create(self, destination: Path) -> dict[str, object]:
+        destination.mkdir(parents=True, exist_ok=False)
+        files: list[dict[str, object]] = []
+        for source in sorted(self.data_dir.glob("*.sqlite3")):
+            target = destination / source.name
+>           source_db = sqlite3.connect(f"file:{source}?mode=ro", uri=True)
+E           sqlite3.OperationalError: no such access mode: rw.sqlite3?mode=ro
+
+meemee/backup.py:21: OperationalError
+_ test_backup_and_restore_preserve_uri_special_filename[tenant#section.sqlite3] _
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-391/test_backup_and_restore_preser1')
+name = 'tenant#section.sqlite3'
+
+    @pytest.mark.parametrize('name', ['tenant?mode=rw.sqlite3', 'tenant#section.sqlite3'])
+    def test_backup_and_restore_preserve_uri_special_filename(tmp_path, name):
+        source = tmp_path / 'source'
+        source.mkdir()
+        with sqlite3.connect(source / name) as db:
+            db.execute('CREATE TABLE evidence(value TEXT)')
+            db.execute("INSERT INTO evidence VALUES('preserved')")
+        backup = tmp_path / 'backup'
+        manager = BackupManager(source)
+        manifest = manager.create(backup)
+        assert manifest['files'][0]['name'] == name
+        BackupManager.verify(backup)
+        restored = tmp_path / 'restored'
+        BackupManager.restore(backup, restored)
+        with sqlite3.connect(restored / name) as db:
+>           assert db.execute('SELECT value FROM evidence').fetchone()[0] == 'preserved'
+E           sqlite3.OperationalError: no such table: evidence
+
+tests/test_backup_filename_uri.py:25: OperationalError
+=========================== short test summary info ============================
+FAILED tests/test_backup_filename_uri.py::test_backup_and_restore_preserve_uri_special_filename[tenant?mode=rw.sqlite3]
+FAILED tests/test_backup_filename_uri.py::test_backup_and_restore_preserve_uri_special_filename[tenant#section.sqlite3]
+2 failed in 0.08s
