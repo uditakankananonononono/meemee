@@ -1,0 +1,50 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+___________ test_unclaimed_job_cannot_publish_terminal_event[finish] ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-104/test_unclaimed_job_cannot_publ0')
+terminal = 'finish'
+
+    @pytest.mark.parametrize('terminal',['finish','fail'])
+    def test_unclaimed_job_cannot_publish_terminal_event(tmp_path, terminal):
+        store = JobStore(tmp_path/'jobs.db')
+        ident = store.enqueue('work',principal='owner')
+        before = store.events(ident)
+>       with pytest.raises(ValueError):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_job_terminal_canaries.py:12: Failed
+____________ test_unclaimed_job_cannot_publish_terminal_event[fail] ____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-104/test_unclaimed_job_cannot_publ1')
+terminal = 'fail'
+
+    @pytest.mark.parametrize('terminal',['finish','fail'])
+    def test_unclaimed_job_cannot_publish_terminal_event(tmp_path, terminal):
+        store = JobStore(tmp_path/'jobs.db')
+        ident = store.enqueue('work',principal='owner')
+        before = store.events(ident)
+>       with pytest.raises(ValueError):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_job_terminal_canaries.py:12: Failed
+______________ test_legacy_cancel_uses_cancelled_state_not_failed ______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-104/test_legacy_cancel_uses_cancel0')
+
+    def test_legacy_cancel_uses_cancelled_state_not_failed(tmp_path):
+        store = JobStore(tmp_path/'jobs.db')
+        ident = store.enqueue('work',principal='owner')
+        assert store.cancel(ident)
+>       assert store.get(ident)['status'] == 'cancelled'
+E       AssertionError: assert 'failed' == 'cancelled'
+E         
+E         - cancelled
+E         + failed
+
+tests/test_job_terminal_canaries.py:25: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_job_terminal_canaries.py::test_unclaimed_job_cannot_publish_terminal_event[finish]
+FAILED tests/test_job_terminal_canaries.py::test_unclaimed_job_cannot_publish_terminal_event[fail]
+FAILED tests/test_job_terminal_canaries.py::test_legacy_cancel_uses_cancelled_state_not_failed
+3 failed in 0.07s

@@ -1,6 +1,6 @@
 # October 7 build-out follow-up
 
-Twenty-three implementation areas improved, not product completion. SQLite migration rollback, shell executable/output boundaries, serialized audit append and browser-store startup have canary-first evidence. Fresh root suite: 671 passed, 126 skipped, 2 warnings. See [scope and retained evidence](docs/audit/2026-10-07-buildout.md). The historical audit below is not silently reclassified.
+Twenty-four implementation areas improved, not product completion. SQLite migration rollback, shell executable/output boundaries, serialized audit append and browser-store startup have canary-first evidence. Fresh root suite: 674 passed, 126 skipped, 2 warnings. See [scope and retained evidence](docs/audit/2026-10-07-buildout.md). The historical audit below is not silently reclassified.
 
 # Meemee status
 

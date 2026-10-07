@@ -110,32 +110,43 @@ class JobStore:
                 self.db.execute("DELETE FROM job_events WHERE job_id=?", (ident,))
         return bool(deleted)
 
-    def finish(self, ident: str, result: dict[str, Any]) -> bool:
-        """Mark a running job done. Returns True when the job was purged instead."""
-        if self._settle_purge(ident):
-            return True
+    def _publish_terminal(self, ident: str, result: dict[str, Any] | None, error: str | None) -> bool:
         now = datetime.now(timezone.utc).isoformat()
-        with self.lock, self.db:
-            self.db.execute(
-                "UPDATE jobs SET status='done', result=?, updated_at=? WHERE id=? AND status='running'",
-                (json.dumps(result), now, ident),
-            )
-        self.event(ident, "done", {"result": result})
-        return False
+        with self.lock:
+            self.db.execute("BEGIN IMMEDIATE")
+            try:
+                row = self.db.execute("SELECT status,purge_pending,attempts,max_attempts FROM jobs WHERE id=?", (ident,)).fetchone()
+                if row is None:
+                    raise ValueError("unknown job")
+                if row["purge_pending"]:
+                    self.db.execute("DELETE FROM jobs WHERE id=?", (ident,))
+                    self.db.execute("DELETE FROM job_events WHERE job_id=?", (ident,))
+                    self.db.commit()
+                    return True
+                if row["status"] != "running":
+                    raise ValueError(f"job is not running: {row['status']}")
+                if result is not None:
+                    target, event, payload = "done", "done", {"result": result}
+                else:
+                    target = "queued" if row["attempts"] < row["max_attempts"] else "failed"
+                    event, payload = ("retry" if target == "queued" else "failed"), {"error": error}
+                self.db.execute("UPDATE jobs SET status=?,result=?,error=?,updated_at=? WHERE id=?",
+                    (target, json.dumps(result) if result is not None else None, error, now, ident))
+                self.db.execute("INSERT INTO job_events(job_id,kind,payload,created_at) VALUES(?,?,?,?)",
+                    (ident, event, json.dumps(payload), now))
+                self.db.commit()
+                return False
+            except BaseException:
+                self.db.rollback()
+                raise
+
+    def finish(self, ident: str, result: dict[str, Any]) -> bool:
+        """Mark running work done atomically with its event; True means purged."""
+        return self._publish_terminal(ident, result, None)
 
     def fail(self, ident: str, error: str) -> bool:
-        """Fail or requeue a running job. Returns True when the job was purged instead."""
-        if self._settle_purge(ident):
-            return True
-        now = datetime.now(timezone.utc).isoformat()
-        with self.lock, self.db:
-            self.db.execute(
-                "UPDATE jobs SET status=CASE WHEN attempts<max_attempts THEN 'queued' ELSE 'failed' END, error=?, updated_at=? WHERE id=? AND status='running'",
-                (error, now, ident),
-            )
-        job = self.get(ident)
-        self.event(ident, "retry" if job and job["status"] == "queued" else "failed", {"error": error})
-        return False
+        """Fail/requeue running work atomically with its event; True means purged."""
+        return self._publish_terminal(ident, None, error)
 
 
     def request_cancel(self, ident: str) -> str | None:
@@ -168,7 +179,7 @@ class JobStore:
         now = datetime.now(timezone.utc).isoformat()
         with self.lock, self.db:
             changed = self.db.execute(
-                "UPDATE jobs SET status='failed', error='cancelled', updated_at=? WHERE id=? AND status='queued'",
+                "UPDATE jobs SET status='cancelled', error='cancelled', updated_at=? WHERE id=? AND status='queued'",
                 (now, ident),
             ).rowcount
         if changed:
