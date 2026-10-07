@@ -32,8 +32,11 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         finally:
             route = getattr(request.scope.get("route"), "path", "__unmatched__")
             HTTP_INFLIGHT.dec()
-            HTTP_REQUESTS.labels(request.method, route, status).inc()
-            HTTP_DURATION.labels(request.method, route).observe(time.perf_counter() - started)
+            method = request.method if request.method in {
+                "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "CONNECT", "TRACE"
+            } else "__other__"
+            HTTP_REQUESTS.labels(method, route, status).inc()
+            HTTP_DURATION.labels(method, route).observe(time.perf_counter() - started)
 
 
 def metrics_response() -> Response:
