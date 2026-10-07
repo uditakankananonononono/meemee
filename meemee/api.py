@@ -639,6 +639,8 @@ def create_job(
     try:
         try:
             run_at = datetime.fromisoformat(request.run_at.replace("Z", "+00:00")) if request.run_at else None
+            if run_at is not None and (run_at.tzinfo is None or run_at.utcoffset() is None):
+                raise HTTPException(422, "run_at must include a timezone")
         except ValueError as exc:
             raise HTTPException(422, "run_at must be ISO 8601") from exc
         try:

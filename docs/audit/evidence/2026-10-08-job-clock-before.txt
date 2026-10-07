@@ -1,0 +1,71 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+________________ test_job_store_rejects_naive_schedule[sqlite] _________________
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7f960738ff10>, jobs=<meemee.jobs.JobStore ...Store object at 0x7f96073f09a0>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7f96073f3eb0>)
+
+    def test_job_store_rejects_naive_schedule(persistence):  # noqa: F811
+>       with pytest.raises(ValueError, match='timezone'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_job_naive_time.py:10: Failed
+______________ test_job_store_rejects_naive_schedule[postgresql] _______________
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f9605dd8970>, jobs=<meemee...re object at 0x7f9605dd96f0>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f9605dd9720>)
+
+    def test_job_store_rejects_naive_schedule(persistence):  # noqa: F811
+>       with pytest.raises(ValueError, match='timezone'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_job_naive_time.py:10: Failed
+______________ test_api_rejects_naive_job_before_quota_or_enqueue ______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f9605dd8340>
+
+    def test_api_rejects_naive_job_before_quota_or_enqueue(monkeypatch):
+        from types import SimpleNamespace
+    
+        from fastapi import HTTPException
+    
+        from meemee import api
+    
+        calls = []
+        monkeypatch.setattr(api.quotas, 'consume_job', lambda owner: calls.append('quota'))
+        monkeypatch.setattr(api.jobs, 'enqueue', lambda *a, **kw: calls.append('enqueue'))
+        with pytest.raises(HTTPException) as exc:
+>           api.create_job(api.JobRequest(goal='work', run_at='2026-10-08T09:00:00'), SimpleNamespace(id='owner'), None)
+
+tests/test_job_naive_time.py:25: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee/api.py:656: in create_job
+    audit.append(principal.id, "job.create", ident, "success", {"scheduled": bool(run_at)})
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <meemee.audit.AuditLog object at 0x7f96051122c0>, actor = 'owner'
+action = 'job.create', resource = None, outcome = 'success'
+metadata = {'scheduled': True}
+
+    def append(self, actor: str, action: str, resource: str, outcome: str, metadata: dict[str, Any] | None = None) -> int:
+        occurred = datetime.now(timezone.utc).isoformat()
+        encoded = json.dumps(metadata or {}, sort_keys=True, separators=(",", ":"))
+        with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            previous_row = self.db.execute("SELECT entry_hash FROM audit_log ORDER BY sequence DESC LIMIT 1").fetchone()
+            if previous_row:
+                previous = previous_row[0]
+            else:
+                base = self.db.execute("SELECT entry_hash FROM audit_chain_base WHERE singleton=1").fetchone()
+                previous = base[0] if base else "0" * 64
+            digest = self.hash(previous, occurred, actor, action, resource, outcome, encoded)
+>           cursor = self.db.execute(
+                "INSERT INTO audit_log(occurred_at,actor_id,action,resource,outcome,metadata,previous_hash,entry_hash) VALUES(?,?,?,?,?,?,?,?)",
+                (occurred, actor, action, resource, outcome, encoded, previous, digest),
+            )
+E           sqlite3.IntegrityError: NOT NULL constraint failed: audit_log.resource
+
+meemee/audit.py:57: IntegrityError
+=========================== short test summary info ============================
+FAILED tests/test_job_naive_time.py::test_job_store_rejects_naive_schedule[sqlite]
+FAILED tests/test_job_naive_time.py::test_job_store_rejects_naive_schedule[postgresql]
+FAILED tests/test_job_naive_time.py::test_api_rejects_naive_job_before_quota_or_enqueue
+3 failed in 2.21s
