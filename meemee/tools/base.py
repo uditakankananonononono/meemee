@@ -54,6 +54,8 @@ class ToolRegistry:
 
     async def execute(self, name: str, arguments: dict[str, Any], cancel=None, *, owner_id: str) -> ToolResult:
         started = time.perf_counter()
+        if cancel is not None and cancel.is_set():
+            return ToolResult(ok=False, error="tool cancelled", elapsed_ms=0)
         try:
             tool = self.get(name)
             parsed = tool.arguments_model.model_validate(arguments)
@@ -71,6 +73,8 @@ class ToolRegistry:
                 options["cancel"] = cancel
             if "owner_id" in parameters:
                 options["owner_id"] = owner_id
+            if cancel is not None and cancel.is_set():
+                return ToolResult(ok=False, error="tool cancelled", elapsed_ms=round((time.perf_counter()-started)*1000))
             value = tool.run(parsed, **options)
             if inspect.isawaitable(value):
                 task = asyncio.create_task(value)
