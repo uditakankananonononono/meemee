@@ -16,7 +16,7 @@ def _gpu_mem_gb() -> float:
         return 0.0
     try:
         out = subprocess.run(["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
-                             capture_output=True, text=True, timeout=10).stdout
+                             capture_output=True, text=True, check=False, timeout=10).stdout
         return sum(float(x) for x in out.split()) / 1024
     except (OSError, ValueError, subprocess.SubprocessError):
         return 0.0

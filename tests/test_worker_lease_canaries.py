@@ -17,14 +17,15 @@ class EndLoop(Exception):
 @pytest.mark.asyncio
 @pytest.mark.parametrize('lost', [False, True])
 async def test_worker_renews_lease_and_never_settles_lost_work(tmp_path, monkeypatch, lost):
+    from meemee import worker
     from meemee_persist_pg.jobs import LeaseLostError
-    import meemee.worker as worker
     class Jobs:
         lease_seconds = 0.15
         claimed = False
         deadline = 0
         beats = 0
-        terminals = []
+        def __init__(self):
+            self.terminals = []
         def claim(self):
             if self.claimed:
                 raise EndLoop()

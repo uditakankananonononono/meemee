@@ -1,0 +1,73 @@
+* Creating isolated environment: venv+pip...
+* Installing packages in isolated environment:
+  - hatchling>=1.25
+* Getting build dependencies for wheel...
+* Installed build dependency versions:
+  - hatchling==1.32.4
+* Building wheel...
+Successfully built meemee_agent-0.122.0-py3-none-any.whl
+* Creating isolated environment: venv+pip...
+* Installing packages in isolated environment:
+  - setuptools>=68
+* Getting build dependencies for wheel...
+running egg_info
+writing src/meemee_client.egg-info/PKG-INFO
+writing dependency_links to src/meemee_client.egg-info/dependency_links.txt
+writing requirements to src/meemee_client.egg-info/requires.txt
+writing top-level names to src/meemee_client.egg-info/top_level.txt
+reading manifest file 'src/meemee_client.egg-info/SOURCES.txt'
+adding license file 'LICENSE'
+writing manifest file 'src/meemee_client.egg-info/SOURCES.txt'
+* Installed build dependency versions:
+  - setuptools==84.0.0
+* Building wheel...
+running bdist_wheel
+running build
+running build_py
+running egg_info
+writing src/meemee_client.egg-info/PKG-INFO
+writing dependency_links to src/meemee_client.egg-info/dependency_links.txt
+writing requirements to src/meemee_client.egg-info/requires.txt
+writing top-level names to src/meemee_client.egg-info/top_level.txt
+reading manifest file 'src/meemee_client.egg-info/SOURCES.txt'
+adding license file 'LICENSE'
+writing manifest file 'src/meemee_client.egg-info/SOURCES.txt'
+installing to build/bdist.linux-x86_64/wheel
+running install
+running install_lib
+creating build/bdist.linux-x86_64/wheel
+creating build/bdist.linux-x86_64/wheel/meemee_client
+copying build/lib/meemee_client/_ws.py -> build/bdist.linux-x86_64/wheel/./meemee_client
+copying build/lib/meemee_client/py.typed -> build/bdist.linux-x86_64/wheel/./meemee_client
+copying build/lib/meemee_client/aio.py -> build/bdist.linux-x86_64/wheel/./meemee_client
+copying build/lib/meemee_client/__init__.py -> build/bdist.linux-x86_64/wheel/./meemee_client
+copying build/lib/meemee_client/errors.py -> build/bdist.linux-x86_64/wheel/./meemee_client
+copying build/lib/meemee_client/auth.py -> build/bdist.linux-x86_64/wheel/./meemee_client
+copying build/lib/meemee_client/sse.py -> build/bdist.linux-x86_64/wheel/./meemee_client
+copying build/lib/meemee_client/_version.py -> build/bdist.linux-x86_64/wheel/./meemee_client
+copying build/lib/meemee_client/client.py -> build/bdist.linux-x86_64/wheel/./meemee_client
+copying build/lib/meemee_client/models.py -> build/bdist.linux-x86_64/wheel/./meemee_client
+copying build/lib/meemee_client/retry.py -> build/bdist.linux-x86_64/wheel/./meemee_client
+running install_egg_info
+Copying src/meemee_client.egg-info to build/bdist.linux-x86_64/wheel/./meemee_client-0.122.0-py3.10.egg-info
+running install_scripts
+creating build/bdist.linux-x86_64/wheel/meemee_client-0.122.0.dist-info/WHEEL
+creating '/tmp/meemee-ci-sdk-dist/.tmp-ai57o2sn/meemee_client-0.122.0-py3-none-any.whl' and adding 'build/bdist.linux-x86_64/wheel' to it
+adding 'meemee_client/__init__.py'
+adding 'meemee_client/_version.py'
+adding 'meemee_client/_ws.py'
+adding 'meemee_client/aio.py'
+adding 'meemee_client/auth.py'
+adding 'meemee_client/client.py'
+adding 'meemee_client/errors.py'
+adding 'meemee_client/models.py'
+adding 'meemee_client/py.typed'
+adding 'meemee_client/retry.py'
+adding 'meemee_client/sse.py'
+adding 'meemee_client-0.122.0.dist-info/licenses/LICENSE'
+adding 'meemee_client-0.122.0.dist-info/METADATA'
+adding 'meemee_client-0.122.0.dist-info/WHEEL'
+adding 'meemee_client-0.122.0.dist-info/top_level.txt'
+adding 'meemee_client-0.122.0.dist-info/RECORD'
+removing build/bdist.linux-x86_64/wheel
+Successfully built meemee_client-0.122.0-py3-none-any.whl

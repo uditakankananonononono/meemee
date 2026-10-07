@@ -4,6 +4,7 @@ import asyncio
 import getpass
 import json
 from pathlib import Path
+from typing import Annotated
 
 import typer
 import uvicorn
@@ -97,7 +98,7 @@ def models_pull(name: str = typer.Argument(..., help="A transport=transformers p
 
 
 @models_app.command("pull-embeddings")
-def models_pull_embeddings(directory: Path = typer.Argument(...)) -> None:
+def models_pull_embeddings(directory: Annotated[Path, typer.Argument()]) -> None:
     """Download/check the pinned free MiniLM encoder for offline semantic memory."""
     from .semantic_memory import MiniLMEmbedder, pull_minilm
     path = pull_minilm(directory)

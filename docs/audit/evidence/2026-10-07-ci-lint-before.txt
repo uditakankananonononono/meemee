@@ -1,0 +1,459 @@
+I001 [*] Import block is un-sorted or un-formatted
+  --> meemee/_vendor/instinct_models/__init__.py:9:1
+   |
+ 7 |   Training pipelines are shared; datasets stay per product.
+ 8 |   """
+ 9 | / from .config import ProductConfig, load_config
+10 | | from .providers import (ChatResult, InklingHFRouter, InklingLocal, HermesLocal, OpenClawOwner, JevEval, JevStatusError, NeedleLocal,
+11 | |                         OrnithOpenAICompat, Provider, ProviderError, ProviderUnavailable, validate_questions)
+12 | | from .lexical import LexicalLocal, LexicalToolModel
+13 | | from .router import Router, Task
+   | |________________________________^
+14 |
+15 |   __all__ = ["ProductConfig", "load_config", "Provider", "ProviderError", "ProviderUnavailable", "ChatResult",
+   |
+help: Organize imports
+   |
+9  | from .config import ProductConfig, load_config
+   - from .providers import (ChatResult, InklingHFRouter, InklingLocal, HermesLocal, OpenClawOwner, JevEval, JevStatusError, NeedleLocal,
+   -                         OrnithOpenAICompat, Provider, ProviderError, ProviderUnavailable, validate_questions)
+10 | from .lexical import LexicalLocal, LexicalToolModel
+11 + from .providers import (
+12 +                         ChatResult,
+13 +                         HermesLocal,
+14 +                         InklingHFRouter,
+15 +                         InklingLocal,
+16 +                         JevEval,
+17 +                         JevStatusError,
+18 +                         NeedleLocal,
+19 +                         OpenClawOwner,
+20 +                         OrnithOpenAICompat,
+21 +                         Provider,
+22 +                         ProviderError,
+23 +                         ProviderUnavailable,
+24 +                         validate_questions,
+25 + )
+26 | from .router import Router, Task
+   |
+
+RUF022 [*] `__all__` is not sorted
+  --> meemee/_vendor/instinct_models/__init__.py:15:11
+   |
+13 |   from .router import Router, Task
+14 |
+15 |   __all__ = ["ProductConfig", "load_config", "Provider", "ProviderError", "ProviderUnavailable", "ChatResult",
+   |  ___________^
+16 | |            "InklingLocal", "InklingHFRouter", "HermesLocal", "OpenClawOwner", "OrnithOpenAICompat", "NeedleLocal", "JevEval", "JevSt…
+17 | |            "validate_questions", "Router", "Task", "LexicalLocal", "LexicalToolModel"]
+   | |______________________________________________________________________________________^
+18 |   __version__ = "0.1.0"
+   |
+help: Apply an isort-style sorting to `__all__`
+   |
+14 |
+   - __all__ = ["ProductConfig", "load_config", "Provider", "ProviderError", "ProviderUnavailable", "ChatResult",
+   -            "InklingLocal", "InklingHFRouter", "HermesLocal", "OpenClawOwner", "OrnithOpenAICompat", "NeedleLocal", "JevEval", "JevStatusError",
+   -            "validate_questions", "Router", "Task", "LexicalLocal", "LexicalToolModel"]
+15 + __all__ = [
+16 +                         "ChatResult",
+17 +                         "HermesLocal",
+18 +                         "InklingHFRouter",
+19 +                         "InklingLocal",
+20 +                         "JevEval",
+21 +                         "JevStatusError",
+22 +                         "LexicalLocal",
+23 +                         "LexicalToolModel",
+24 +                         "NeedleLocal",
+25 +                         "OpenClawOwner",
+26 +                         "OrnithOpenAICompat",
+27 +                         "ProductConfig",
+28 +                         "Provider",
+29 +                         "ProviderError",
+30 +                         "ProviderUnavailable",
+31 +                         "Router",
+32 +                         "Task",
+33 +                         "load_config",
+34 +                         "validate_questions",
+35 + ]
+36 | __version__ = "0.1.0"
+   |
+
+UP035 [*] Import from `collections.abc` instead: `Callable`
+  --> meemee/_vendor/instinct_models/catalog.py:17:1
+   |
+15 | from dataclasses import dataclass
+16 | from html.parser import HTMLParser
+17 | from typing import Callable, Protocol
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+18 |
+19 | BASE = "https://www.theailibrary.co"
+   |
+help: Import from `collections.abc`
+   |
+16 | from html.parser import HTMLParser
+   - from typing import Callable, Protocol
+17 + from typing import Protocol
+18 + from collections.abc import Callable
+19 |
+   |
+
+RUF012 Mutable default value for class attribute
+  --> meemee/_vendor/instinct_models/catalog.py:64:16
+   |
+62 | class AILibraryCatalog:
+63 |     name = "theailibrary.co"
+64 |     SECTIONS = {"": "/", "prompts": "/prompts", "ai": "/categories/ai"}
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+65 |
+66 |     def __init__(self, fetch: Callable[[str], str] = _get, min_interval_s: float = 2.0, ttl_s: float = 3600,
+   |
+help: Consider initializing in `__init__` or annotating with `typing.ClassVar`
+
+RUF007 Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
+  --> meemee/_vendor/instinct_models/lexical.py:39:40
+   |
+37 | def _feats(text: str) -> list[str]:
+38 |     w = [x for x in _words(text) if x not in _STOP]
+39 |     return w + [f"{a}_{b}" for a, b in zip(w, w[1:])]
+   |                                        ^^^
+help: Replace `zip()` with `itertools.pairwise()`
+
+UP037 [*] Remove quotes from type annotation
+  --> meemee/_vendor/instinct_models/lexical.py:53:40
+   |
+52 |     # ---- training -------------------------------------------------------
+53 |     def fit(self, rows: list[dict]) -> "LexicalToolModel":
+   |                                        ^^^^^^^^^^^^^^^^^^
+54 |         """rows: Needle-format records {query, tools, answers}."""
+55 |         for r in rows:
+   |
+help: Remove quotes
+   |
+52 |     # ---- training -------------------------------------------------------
+   -     def fit(self, rows: list[dict]) -> "LexicalToolModel":
+53 +     def fit(self, rows: list[dict]) -> LexicalToolModel:
+54 |         """rows: Needle-format records {query, tools, answers}."""
+   |
+
+UP037 [*] Remove quotes from type annotation
+  --> meemee/_vendor/instinct_models/lexical.py:73:52
+   |
+72 |     @classmethod
+73 |     def from_jsonl(cls, path: str | Path, **kw) -> "LexicalToolModel":
+   |                                                    ^^^^^^^^^^^^^^^^^^
+74 |         rows = [json.loads(l) for l in Path(path).read_text().splitlines() if l.strip()]
+75 |         return cls(**kw).fit(rows)
+   |
+help: Remove quotes
+   |
+72 |     @classmethod
+   -     def from_jsonl(cls, path: str | Path, **kw) -> "LexicalToolModel":
+73 +     def from_jsonl(cls, path: str | Path, **kw) -> LexicalToolModel:
+74 |         rows = [json.loads(l) for l in Path(path).read_text().splitlines() if l.strip()]
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> meemee/_vendor/instinct_models/router.py:11:1
+   |
+ 9 |   - No paid route exists in this package.
+10 |   """
+11 | / from __future__ import annotations
+12 | |
+13 | | from dataclasses import dataclass, field
+14 | |
+15 | | from .config import ProductConfig
+16 | | from .lexical import LexicalLocal, LexicalToolModel
+17 | | from .providers import (HOSTED, ChatResult, InklingHFRouter, InklingLocal, NeedleLocal, OrnithOpenAICompat, HermesLocal, Provider,
+18 | |                         ProviderError)
+   | |______________________________________^
+help: Organize imports
+   |
+16 | from .lexical import LexicalLocal, LexicalToolModel
+   - from .providers import (HOSTED, ChatResult, InklingHFRouter, InklingLocal, NeedleLocal, OrnithOpenAICompat, HermesLocal, Provider,
+   -                         ProviderError)
+17 + from .providers import (
+18 +     HOSTED,
+19 +     ChatResult,
+20 +     HermesLocal,
+21 +     InklingHFRouter,
+22 +     InklingLocal,
+23 +     NeedleLocal,
+24 +     OrnithOpenAICompat,
+25 +     Provider,
+26 +     ProviderError,
+27 + )
+28 |
+   |
+
+UP037 [*] Remove quotes from type annotation
+  --> meemee/_vendor/instinct_models/router.py:51:49
+   |
+50 |     @classmethod
+51 |     def from_config(cls, cfg: ProductConfig) -> "Router":
+   |                                                 ^^^^^^^^
+52 |         chain: list[Provider] = [NeedleLocal(cfg.needle_weights),
+53 |                                  OrnithOpenAICompat(cfg.ornith_url, cfg.ornith_model),
+   |
+help: Remove quotes
+   |
+50 |     @classmethod
+   -     def from_config(cls, cfg: ProductConfig) -> "Router":
+51 +     def from_config(cls, cfg: ProductConfig) -> Router:
+52 |         chain: list[Provider] = [NeedleLocal(cfg.needle_weights),
+   |
+
+RUF022 [*] `__all__` is not sorted
+ --> meemee/_vendor/instinct_models/training/__init__.py:5:11
+  |
+3 |   from .ornith_rl import OrnithRLUnavailable, ornith_rl_preflight
+4 |
+5 |   __all__ = ["DomainDataset", "ExampleRow", "build_needle_jsonl", "NeedleLoRAJob", "train_needle_lora",
+  |  ___________^
+6 | |            "OrnithRLUnavailable", "ornith_rl_preflight"]
+  | |________________________________________________________^
+help: Apply an isort-style sorting to `__all__`
+   |
+4  |
+   - __all__ = ["DomainDataset", "ExampleRow", "build_needle_jsonl", "NeedleLoRAJob", "train_needle_lora",
+   -            "OrnithRLUnavailable", "ornith_rl_preflight"]
+5  + __all__ = [
+6  +            "DomainDataset",
+7  +            "ExampleRow",
+8  +            "NeedleLoRAJob",
+9  +            "OrnithRLUnavailable",
+10 +            "build_needle_jsonl",
+11 +            "ornith_rl_preflight",
+12 +            "train_needle_lora",
+13 + ]
+   |
+
+UP035 [*] Import from `collections.abc` instead: `Iterable`
+  --> meemee/_vendor/instinct_models/training/dataset.py:17:1
+   |
+15 | from dataclasses import dataclass, field
+16 | from pathlib import Path
+17 | from typing import Iterable, Protocol
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Import from `collections.abc`
+   |
+16 | from pathlib import Path
+   - from typing import Iterable, Protocol
+17 + from typing import Protocol
+18 + from collections.abc import Iterable
+19 |
+   |
+
+UP035 [*] Import from `collections.abc` instead: `Callable`
+  --> meemee/_vendor/instinct_models/training/needle_lora.py:20:1
+   |
+18 | from datetime import datetime, timezone
+19 | from pathlib import Path
+20 | from typing import Callable
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+21 |
+22 | Runner = Callable[[list[str], dict], subprocess.CompletedProcess]
+   |
+help: Import from `collections.abc`
+   |
+19 | from pathlib import Path
+   - from typing import Callable
+20 + from collections.abc import Callable
+21 |
+   |
+
+PLW1510 `subprocess.run` without explicit `check` argument
+  --> meemee/_vendor/instinct_models/training/needle_lora.py:26:12
+   |
+25 | def _run(cmd: list[str], env: dict) -> subprocess.CompletedProcess:
+26 |     return subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=6 * 3600)
+   |            ^^^^^^^^^^^^^^
+help: Add explicit `check=False`
+
+PLW1510 `subprocess.run` without explicit `check` argument
+  --> meemee/_vendor/instinct_models/training/ornith_rl.py:18:15
+   |
+16 |         return 0.0
+17 |     try:
+18 |         out = subprocess.run(["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
+   |               ^^^^^^^^^^^^^^
+19 |                              capture_output=True, text=True, timeout=10).stdout
+20 |         return sum(float(x) for x in out.split()) / 1024
+   |
+help: Add explicit `check=False`
+
+B008 Do not perform function call `typer.Argument` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+   --> meemee/cli.py:100:46
+    |
+ 99 | @models_app.command("pull-embeddings")
+100 | def models_pull_embeddings(directory: Path = typer.Argument(...)) -> None:
+    |                                              ^^^^^^^^^^^^^^^^^^^
+101 |     """Download/check the pinned free MiniLM encoder for offline semantic memory."""
+102 |     from .semantic_memory import MiniLMEmbedder, pull_minilm
+    |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> meemee/shared_models.py:17:1
+   |
+15 |   the hosted Hugging Face router unless ``MEEMEE_SHARED_ALLOW_HOSTED=true``.
+16 |   """
+17 | / from __future__ import annotations
+18 | |
+19 | | import asyncio
+20 | | import json
+21 | | from collections.abc import Iterable
+22 | | from dataclasses import dataclass, field
+23 | | from pathlib import Path
+24 | | from typing import Any
+25 | |
+26 | | from ._vendor.instinct_models import (
+27 | |     InklingHFRouter,
+28 | |     InklingLocal,
+29 | |     HermesLocal,
+30 | |     OpenClawOwner,
+31 | |     JevEval,
+32 | |     NeedleLocal,
+33 | |     OrnithOpenAICompat,
+34 | |     Provider,
+35 | |     Router,
+36 | |     Task,
+37 | | )
+38 | | from ._vendor.instinct_models.training import (
+39 | |     ExampleRow,
+40 | |     NeedleLoRAJob,
+41 | |     build_needle_jsonl,
+42 | |     train_needle_lora,
+43 | | )
+44 | | from .llm import ModelError
+45 | | from .types import AgentDecision
+   | |________________________________^
+46 |
+47 |   PRODUCT = "meemee"
+   |
+help: Organize imports
+   |
+26 | from ._vendor.instinct_models import (
+27 +     HermesLocal,
+28 |     InklingHFRouter,
+29 |     InklingLocal,
+   -     HermesLocal,
+   -     OpenClawOwner,
+30 |     JevEval,
+31 |     NeedleLocal,
+32 +     OpenClawOwner,
+33 |     OrnithOpenAICompat,
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_isolated_owner_canary.py:2:1
+  |
+1 |   """Process isolation must not silently drop the caller's tenant identity."""
+2 | / from pydantic import BaseModel
+3 | | import pytest
+4 | |
+5 | | from meemee.isolation import IsolationPolicy
+6 | | from meemee.tools.base import Tool, ToolRegistry
+  | |________________________________________________^
+help: Organize imports
+  |
+1 | """Process isolation must not silently drop the caller's tenant identity."""
+2 + import pytest
+3 | from pydantic import BaseModel
+  - import pytest
+4 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_monitors.py:23:2
+   |
+22 |   def test_monitor_rejects_zero_fire_budget_and_ambiguous_deadline():
+23 | /  from pydantic import ValidationError
+24 | |  import pytest
+   | |______________^
+25 |    with pytest.raises(ValidationError):MonitorInput(name='bad',source_id='s',field='x',operator='exists',max_fires=0)
+26 |    with pytest.raises(ValidationError):MonitorInput(name='bad',source_id='s',field='x',operator='exists',deadline='2026-09-27T12:00:00…
+   |
+help: Organize imports
+   |
+22 | def test_monitor_rejects_zero_fire_budget_and_ambiguous_deadline():
+23 +  import pytest
+24 |  from pydantic import ValidationError
+   -  import pytest
+25 |  with pytest.raises(ValidationError):MonitorInput(name='bad',source_id='s',field='x',operator='exists',max_fires=0)
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_oidc_nonce_canaries.py:2:1
+   |
+ 1 |   """Signed fixture-token login must bind the response to nonce and subject."""
+ 2 | / from datetime import timedelta
+ 3 | |
+ 4 | | import httpx
+ 5 | | import pytest
+ 6 | | from fastapi import HTTPException
+ 7 | | from starlette.requests import Request
+ 8 | |
+ 9 | | from meemee.web_login import WebLogin, WebLoginConfig
+10 | | from test_oidc import token, validator
+   | |______________________________________^
+help: Organize imports
+   |
+7  | from starlette.requests import Request
+8  + from test_oidc import token, validator
+9  |
+10 | from meemee.web_login import WebLogin, WebLoginConfig
+   - from test_oidc import token, validator
+11 |
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_worker_lease_canaries.py:20:5
+   |
+18 |   @pytest.mark.parametrize('lost', [False, True])
+19 |   async def test_worker_renews_lease_and_never_settles_lost_work(tmp_path, monkeypatch, lost):
+20 | /     from meemee_persist_pg.jobs import LeaseLostError
+21 | |     import meemee.worker as worker
+   | |__________________________________^
+22 |       class Jobs:
+23 |           lease_seconds = 0.15
+   |
+help: Organize imports
+   |
+19 | async def test_worker_renews_lease_and_never_settles_lost_work(tmp_path, monkeypatch, lost):
+20 +     import meemee.worker as worker
+21 |     from meemee_persist_pg.jobs import LeaseLostError
+   -     import meemee.worker as worker
+22 |     class Jobs:
+   |
+
+PLR0402 [*] Use `from meemee import worker` in lieu of alias
+  --> tests/test_worker_lease_canaries.py:21:12
+   |
+19 | async def test_worker_renews_lease_and_never_settles_lost_work(tmp_path, monkeypatch, lost):
+20 |     from meemee_persist_pg.jobs import LeaseLostError
+21 |     import meemee.worker as worker
+   |            ^^^^^^^^^^^^^^^^^^^^^^^
+22 |     class Jobs:
+23 |         lease_seconds = 0.15
+   |
+help: Replace with `from meemee import worker`
+   |
+20 |     from meemee_persist_pg.jobs import LeaseLostError
+   -     import meemee.worker as worker
+21 +     from meemee import worker
+22 |     class Jobs:
+   |
+
+RUF012 Mutable default value for class attribute
+  --> tests/test_worker_lease_canaries.py:27:21
+   |
+25 |         deadline = 0
+26 |         beats = 0
+27 |         terminals = []
+   |                     ^^
+28 |         def claim(self):
+29 |             if self.claimed:
+   |
+help: Consider initializing in `__init__` or annotating with `typing.ClassVar`
+
+Found 22 errors.
+[*] 16 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).

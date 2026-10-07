@@ -1,6 +1,6 @@
 """Process isolation must not silently drop the caller's tenant identity."""
-from pydantic import BaseModel
 import pytest
+from pydantic import BaseModel
 
 from meemee.isolation import IsolationPolicy
 from meemee.tools.base import Tool, ToolRegistry
