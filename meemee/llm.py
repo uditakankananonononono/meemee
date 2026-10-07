@@ -74,7 +74,7 @@ class OpenAICompatibleModel:
                     raise ModelError("model completion was blocked by the provider content filter")
                 text = choice["message"]["content"]
                 return AgentDecision.model_validate_json(text)
-            except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError) as exc:
+            except (httpx.TimeoutException, httpx.NetworkError, httpx.RemoteProtocolError, httpx.HTTPStatusError) as exc:
                 last_error = exc
                 retryable = not isinstance(exc, httpx.HTTPStatusError) or exc.response.status_code in {
                     408, 429, 500, 502, 503, 504
@@ -134,7 +134,7 @@ class OpenAICompatibleModel:
                 if not isinstance(text, str) or not text.strip():
                     raise ModelError("model returned an empty chat completion")
                 return text.strip()
-            except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError) as exc:
+            except (httpx.TimeoutException, httpx.NetworkError, httpx.RemoteProtocolError, httpx.HTTPStatusError) as exc:
                 last_error = exc
                 retryable = not isinstance(exc, httpx.HTTPStatusError) or exc.response.status_code in {
                     408, 429, 500, 502, 503, 504

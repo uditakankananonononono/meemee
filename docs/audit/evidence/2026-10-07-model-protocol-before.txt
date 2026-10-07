@@ -1,0 +1,88 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+____________ test_remote_protocol_failure_maps_to_model_error[chat] ____________
+
+method = 'chat'
+
+    @pytest.mark.parametrize('method', ['chat', 'decide'])
+    async def test_remote_protocol_failure_maps_to_model_error(method):
+        def broken(request):
+            raise httpx.RemoteProtocolError('fixture premature disconnect')
+    
+        async with httpx.AsyncClient(transport=httpx.MockTransport(broken)) as client:
+            model = OpenAICompatibleModel('https://fixture.invalid/v1','fixture','fixture',max_attempts=1,client=client)
+            with pytest.raises(ModelError, match='1 attempts'):
+>               await getattr(model, method)([{'role':'user','content':'fixture'}])
+
+tests/test_model_protocol_canary.py:16: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee/llm.py:113: in chat
+    response = await self.client.post(
+.venv/lib/python3.10/site-packages/httpx/_client.py:1859: in post
+    return await self.request(
+.venv/lib/python3.10/site-packages/httpx/_client.py:1540: in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+.venv/lib/python3.10/site-packages/httpx/_client.py:1629: in send
+    response = await self._send_handling_auth(
+.venv/lib/python3.10/site-packages/httpx/_client.py:1657: in _send_handling_auth
+    response = await self._send_handling_redirects(
+.venv/lib/python3.10/site-packages/httpx/_client.py:1694: in _send_handling_redirects
+    response = await self._send_single_request(request)
+.venv/lib/python3.10/site-packages/httpx/_client.py:1730: in _send_single_request
+    response = await transport.handle_async_request(request)
+.venv/lib/python3.10/site-packages/httpx/_transports/mock.py:34: in handle_async_request
+    response = self.handler(request)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+request = <Request('POST', 'https://fixture.invalid/v1/chat/completions')>
+
+    def broken(request):
+>       raise httpx.RemoteProtocolError('fixture premature disconnect')
+E       httpx.RemoteProtocolError: fixture premature disconnect
+
+tests/test_model_protocol_canary.py:11: RemoteProtocolError
+___________ test_remote_protocol_failure_maps_to_model_error[decide] ___________
+
+method = 'decide'
+
+    @pytest.mark.parametrize('method', ['chat', 'decide'])
+    async def test_remote_protocol_failure_maps_to_model_error(method):
+        def broken(request):
+            raise httpx.RemoteProtocolError('fixture premature disconnect')
+    
+        async with httpx.AsyncClient(transport=httpx.MockTransport(broken)) as client:
+            model = OpenAICompatibleModel('https://fixture.invalid/v1','fixture','fixture',max_attempts=1,client=client)
+            with pytest.raises(ModelError, match='1 attempts'):
+>               await getattr(model, method)([{'role':'user','content':'fixture'}])
+
+tests/test_model_protocol_canary.py:16: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee/llm.py:50: in decide
+    response = await self.client.post(
+.venv/lib/python3.10/site-packages/httpx/_client.py:1859: in post
+    return await self.request(
+.venv/lib/python3.10/site-packages/httpx/_client.py:1540: in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+.venv/lib/python3.10/site-packages/httpx/_client.py:1629: in send
+    response = await self._send_handling_auth(
+.venv/lib/python3.10/site-packages/httpx/_client.py:1657: in _send_handling_auth
+    response = await self._send_handling_redirects(
+.venv/lib/python3.10/site-packages/httpx/_client.py:1694: in _send_handling_redirects
+    response = await self._send_single_request(request)
+.venv/lib/python3.10/site-packages/httpx/_client.py:1730: in _send_single_request
+    response = await transport.handle_async_request(request)
+.venv/lib/python3.10/site-packages/httpx/_transports/mock.py:34: in handle_async_request
+    response = self.handler(request)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+request = <Request('POST', 'https://fixture.invalid/v1/chat/completions')>
+
+    def broken(request):
+>       raise httpx.RemoteProtocolError('fixture premature disconnect')
+E       httpx.RemoteProtocolError: fixture premature disconnect
+
+tests/test_model_protocol_canary.py:11: RemoteProtocolError
+=========================== short test summary info ============================
+FAILED tests/test_model_protocol_canary.py::test_remote_protocol_failure_maps_to_model_error[chat]
+FAILED tests/test_model_protocol_canary.py::test_remote_protocol_failure_maps_to_model_error[decide]
+2 failed in 0.20s
