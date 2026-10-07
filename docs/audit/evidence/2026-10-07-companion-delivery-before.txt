@@ -1,0 +1,51 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_______________ test_negative_delivery_result_does_not_mark_done _______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-123/test_negative_delivery_result_0')
+
+    async def test_negative_delivery_result_does_not_mark_done(tmp_path):
+        store, engine, channels = setup(tmp_path)
+        queue_checkin(store)
+    
+        class Declined:
+            async def send(self, address, message):
+                return DeliveryResult('local', address, False, 'provider declined')
+    
+        channels['local'] = Declined()
+        summary = await deliver_due_once(store, engine, channels)
+        assert not summary['delivered']
+>       assert store.list_checkins('udita')[0]['status'] == 'queued'
+E       AssertionError: assert 'done' == 'queued'
+E         
+E         - queued
+E         + done
+
+tests/test_companion_delivery_truth_canary.py:19: AssertionError
+___________ test_unexpected_model_exception_does_not_strand_running ____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-123/test_unexpected_model_exceptio0')
+
+    async def test_unexpected_model_exception_does_not_strand_running(tmp_path):
+        store, engine, channels = setup(tmp_path)
+        queue_checkin(store)
+    
+        async def broken(user):
+            raise OSError('fixture transport error')
+    
+        engine.checkin_message = broken
+        try:
+            await deliver_due_once(store, engine, channels)
+        except OSError:
+            pass
+>       assert store.list_checkins('udita')[0]['status'] == 'queued'
+E       AssertionError: assert 'running' == 'queued'
+E         
+E         - queued
+E         + running
+
+tests/test_companion_delivery_truth_canary.py:34: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_companion_delivery_truth_canary.py::test_negative_delivery_result_does_not_mark_done
+FAILED tests/test_companion_delivery_truth_canary.py::test_unexpected_model_exception_does_not_strand_running
+2 failed in 0.22s

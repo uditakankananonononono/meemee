@@ -26,7 +26,13 @@ async def deliver_due_once(
     try:
         if adapter is None:
             raise ChannelError(f"unknown companion channel: {channel_name}")
-        message = await engine.checkin_message(checkin["user_id"])
+        try:
+            message = await engine.checkin_message(checkin["user_id"])
+        except Exception as exc:  # noqa: BLE001 - generation has no delivery side effect
+            state = store.fail_checkin(checkin["id"], str(exc))
+            log.warning("check-in %s generation failed (%s)", checkin["id"], exc)
+            return {"claimed": True, "checkin_id": checkin["id"], "user_id": checkin["user_id"],
+                    "delivered": False, "status": state, "detail": str(exc)}
         address = checkin["address"]
         if not address:
             if channel_name != "local":
@@ -39,6 +45,8 @@ async def deliver_due_once(
             address = conversation["id"]
         validate_delivery_address(store, checkin["user_id"], channel_name, address)
         result = await adapter.send(address, message)
+        if not result.delivered:
+            raise ChannelError(result.detail or "channel did not deliver check-in")
         store.finish_checkin(checkin["id"], message)
         return {
             "claimed": True,
