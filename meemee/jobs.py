@@ -75,11 +75,15 @@ class JobStore:
         now = datetime.now(timezone.utc).isoformat()
         due = (run_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
         with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
             self.db.execute(
                 "INSERT INTO jobs(id,goal,run_at,status,max_attempts,created_at,updated_at,principal) VALUES(?,?,?,'queued',?,?,?,?)",
                 (ident, goal, due, max_attempts, now, now, principal),
             )
-        self.event(ident, "queued", {"run_at": due})
+            self.db.execute(
+                "INSERT INTO job_events(job_id,kind,payload,created_at) VALUES(?,?,?,?)",
+                (ident, "queued", json.dumps({"run_at": due}), now),
+            )
         return ident
 
     def claim(self) -> dict[str, Any] | None:
@@ -97,9 +101,11 @@ class JobStore:
                 "UPDATE jobs SET status='running', attempts=attempts+1, updated_at=? WHERE id=? AND status='queued'",
                 (now, row["id"]),
             ).rowcount
-            self.db.execute("COMMIT")
-        if changed:
-            self.event(row["id"], "running", {"attempt": row["attempts"] + 1})
+            if changed:
+                self.db.execute(
+                    "INSERT INTO job_events(job_id,kind,payload,created_at) VALUES(?,?,?,?)",
+                    (row["id"], "running", json.dumps({"attempt": row["attempts"] + 1}), now),
+                )
         return dict(row) if changed else None
 
     def _settle_purge(self, ident: str) -> bool:
