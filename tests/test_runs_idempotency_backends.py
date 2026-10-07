@@ -126,3 +126,20 @@ def test_retention_run_in_postgresql_mode_never_prunes_local_files(monkeypatch, 
     result = CliRunner().invoke(app, ["retention-run"])
     assert result.exit_code == 2 and "MEEMEE_POSTGRES_DSN" in result.output
     assert not (tmp_path / "runs.sqlite3").exists()
+
+
+@pytest.mark.parametrize('completed', [False, True])
+def test_idempotency_publication_digest_binding(persistence, completed):  # noqa: F811
+    store = persistence.idempotency
+    payload = {'goal': 'original'}
+    store.claim('owner', '/jobs', 'key', payload)
+    if completed:
+        store.put('owner', '/jobs', 'key', payload, 201, {'id': 'original'})
+    with pytest.raises(IdempotencyConflict):
+        store.put('owner', '/jobs', 'key', {'goal': 'wrong'}, 201, {'id': 'wrong'})
+    if completed:
+        assert store.get('owner', '/jobs', 'key', payload) == (201, {'id': 'original'})
+    else:
+        from meemee.idempotency import IdempotencyInProgress
+        with pytest.raises(IdempotencyInProgress):
+            store.get('owner', '/jobs', 'key', payload)
