@@ -1,0 +1,46 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+________ test_dependent_cannot_run_or_finish_before_dependency[running] ________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-31/test_dependent_cannot_run_or_f0')
+status = 'running'
+
+    @pytest.mark.parametrize('status', ['running', 'done'])
+    def test_dependent_cannot_run_or_finish_before_dependency(tmp_path, status):
+        store = PlanStore(tmp_path / 'plan.db')
+        record = store.create(Plan(goal='ship', steps=[PlanStep(id='build', description='build'),
+            PlanStep(id='test', description='test', depends_on=['build'])]))
+>       with pytest.raises(ValueError, match='dependenc'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_plan_execution_canaries.py:13: Failed
+_________ test_dependent_cannot_run_or_finish_before_dependency[done] __________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-31/test_dependent_cannot_run_or_f1')
+status = 'done'
+
+    @pytest.mark.parametrize('status', ['running', 'done'])
+    def test_dependent_cannot_run_or_finish_before_dependency(tmp_path, status):
+        store = PlanStore(tmp_path / 'plan.db')
+        record = store.create(Plan(goal='ship', steps=[PlanStep(id='build', description='build'),
+            PlanStep(id='test', description='test', depends_on=['build'])]))
+>       with pytest.raises(ValueError, match='dependenc'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_plan_execution_canaries.py:13: Failed
+__________________ test_finished_step_cannot_silently_reopen ___________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-31/test_finished_step_cannot_sile0')
+
+    def test_finished_step_cannot_silently_reopen(tmp_path):
+        store = PlanStore(tmp_path / 'plan.db')
+        record = store.create(Plan(goal='ship', steps=[PlanStep(id='build', description='build', status='done')]))
+>       with pytest.raises(ValueError, match='transition'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_plan_execution_canaries.py:22: Failed
+=========================== short test summary info ============================
+FAILED tests/test_plan_execution_canaries.py::test_dependent_cannot_run_or_finish_before_dependency[running]
+FAILED tests/test_plan_execution_canaries.py::test_dependent_cannot_run_or_finish_before_dependency[done]
+FAILED tests/test_plan_execution_canaries.py::test_finished_step_cannot_silently_reopen
+3 failed in 0.11s

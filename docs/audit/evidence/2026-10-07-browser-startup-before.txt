@@ -1,0 +1,85 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+______________ test_two_startups_cannot_duplicate_host_id_column _______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-12/test_two_startups_cannot_dupli0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fa7a093ddb0>
+
+    def test_two_startups_cannot_duplicate_host_id_column(tmp_path, monkeypatch):
+        barrier = threading.Barrier(2)
+        connect = sqlite3.connect
+    
+        def traced_connect(*args, **kwargs):
+            connection = connect(*args, **kwargs)
+            def sync_alter(statement):
+                if statement.startswith('ALTER TABLE browser_sessions ADD COLUMN host_id'):
+                    try:
+                        barrier.wait(timeout=0.2)
+                    except threading.BrokenBarrierError:
+                        pass
+            connection.set_trace_callback(sync_alter)
+            return connection
+    
+        monkeypatch.setattr(sqlite3, 'connect', traced_connect)
+        path = tmp_path / 'sessions.db'
+        with ThreadPoolExecutor(max_workers=2) as pool:
+>           stores = list(pool.map(lambda _: BrowserSessionStore(path), range(2)))
+
+tests/test_browser_startup_race_canary.py:27: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.10/concurrent/futures/_base.py:621: in result_iterator
+    yield _result_or_cancel(fs.pop())
+/usr/lib/python3.10/concurrent/futures/_base.py:319: in _result_or_cancel
+    return fut.result(timeout)
+/usr/lib/python3.10/concurrent/futures/_base.py:458: in result
+    return self.__get_result()
+/usr/lib/python3.10/concurrent/futures/_base.py:403: in __get_result
+    raise self._exception
+/usr/lib/python3.10/concurrent/futures/thread.py:58: in run
+    result = self.fn(*self.args, **self.kwargs)
+tests/test_browser_startup_race_canary.py:27: in <lambda>
+    stores = list(pool.map(lambda _: BrowserSessionStore(path), range(2)))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <meemee.browser_sessions.BrowserSessionStore object at 0x7fa7a093c2e0>
+path = PosixPath('/tmp/pytest-of-sandbox/pytest-12/test_two_startups_cannot_dupli0/sessions.db')
+host_id = None
+
+    def __init__(self, path: Path, host_id: str | None = None):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self.host_id = host_id or default_host_id(path.parent)
+        self.db = sqlite3.connect(path, check_same_thread=False)
+        self.db.row_factory = sqlite3.Row
+        self.lock = threading.RLock()
+        with self.lock, self.db:
+            self.db.executescript("""
+                PRAGMA journal_mode=WAL;
+                PRAGMA busy_timeout=5000;
+                CREATE TABLE IF NOT EXISTS browser_sessions (
+                    id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, state TEXT NOT NULL,
+                    profile TEXT, allowed_domains TEXT NOT NULL, url TEXT, title TEXT,
+                    created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+                    closed_at TEXT, close_reason TEXT
+                );
+                CREATE TABLE IF NOT EXISTS browser_takeovers (
+                    id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES browser_sessions(id),
+                    token_digest BLOB NOT NULL, reason TEXT NOT NULL, requested_by TEXT NOT NULL,
+                    created_at TEXT NOT NULL, expires_at TEXT NOT NULL,
+                    claimed_at TEXT, finished_at TEXT, outcome TEXT, note TEXT
+                );
+                CREATE TABLE IF NOT EXISTS browser_session_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT NOT NULL,
+                    ts TEXT NOT NULL, actor TEXT NOT NULL, kind TEXT NOT NULL, detail TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS browser_events_session ON browser_session_events(session_id, id);
+                CREATE INDEX IF NOT EXISTS browser_takeovers_session ON browser_takeovers(session_id);
+            """)
+            columns = {row["name"] for row in self.db.execute("PRAGMA table_info(browser_sessions)")}
+            if "host_id" not in columns:  # the host whose process holds the live browser
+>               self.db.execute("ALTER TABLE browser_sessions ADD COLUMN host_id TEXT")
+E               sqlite3.OperationalError: duplicate column name: host_id
+
+meemee/browser_sessions.py:165: OperationalError
+=========================== short test summary info ============================
+FAILED tests/test_browser_startup_race_canary.py::test_two_startups_cannot_duplicate_host_id_column
+1 failed in 0.07s

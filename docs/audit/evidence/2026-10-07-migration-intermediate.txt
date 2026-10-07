@@ -1,0 +1,235 @@
+.F.F.....F......                                                         [100%]
+=================================== FAILURES ===================================
+_______________________ test_failed_dml_rolls_back_data ________________________
+
+self = <meemee.migrations.Migrator object at 0x7f085127eb60>, target = None
+
+    def migrate(self, target: int | None = None) -> list[int]:
+        self.database.parent.mkdir(parents=True, exist_ok=True)
+        connection = sqlite3.connect(self.database, timeout=30)
+        applied: list[int] = []
+        try:
+            connection.execute("PRAGMA journal_mode=WAL")
+            connection.execute("""CREATE TABLE IF NOT EXISTS schema_migrations (
+                version INTEGER PRIMARY KEY, name TEXT NOT NULL, checksum TEXT NOT NULL,
+                applied_at TEXT NOT NULL
+            )""")
+            connection.execute("BEGIN IMMEDIATE")
+            current = {row[0]: row[1] for row in connection.execute("SELECT version,checksum FROM schema_migrations")}
+            for migration in self.migrations:
+                if migration.version in current and current[migration.version] != migration.checksum:
+                    raise RuntimeError(f"migration {migration.version} checksum changed after application")
+                if migration.version in current or (target is not None and migration.version > target):
+                    continue
+                self._execute_script(connection, migration.sql)
+>               connection.execute(
+                    "INSERT INTO schema_migrations VALUES(?,?,?,?)",
+                    (migration.version, migration.name, migration.checksum, datetime.now(timezone.utc).isoformat()),
+                )
+E               sqlite3.DatabaseError: not authorized
+
+meemee/migrations.py:75: DatabaseError
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-2/test_failed_dml_rolls_back_dat0')
+
+    def test_failed_dml_rolls_back_data(tmp_path):
+        db = tmp_path / 'dml.db'
+        initial = Migration(1, 'initial', 'CREATE TABLE items(value TEXT); INSERT INTO items VALUES(\'original\');')
+>       Migrator(db, [initial]).migrate()
+
+tests/test_migration_atomicity_canaries.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <meemee.migrations.Migrator object at 0x7f085127eb60>, target = None
+
+    def migrate(self, target: int | None = None) -> list[int]:
+        self.database.parent.mkdir(parents=True, exist_ok=True)
+        connection = sqlite3.connect(self.database, timeout=30)
+        applied: list[int] = []
+        try:
+            connection.execute("PRAGMA journal_mode=WAL")
+            connection.execute("""CREATE TABLE IF NOT EXISTS schema_migrations (
+                version INTEGER PRIMARY KEY, name TEXT NOT NULL, checksum TEXT NOT NULL,
+                applied_at TEXT NOT NULL
+            )""")
+            connection.execute("BEGIN IMMEDIATE")
+            current = {row[0]: row[1] for row in connection.execute("SELECT version,checksum FROM schema_migrations")}
+            for migration in self.migrations:
+                if migration.version in current and current[migration.version] != migration.checksum:
+                    raise RuntimeError(f"migration {migration.version} checksum changed after application")
+                if migration.version in current or (target is not None and migration.version > target):
+                    continue
+                self._execute_script(connection, migration.sql)
+                connection.execute(
+                    "INSERT INTO schema_migrations VALUES(?,?,?,?)",
+                    (migration.version, migration.name, migration.checksum, datetime.now(timezone.utc).isoformat()),
+                )
+                applied.append(migration.version)
+            connection.commit()
+        except BaseException:
+>           connection.rollback()
+E           sqlite3.DatabaseError: not authorized
+
+meemee/migrations.py:82: DatabaseError
+______ test_trigger_semicolons_comments_and_unterminated_final_statement _______
+
+self = <meemee.migrations.Migrator object at 0x7f08512255d0>, target = None
+
+    def migrate(self, target: int | None = None) -> list[int]:
+        self.database.parent.mkdir(parents=True, exist_ok=True)
+        connection = sqlite3.connect(self.database, timeout=30)
+        applied: list[int] = []
+        try:
+            connection.execute("PRAGMA journal_mode=WAL")
+            connection.execute("""CREATE TABLE IF NOT EXISTS schema_migrations (
+                version INTEGER PRIMARY KEY, name TEXT NOT NULL, checksum TEXT NOT NULL,
+                applied_at TEXT NOT NULL
+            )""")
+            connection.execute("BEGIN IMMEDIATE")
+            current = {row[0]: row[1] for row in connection.execute("SELECT version,checksum FROM schema_migrations")}
+            for migration in self.migrations:
+                if migration.version in current and current[migration.version] != migration.checksum:
+                    raise RuntimeError(f"migration {migration.version} checksum changed after application")
+                if migration.version in current or (target is not None and migration.version > target):
+                    continue
+                self._execute_script(connection, migration.sql)
+>               connection.execute(
+                    "INSERT INTO schema_migrations VALUES(?,?,?,?)",
+                    (migration.version, migration.name, migration.checksum, datetime.now(timezone.utc).isoformat()),
+                )
+E               sqlite3.DatabaseError: not authorized
+
+meemee/migrations.py:75: DatabaseError
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-2/test_trigger_semicolons_commen0')
+
+    def test_trigger_semicolons_comments_and_unterminated_final_statement(tmp_path):
+        db = tmp_path / 'trigger.db'
+        sql = """
+        -- semicolon in comment ;
+        CREATE TABLE items(value TEXT);
+        CREATE TABLE copies(value TEXT);
+        CREATE TRIGGER copied AFTER INSERT ON items BEGIN
+          INSERT INTO copies VALUES(new.value);
+          INSERT INTO copies VALUES('literal;semicolon');
+        END;
+        INSERT INTO items VALUES('ok')
+        """
+>       assert Migrator(db, [Migration(1, 'trigger', sql)]).migrate() == [1]
+
+tests/test_migration_atomicity_canaries.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <meemee.migrations.Migrator object at 0x7f08512255d0>, target = None
+
+    def migrate(self, target: int | None = None) -> list[int]:
+        self.database.parent.mkdir(parents=True, exist_ok=True)
+        connection = sqlite3.connect(self.database, timeout=30)
+        applied: list[int] = []
+        try:
+            connection.execute("PRAGMA journal_mode=WAL")
+            connection.execute("""CREATE TABLE IF NOT EXISTS schema_migrations (
+                version INTEGER PRIMARY KEY, name TEXT NOT NULL, checksum TEXT NOT NULL,
+                applied_at TEXT NOT NULL
+            )""")
+            connection.execute("BEGIN IMMEDIATE")
+            current = {row[0]: row[1] for row in connection.execute("SELECT version,checksum FROM schema_migrations")}
+            for migration in self.migrations:
+                if migration.version in current and current[migration.version] != migration.checksum:
+                    raise RuntimeError(f"migration {migration.version} checksum changed after application")
+                if migration.version in current or (target is not None and migration.version > target):
+                    continue
+                self._execute_script(connection, migration.sql)
+                connection.execute(
+                    "INSERT INTO schema_migrations VALUES(?,?,?,?)",
+                    (migration.version, migration.name, migration.checksum, datetime.now(timezone.utc).isoformat()),
+                )
+                applied.append(migration.version)
+            connection.commit()
+        except BaseException:
+>           connection.rollback()
+E           sqlite3.DatabaseError: not authorized
+
+meemee/migrations.py:82: DatabaseError
+________________ test_migrations_are_idempotent_and_checksummed ________________
+
+self = <meemee.migrations.Migrator object at 0x7f08511e31c0>, target = None
+
+    def migrate(self, target: int | None = None) -> list[int]:
+        self.database.parent.mkdir(parents=True, exist_ok=True)
+        connection = sqlite3.connect(self.database, timeout=30)
+        applied: list[int] = []
+        try:
+            connection.execute("PRAGMA journal_mode=WAL")
+            connection.execute("""CREATE TABLE IF NOT EXISTS schema_migrations (
+                version INTEGER PRIMARY KEY, name TEXT NOT NULL, checksum TEXT NOT NULL,
+                applied_at TEXT NOT NULL
+            )""")
+            connection.execute("BEGIN IMMEDIATE")
+            current = {row[0]: row[1] for row in connection.execute("SELECT version,checksum FROM schema_migrations")}
+            for migration in self.migrations:
+                if migration.version in current and current[migration.version] != migration.checksum:
+                    raise RuntimeError(f"migration {migration.version} checksum changed after application")
+                if migration.version in current or (target is not None and migration.version > target):
+                    continue
+                self._execute_script(connection, migration.sql)
+>               connection.execute(
+                    "INSERT INTO schema_migrations VALUES(?,?,?,?)",
+                    (migration.version, migration.name, migration.checksum, datetime.now(timezone.utc).isoformat()),
+                )
+E               sqlite3.DatabaseError: not authorized
+
+meemee/migrations.py:75: DatabaseError
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-2/test_migrations_are_idempotent0')
+
+    def test_migrations_are_idempotent_and_checksummed(tmp_path: Path):
+        db = tmp_path / "db.sqlite3"
+        migrations = [Migration(1, "create-items", "CREATE TABLE items(id INTEGER PRIMARY KEY);")]
+>       assert Migrator(db, migrations).migrate() == [1]
+
+tests/test_operations.py:14: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <meemee.migrations.Migrator object at 0x7f08511e31c0>, target = None
+
+    def migrate(self, target: int | None = None) -> list[int]:
+        self.database.parent.mkdir(parents=True, exist_ok=True)
+        connection = sqlite3.connect(self.database, timeout=30)
+        applied: list[int] = []
+        try:
+            connection.execute("PRAGMA journal_mode=WAL")
+            connection.execute("""CREATE TABLE IF NOT EXISTS schema_migrations (
+                version INTEGER PRIMARY KEY, name TEXT NOT NULL, checksum TEXT NOT NULL,
+                applied_at TEXT NOT NULL
+            )""")
+            connection.execute("BEGIN IMMEDIATE")
+            current = {row[0]: row[1] for row in connection.execute("SELECT version,checksum FROM schema_migrations")}
+            for migration in self.migrations:
+                if migration.version in current and current[migration.version] != migration.checksum:
+                    raise RuntimeError(f"migration {migration.version} checksum changed after application")
+                if migration.version in current or (target is not None and migration.version > target):
+                    continue
+                self._execute_script(connection, migration.sql)
+                connection.execute(
+                    "INSERT INTO schema_migrations VALUES(?,?,?,?)",
+                    (migration.version, migration.name, migration.checksum, datetime.now(timezone.utc).isoformat()),
+                )
+                applied.append(migration.version)
+            connection.commit()
+        except BaseException:
+>           connection.rollback()
+E           sqlite3.DatabaseError: not authorized
+
+meemee/migrations.py:82: DatabaseError
+=========================== short test summary info ============================
+FAILED tests/test_migration_atomicity_canaries.py::test_failed_dml_rolls_back_data
+FAILED tests/test_migration_atomicity_canaries.py::test_trigger_semicolons_comments_and_unterminated_final_statement
+FAILED tests/test_operations.py::test_migrations_are_idempotent_and_checksummed
+3 failed, 13 passed in 0.14s

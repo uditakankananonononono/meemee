@@ -1,0 +1,47 @@
+........Fs.s.s.s.s.sss                                                   [100%]
+=================================== FAILURES ===================================
+_______________ test_both_stores_satisfy_the_interfaces[sqlite] ________________
+
+    from __future__ import annotations
+    
+    from collections.abc import Iterator
+    from contextlib import contextmanager
+    from typing import Any
+    
+    try:
+>       from psycopg import Connection
+E       ModuleNotFoundError: No module named 'psycopg'
+
+meemee_persist_pg/_db.py:8: ModuleNotFoundError
+
+The above exception was the direct cause of the following exception:
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7fb4c1dc18a0>, jobs=<meemee.jobs.JobStore ...Store object at 0x7fb4bbc3e950>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7fb4bbc3e8f0>)
+
+    def test_both_stores_satisfy_the_interfaces(persistence):
+>       from meemee_persist_pg.interfaces import AuditStoreInterface, TokenStoreInterface
+
+tests/test_token_audit_backends.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee_persist_pg/__init__.py:2: in <module>
+    from ._db import Database
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    from __future__ import annotations
+    
+    from collections.abc import Iterator
+    from contextlib import contextmanager
+    from typing import Any
+    
+    try:
+        from psycopg import Connection
+        from psycopg.rows import dict_row
+        from psycopg_pool import ConnectionPool
+    except ImportError as exc:  # explicit install failure, not a silent fallback
+>       raise RuntimeError("meemee_persist_pg requires psycopg[binary,pool]>=3.2") from exc
+E       RuntimeError: meemee_persist_pg requires psycopg[binary,pool]>=3.2
+
+meemee_persist_pg/_db.py:12: RuntimeError
+=========================== short test summary info ============================
+FAILED tests/test_token_audit_backends.py::test_both_stores_satisfy_the_interfaces[sqlite]
+1 failed, 13 passed, 8 skipped in 3.04s

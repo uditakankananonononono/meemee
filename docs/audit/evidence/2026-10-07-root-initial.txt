@@ -1,0 +1,296 @@
+..........................................s.s.s.s.s.s.s.s.s.s.s......... [  9%]
+.............s.s..ssF...................s.s.s.s.s.s..................... [ 19%]
+................s....................................................... [ 29%]
+.....s.sss.............sss.....s.s.s.s.s.s.............................. [ 39%]
+................ss.sssss...........ssFsssssssssssss............s.s.ss.s. [ 49%]
+........................ss..............s..............sss.s.s.s.s...... [ 59%]
+...............sss.................s.s.s.s.s..s.........ss.............. [ 69%]
+..........s.s.s.s.s.s..s.ss......................s.s.s.s.s.s.s.ssss....F [ 79%]
+......................................s.s.s.s.s.sss....sss.............. [ 89%]
+....sss............s.s.s.s.s.s.s.s..............................sss..... [ 99%]
+..                                                                       [100%]
+=================================== FAILURES ===================================
+___________ test_real_wheel_contains_postgres_package_and_migrations ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-11/test_real_wheel_contains_postg0')
+
+    def test_real_wheel_contains_postgres_package_and_migrations(tmp_path):
+        root=Path(__file__).parents[1]
+>       built=subprocess.run([sys.executable,"-m","build","--wheel","--outdir",str(tmp_path)],cwd=root,check=True,capture_output=True,text=True)
+
+tests/test_build_wheel.py:9: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['/home/sandbox/meemee/.venv/bin/python', '-m', 'build', '--wheel', '--outdir', '/tmp/pytest-of-sandbox/pytest-11/test_real_wheel_contains_postg0'],)
+kwargs = {'cwd': PosixPath('/home/sandbox/meemee'), 'stderr': -1, 'stdout': -1, 'text': True}
+process = <Popen: returncode: 1 args: ['/home/sandbox/meemee/.venv/bin/python', '-m', ...>
+stdout = ''
+stderr = '/home/sandbox/meemee/.venv/bin/python: No module named build\n'
+retcode = 1
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+    
+        If timeout is given, and the process takes too long, a TimeoutExpired
+        exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['/home/sandbox/meemee/.venv/bin/python', '-m', 'build', '--wheel', '--outdir', '/tmp/pytest-of-sandbox/pytest-11/test_real_wheel_contains_postg0']' returned non-zero exit status 1.
+
+/usr/lib/python3.10/subprocess.py:526: CalledProcessError
+_ test_signed_job_webhooks_reach_a_real_receiver_retry_and_stay_in_tenant[sqlite] _
+
+stack = {'backend': 'sqlite', 'base': 'http://127.0.0.1:44957', 'dispatcher_logs': PosixPath('/tmp/pytest-of-sandbox/pytest-11/e2e-sqlite-data0/webhook-worker.log'), 'env_ref': <function stack.<locals>.<lambda> at 0x7f50677bcd30>, ...}
+receiver = 'https://127.0.0.1:35507'
+
+    def test_signed_job_webhooks_reach_a_real_receiver_retry_and_stay_in_tenant(stack, receiver):
+        """job.done reaches a real local HTTPS receiver with `blocked` in the payload, the signature
+        verifies under the documented scheme, a 500 is retried with the same delivery and a fresh
+        signature, and another principal's subscription receives nothing."""
+        from meemee.webhook_verify import verify_signature
+    
+        base = stack["base"]
+        alice, bob = _minted(base)["token"], _minted(base)["token"]
+        tag = uuid.uuid4().hex[:8]
+        alice_path, bob_path = f"/fail-once/alice-{tag}", f"/bob-{tag}"
+        alice_hook = _subscribe(base, alice, receiver + alice_path, ["job.done"])
+        _subscribe(base, bob, receiver + bob_path, ["*"])
+    
+        created = httpx.post(f"{base}/v1/jobs", headers=_headers(alice), json={"goal": "WRITE hooks/x.txt y"}, timeout=10)
+        assert created.status_code in (200, 201, 202), created.text
+        job_id = created.json()["id"]
+>       first, second = _wait_hits(alice_path, 2, stack)[:2]
+
+tests/test_live_runs_e2e.py:608: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = '/fail-once/alice-f7a26f85', count = 2
+stack = {'backend': 'sqlite', 'base': 'http://127.0.0.1:44957', 'dispatcher_logs': PosixPath('/tmp/pytest-of-sandbox/pytest-11/e2e-sqlite-data0/webhook-worker.log'), 'env_ref': <function stack.<locals>.<lambda> at 0x7f50677bcd30>, ...}
+seconds = 20
+
+    def _wait_hits(path: str, count: int, stack, seconds: float = 20) -> list[dict]:
+        deadline = time.monotonic() + seconds
+        while time.monotonic() < deadline:
+            hits = [hit for hit in WebhookReceiver.hits if hit["path"] == path]
+            if len(hits) >= count:
+                return hits
+            time.sleep(0.1)
+>       pytest.fail(f"{path}: {len(hits)}/{count} deliveries\n{stack['dispatcher_logs'].read_text()[-3000:]}")
+E       Failed: /fail-once/alice-f7a26f85: 0/2 deliveries
+E                                        │
+E       │   175 │   │   │   │   │   │   │    vault_key=settings.vault_key,             │
+E       │       webhook_max_payload_bytes=settings.webhook_max_payload_bytes,          │
+E       │   176 │   │   │   │   │   │   │                                              │
+E       │       memory_embedder=embedder_from_settings(settings))                      │
+E       │                                                                              │
+E       │ /home/sandbox/meemee/meemee/persistence.py:126 in build_persistence          │
+E       │                                                                              │
+E       │   123 │   │   │   │   │   │      monitors=SQLiteMonitorStore(data_dir /      │
+E       │       "monitors.sqlite3"),                                                   │
+E       │   124 │   │   │   │   │   │                                                  │
+E       │       reflection_schedule=_sqlite_reflection_schedule(data_dir),             │
+E       │   125 │   │   │   │   │   │                                                  │
+E       │       deletion_ledger=_sqlite_deletion_ledger(data_dir),                     │
+E       │ ❱ 126 │   │   │   │   │   │                                                  │
+E       │       browser_sessions=SQLiteBrowserSessionStore(data_dir /                  │
+E       │       "browser-sessions.sqlite3"),                                           │
+E       │   127 │   │   │   │   │   │                                                  │
+E       │       browser_notices=SQLiteTakeoverNoticeQueue(data_dir /                   │
+E       │       "browser-notices.sqlite3"))                                            │
+E       │   128 │   if normalized != "postgresql":                                     │
+E       │   129 │   │   raise ValueError("MEEMEE_PERSISTENCE_BACKEND must be sqlite or │
+E       │       postgresql")                                                           │
+E       │                                                                              │
+E       │ /home/sandbox/meemee/meemee/browser_sessions.py:165 in __init__              │
+E       │                                                                              │
+E       │   162 │   │   │   """)                                                       │
+E       │   163 │   │   │   columns = {row["name"] for row in self.db.execute("PRAGMA  │
+E       │       table_info(browser_sessions)")}                                        │
+E       │   164 │   │   │   if "host_id" not in columns:  # the host whose process     │
+E       │       holds the live browser                                                 │
+E       │ ❱ 165 │   │   │   │   self.db.execute("ALTER TABLE browser_sessions ADD      │
+E       │       COLUMN host_id TEXT")                                                  │
+E       │   166 │                                                                      │
+E       │   167 │   def ping(self) -> bool:                                            │
+E       │   168 │   │   with self.lock:                                                │
+E       ╰──────────────────────────────────────────────────────────────────────────────╯
+E       OperationalError: duplicate column name: host_id
+
+tests/test_live_runs_e2e.py:589: Failed
+----------------------------- Captured stderr call -----------------------------
+{"timestamp":"2026-10-07T07:57:12.075630+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: POST http://127.0.0.1:44957/v1/tokens \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-07T07:57:12.113078+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: POST http://127.0.0.1:44957/v1/tokens \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-07T07:57:12.157003+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: POST http://127.0.0.1:44957/v1/webhooks \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-07T07:57:12.207361+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: POST http://127.0.0.1:44957/v1/webhooks \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-07T07:57:12.247382+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: POST http://127.0.0.1:44957/v1/jobs \"HTTP/1.1 200 OK\""}
+------------------------------ Captured log call -------------------------------
+INFO     httpx:_client.py:1025 HTTP Request: POST http://127.0.0.1:44957/v1/tokens "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1025 HTTP Request: POST http://127.0.0.1:44957/v1/tokens "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1025 HTTP Request: POST http://127.0.0.1:44957/v1/webhooks "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1025 HTTP Request: POST http://127.0.0.1:44957/v1/webhooks "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1025 HTTP Request: POST http://127.0.0.1:44957/v1/jobs "HTTP/1.1 200 OK"
+___________ test_real_sdk_wheel_has_current_version_and_typed_client ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-11/test_real_sdk_wheel_has_curren0')
+
+    def test_real_sdk_wheel_has_current_version_and_typed_client(tmp_path):
+        root=Path(__file__).parents[1]
+>       built=subprocess.run([sys.executable,"-m","build","--wheel","--outdir",str(tmp_path)],cwd=root/"sdk",check=True,capture_output=True,text=True)
+
+tests/test_sdk_wheel.py:11: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['/home/sandbox/meemee/.venv/bin/python', '-m', 'build', '--wheel', '--outdir', '/tmp/pytest-of-sandbox/pytest-11/test_real_sdk_wheel_has_curren0'],)
+kwargs = {'cwd': PosixPath('/home/sandbox/meemee/sdk'), 'stderr': -1, 'stdout': -1, 'text': True}
+process = <Popen: returncode: 1 args: ['/home/sandbox/meemee/.venv/bin/python', '-m', ...>
+stdout = ''
+stderr = '/home/sandbox/meemee/.venv/bin/python: No module named build\n'
+retcode = 1
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+    
+        If timeout is given, and the process takes too long, a TimeoutExpired
+        exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['/home/sandbox/meemee/.venv/bin/python', '-m', 'build', '--wheel', '--outdir', '/tmp/pytest-of-sandbox/pytest-11/test_real_sdk_wheel_has_curren0']' returned non-zero exit status 1.
+
+/usr/lib/python3.10/subprocess.py:526: CalledProcessError
+=============================== warnings summary ===============================
+.venv/lib/python3.10/site-packages/fastapi/testclient.py:1
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+.venv/lib/python3.10/site-packages/starlette/testclient.py:53
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_build_wheel.py::test_real_wheel_contains_postgres_package_and_migrations
+FAILED tests/test_live_runs_e2e.py::test_signed_job_webhooks_reach_a_real_receiver_retry_and_stay_in_tenant[sqlite]
+FAILED tests/test_sdk_wheel.py::test_real_sdk_wheel_has_current_version_and_typed_client
+3 failed, 591 passed, 130 skipped, 2 warnings in 70.56s (0:01:10)
