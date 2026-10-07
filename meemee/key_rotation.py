@@ -58,8 +58,10 @@ def rotate_keys(data_dir: Path, old_key: str, new_key: str) -> dict[str, int]:
         backups = {path: backup_dir / path.name for path in paths}
         for path, backup in backups.items():
             _backup(path, backup)
-        marker.write_text("Do not start Meemee; key rotation is in progress.\n")
-        os.chmod(marker, 0o600)
+        # Exclusive publication closes the check/backup/write race between operators.
+        fd = os.open(marker, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w") as output:
+            output.write("Do not start Meemee; key rotation is in progress.\n")
         vault = sqlite3.connect(vault_path) if vault_path.exists() else None
         hooks = sqlite3.connect(webhook_path) if webhook_path.exists() else None
         try:
