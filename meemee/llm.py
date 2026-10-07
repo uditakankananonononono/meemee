@@ -65,7 +65,12 @@ class OpenAICompatibleModel:
                     )
                 response.raise_for_status()
                 payload: dict[str, Any] = response.json()
-                text = payload["choices"][0]["message"]["content"]
+                choice = payload["choices"][0]
+                if choice.get("finish_reason") == "length":
+                    raise ModelError("model completion was truncated by the token limit")
+                if choice.get("finish_reason") == "content_filter":
+                    raise ModelError("model completion was blocked by the provider content filter")
+                text = choice["message"]["content"]
                 return AgentDecision.model_validate_json(text)
             except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError) as exc:
                 last_error = exc
@@ -116,7 +121,12 @@ class OpenAICompatibleModel:
                     )
                 response.raise_for_status()
                 payload: dict[str, Any] = response.json()
-                text = payload["choices"][0]["message"]["content"]
+                choice = payload["choices"][0]
+                if choice.get("finish_reason") == "length":
+                    raise ModelError("model completion was truncated by the token limit")
+                if choice.get("finish_reason") == "content_filter":
+                    raise ModelError("model completion was blocked by the provider content filter")
+                text = choice["message"]["content"]
                 if not isinstance(text, str) or not text.strip():
                     raise ModelError("model returned an empty chat completion")
                 return text.strip()

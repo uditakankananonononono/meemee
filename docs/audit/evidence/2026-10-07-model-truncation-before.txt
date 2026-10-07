@@ -1,0 +1,34 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_____________ test_length_finish_reason_is_explicit_failure[chat] ______________
+
+method = 'chat'
+
+    @pytest.mark.parametrize('method', ['chat', 'decide'])
+    async def test_length_finish_reason_is_explicit_failure(method):
+        text = 'incomplete answer' if method == 'chat' else '{"thought":"fixture","final":"incomplete"}'
+        payload = {'choices':[{'finish_reason':'length','message':{'content':text}}]}
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda request: httpx.Response(200,json=payload))) as client:
+            model = OpenAICompatibleModel('https://fixture.invalid/v1','fixture','fixture',client=client)
+>           with pytest.raises(ModelError, match='truncated'):
+E           Failed: DID NOT RAISE <class 'meemee.llm.ModelError'>
+
+tests/test_model_truncation_canary.py:14: Failed
+____________ test_length_finish_reason_is_explicit_failure[decide] _____________
+
+method = 'decide'
+
+    @pytest.mark.parametrize('method', ['chat', 'decide'])
+    async def test_length_finish_reason_is_explicit_failure(method):
+        text = 'incomplete answer' if method == 'chat' else '{"thought":"fixture","final":"incomplete"}'
+        payload = {'choices':[{'finish_reason':'length','message':{'content':text}}]}
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda request: httpx.Response(200,json=payload))) as client:
+            model = OpenAICompatibleModel('https://fixture.invalid/v1','fixture','fixture',client=client)
+>           with pytest.raises(ModelError, match='truncated'):
+E           Failed: DID NOT RAISE <class 'meemee.llm.ModelError'>
+
+tests/test_model_truncation_canary.py:14: Failed
+=========================== short test summary info ============================
+FAILED tests/test_model_truncation_canary.py::test_length_finish_reason_is_explicit_failure[chat]
+FAILED tests/test_model_truncation_canary.py::test_length_finish_reason_is_explicit_failure[decide]
+2 failed in 0.10s
