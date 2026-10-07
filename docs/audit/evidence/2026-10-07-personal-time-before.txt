@@ -1,0 +1,78 @@
+FFFFF                                                                    [100%]
+=================================== FAILURES ===================================
+_________________ test_expiry_compares_instants_across_offsets _________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-65/test_expiry_compares_instants_0')
+
+    def test_expiry_compares_instants_across_offsets(tmp_path):
+        store = PersonalModelStore(tmp_path / 'model.db')
+        row = store.upsert('owner', entry(valid_until='2026-10-07T16:00:00+05:30'))
+>       assert store.expire('owner', at='2026-10-07T11:00:00+00:00') == 1
+E       AssertionError: assert 0 == 1
+E        +  where 0 = expire('owner', at='2026-10-07T11:00:00+00:00')
+E        +    where expire = <meemee.personal_model.PersonalModelStore object at 0x7f7305df76a0>.expire
+
+tests/test_personal_time_canaries.py:16: AssertionError
+________________ test_active_list_never_supplies_expired_claims ________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-65/test_active_list_never_supplie0')
+
+    def test_active_list_never_supplies_expired_claims(tmp_path):
+        store = PersonalModelStore(tmp_path / 'model.db')
+        store.upsert('owner', entry(valid_until='2020-01-01T00:00:00Z'))
+>       assert store.list('owner') == []
+E       AssertionError: assert [{'confidence...f15b7a', ...}] == []
+E         
+E         Left contains one more item: {'confidence': 1.0, 'created_at': '2026-10-07T08:29:40.251787+00:00', 'evidence': [{'confidence': 1.0, 'observed_at': ...1787+00:00', 'observed_value': 'Travel', 'source_id': 'calendar', ...}], 'id': 'fb53cd03d1dd4f189f3a728530f15b7a', ...}
+E         Use -v to get more diff
+
+tests/test_personal_time_canaries.py:23: AssertionError
+__________ test_invalid_validity_rejected_before_persistence[times0] ___________
+
+times = {'valid_until': 'not-a-date'}
+
+    @pytest.mark.parametrize('times', [
+        {'valid_until':'not-a-date'},
+        {'valid_from':'2026-10-07T12:00:00'},
+        {'valid_from':'2026-10-08T00:00:00Z','valid_until':'2026-10-07T00:00:00Z'},
+    ])
+    def test_invalid_validity_rejected_before_persistence(times):
+>       with pytest.raises(ValidationError):
+E       Failed: DID NOT RAISE <class 'pydantic_core._pydantic_core.ValidationError'>
+
+tests/test_personal_time_canaries.py:33: Failed
+__________ test_invalid_validity_rejected_before_persistence[times1] ___________
+
+times = {'valid_from': '2026-10-07T12:00:00'}
+
+    @pytest.mark.parametrize('times', [
+        {'valid_until':'not-a-date'},
+        {'valid_from':'2026-10-07T12:00:00'},
+        {'valid_from':'2026-10-08T00:00:00Z','valid_until':'2026-10-07T00:00:00Z'},
+    ])
+    def test_invalid_validity_rejected_before_persistence(times):
+>       with pytest.raises(ValidationError):
+E       Failed: DID NOT RAISE <class 'pydantic_core._pydantic_core.ValidationError'>
+
+tests/test_personal_time_canaries.py:33: Failed
+__________ test_invalid_validity_rejected_before_persistence[times2] ___________
+
+times = {'valid_from': '2026-10-08T00:00:00Z', 'valid_until': '2026-10-07T00:00:00Z'}
+
+    @pytest.mark.parametrize('times', [
+        {'valid_until':'not-a-date'},
+        {'valid_from':'2026-10-07T12:00:00'},
+        {'valid_from':'2026-10-08T00:00:00Z','valid_until':'2026-10-07T00:00:00Z'},
+    ])
+    def test_invalid_validity_rejected_before_persistence(times):
+>       with pytest.raises(ValidationError):
+E       Failed: DID NOT RAISE <class 'pydantic_core._pydantic_core.ValidationError'>
+
+tests/test_personal_time_canaries.py:33: Failed
+=========================== short test summary info ============================
+FAILED tests/test_personal_time_canaries.py::test_expiry_compares_instants_across_offsets
+FAILED tests/test_personal_time_canaries.py::test_active_list_never_supplies_expired_claims
+FAILED tests/test_personal_time_canaries.py::test_invalid_validity_rejected_before_persistence[times0]
+FAILED tests/test_personal_time_canaries.py::test_invalid_validity_rejected_before_persistence[times1]
+FAILED tests/test_personal_time_canaries.py::test_invalid_validity_rejected_before_persistence[times2]
+5 failed in 0.10s

@@ -1,0 +1,23 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______________ test_same_value_refresh_updates_validity_window ________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-68/test_same_value_refresh_update0')
+
+    def test_same_value_refresh_updates_validity_window(tmp_path):
+        store = PersonalModelStore(tmp_path / 'model.db')
+        first = store.upsert('owner', entry(valid_until='2020-01-01T00:00:00Z'))
+        refreshed = store.upsert('owner', entry(valid_until='2099-01-01T00:00:00Z'))
+        assert refreshed['id'] == first['id']
+>       assert refreshed['valid_until'] == '2099-01-01T00:00:00+00:00'
+E       AssertionError: assert '2020-01-01T00:00:00+00:00' == '2099-01-01T00:00:00+00:00'
+E         
+E         - 2099-01-01T00:00:00+00:00
+E         ?   ^^
+E         + 2020-01-01T00:00:00+00:00
+E         ?   ^^
+
+tests/test_personal_time_canaries.py:42: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_personal_time_canaries.py::test_same_value_refresh_updates_validity_window
+1 failed in 0.10s
