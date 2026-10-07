@@ -14,7 +14,12 @@ from typing import Any
 
 
 def canonical_json(value: Any) -> bytes:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    from .approvals import validate_constraints
+
+    # Share the finite-JSON validator without treating its grant semantics as
+    # command authorization. This only preserves values across serialization.
+    validate_constraints(value)
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode()
 
 
 def sign(secret: bytes, envelope: dict[str, Any]) -> str:
