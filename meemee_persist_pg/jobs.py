@@ -6,10 +6,11 @@ from typing import Any
 
 from psycopg.types.json import Jsonb
 
+from meemee.job_errors import LeaseLostError
+
 from ._db import Database
 
 
-from meemee.job_errors import LeaseLostError
 class JobStore:
     def __init__(self,db:Database,*,worker_id:str|None=None,lease_seconds:int=60):
         self.db,self.worker_id,self.lease_seconds=db,worker_id or uuid.uuid4().hex,lease_seconds

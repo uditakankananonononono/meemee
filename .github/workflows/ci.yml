@@ -22,7 +22,7 @@ jobs:
       - name: Install Chromium for real browser canaries
         run: python -m playwright install --with-deps chromium
       - name: Lint
-        run: ruff check meemee tests examples/webhook_receiver
+        run: ruff check meemee meemee_persist_pg tests examples/webhook_receiver
       - name: Core and PostgreSQL contract tests
         run: pytest -q && pytest -q tests_pg/test_contract.py
       - name: SDK tests
