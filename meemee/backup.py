@@ -52,6 +52,16 @@ class BackupManager:
     @staticmethod
     def verify(directory: Path) -> dict[str, object]:
         manifest = json.loads((directory / "manifest.json").read_text())
+        if (not isinstance(manifest, dict) or type(manifest.get("format")) is not int
+                or manifest["format"] != 1 or not isinstance(manifest.get("files"), list)):
+            raise ValueError("unsupported backup manifest")
+        names = set()
+        for expected in manifest["files"]:
+            if not isinstance(expected, dict) or not isinstance(expected.get("name"), str):
+                raise TypeError("invalid backup manifest entry")
+            if expected["name"] in names:
+                raise ValueError("duplicate backup manifest file")
+            names.add(expected["name"])
         for expected in manifest["files"]:
             path = BackupManager._file(directory, expected["name"])
             if not path.is_file() or path.stat().st_size != expected["bytes"]:

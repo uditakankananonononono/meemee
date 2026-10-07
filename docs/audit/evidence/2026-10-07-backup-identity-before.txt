@@ -1,0 +1,81 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+________ test_backup_manifest_identity_rejects_ambiguous_plan[version] _________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-403/test_backup_manifest_identity_0')
+fault = 'version'
+
+    @pytest.mark.parametrize('fault', ['version', 'duplicate'])
+    def test_backup_manifest_identity_rejects_ambiguous_plan(tmp_path, fault):
+        source = tmp_path / 'source'
+        source.mkdir()
+        with sqlite3.connect(source / 'data.sqlite3') as db:
+            db.execute('CREATE TABLE evidence(id INTEGER)')
+        backup = tmp_path / 'backup'
+        manifest = BackupManager(source).create(backup)
+        if fault == 'version':
+            manifest['format'] = 900
+        else:
+            manifest['files'].append(dict(manifest['files'][0]))
+        (backup / 'manifest.json').write_text(json.dumps(manifest))
+>       with pytest.raises(ValueError, match='manifest'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_backup_manifest_identity.py:24: Failed
+_______ test_backup_manifest_identity_rejects_ambiguous_plan[duplicate] ________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-403/test_backup_manifest_identity_1')
+fault = 'duplicate'
+
+    @pytest.mark.parametrize('fault', ['version', 'duplicate'])
+    def test_backup_manifest_identity_rejects_ambiguous_plan(tmp_path, fault):
+        source = tmp_path / 'source'
+        source.mkdir()
+        with sqlite3.connect(source / 'data.sqlite3') as db:
+            db.execute('CREATE TABLE evidence(id INTEGER)')
+        backup = tmp_path / 'backup'
+        manifest = BackupManager(source).create(backup)
+        if fault == 'version':
+            manifest['format'] = 900
+        else:
+            manifest['files'].append(dict(manifest['files'][0]))
+        (backup / 'manifest.json').write_text(json.dumps(manifest))
+        with pytest.raises(ValueError, match='manifest'):
+>           BackupManager.restore(backup, tmp_path / 'restored')
+
+tests/test_backup_manifest_identity.py:25: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+directory = PosixPath('/tmp/pytest-of-sandbox/pytest-403/test_backup_manifest_identity_1/backup')
+destination = PosixPath('/tmp/pytest-of-sandbox/pytest-403/test_backup_manifest_identity_1/restored')
+
+    @staticmethod
+    def restore(directory: Path, destination: Path) -> dict[str, object]:
+        """Verify and restore a complete backup into a new, empty directory."""
+        manifest = BackupManager.verify(directory)
+        if destination.exists():
+            if any(destination.iterdir()):
+                raise FileExistsError(f"restore destination is not empty: {destination}")
+        else:
+            destination.mkdir(parents=True)
+        restored=[]
+        started=[]
+        try:
+            for expected in manifest["files"]:
+                source=BackupManager._file(directory, expected["name"]); target=BackupManager._file(destination, expected["name"])
+                started.append(expected["name"])
+                source_db=sqlite3.connect(source.resolve().as_uri() + "?mode=ro",uri=True); target_db=sqlite3.connect(target)
+                try:
+                    source_db.backup(target_db)
+                    if target_db.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+                        raise RuntimeError(f"restored database corrupt: {expected['name']}")
+                finally: source_db.close(); target_db.close()
+                if hashlib.sha256(target.read_bytes()).hexdigest()!=expected["sha256"]:
+>                   raise RuntimeError(f"restored checksum mismatch: {expected['name']}")
+E                   RuntimeError: restored checksum mismatch: data.sqlite3
+
+meemee/backup.py:91: RuntimeError
+=========================== short test summary info ============================
+FAILED tests/test_backup_manifest_identity.py::test_backup_manifest_identity_rejects_ambiguous_plan[version]
+FAILED tests/test_backup_manifest_identity.py::test_backup_manifest_identity_rejects_ambiguous_plan[duplicate]
+2 failed in 0.08s
