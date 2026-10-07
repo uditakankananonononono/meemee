@@ -25,12 +25,12 @@ def in_quiet_hours(moment: datetime, quiet: QuietHours) -> bool:
 
 def next_due(prefs: CheckInPreferences, tz, after: datetime) -> datetime:
     """Next check-in instant strictly after `after`, honoring quiet hours."""
-    candidate = after.astimezone(tz) + timedelta(minutes=prefs.cadence_minutes)
+    candidate = (after.astimezone(timezone.utc) + timedelta(minutes=prefs.cadence_minutes)).astimezone(tz)
     if prefs.quiet_hours is None:
         return candidate.astimezone(timezone.utc)
     guard = 0
     while in_quiet_hours(candidate, prefs.quiet_hours):
-        candidate += timedelta(minutes=15)
+        candidate = (candidate.astimezone(timezone.utc) + timedelta(minutes=15)).astimezone(tz)
         guard += 1
         if guard > 4 * 24 * 14:
             raise ValueError("quiet hours leave no deliverable slot in two weeks")
