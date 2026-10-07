@@ -102,6 +102,7 @@ class ApprovalStore:
                 argument_constraints TEXT,
                 PRIMARY KEY(principal, tool)
             )""")
+            self.db.execute("BEGIN IMMEDIATE")
             columns={row[1] for row in self.db.execute("PRAGMA table_info(tool_approvals)")}
             if "argument_constraints" not in columns:
                 self.db.execute("ALTER TABLE tool_approvals ADD COLUMN argument_constraints TEXT")
