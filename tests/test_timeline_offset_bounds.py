@@ -25,3 +25,10 @@ def test_timeline_offset_order_and_pagination_use_actual_instant(tmp_path):
     assert [item.title for item in first] == ['later']
     rest = timeline.range('owner', before=(first[0].occurred_at, first[0].id))
     assert [item.title for item in rest] == ['early']
+
+
+def test_timeline_summary_uses_actual_first_and_last_instants(tmp_path):
+    timeline = setup_timeline(tmp_path)
+    [summary] = timeline.source_summary('owner')
+    assert summary['first_event_at'] == '2026-10-07T10:00:00.000000+00:00'
+    assert summary['last_event_at'] == '2026-10-07T11:00:00.000000+00:00'

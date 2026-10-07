@@ -112,9 +112,10 @@ class Timeline:
 
     def source_summary(self, owner_id: str) -> list[dict[str, Any]]:
         with self.store.lock:
+            self.store.db.create_function("timeline_utc", 1, self._utc, deterministic=True)
             rows = self.store.db.execute(
-                """SELECT source_id,count(*) event_count,min(occurred_at) first_event_at,
-                max(occurred_at) last_event_at,max(ingested_at) last_ingested_at
+                """SELECT source_id,count(*) event_count,min(timeline_utc(occurred_at)) first_event_at,
+                max(timeline_utc(occurred_at)) last_event_at,max(ingested_at) last_ingested_at
                 FROM context_records WHERE owner_id=? GROUP BY source_id ORDER BY source_id""",
                 (owner_id,),
             ).fetchall()
