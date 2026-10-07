@@ -1,0 +1,167 @@
+FFFFFFFF                                                                 [100%]
+=================================== FAILURES ===================================
+_________ test_quota_limits_require_exact_integer[sqlite-default-True] _________
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7f213ad9b0a0>, jobs=<meemee.jobs.JobStore ...Store object at 0x7f213ac1feb0>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7f213ac1fe50>)
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-557/test_quota_limits_require_exac0')
+value = True, operation = 'default'
+
+    @pytest.mark.parametrize('value', [True, 1.5])
+    @pytest.mark.parametrize('operation', ['default', 'set'])
+    def test_quota_limits_require_exact_integer(persistence, tmp_path, value, operation):  # noqa: F811
+        quota = persistence.quotas
+>       with pytest.raises(ValueError, match='integer'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_quota_integer_limits.py:11: Failed
+_________ test_quota_limits_require_exact_integer[sqlite-default-1.5] __________
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7f213ac1f340>, jobs=<meemee.jobs.JobStore ...Store object at 0x7f213ad9bb20>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7f213ad993f0>)
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-557/test_quota_limits_require_exac1')
+value = 1.5, operation = 'default'
+
+    @pytest.mark.parametrize('value', [True, 1.5])
+    @pytest.mark.parametrize('operation', ['default', 'set'])
+    def test_quota_limits_require_exact_integer(persistence, tmp_path, value, operation):  # noqa: F811
+        quota = persistence.quotas
+>       with pytest.raises(ValueError, match='integer'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_quota_integer_limits.py:11: Failed
+___________ test_quota_limits_require_exact_integer[sqlite-set-True] ___________
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7f213ac1df60>, jobs=<meemee.jobs.JobStore ...Store object at 0x7f213ac1c3d0>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7f213ac1c640>)
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-557/test_quota_limits_require_exac2')
+value = True, operation = 'set'
+
+    @pytest.mark.parametrize('value', [True, 1.5])
+    @pytest.mark.parametrize('operation', ['default', 'set'])
+    def test_quota_limits_require_exact_integer(persistence, tmp_path, value, operation):  # noqa: F811
+        quota = persistence.quotas
+>       with pytest.raises(ValueError, match='integer'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_quota_integer_limits.py:11: Failed
+___________ test_quota_limits_require_exact_integer[sqlite-set-1.5] ____________
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7f213ad9af50>, jobs=<meemee.jobs.JobStore ...Store object at 0x7f213adf64a0>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7f213adf6500>)
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-557/test_quota_limits_require_exac3')
+value = 1.5, operation = 'set'
+
+    @pytest.mark.parametrize('value', [True, 1.5])
+    @pytest.mark.parametrize('operation', ['default', 'set'])
+    def test_quota_limits_require_exact_integer(persistence, tmp_path, value, operation):  # noqa: F811
+        quota = persistence.quotas
+>       with pytest.raises(ValueError, match='integer'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_quota_integer_limits.py:11: Failed
+_______ test_quota_limits_require_exact_integer[postgresql-default-True] _______
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f21397d1ea0>, jobs=<meemee...re object at 0x7f21397d2c20>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f21397d2c50>)
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-557/test_quota_limits_require_exac4')
+value = True, operation = 'default'
+
+    @pytest.mark.parametrize('value', [True, 1.5])
+    @pytest.mark.parametrize('operation', ['default', 'set'])
+    def test_quota_limits_require_exact_integer(persistence, tmp_path, value, operation):  # noqa: F811
+        quota = persistence.quotas
+>       with pytest.raises(ValueError, match='integer'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_quota_integer_limits.py:11: Failed
+_______ test_quota_limits_require_exact_integer[postgresql-default-1.5] ________
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f213cc6b370>, jobs=<meemee...re object at 0x7f213cc8b250>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f213cc8b1f0>)
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-557/test_quota_limits_require_exac5')
+value = 1.5, operation = 'default'
+
+    @pytest.mark.parametrize('value', [True, 1.5])
+    @pytest.mark.parametrize('operation', ['default', 'set'])
+    def test_quota_limits_require_exact_integer(persistence, tmp_path, value, operation):  # noqa: F811
+        quota = persistence.quotas
+>       with pytest.raises(ValueError, match='integer'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_quota_integer_limits.py:11: Failed
+_________ test_quota_limits_require_exact_integer[postgresql-set-True] _________
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f213cc8abf0>, jobs=<meemee...re object at 0x7f213cca8100>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f213cc54160>)
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-557/test_quota_limits_require_exac6')
+value = True, operation = 'set'
+
+    @pytest.mark.parametrize('value', [True, 1.5])
+    @pytest.mark.parametrize('operation', ['default', 'set'])
+    def test_quota_limits_require_exact_integer(persistence, tmp_path, value, operation):  # noqa: F811
+        quota = persistence.quotas
+        with pytest.raises(ValueError, match='integer'):
+            if operation == 'default':
+                target = tmp_path / 'invalid.db' if persistence.backend == 'sqlite' else quota.db
+                type(quota)(target, default_daily_jobs=value)
+            else:
+>               quota.set_limit('owner', value)
+
+tests/test_quota_integer_limits.py:16: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee_persist_pg/quotas.py:41: in set_limit
+    c.execute("""INSERT INTO meemee_quota_limits(principal, daily_jobs) VALUES (%s, %s)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <psycopg.Connection [IDLE] (host=127.0.0.1 port=55439 user=sandbox database=meemee_tok_814d3eabc140) at 0x7f213cc8bac0>
+query = 'INSERT INTO meemee_quota_limits(principal, daily_jobs) VALUES (%s, %s)\n                         ON CONFLICT (principal) DO UPDATE SET daily_jobs = excluded.daily_jobs'
+params = ('owner', True)
+
+    def execute(
+        self,
+        query: Query,
+        params: Params | None = None,
+        *,
+        prepare: bool | None = None,
+        binary: bool = False,
+    ) -> Cursor[Row]:
+        """Execute a query and return a cursor to read its results."""
+        try:
+            cur = self.cursor()
+            if binary:
+                cur.format = BINARY
+    
+            if isinstance(query, Template):
+                if params is not None:
+                    raise TypeError(
+                        "'execute()' with string template query doesn't support parameters"
+                    )
+                return cur.execute(query, prepare=prepare)
+            else:
+                return cur.execute(query, params, prepare=prepare)
+        except e._NO_TRACEBACK as ex:
+>           raise ex.with_traceback(None)
+E           psycopg.errors.DatatypeMismatch: column "daily_jobs" is of type integer but expression is of type boolean
+E           LINE 1: ...O meemee_quota_limits(principal, daily_jobs) VALUES ($1, $2)
+E                                                                               ^
+E           HINT:  You will need to rewrite or cast the expression.
+
+.venv/lib/python3.10/site-packages/psycopg/connection.py:304: DatatypeMismatch
+_________ test_quota_limits_require_exact_integer[postgresql-set-1.5] __________
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f21397d1e40>, jobs=<meemee...re object at 0x7f213cc69840>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f213cc6a6e0>)
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-557/test_quota_limits_require_exac7')
+value = 1.5, operation = 'set'
+
+    @pytest.mark.parametrize('value', [True, 1.5])
+    @pytest.mark.parametrize('operation', ['default', 'set'])
+    def test_quota_limits_require_exact_integer(persistence, tmp_path, value, operation):  # noqa: F811
+        quota = persistence.quotas
+>       with pytest.raises(ValueError, match='integer'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_quota_integer_limits.py:11: Failed
+=========================== short test summary info ============================
+FAILED tests/test_quota_integer_limits.py::test_quota_limits_require_exact_integer[sqlite-default-True]
+FAILED tests/test_quota_integer_limits.py::test_quota_limits_require_exact_integer[sqlite-default-1.5]
+FAILED tests/test_quota_integer_limits.py::test_quota_limits_require_exact_integer[sqlite-set-True]
+FAILED tests/test_quota_integer_limits.py::test_quota_limits_require_exact_integer[sqlite-set-1.5]
+FAILED tests/test_quota_integer_limits.py::test_quota_limits_require_exact_integer[postgresql-default-True]
+FAILED tests/test_quota_integer_limits.py::test_quota_limits_require_exact_integer[postgresql-default-1.5]
+FAILED tests/test_quota_integer_limits.py::test_quota_limits_require_exact_integer[postgresql-set-True]
+FAILED tests/test_quota_integer_limits.py::test_quota_limits_require_exact_integer[postgresql-set-1.5]
+8 failed in 2.06s

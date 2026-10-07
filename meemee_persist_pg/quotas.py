@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from meemee.quotas import QuotaExceeded, quota_day
+from meemee.quotas import QuotaExceeded, quota_day, validate_quota_limit
 
 from ._db import Database
 
@@ -22,8 +22,7 @@ class QuotaStore:
     """Atomic per-principal daily quotas shared by every host on the database."""
 
     def __init__(self, db: Database, default_daily_jobs: int = 100):
-        if default_daily_jobs < 1:
-            raise ValueError("default quota must be positive")
+        validate_quota_limit(default_daily_jobs)
         self.db, self.default = db, default_daily_jobs
 
     def _limit(self, c, principal: str) -> int:
@@ -35,8 +34,7 @@ class QuotaStore:
             return self._limit(c, principal)
 
     def set_limit(self, principal: str, daily_jobs: int) -> None:
-        if daily_jobs < 1:
-            raise ValueError("daily quota must be positive")
+        validate_quota_limit(daily_jobs)
         with self.db.transaction() as c:
             c.execute("""INSERT INTO meemee_quota_limits(principal, daily_jobs) VALUES (%s, %s)
                          ON CONFLICT (principal) DO UPDATE SET daily_jobs = excluded.daily_jobs""", (principal, daily_jobs))
