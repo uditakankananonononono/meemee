@@ -106,9 +106,10 @@ class GoalStore:
 
     def claim(self, principal: str, worker_id: str, *, lease_seconds: int = 300) -> dict[str, Any] | None:
         if not worker_id.strip() or lease_seconds <= 0: raise ValueError("worker and positive lease are required")
-        now, until = _iso(), _iso(_now() + timedelta(seconds=lease_seconds))
         with self.lock, self.db:
             self.db.execute("BEGIN IMMEDIATE")
+            clock = _now()
+            now, until = _iso(clock), _iso(clock + timedelta(seconds=lease_seconds))
             row = self.db.execute("""
                 SELECT g.id FROM agency_goals g
                 WHERE g.principal=? AND g.status IN ('pending','active')
@@ -127,8 +128,10 @@ class GoalStore:
 
     def renew(self, principal: str, goal_id: str, worker_id: str, lease_seconds: int = 300) -> dict[str, Any]:
         if lease_seconds <= 0: raise ValueError("positive lease is required")
-        now, until = _iso(), _iso(_now() + timedelta(seconds=lease_seconds))
         with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            clock = _now()
+            now, until = _iso(clock), _iso(clock + timedelta(seconds=lease_seconds))
             changed = self.db.execute("""UPDATE agency_goals SET lease_until=?,version=version+1,updated_at=?
                 WHERE principal=? AND id=? AND status='active' AND lease_owner=? AND lease_until>?""",
                 (until, now, principal, goal_id, worker_id, now)).rowcount
