@@ -1,0 +1,12 @@
+...............................ss.sss.sssss............................. [100%]
+=========================== short test summary info ============================
+SKIPPED [2] tests/test_memory_tenant_isolation.py:89: requires actual MiniLM weights
+SKIPPED [1] tests/test_memory_tenant_isolation.py:126: requires actual MiniLM weights
+SKIPPED [1] tests/test_learned_memory.py:19: set MEEMEE_TEST_EMBEDDING_DIR to pinned pulled MiniLM weights
+SKIPPED [1] tests/test_learned_memory.py:29: set MEEMEE_TEST_EMBEDDING_DIR to pinned pulled MiniLM weights
+SKIPPED [1] tests/test_learned_memory.py:46: could not import 'onnxruntime': No module named 'onnxruntime'
+SKIPPED [1] tests/test_learned_memory.py:54: set MEEMEE_TEST_EMBEDDING_DIR to pinned pulled MiniLM weights
+SKIPPED [1] tests/test_learned_memory.py:62: set MEEMEE_TEST_EMBEDDING_DIR to pinned pulled MiniLM weights
+SKIPPED [1] tests/test_learned_memory.py:82: set MEEMEE_TEST_EMBEDDING_DIR to pinned pulled MiniLM weights
+SKIPPED [1] tests/test_learned_memory.py:92: set MEEMEE_TEST_EMBEDDING_DIR to pinned pulled MiniLM weights
+62 passed, 10 skipped in 50.19s
