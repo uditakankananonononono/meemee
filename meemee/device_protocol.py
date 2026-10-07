@@ -32,8 +32,13 @@ def make_command(
     nonce: str | None = None,
     command_id: str | None = None,
 ) -> dict[str, Any]:
-    if not device_id or not capability:
-        raise ValueError("device_id and capability are required")
+    if (not isinstance(device_id, str) or not device_id
+            or not isinstance(capability, str) or not capability
+            or not isinstance(arguments, dict)
+            or (issued_at is not None and type(issued_at) is not int)
+            or (nonce is not None and (not isinstance(nonce, str) or not nonce))
+            or (command_id is not None and (not isinstance(command_id, str) or not command_id))):
+        raise ValueError("invalid command fields")
     envelope = {
         "version": 1,
         "command_id": command_id or secrets.token_hex(16),
