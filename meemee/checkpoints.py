@@ -13,7 +13,7 @@ from typing import Any
 
 
 def _canonical(value: dict[str, Any]) -> str:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
 
 
 class CheckpointConflict(RuntimeError):
