@@ -1,0 +1,176 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+_______________ test_source_check_rejects_nonboolean_outcome[1] ________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-420/test_source_check_rejects_nonb0')
+outcome = 1
+
+    @pytest.mark.parametrize('outcome', [1, 0, 'false', None])
+    def test_source_check_rejects_nonboolean_outcome(tmp_path, outcome):
+        store = SourceHealthStore(tmp_path / 'health.sqlite3')
+>       with pytest.raises((ValueError, TypeError), match='ok'):
+E       Failed: DID NOT RAISE any of (<class 'ValueError'>, <class 'TypeError'>)
+
+tests/test_source_health_boolean_result.py:11: Failed
+_______________ test_source_check_rejects_nonboolean_outcome[0] ________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-420/test_source_check_rejects_nonb1')
+outcome = 0
+
+    @pytest.mark.parametrize('outcome', [1, 0, 'false', None])
+    def test_source_check_rejects_nonboolean_outcome(tmp_path, outcome):
+        store = SourceHealthStore(tmp_path / 'health.sqlite3')
+>       with pytest.raises((ValueError, TypeError), match='ok'):
+E       Failed: DID NOT RAISE any of (<class 'ValueError'>, <class 'TypeError'>)
+
+tests/test_source_health_boolean_result.py:11: Failed
+_____________ test_source_check_rejects_nonboolean_outcome[false] ______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-420/test_source_check_rejects_nonb2')
+outcome = 'false'
+
+    @pytest.mark.parametrize('outcome', [1, 0, 'false', None])
+    def test_source_check_rejects_nonboolean_outcome(tmp_path, outcome):
+        store = SourceHealthStore(tmp_path / 'health.sqlite3')
+        with pytest.raises((ValueError, TypeError), match='ok'):
+>           store.record('owner', 'source', ok=outcome)
+
+tests/test_source_health_boolean_result.py:12: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <meemee.source_health.SourceHealthStore object at 0x7f870eeb1f30>
+owner_id = 'owner', source_id = 'source'
+
+    def record(
+        self,
+        owner_id: str,
+        source_id: str,
+        *,
+        ok: bool,
+        latency_ms: float | None = None,
+        cursor: str | None = None,
+        error: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        checked_at: str | None = None,
+    ) -> dict[str, Any]:
+        if not owner_id or not source_id:
+            raise ValueError("owner_id and source_id are required")
+        if ok and error:
+            raise ValueError("successful check cannot have an error")
+        if latency_ms is not None and (not math.isfinite(latency_ms) or latency_ms < 0):
+            raise ValueError("latency_ms must be finite and nonnegative")
+        moment = datetime.fromisoformat(checked_at) if checked_at else datetime.now(timezone.utc)
+        if moment.tzinfo is None:
+            raise ValueError("checked_at must include a timezone")
+        stamp = moment.astimezone(timezone.utc).isoformat()
+        encoded = json.dumps(metadata or {}, sort_keys=True)
+        with self.lock, self.db:
+            # Normalize this source's legacy timestamps in the same write transaction.
+            self.db.execute(
+                "UPDATE source_health SET last_attempt_at=health_utc(last_attempt_at),last_success_at=health_utc(last_success_at) WHERE owner_id=? AND source_id=?",
+                (owner_id, source_id),
+            )
+            self.db.execute(
+                "UPDATE source_health_checks SET checked_at=health_utc(checked_at) WHERE owner_id=? AND source_id=?",
+                (owner_id, source_id),
+            )
+            self.db.execute(
+                "INSERT INTO source_health_checks(owner_id,source_id,checked_at,ok,latency_ms,cursor,error,metadata) VALUES(?,?,?,?,?,?,?,?)",
+>               (owner_id, source_id, stamp, int(ok), latency_ms, cursor, error, encoded),
+            )
+E           ValueError: invalid literal for int() with base 10: 'false'
+
+meemee/source_health.py:83: ValueError
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-420/test_source_check_rejects_nonb2')
+outcome = 'false'
+
+    @pytest.mark.parametrize('outcome', [1, 0, 'false', None])
+    def test_source_check_rejects_nonboolean_outcome(tmp_path, outcome):
+        store = SourceHealthStore(tmp_path / 'health.sqlite3')
+>       with pytest.raises((ValueError, TypeError), match='ok'):
+E       AssertionError: Regex pattern did not match.
+E        Regex: 'ok'
+E        Input: "invalid literal for int() with base 10: 'false'"
+
+tests/test_source_health_boolean_result.py:11: AssertionError
+______________ test_source_check_rejects_nonboolean_outcome[None] ______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-420/test_source_check_rejects_nonb3')
+outcome = None
+
+    @pytest.mark.parametrize('outcome', [1, 0, 'false', None])
+    def test_source_check_rejects_nonboolean_outcome(tmp_path, outcome):
+        store = SourceHealthStore(tmp_path / 'health.sqlite3')
+        with pytest.raises((ValueError, TypeError), match='ok'):
+>           store.record('owner', 'source', ok=outcome)
+
+tests/test_source_health_boolean_result.py:12: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <meemee.source_health.SourceHealthStore object at 0x7f870ebcfc40>
+owner_id = 'owner', source_id = 'source'
+
+    def record(
+        self,
+        owner_id: str,
+        source_id: str,
+        *,
+        ok: bool,
+        latency_ms: float | None = None,
+        cursor: str | None = None,
+        error: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        checked_at: str | None = None,
+    ) -> dict[str, Any]:
+        if not owner_id or not source_id:
+            raise ValueError("owner_id and source_id are required")
+        if ok and error:
+            raise ValueError("successful check cannot have an error")
+        if latency_ms is not None and (not math.isfinite(latency_ms) or latency_ms < 0):
+            raise ValueError("latency_ms must be finite and nonnegative")
+        moment = datetime.fromisoformat(checked_at) if checked_at else datetime.now(timezone.utc)
+        if moment.tzinfo is None:
+            raise ValueError("checked_at must include a timezone")
+        stamp = moment.astimezone(timezone.utc).isoformat()
+        encoded = json.dumps(metadata or {}, sort_keys=True)
+        with self.lock, self.db:
+            # Normalize this source's legacy timestamps in the same write transaction.
+            self.db.execute(
+                "UPDATE source_health SET last_attempt_at=health_utc(last_attempt_at),last_success_at=health_utc(last_success_at) WHERE owner_id=? AND source_id=?",
+                (owner_id, source_id),
+            )
+            self.db.execute(
+                "UPDATE source_health_checks SET checked_at=health_utc(checked_at) WHERE owner_id=? AND source_id=?",
+                (owner_id, source_id),
+            )
+            self.db.execute(
+                "INSERT INTO source_health_checks(owner_id,source_id,checked_at,ok,latency_ms,cursor,error,metadata) VALUES(?,?,?,?,?,?,?,?)",
+>               (owner_id, source_id, stamp, int(ok), latency_ms, cursor, error, encoded),
+            )
+E           TypeError: int() argument must be a string, a bytes-like object or a real number, not 'NoneType'
+
+meemee/source_health.py:83: TypeError
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-420/test_source_check_rejects_nonb3')
+outcome = None
+
+    @pytest.mark.parametrize('outcome', [1, 0, 'false', None])
+    def test_source_check_rejects_nonboolean_outcome(tmp_path, outcome):
+        store = SourceHealthStore(tmp_path / 'health.sqlite3')
+>       with pytest.raises((ValueError, TypeError), match='ok'):
+E       AssertionError: Regex pattern did not match.
+E        Regex: 'ok'
+E        Input: "int() argument must be a string, a bytes-like object or a real number, not 'NoneType'"
+
+tests/test_source_health_boolean_result.py:11: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_source_health_boolean_result.py::test_source_check_rejects_nonboolean_outcome[1]
+FAILED tests/test_source_health_boolean_result.py::test_source_check_rejects_nonboolean_outcome[0]
+FAILED tests/test_source_health_boolean_result.py::test_source_check_rejects_nonboolean_outcome[false]
+FAILED tests/test_source_health_boolean_result.py::test_source_check_rejects_nonboolean_outcome[None]
+4 failed in 0.09s
