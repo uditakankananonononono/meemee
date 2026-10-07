@@ -4,7 +4,7 @@ from typing import Any
 
 from psycopg.types.json import Jsonb
 
-from meemee.semantic_memory import Embedder, cosine, embedding_space
+from meemee.semantic_memory import Embedder, cosine, embedding_space, validate_embedding_batch
 from meemee.sensitive import scrub_text
 
 from ._db import Database
@@ -53,6 +53,7 @@ class MemoryStore:
                 texts = [r["content"] for r in rows]
                 vectors = (self.embedder.embed_many(texts) if hasattr(self.embedder, "embed_many")
                            else [self.embedder.embed(text) for text in texts])
+                validate_embedding_batch(vectors, len(rows), self.embedder.dimensions)
                 for row, vector in zip(rows, vectors):
                     c.execute("""INSERT INTO meemee_memory_embeddings(memory_id,space_id,dimensions,embedding)
                         VALUES(%s,%s,%s,%s) ON CONFLICT(memory_id) DO UPDATE SET
