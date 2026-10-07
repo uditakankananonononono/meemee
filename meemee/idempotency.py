@@ -88,7 +88,15 @@ class IdempotencyStore:
         if not key or len(key) > 200:
             raise ValueError("idempotency key must contain 1-200 characters")
         now = datetime.now(timezone.utc)
+        digest = self.request_hash(payload)
         with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            reserved = self.db.execute(
+                "SELECT request_hash FROM idempotency WHERE principal=? AND route=? AND key=?",
+                (principal, route, key),
+            ).fetchone()
+            if reserved is not None and reserved["request_hash"] != digest:
+                raise IdempotencyConflict("idempotency key was already used with a different request")
             self.db.execute(
                 """INSERT INTO idempotency VALUES(?,?,?,?,?,?,?,?)
                    ON CONFLICT(principal, route, key) DO UPDATE SET request_hash=excluded.request_hash,

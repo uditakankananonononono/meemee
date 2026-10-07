@@ -1,0 +1,38 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+______ test_different_payload_cannot_publish_over_reserved_digest[False] _______
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-330/test_different_payload_cannot_0')
+completed = False
+
+    @pytest.mark.parametrize('completed', [False, True])
+    def test_different_payload_cannot_publish_over_reserved_digest(tmp_path, completed):
+        store = IdempotencyStore(tmp_path / 'i.db')
+        original = {'goal': 'original'}
+        store.claim('owner', '/jobs', 'key', original)
+        if completed:
+            store.put('owner', '/jobs', 'key', original, 201, {'id': 'original'})
+>       with pytest.raises(IdempotencyConflict):
+E       Failed: DID NOT RAISE <class 'meemee.idempotency.IdempotencyConflict'>
+
+tests/test_idempotency_publication_digest_canary.py:14: Failed
+_______ test_different_payload_cannot_publish_over_reserved_digest[True] _______
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-330/test_different_payload_cannot_1')
+completed = True
+
+    @pytest.mark.parametrize('completed', [False, True])
+    def test_different_payload_cannot_publish_over_reserved_digest(tmp_path, completed):
+        store = IdempotencyStore(tmp_path / 'i.db')
+        original = {'goal': 'original'}
+        store.claim('owner', '/jobs', 'key', original)
+        if completed:
+            store.put('owner', '/jobs', 'key', original, 201, {'id': 'original'})
+>       with pytest.raises(IdempotencyConflict):
+E       Failed: DID NOT RAISE <class 'meemee.idempotency.IdempotencyConflict'>
+
+tests/test_idempotency_publication_digest_canary.py:14: Failed
+=========================== short test summary info ============================
+FAILED tests/test_idempotency_publication_digest_canary.py::test_different_payload_cannot_publish_over_reserved_digest[False]
+FAILED tests/test_idempotency_publication_digest_canary.py::test_different_payload_cannot_publish_over_reserved_digest[True]
+2 failed in 0.06s
