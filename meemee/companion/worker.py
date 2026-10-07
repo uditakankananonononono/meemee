@@ -65,7 +65,9 @@ async def deliver_due_once(
         # Other stores/adapters retain the explicit accepted/unknown delivery boundary.
         if (channel_name == "local" and type(adapter) is LocalChannel and adapter.store is store
                 and isinstance(store, CompanionStore)):
-            store.finish_local_checkin(checkin["id"], address, message)
+            if not store.finish_local_checkin(checkin["id"], address, message):
+                return {"claimed": True, "checkin_id": checkin["id"], "user_id": checkin["user_id"],
+                        "delivered": False, "status": "cancelled", "detail": "delivery preferences changed at commit"}
             return {"claimed": True, "checkin_id": checkin["id"], "user_id": checkin["user_id"],
                     "delivered": True, "detail": "stored in local conversation"}
         try:
