@@ -1,0 +1,26 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_________ test_quota_deletion_rolls_back_usage_when_limit_delete_fails _________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-346/test_quota_deletion_rolls_back0')
+
+    def test_quota_deletion_rolls_back_usage_when_limit_delete_fails(tmp_path):
+        store = QuotaStore(tmp_path / 'quota.sqlite3')
+        store.set_limit('owner', 5)
+        store.consume_job('owner')
+        store.set_limit('other', 7)
+        store.consume_job('other')
+        store.db.executescript("""
+            CREATE TRIGGER refuse_limit_delete BEFORE DELETE ON quota_limits
+            WHEN OLD.principal='owner'
+            BEGIN SELECT RAISE(ABORT, 'injected quota deletion failure'); END;
+        """)
+        with pytest.raises(sqlite3.IntegrityError, match='injected'):
+            store.delete_principal('owner')
+>       assert store.status('owner')['used'] == 1
+E       assert 0 == 1
+
+tests/test_quota_deletion_atomicity.py:23: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_quota_deletion_atomicity.py::test_quota_deletion_rolls_back_usage_when_limit_delete_fails
+1 failed in 0.07s

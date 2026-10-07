@@ -68,6 +68,7 @@ class QuotaStore:
 
     def delete_principal(self, principal: str) -> dict[str, int]:
         with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
             usage = self.db.execute("DELETE FROM quota_usage WHERE principal=?", (principal,)).rowcount
             limits = self.db.execute("DELETE FROM quota_limits WHERE principal=?", (principal,)).rowcount
         return {"quota_usage": usage, "quota_limits": limits}
