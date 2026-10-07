@@ -40,6 +40,13 @@ class PersonalItemInput(BaseModel):
     valid_from: str | None = None
     valid_until: str | None = None
 
+    @field_validator("title", "value", "source_id", "source_record_id")
+    @classmethod
+    def nonblank_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("personal text and evidence identifiers must not be blank")
+        return value
+
     @field_validator("valid_from", "valid_until")
     @classmethod
     def normalized_time(cls, value):

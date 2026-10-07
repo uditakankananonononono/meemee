@@ -1,0 +1,20 @@
+"""Failed claim writes release the transaction and remain retryable."""
+
+import sqlite3
+
+import pytest
+
+from meemee.goals import GoalStore
+
+
+def test_failed_claim_rolls_back_transaction_and_can_retry(tmp_path):
+    store = GoalStore(tmp_path / 'goals.sqlite3')
+    goal = store.create('owner', 'work')
+    store.db.execute("""CREATE TRIGGER reject_claim BEFORE UPDATE ON agency_goals
+                     BEGIN SELECT RAISE(ABORT, 'injected claim failure'); END""")
+    with pytest.raises(sqlite3.IntegrityError, match='injected'):
+        store.claim('owner', 'worker')
+    assert not store.db.in_transaction
+    assert store.get('owner', goal['id'])['status'] == 'pending'
+    store.db.execute('DROP TRIGGER reject_claim')
+    assert store.claim('owner', 'worker')['id'] == goal['id']
