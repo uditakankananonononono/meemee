@@ -22,6 +22,7 @@ class MemoryStore:
             ident = int(row["id"])
             if self.embedder:
                 vector = self.embedder.embed(scrub_text(content))
+                validate_embedding_batch([vector], 1, self.embedder.dimensions)
                 c.execute("INSERT INTO meemee_memory_embeddings(memory_id,space_id,dimensions,embedding) VALUES(%s,%s,%s,%s)",
                           (ident, embedding_space(self.embedder), len(vector), Jsonb(vector)))
             return ident

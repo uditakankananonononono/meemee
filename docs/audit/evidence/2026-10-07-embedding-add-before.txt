@@ -1,0 +1,64 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+____________ test_invalid_single_embedding_rolls_back_add[vector0] _____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-142/test_invalid_single_embedding_0')
+vector = [nan, nan, nan, nan, nan, nan, ...]
+
+    @pytest.mark.parametrize('vector', [[float('nan')] * 32, [1.0], [True] * 32])
+    def test_invalid_single_embedding_rolls_back_add(tmp_path, vector):
+        class Broken:
+            dimensions = 32
+            space_id = 'fixture-invalid'
+    
+            def embed(self, text):
+                return vector
+    
+        store = MemoryStore(tmp_path / 'm.db', Broken())
+>       with pytest.raises(ValueError):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_embedding_add_canary.py:17: Failed
+____________ test_invalid_single_embedding_rolls_back_add[vector1] _____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-142/test_invalid_single_embedding_1')
+vector = [1.0]
+
+    @pytest.mark.parametrize('vector', [[float('nan')] * 32, [1.0], [True] * 32])
+    def test_invalid_single_embedding_rolls_back_add(tmp_path, vector):
+        class Broken:
+            dimensions = 32
+            space_id = 'fixture-invalid'
+    
+            def embed(self, text):
+                return vector
+    
+        store = MemoryStore(tmp_path / 'm.db', Broken())
+>       with pytest.raises(ValueError):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_embedding_add_canary.py:17: Failed
+____________ test_invalid_single_embedding_rolls_back_add[vector2] _____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-142/test_invalid_single_embedding_2')
+vector = [True, True, True, True, True, True, ...]
+
+    @pytest.mark.parametrize('vector', [[float('nan')] * 32, [1.0], [True] * 32])
+    def test_invalid_single_embedding_rolls_back_add(tmp_path, vector):
+        class Broken:
+            dimensions = 32
+            space_id = 'fixture-invalid'
+    
+            def embed(self, text):
+                return vector
+    
+        store = MemoryStore(tmp_path / 'm.db', Broken())
+>       with pytest.raises(ValueError):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_embedding_add_canary.py:17: Failed
+=========================== short test summary info ============================
+FAILED tests/test_embedding_add_canary.py::test_invalid_single_embedding_rolls_back_add[vector0]
+FAILED tests/test_embedding_add_canary.py::test_invalid_single_embedding_rolls_back_add[vector1]
+FAILED tests/test_embedding_add_canary.py::test_invalid_single_embedding_rolls_back_add[vector2]
+3 failed in 0.07s
