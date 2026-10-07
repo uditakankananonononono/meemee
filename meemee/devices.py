@@ -116,6 +116,7 @@ class DeviceRegistry:
         self, owner_id: str, device_id: str, capability: str, arguments: dict[str, Any]
     ) -> dict[str, Any]:
         with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
             row = self.db.execute(
                 "SELECT * FROM devices WHERE owner_id=? AND device_id=? AND revoked_at IS NULL",
                 (owner_id, device_id),
@@ -172,6 +173,7 @@ class DeviceRegistry:
 
     def revoke(self, owner_id: str, device_id: str) -> bool:
         with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
             return bool(
                 self.db.execute(
                     "UPDATE devices SET revoked_at=? WHERE owner_id=? AND device_id=? AND revoked_at IS NULL",
