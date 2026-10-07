@@ -1,0 +1,38 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___________ test_owner_source_event_can_trigger_monitor_through_api ____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-145/test_owner_source_event_can_tr0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fc2e72c3af0>
+
+    def test_owner_source_event_can_trigger_monitor_through_api(tmp_path, monkeypatch):
+        monkeypatch.setattr(api, 'monitors', MonitorStore(tmp_path / 'm.db'))
+        client = TestClient(api.app)
+        headers = {'Authorization': 'Bearer test-bootstrap-token'}
+        created = client.post('/v1/monitors', headers=headers, json={'name':'fixture','source_id':'shop','field':'price','operator':'lt','expected':10}).json()
+        result = client.post('/v1/monitors/evaluate', headers=headers, json={'source_id':'shop','event':{'price':5}})
+>       assert result.status_code == 200, result.text
+E       AssertionError: {"detail":"Method Not Allowed"}
+E       assert 405 == 200
+E        +  where 405 = <Response [405 Method Not Allowed]>.status_code
+
+tests/test_monitor_feed_canary.py:14: AssertionError
+----------------------------- Captured stderr call -----------------------------
+{"timestamp":"2026-10-07T10:02:11.093714+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: POST http://testserver/v1/monitors \"HTTP/1.1 201 Created\""}
+{"timestamp":"2026-10-07T10:02:11.097042+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: POST http://testserver/v1/monitors/evaluate \"HTTP/1.1 405 Method Not Allowed\""}
+------------------------------ Captured log call -------------------------------
+INFO     httpx:_client.py:1025 HTTP Request: POST http://testserver/v1/monitors "HTTP/1.1 201 Created"
+INFO     httpx:_client.py:1025 HTTP Request: POST http://testserver/v1/monitors/evaluate "HTTP/1.1 405 Method Not Allowed"
+=============================== warnings summary ===============================
+.venv/lib/python3.10/site-packages/fastapi/testclient.py:1
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+.venv/lib/python3.10/site-packages/starlette/testclient.py:53
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_monitor_feed_canary.py::test_owner_source_event_can_trigger_monitor_through_api
+1 failed, 2 warnings in 0.77s

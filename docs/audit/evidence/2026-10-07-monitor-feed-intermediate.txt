@@ -1,0 +1,183 @@
+F.s.s.s.s                                                                [100%]
+=================================== FAILURES ===================================
+___________ test_owner_source_event_can_trigger_monitor_through_api ____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-146/test_owner_source_event_can_tr0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fced957b370>
+
+    def test_owner_source_event_can_trigger_monitor_through_api(tmp_path, monkeypatch):
+        monkeypatch.setattr(api, 'monitors', MonitorStore(tmp_path / 'm.db'))
+        client = TestClient(api.app)
+        headers = {'Authorization': 'Bearer test-bootstrap-token'}
+        created = client.post('/v1/monitors', headers=headers, json={'name':'fixture','source_id':'shop','field':'price','operator':'lt','expected':10}).json()
+        result = client.post('/v1/monitors/evaluate', headers=headers, json={'source_id':'shop','event':{'price':5}})
+>       assert result.status_code == 200, result.text
+E       AssertionError: {"detail":"internal server error","request_id":"f1a0771471cf4e56927cc818f71f0a75"}
+E       assert 500 == 200
+E        +  where 500 = <Response [500 Internal Server Error]>.status_code
+
+tests/test_monitor_feed_canary.py:14: AssertionError
+----------------------------- Captured stderr call -----------------------------
+{"timestamp":"2026-10-07T10:02:25.349230+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: POST http://testserver/v1/monitors \"HTTP/1.1 201 Created\""}
+{"timestamp":"2026-10-07T10:02:25.354689+00:00","level":"ERROR","logger":"meemee.api","message":"unhandled request error","request_id":"f1a0771471cf4e56927cc818f71f0a75","exception":"  + Exception Group Traceback (most recent call last):\n  |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/_utils.py\", line 85, in create_collapsing_task_group\n  |     async with anyio.create_task_group() as tg:\n  |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/anyio/_backends/_asyncio.py\", line 847, in __aexit__\n  |     raise BaseExceptionGroup(\n  | exceptiongroup.ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)\n  +-+---------------- 1 ----------------\n    | Traceback (most recent call last):\n    |   File \"/home/sandbox/meemee/meemee/api.py\", line 168, in request_context\n    |     response = await call_next(request)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py\", line 168, in call_next\n    |     raise app_exc from app_exc.__cause__ or app_exc.__context__\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py\", line 144, in coro\n    |     await self.app(scope, receive_or_disconnect, send_no_error)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py\", line 193, in __call__\n    |     response = await self.dispatch_func(request, call_next)\n    |   File \"/home/sandbox/meemee/meemee/rate_limit.py\", line 95, in dispatch\n    |     response = await call_next(request)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py\", line 168, in call_next\n    |     raise app_exc from app_exc.__cause__ or app_exc.__context__\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py\", line 144, in coro\n    |     await self.app(scope, receive_or_disconnect, send_no_error)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py\", line 193, in __call__\n    |     response = await self.dispatch_func(request, call_next)\n    |   File \"/home/sandbox/meemee/meemee/observability.py\", line 29, in dispatch\n    |     response = await call_next(request)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py\", line 168, in call_next\n    |     raise app_exc from app_exc.__cause__ or app_exc.__context__\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py\", line 144, in coro\n    |     await self.app(scope, receive_or_disconnect, send_no_error)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/trustedhost.py\", line 51, in __call__\n    |     await self.app(scope, receive, send)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/exceptions.py\", line 63, in __call__\n    |     await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/_exception_handler.py\", line 53, in wrapped_app\n    |     raise exc\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/_exception_handler.py\", line 42, in wrapped_app\n    |     await app(scope, receive, sender)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/middleware/asyncexitstack.py\", line 18, in __call__\n    |     await self.app(scope, receive, send)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/routing.py\", line 670, in __call__\n    |     await self.middleware_stack(scope, receive, send)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/routing.py\", line 2734, in app\n    |     await route.handle(scope, receive, send)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/routing.py\", line 1281, in handle\n    |     await super().handle(scope, receive, send)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/routing.py\", line 280, in handle\n    |     await self.app(scope, receive, send)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/routing.py\", line 158, in app\n    |     await wrap_app_handling_exceptions(app, request)(scope, receive, send)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/_exception_handler.py\", line 53, in wrapped_app\n    |     raise exc\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/_exception_handler.py\", line 42, in wrapped_app\n    |     await app(scope, receive, sender)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/routing.py\", line 144, in app\n    |     response = await f(request)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/routing.py\", line 481, in app\n    |     solved_result = await solve_dependencies(\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/dependencies/utils.py\", line 702, in solve_dependencies\n    |     ) = await request_body_to_args(  # body_params checked above\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/dependencies/utils.py\", line 977, in request_body_to_args\n    |     v_, errors_ = _validate_value_with_model_field(\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/dependencies/utils.py\", line 742, in _validate_value_with_model_field\n    |     return field.validate(value, values, loc=loc)\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/_compat/v2.py\", line 182, in validate\n    |     self._type_adapter.validate_python(value, from_attributes=True),\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/pydantic/type_adapter.py\", line 441, in validate_python\n    |     return self.validator.validate_python(\n    |   File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/pydantic/_internal/_mock_val_ser.py\", line 100, in __getattr__\n    |     raise PydanticUserError(self._error_message, code=self._code)\n    | pydantic.errors.PydanticUserError: `TypeAdapter[typing.Annotated[meemee.api.MonitorEventRequest, FieldInfo(annotation=NoneType, required=True, alias='request', alias_priority=2, json_schema_extra={})]]` is not fully defined; you should define `typing.Annotated[meemee.api.MonitorEventRequest, FieldInfo(annotation=NoneType, required=True, alias='request', alias_priority=2, json_schema_extra={})]` and all referenced types, then call `.rebuild()` on the instance.\n    | \n    | For further information visit https://errors.pydantic.dev/2.13/u/class-not-fully-defined\n    +------------------------------------\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"/home/sandbox/meemee/meemee/api.py\", line 168, in request_context\n    response = await call_next(request)\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py\", line 168, in call_next\n    raise app_exc from app_exc.__cause__ or app_exc.__context__\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py\", line 144, in coro\n    await self.app(scope, receive_or_disconnect, send_no_error)\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py\", line 193, in __call__\n    response = await self.dispatch_func(request, call_next)\n  File \"/home/sandbox/meemee/meemee/rate_limit.py\", line 95, in dispatch\n    response = await call_next(request)\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py\", line 168, in call_next\n    raise app_exc from app_exc.__cause__ or app_exc.__context__\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py\", line 144, in coro\n    await self.app(scope, receive_or_disconnect, send_no_error)\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py\", line 193, in __call__\n    response = await self.dispatch_func(request, call_next)\n  File \"/home/sandbox/meemee/meemee/observability.py\", line 29, in dispatch\n    response = await call_next(request)\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py\", line 168, in call_next\n    raise app_exc from app_exc.__cause__ or app_exc.__context__\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py\", line 144, in coro\n    await self.app(scope, receive_or_disconnect, send_no_error)\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/trustedhost.py\", line 51, in __call__\n    await self.app(scope, receive, send)\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/exceptions.py\", line 63, in __call__\n    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/_exception_handler.py\", line 53, in wrapped_app\n    raise exc\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/_exception_handler.py\", line 42, in wrapped_app\n    await app(scope, receive, sender)\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/middleware/asyncexitstack.py\", line 18, in __call__\n    await self.app(scope, receive, send)\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/routing.py\", line 670, in __call__\n    await self.middleware_stack(scope, receive, send)\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/routing.py\", line 2734, in app\n    await route.handle(scope, receive, send)\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/routing.py\", line 1281, in handle\n    await super().handle(scope, receive, send)\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/routing.py\", line 280, in handle\n    await self.app(scope, receive, send)\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/routing.py\", line 158, in app\n    await wrap_app_handling_exceptions(app, request)(scope, receive, send)\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/_exception_handler.py\", line 53, in wrapped_app\n    raise exc\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/_exception_handler.py\", line 42, in wrapped_app\n    await app(scope, receive, sender)\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/routing.py\", line 144, in app\n    response = await f(request)\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/routing.py\", line 481, in app\n    solved_result = await solve_dependencies(\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/dependencies/utils.py\", line 702, in solve_dependencies\n    ) = await request_body_to_args(  # body_params checked above\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/dependencies/utils.py\", line 977, in request_body_to_args\n    v_, errors_ = _validate_value_with_model_field(\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/dependencies/utils.py\", line 742, in _validate_value_with_model_field\n    return field.validate(value, values, loc=loc)\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/_compat/v2.py\", line 182, in validate\n    self._type_adapter.validate_python(value, from_attributes=True),\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/pydantic/type_adapter.py\", line 441, in validate_python\n    return self.validator.validate_python(\n  File \"/home/sandbox/meemee/.venv/lib/python3.10/site-packages/pydantic/_internal/_mock_val_ser.py\", line 100, in __getattr__\n    raise PydanticUserError(self._error_message, code=self._code)\npydantic.errors.PydanticUserError: `TypeAdapter[typing.Annotated[meemee.api.MonitorEventRequest, FieldInfo(annotation=NoneType, required=True, alias='request', alias_priority=2, json_schema_extra={})]]` is not fully defined; you should define `typing.Annotated[meemee.api.MonitorEventRequest, FieldInfo(annotation=NoneType, required=True, alias='request', alias_priority=2, json_schema_extra={})]` and all referenced types, then call `.rebuild()` on the instance.\n\nFor further information visit https://errors.pydantic.dev/2.13/u/class-not-fully-defined"}
+{"timestamp":"2026-10-07T10:02:25.385906+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: POST http://testserver/v1/monitors/evaluate \"HTTP/1.1 500 Internal Server Error\""}
+------------------------------ Captured log call -------------------------------
+INFO     httpx:_client.py:1025 HTTP Request: POST http://testserver/v1/monitors "HTTP/1.1 201 Created"
+ERROR    meemee.api:api.py:170 unhandled request error
+  + Exception Group Traceback (most recent call last):
+  |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/_utils.py", line 85, in create_collapsing_task_group
+  |     async with anyio.create_task_group() as tg:
+  |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/anyio/_backends/_asyncio.py", line 847, in __aexit__
+  |     raise BaseExceptionGroup(
+  | exceptiongroup.ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+  +-+---------------- 1 ----------------
+    | Traceback (most recent call last):
+    |   File "/home/sandbox/meemee/meemee/api.py", line 168, in request_context
+    |     response = await call_next(request)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py", line 168, in call_next
+    |     raise app_exc from app_exc.__cause__ or app_exc.__context__
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py", line 144, in coro
+    |     await self.app(scope, receive_or_disconnect, send_no_error)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py", line 193, in __call__
+    |     response = await self.dispatch_func(request, call_next)
+    |   File "/home/sandbox/meemee/meemee/rate_limit.py", line 95, in dispatch
+    |     response = await call_next(request)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py", line 168, in call_next
+    |     raise app_exc from app_exc.__cause__ or app_exc.__context__
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py", line 144, in coro
+    |     await self.app(scope, receive_or_disconnect, send_no_error)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py", line 193, in __call__
+    |     response = await self.dispatch_func(request, call_next)
+    |   File "/home/sandbox/meemee/meemee/observability.py", line 29, in dispatch
+    |     response = await call_next(request)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py", line 168, in call_next
+    |     raise app_exc from app_exc.__cause__ or app_exc.__context__
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py", line 144, in coro
+    |     await self.app(scope, receive_or_disconnect, send_no_error)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/trustedhost.py", line 51, in __call__
+    |     await self.app(scope, receive, send)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    |     await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    |     raise exc
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    |     await app(scope, receive, sender)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    |     await self.app(scope, receive, send)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/routing.py", line 670, in __call__
+    |     await self.middleware_stack(scope, receive, send)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/routing.py", line 2734, in app
+    |     await route.handle(scope, receive, send)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/routing.py", line 1281, in handle
+    |     await super().handle(scope, receive, send)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/routing.py", line 280, in handle
+    |     await self.app(scope, receive, send)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/routing.py", line 158, in app
+    |     await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    |     raise exc
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    |     await app(scope, receive, sender)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/routing.py", line 144, in app
+    |     response = await f(request)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/routing.py", line 481, in app
+    |     solved_result = await solve_dependencies(
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/dependencies/utils.py", line 702, in solve_dependencies
+    |     ) = await request_body_to_args(  # body_params checked above
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/dependencies/utils.py", line 977, in request_body_to_args
+    |     v_, errors_ = _validate_value_with_model_field(
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/dependencies/utils.py", line 742, in _validate_value_with_model_field
+    |     return field.validate(value, values, loc=loc)
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/_compat/v2.py", line 182, in validate
+    |     self._type_adapter.validate_python(value, from_attributes=True),
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/pydantic/type_adapter.py", line 441, in validate_python
+    |     return self.validator.validate_python(
+    |   File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/pydantic/_internal/_mock_val_ser.py", line 100, in __getattr__
+    |     raise PydanticUserError(self._error_message, code=self._code)
+    | pydantic.errors.PydanticUserError: `TypeAdapter[typing.Annotated[meemee.api.MonitorEventRequest, FieldInfo(annotation=NoneType, required=True, alias='request', alias_priority=2, json_schema_extra={})]]` is not fully defined; you should define `typing.Annotated[meemee.api.MonitorEventRequest, FieldInfo(annotation=NoneType, required=True, alias='request', alias_priority=2, json_schema_extra={})]` and all referenced types, then call `.rebuild()` on the instance.
+    | 
+    | For further information visit https://errors.pydantic.dev/2.13/u/class-not-fully-defined
+    +------------------------------------
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/sandbox/meemee/meemee/api.py", line 168, in request_context
+    response = await call_next(request)
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py", line 193, in __call__
+    response = await self.dispatch_func(request, call_next)
+  File "/home/sandbox/meemee/meemee/rate_limit.py", line 95, in dispatch
+    response = await call_next(request)
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py", line 193, in __call__
+    response = await self.dispatch_func(request, call_next)
+  File "/home/sandbox/meemee/meemee/observability.py", line 29, in dispatch
+    response = await call_next(request)
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/trustedhost.py", line 51, in __call__
+    await self.app(scope, receive, send)
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/routing.py", line 670, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/routing.py", line 2734, in app
+    await route.handle(scope, receive, send)
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/routing.py", line 1281, in handle
+    await super().handle(scope, receive, send)
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/routing.py", line 280, in handle
+    await self.app(scope, receive, send)
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/routing.py", line 158, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/routing.py", line 144, in app
+    response = await f(request)
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/routing.py", line 481, in app
+    solved_result = await solve_dependencies(
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/dependencies/utils.py", line 702, in solve_dependencies
+    ) = await request_body_to_args(  # body_params checked above
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/dependencies/utils.py", line 977, in request_body_to_args
+    v_, errors_ = _validate_value_with_model_field(
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/dependencies/utils.py", line 742, in _validate_value_with_model_field
+    return field.validate(value, values, loc=loc)
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/_compat/v2.py", line 182, in validate
+    self._type_adapter.validate_python(value, from_attributes=True),
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/pydantic/type_adapter.py", line 441, in validate_python
+    return self.validator.validate_python(
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/pydantic/_internal/_mock_val_ser.py", line 100, in __getattr__
+    raise PydanticUserError(self._error_message, code=self._code)
+pydantic.errors.PydanticUserError: `TypeAdapter[typing.Annotated[meemee.api.MonitorEventRequest, FieldInfo(annotation=NoneType, required=True, alias='request', alias_priority=2, json_schema_extra={})]]` is not fully defined; you should define `typing.Annotated[meemee.api.MonitorEventRequest, FieldInfo(annotation=NoneType, required=True, alias='request', alias_priority=2, json_schema_extra={})]` and all referenced types, then call `.rebuild()` on the instance.
+
+For further information visit https://errors.pydantic.dev/2.13/u/class-not-fully-defined
+INFO     httpx:_client.py:1025 HTTP Request: POST http://testserver/v1/monitors/evaluate "HTTP/1.1 500 Internal Server Error"
+=============================== warnings summary ===============================
+.venv/lib/python3.10/site-packages/fastapi/testclient.py:1
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+.venv/lib/python3.10/site-packages/starlette/testclient.py:53
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_monitor_feed_canary.py::test_owner_source_event_can_trigger_monitor_through_api
+1 failed, 4 passed, 4 skipped, 2 warnings in 1.10s
