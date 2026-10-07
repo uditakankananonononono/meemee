@@ -1,0 +1,35 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_________ test_independent_monitor_writers_do_not_duplicate_last_fire __________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-151/test_independent_monitor_write0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fb22eb5af50>
+
+    def test_independent_monitor_writers_do_not_duplicate_last_fire(tmp_path, monkeypatch):
+        path = tmp_path / 'm.db'
+        stores = [MonitorStore(path), MonitorStore(path)]
+        row = stores[0].create('o', MonitorInput(name='fixture', source_id='s', field='x', operator='eq', expected=1))
+        original = MonitorStore.matches
+    
+        def slow_match(predicate, event):
+            time.sleep(0.04)
+            return original(predicate, event)
+    
+        monkeypatch.setattr(MonitorStore, 'matches', staticmethod(slow_match))
+        ready = threading.Barrier(2)
+    
+        def evaluate(store):
+            ready.wait()
+            return store.evaluate('o', 's', {'x':1})
+    
+        with ThreadPoolExecutor(2) as pool:
+            results = list(pool.map(evaluate, stores))
+>       assert sum(map(len, results)) == 1
+E       AssertionError: assert 2 == 1
+E        +  where 2 = sum(<map object at 0x7fb22eb5b760>)
+E        +    where <map object at 0x7fb22eb5b760> = map(len, [['a3ace106b4e34586bb4981117f4b0a65'], ['a3ace106b4e34586bb4981117f4b0a65']])
+
+tests/test_monitor_cross_connection_canary.py:28: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_monitor_cross_connection_canary.py::test_independent_monitor_writers_do_not_duplicate_last_fire
+1 failed in 0.14s

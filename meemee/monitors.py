@@ -70,6 +70,7 @@ class MonitorStore:
         if instant.tzinfo is None:raise ValueError('evaluation time must include a timezone')
         clock=instant.astimezone(timezone.utc).isoformat();fired=[]
         with self.lock,self.db:
+            self.db.execute("BEGIN IMMEDIATE")
             rows=self.db.execute("SELECT * FROM monitors WHERE owner_id=? AND source_id=? AND status='active'",(owner_id,source_id)).fetchall()
             for row in rows:
                 if row['deadline'] and row['deadline']<=clock:self.db.execute("UPDATE monitors SET status='timed_out',updated_at=? WHERE id=?",(clock,row['id']));self._event(row['id'],owner_id,'timed_out',{});continue
