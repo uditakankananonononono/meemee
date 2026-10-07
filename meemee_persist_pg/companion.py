@@ -168,9 +168,17 @@ class CompanionStore:
 
     # check-ins ----------------------------------------------------------
     def schedule_checkin(self, user_id: str, due_at: datetime, slot: str, channel: str, address: str | None,
-                         max_attempts: int = 3) -> tuple[dict[str, Any], bool]:
+                         max_attempts: int = 3, *, reuse_pending: bool = False) -> tuple[dict[str, Any], bool]:
         now = _now()
         with self.db.transaction() as c:
+            if reuse_pending:
+                c.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (f"checkin-plan:{user_id}",))
+                pending = c.execute(
+                    "SELECT * FROM meemee_companion_checkins WHERE user_id=%s AND status IN ('queued','running') ORDER BY due_at,id LIMIT 1",
+                    (user_id,),
+                ).fetchone()
+                if pending is not None:
+                    return _row(pending), False
             created = c.execute("""INSERT INTO meemee_companion_checkins(id,user_id,slot,due_at,status,max_attempts,channel,address,created_at,updated_at)
                                    VALUES (%s,%s,%s,%s,'queued',%s,%s,%s,%s,%s) ON CONFLICT (user_id, slot) DO NOTHING""",
                                 (uuid.uuid4().hex, user_id, slot, due_at.astimezone(timezone.utc), max_attempts, channel, address,

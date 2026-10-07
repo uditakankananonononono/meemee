@@ -61,7 +61,7 @@ class CheckInScheduler:
         moment = after or datetime.now(timezone.utc)
         due = next_due(profile.checkins, profile.tz(), moment)
         row, _created = self.store.schedule_checkin(
-            user_id, due, slot_name(due), profile.checkins.channel, profile.checkins.address
+            user_id, due, slot_name(due), profile.checkins.channel, profile.checkins.address, reuse_pending=True
         )
         return row
 
