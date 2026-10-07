@@ -1,0 +1,70 @@
+FFFFFF                                                                   [100%]
+=================================== FAILURES ===================================
+____________ test_profile_cannot_be_parent_or_current_directory[.] _____________
+
+profile = '.'
+
+    @pytest.mark.parametrize('profile', ['.', '..'])
+    def test_profile_cannot_be_parent_or_current_directory(profile):
+>       with pytest.raises(ValidationError):
+E       Failed: DID NOT RAISE <class 'pydantic_core._pydantic_core.ValidationError'>
+
+tests/test_browser_input_canaries.py:10: Failed
+____________ test_profile_cannot_be_parent_or_current_directory[..] ____________
+
+profile = '..'
+
+    @pytest.mark.parametrize('profile', ['.', '..'])
+    def test_profile_cannot_be_parent_or_current_directory(profile):
+>       with pytest.raises(ValidationError):
+E       Failed: DID NOT RAISE <class 'pydantic_core._pydantic_core.ValidationError'>
+
+tests/test_browser_input_canaries.py:10: Failed
+________ test_selector_actions_fail_before_browser_side_effects[click] _________
+
+kind = 'click'
+
+    @pytest.mark.parametrize('kind', ['click', 'fill', 'press', 'select'])
+    def test_selector_actions_fail_before_browser_side_effects(kind):
+>       with pytest.raises(ValidationError):
+E       Failed: DID NOT RAISE <class 'pydantic_core._pydantic_core.ValidationError'>
+
+tests/test_browser_input_canaries.py:16: Failed
+_________ test_selector_actions_fail_before_browser_side_effects[fill] _________
+
+kind = 'fill'
+
+    @pytest.mark.parametrize('kind', ['click', 'fill', 'press', 'select'])
+    def test_selector_actions_fail_before_browser_side_effects(kind):
+>       with pytest.raises(ValidationError):
+E       Failed: DID NOT RAISE <class 'pydantic_core._pydantic_core.ValidationError'>
+
+tests/test_browser_input_canaries.py:16: Failed
+________ test_selector_actions_fail_before_browser_side_effects[press] _________
+
+kind = 'press'
+
+    @pytest.mark.parametrize('kind', ['click', 'fill', 'press', 'select'])
+    def test_selector_actions_fail_before_browser_side_effects(kind):
+>       with pytest.raises(ValidationError):
+E       Failed: DID NOT RAISE <class 'pydantic_core._pydantic_core.ValidationError'>
+
+tests/test_browser_input_canaries.py:16: Failed
+________ test_selector_actions_fail_before_browser_side_effects[select] ________
+
+kind = 'select'
+
+    @pytest.mark.parametrize('kind', ['click', 'fill', 'press', 'select'])
+    def test_selector_actions_fail_before_browser_side_effects(kind):
+>       with pytest.raises(ValidationError):
+E       Failed: DID NOT RAISE <class 'pydantic_core._pydantic_core.ValidationError'>
+
+tests/test_browser_input_canaries.py:16: Failed
+=========================== short test summary info ============================
+FAILED tests/test_browser_input_canaries.py::test_profile_cannot_be_parent_or_current_directory[.]
+FAILED tests/test_browser_input_canaries.py::test_profile_cannot_be_parent_or_current_directory[..]
+FAILED tests/test_browser_input_canaries.py::test_selector_actions_fail_before_browser_side_effects[click]
+FAILED tests/test_browser_input_canaries.py::test_selector_actions_fail_before_browser_side_effects[fill]
+FAILED tests/test_browser_input_canaries.py::test_selector_actions_fail_before_browser_side_effects[press]
+FAILED tests/test_browser_input_canaries.py::test_selector_actions_fail_before_browser_side_effects[select]
+6 failed in 0.11s

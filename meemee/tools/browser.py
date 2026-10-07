@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from ..types import Risk
 from .base import Tool
@@ -18,6 +18,12 @@ class BrowserAction(BaseModel):
     value: str | None = Field(default=None, max_length=20_000)
     milliseconds: int | None = Field(default=None, ge=0, le=10_000)
 
+    @model_validator(mode="after")
+    def required_selector(self):
+        if self.kind != "wait" and (not self.selector or not self.selector.strip()):
+            raise ValueError(f"{self.kind} action requires selector")
+        return self
+
 
 class BrowseArgs(BaseModel):
     url: str = Field(min_length=8, max_length=2048)
@@ -27,6 +33,13 @@ class BrowseArgs(BaseModel):
     profile: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_.-]{1,64}$")
     allowed_domains: list[str] = Field(default_factory=list, max_length=100)
     download_dir: str | None = None
+
+    @field_validator("profile")
+    @classmethod
+    def profile_directory(cls, value):
+        if value in {".", ".."}:
+            raise ValueError("profile must name a directory, not dot or parent")
+        return value
 
 
 def validate_public_url(url: str) -> str:
