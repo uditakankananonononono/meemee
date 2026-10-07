@@ -1,0 +1,37 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+__________ test_unknown_notice_send_is_terminal_without_token_replay ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-222/test_unknown_notice_send_is_te0')
+
+    async def test_unknown_notice_send_is_terminal_without_token_replay(tmp_path):
+        sessions = BrowserSessionStore(tmp_path / 's.db', 'fixture')
+        queue = TakeoverNoticeQueue(tmp_path / 'n.db')
+        sessions.create_session('s', 'o', None, [])
+        expires = datetime.now(timezone.utc) + timedelta(minutes=5)
+        sessions.create_takeover('t', 's', 'fixture-token', 'captcha', 'agent', expires)
+        queue.enqueue({'takeover_id': 't', 'reason': 'captcha', 'expires_at': expires.isoformat(),
+                       'url': 'https://fixture.invalid/t'}, 's', 'o')
+        sends = []
+    
+        class Companion:
+            def profile(self, user):
+                return SimpleNamespace(checkins=SimpleNamespace(channel='fixture', address='dest'))
+    
+        class LostReply:
+            async def send(self, address, text):
+                sends.append(text)
+                raise DeliveryOutcomeUnknown('provider acceptance unknown: reply lost')
+    
+        channels = {'fixture': LostReply()}
+        result = await queue.deliver_pending(sessions, Companion(), channels)
+>       assert result[0]['status'] == 'failed'
+E       AssertionError: assert 'queued' == 'failed'
+E         
+E         - failed
+E         + queued
+
+tests/test_notice_unknown_delivery_canary.py:31: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_notice_unknown_delivery_canary.py::test_unknown_notice_send_is_terminal_without_token_replay
+1 failed in 0.16s

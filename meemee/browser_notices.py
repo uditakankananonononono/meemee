@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from .companion.channels import ChannelError, validate_delivery_address
+from .companion.channels import ChannelError, DeliveryOutcomeUnknown, validate_delivery_address
 
 
 def _now() -> str:
@@ -143,6 +143,10 @@ async def deliver_notices(queue, sessions_store, companion_store, channels: dict
                 raise ChannelError(result.detail or "channel did not deliver takeover notice")
             queue._finish(notice["id"], "delivered", result.detail, channel_name)
             results.append({"id": notice["id"], "status": "delivered", "channel": channel_name})
+        except DeliveryOutcomeUnknown as exc:
+            # A lost provider response is not evidence that retrying is safe.
+            queue._finish(notice["id"], "failed", str(exc), channel_name)
+            results.append({"id": notice["id"], "status": "failed", "error": str(exc)[:200]})
         except (ChannelError, ValueError, RuntimeError) as exc:
             attempts = queue._record_failure(notice["id"], str(exc), channel_name)
             if attempts >= queue.max_attempts:
