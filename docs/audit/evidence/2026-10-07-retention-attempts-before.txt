@@ -1,0 +1,28 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___________ test_retention_deletes_attempts_with_terminal_deliveries ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-187/test_retention_deletes_attempt0')
+
+    def test_retention_deletes_attempts_with_terminal_deliveries(tmp_path):
+        db = sqlite3.connect(tmp_path / 'webhooks.sqlite3')
+        db.executescript("""CREATE TABLE webhook_deliveries(id TEXT,status TEXT,created_at TEXT);
+            CREATE TABLE webhook_attempts(delivery_id TEXT,detail TEXT);
+            INSERT INTO webhook_deliveries VALUES('old','delivered','2020-01-01T00:00:00+00:00');
+            INSERT INTO webhook_deliveries VALUES('new','delivered','2026-10-07T00:00:00+00:00');
+            INSERT INTO webhook_attempts VALUES('old','old payload');
+            INSERT INTO webhook_attempts VALUES('new','new payload');""")
+        db.close()
+        RetentionManager(tmp_path).run(now=datetime(2026,10,7,tzinfo=timezone.utc))
+        db = sqlite3.connect(tmp_path / 'webhooks.sqlite3')
+>       assert db.execute('SELECT delivery_id FROM webhook_attempts').fetchall() == [('new',)]
+E       AssertionError: assert [('old',), ('new',)] == [('new',)]
+E         
+E         At index 0 diff: ('old',) != ('new',)
+E         Left contains one more item: ('new',)
+E         Use -v to get more diff
+
+tests/test_retention_attempts_canary.py:19: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_retention_attempts_canary.py::test_retention_deletes_attempts_with_terminal_deliveries
+1 failed in 0.05s

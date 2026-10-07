@@ -56,6 +56,23 @@ class RetentionManager:
         finally:
             db.close()
 
+    def _delete_webhooks(self, path: Path, status: str, cutoff: str) -> int:
+        """Delete terminal deliveries and their retained attempts atomically."""
+        if not path.exists():
+            return 0
+        db = sqlite3.connect(path, timeout=5)
+        try:
+            with db:
+                db.execute("BEGIN IMMEDIATE")
+                db.execute(
+                    "DELETE FROM webhook_attempts WHERE delivery_id IN"
+                    " (SELECT id FROM webhook_deliveries WHERE status=? AND created_at<?)",
+                    (status, cutoff),
+                )
+                return db.execute("DELETE FROM webhook_deliveries WHERE status=? AND created_at<?", (status, cutoff)).rowcount
+        finally:
+            db.close()
+
     def run(self, now: datetime | None = None, jobs_days: int = 30, memory_days: int = 90, audit_days: int = 365, runs_days: int = 90) -> RetentionReport:
         if min(jobs_days, memory_days, audit_days, runs_days) < 1:
             raise ValueError("retention windows must be at least one day")
@@ -78,8 +95,8 @@ class RetentionManager:
         runs = self.delete(self.data_dir / "runs.sqlite3", "DELETE FROM runs WHERE created_at<?", (runs_cutoff,))
         # Tamper-evident audit chains are intentionally retained; pruning needs signed anchors.
         audit_entries = 0
-        webhook_delivered = self.delete(self.data_dir / "webhooks.sqlite3", "DELETE FROM webhook_deliveries WHERE status='delivered' AND created_at<?", (jobs_cutoff,))
-        webhook_failed = self.delete(self.data_dir / "webhooks.sqlite3", "DELETE FROM webhook_deliveries WHERE status='failed' AND created_at<?", (_audit_cutoff,))
+        webhook_delivered = self._delete_webhooks(self.data_dir / "webhooks.sqlite3", "delivered", jobs_cutoff)
+        webhook_failed = self._delete_webhooks(self.data_dir / "webhooks.sqlite3", "failed", _audit_cutoff)
         idempotency = self.delete(self.data_dir / "idempotency.sqlite3", "DELETE FROM idempotency WHERE expires_at<=?", (now.isoformat(),))
         rate_limits = self.delete(self.data_dir / "rate-limits.sqlite3", "DELETE FROM rate_limits WHERE window_start<?", (int(now.timestamp()) - 86400,))
         return RetentionReport(job_events, terminal_jobs, memories, runs, audit_entries, idempotency, rate_limits, webhook_delivered, webhook_failed)
