@@ -16,6 +16,10 @@ class ChannelError(RuntimeError):
     """A configured channel failed to deliver."""
 
 
+class DeliveryOutcomeUnknown(ChannelError):
+    """The provider may have accepted the message before its response was lost."""
+
+
 class ChannelNotConfiguredError(ChannelError):
     """The channel's provider credentials or endpoint are not configured."""
 
@@ -94,8 +98,10 @@ class WebhookChannel:
             headers["X-Meemee-Signature"] = f"sha256={signature}"
         try:
             response = await self.client.post(url, content=body, headers=headers, follow_redirects=False)
+        except (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout) as exc:
+            raise ChannelError(f"webhook delivery failed before connection: {exc}") from exc
         except httpx.HTTPError as exc:
-            raise ChannelError(f"webhook delivery failed: {exc}") from exc
+            raise DeliveryOutcomeUnknown(f"webhook delivery outcome unknown: {exc}") from exc
         if not 200 <= response.status_code < 300:
             raise ChannelError(f"webhook endpoint returned HTTP {response.status_code}")
         return DeliveryResult(self.name, url, True, f"HTTP {response.status_code}")
@@ -144,8 +150,10 @@ class ProviderChannel:
                 json={"to": address, "text": text},
                 follow_redirects=False,
             )
+        except (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout) as exc:
+            raise ChannelError(f"{self.name} provider delivery failed before connection: {exc}") from exc
         except httpx.HTTPError as exc:
-            raise ChannelError(f"{self.name} provider delivery failed: {exc}") from exc
+            raise DeliveryOutcomeUnknown(f"{self.name} delivery outcome unknown: {exc}") from exc
         if not 200 <= response.status_code < 300:
             raise ChannelError(f"{self.name} provider returned HTTP {response.status_code}")
         return DeliveryResult(self.name, address, True, f"HTTP {response.status_code}")
