@@ -1,0 +1,33 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+____ test_pg_active_context_filters_expired_rows_without_claiming_live_sql _____
+
+    def test_pg_active_context_filters_expired_rows_without_claiming_live_sql():
+        db = ContractDB()
+        store = PersonalModelStore(db)
+>       assert store.list('owner') == []
+E       AssertionError: assert [{'confidence...roject', ...}] == []
+E         
+E         Left contains one more item: {'confidence': 0.5, 'evidence': [], 'id': 'item', 'kind': 'project', ...}
+E         Use -v to get more diff
+
+tests/test_pg_personal_time_contract_canary.py:45: AssertionError
+_____________ test_pg_same_value_refresh_updates_temporal_contract _____________
+
+    def test_pg_same_value_refresh_updates_temporal_contract():
+        db = ContractDB()
+        row = PersonalModelStore(db).upsert('owner', PersonalItemInput(kind='project', title='trip',
+            value='Travel', source_id='calendar', source_record_id='e2', valid_until='2099-01-01T00:00:00Z'))
+>       assert row['valid_until'] == '2099-01-01T00:00:00+00:00'
+E       AssertionError: assert '2020-01-01T00:00:00+00:00' == '2099-01-01T00:00:00+00:00'
+E         
+E         - 2099-01-01T00:00:00+00:00
+E         ?   ^^
+E         + 2020-01-01T00:00:00+00:00
+E         ?   ^^
+
+tests/test_pg_personal_time_contract_canary.py:53: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_pg_personal_time_contract_canary.py::test_pg_active_context_filters_expired_rows_without_claiming_live_sql
+FAILED tests/test_pg_personal_time_contract_canary.py::test_pg_same_value_refresh_updates_temporal_contract
+2 failed in 0.21s

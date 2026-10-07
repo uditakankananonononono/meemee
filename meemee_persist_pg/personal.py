@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from meemee.context import ContextRecord, context_record_hash
-from meemee.personal_model import PersonalItemInput, PersonalKind
+from meemee.personal_model import PersonalItemInput, PersonalKind, currently_valid, validity_instant
 
 from ._db import Database
 
@@ -51,8 +51,8 @@ class PersonalModelStore:
                 (owner_id, item.kind, title)).fetchone()
             if current and current["value"] == value:
                 ident = current["id"]
-                c.execute("UPDATE meemee_personal_items SET confidence=%s,updated_at=%s WHERE id=%s",
-                          (max(float(current["confidence"]), item.confidence), now, ident))
+                c.execute("UPDATE meemee_personal_items SET confidence=%s,valid_from=%s,valid_until=%s,updated_at=%s WHERE id=%s",
+                          (max(float(current["confidence"]), item.confidence), item.valid_from, item.valid_until, now, ident))
             else:
                 ident = uuid.uuid4().hex
                 previous = current["id"] if current else None
@@ -85,7 +85,11 @@ class PersonalModelStore:
         with self.db.transaction() as c:
             rows = c.execute(f"SELECT id FROM meemee_personal_items WHERE {' AND '.join(clauses)} ORDER BY updated_at DESC,id DESC",
                              values).fetchall()
-        return [self.get(owner_id, row["id"]) for row in rows]
+        items = [self.get(owner_id, row["id"]) for row in rows]
+        if include_history:
+            return items
+        clock = datetime.now(timezone.utc)
+        return [row for row in items if row and currently_valid(row, clock)]
 
     def correct(self, owner_id: str, ident: str, value: str) -> dict | None:
         current = self.get(owner_id, ident)
@@ -115,10 +119,22 @@ class PersonalModelStore:
         return json.dumps([{key: row[key] for key in ("kind", "title", "value", "confidence", "valid_from", "valid_until")} for row in rows])
 
     def expire(self, owner_id: str, at: str | None = None) -> int:
-        clock = at or _now()
+        clock = validity_instant(at) if at is not None else datetime.now(timezone.utc)
         with self.db.transaction() as c:
-            return c.execute("""UPDATE meemee_personal_items SET status='superseded',updated_at=%s WHERE owner_id=%s AND status='active'
-                                AND valid_until IS NOT NULL AND valid_until<=%s""", (clock, owner_id, clock)).rowcount
+            rows = c.execute("SELECT id,valid_until FROM meemee_personal_items WHERE owner_id=%s AND status='active' AND valid_until IS NOT NULL FOR UPDATE",
+                             (owner_id,)).fetchall()
+            expired = []
+            for row in rows:
+                try:
+                    if validity_instant(row["valid_until"]) <= clock:
+                        expired.append(row["id"])
+                except (ValueError, TypeError):
+                    expired.append(row["id"])
+            count = 0
+            for ident in expired:
+                count += c.execute("UPDATE meemee_personal_items SET status='superseded',updated_at=%s WHERE id=%s AND owner_id=%s AND status='active'",
+                                   (clock.isoformat(), ident, owner_id)).rowcount
+            return count
 
     def purge_owner(self, owner_id: str) -> dict[str, int]:
         if not owner_id:
