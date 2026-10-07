@@ -1,0 +1,30 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+____ test_source_health_rejects_nonfinite_metadata_before_publication[nan] _____
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-424/test_source_health_rejects_non0')
+value = nan
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf')])
+    def test_source_health_rejects_nonfinite_metadata_before_publication(tmp_path, value):
+        store = SourceHealthStore(tmp_path / 'health.sqlite3')
+>       with pytest.raises(ValueError):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_source_health_metadata_json.py:11: Failed
+____ test_source_health_rejects_nonfinite_metadata_before_publication[inf] _____
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-424/test_source_health_rejects_non1')
+value = inf
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf')])
+    def test_source_health_rejects_nonfinite_metadata_before_publication(tmp_path, value):
+        store = SourceHealthStore(tmp_path / 'health.sqlite3')
+>       with pytest.raises(ValueError):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_source_health_metadata_json.py:11: Failed
+=========================== short test summary info ============================
+FAILED tests/test_source_health_metadata_json.py::test_source_health_rejects_nonfinite_metadata_before_publication[nan]
+FAILED tests/test_source_health_metadata_json.py::test_source_health_rejects_nonfinite_metadata_before_publication[inf]
+2 failed in 0.08s
