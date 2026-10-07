@@ -207,6 +207,8 @@ class CompanionStore:
     def schedule_checkin(self, user_id: str, due_at: datetime, slot: str, channel: str, address: str | None,
                          max_attempts: int = 3, *, reuse_pending: bool = False) -> tuple[dict[str, Any], bool]:
         now = _now()
+        if type(max_attempts) is not int or max_attempts < 1:
+            raise ValueError("max_attempts must be a positive integer")
         if due_at.tzinfo is None or due_at.utcoffset() is None:
             raise ValueError("check-in due_at requires a timezone")
         with self.db.transaction() as c:
