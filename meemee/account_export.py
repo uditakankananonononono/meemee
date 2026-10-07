@@ -53,43 +53,40 @@ def inspect_import(source: Path, target_principal: str | None = None) -> dict:
 
 
 def import_account(data_dir: Path, source: Path, target_principal: str | None = None) -> dict:
-    """Import a verified export with collision preflight and rollback-safe database copies."""
-    import shutil
-    import tempfile
-
-    plan=inspect_import(source,target_principal); payload=plan["payload"]; target=plan["target_principal"]
-    paths={"jobs":data_dir/"jobs.sqlite3","runs":data_dir/"runs.sqlite3","entitlements":data_dir/"entitlements.sqlite3"}
+    """Import with one attached-database transaction, never old-file replacement."""
+    plan = inspect_import(source, target_principal)
+    payload, target = plan["payload"], plan["target_principal"]
+    paths = {name: data_dir / f"{name}.sqlite3" for name in ("jobs", "runs", "entitlements")}
     for path in paths.values():
-        if not path.exists(): raise FileNotFoundError(f"target database missing: {path.name}")
-    jobs=sqlite3.connect(paths["jobs"]); runs=sqlite3.connect(paths["runs"]); entitlements=sqlite3.connect(paths["entitlements"])
+        if not path.exists():
+            raise FileNotFoundError(f"target database missing: {path.name}")
+    db = sqlite3.connect(paths["jobs"])
     try:
-        job_ids=[row["id"] for row in payload["jobs"]]; run_ids=[row["run_id"] for row in payload["runs"]]
-        if any(jobs.execute("SELECT 1 FROM jobs WHERE id=?",(ident,)).fetchone() for ident in job_ids): raise ValueError("job ID collision")
-        if any(runs.execute("SELECT 1 FROM runs WHERE run_id=?",(ident,)).fetchone() for ident in run_ids): raise ValueError("run ID collision")
-        if payload["entitlements"] and entitlements.execute("SELECT 1 FROM principal_plans WHERE principal=?",(target,)).fetchone(): raise ValueError("target principal already has an entitlement assignment")
+        db.execute("ATTACH DATABASE ? AS imported_runs", (str(paths["runs"]),))
+        db.execute("ATTACH DATABASE ? AS imported_entitlements", (str(paths["entitlements"]),))
+        db.execute("BEGIN IMMEDIATE")
+        if any(db.execute("SELECT 1 FROM jobs WHERE id=?", (row["id"],)).fetchone() for row in payload["jobs"]):
+            raise ValueError("job ID collision")
+        if any(db.execute("SELECT 1 FROM imported_runs.runs WHERE run_id=?", (row["run_id"],)).fetchone() for row in payload["runs"]):
+            raise ValueError("run ID collision")
+        if payload["entitlements"] and db.execute("SELECT 1 FROM imported_entitlements.principal_plans WHERE principal=?", (target,)).fetchone():
+            raise ValueError("target principal already has an entitlement assignment")
+        for kind, table, schema in (("jobs", "jobs", "main"), ("runs", "runs", "imported_runs")):
+            allowed = {row[1] for row in db.execute(f"PRAGMA {schema}.table_info({table})")}
+            for row in payload[kind]:
+                values = dict(row)
+                values["principal"] = target
+                if not set(values) <= allowed:
+                    raise ValueError(f"unsupported {kind} columns")
+                columns = list(values)
+                quoted = ",".join('"' + column.replace('"', '""') + '"' for column in columns)
+                db.execute(f"INSERT INTO {schema}.{table}({quoted}) VALUES({','.join('?' for _ in columns)})", tuple(values[c] for c in columns))
+        for row in payload["entitlements"]:
+            db.execute("INSERT INTO imported_entitlements.principal_plans(principal,plan,updated_at) VALUES(?,?,?)", (target, row["plan"], row["updated_at"]))
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
-        jobs.close(); runs.close(); entitlements.close()
-    with tempfile.TemporaryDirectory(prefix="meemee-account-import-",dir=data_dir) as temporary:
-        backup_dir=Path(temporary); backups={path:backup_dir/path.name for path in paths.values()}
-        for path,backup in backups.items(): shutil.copy2(path,backup)
-        jobs=sqlite3.connect(paths["jobs"]); runs=sqlite3.connect(paths["runs"]); entitlements=sqlite3.connect(paths["entitlements"])
-        try:
-            jobs.execute("BEGIN IMMEDIATE"); runs.execute("BEGIN IMMEDIATE"); entitlements.execute("BEGIN IMMEDIATE")
-            for row in payload["jobs"]:
-                values=dict(row); values["principal"]=target
-                columns=list(values); jobs.execute(f"INSERT INTO jobs({','.join(columns)}) VALUES({','.join('?' for _ in columns)})",tuple(values[c] for c in columns))
-            for row in payload["runs"]:
-                values=dict(row); values["principal"]=target
-                columns=list(values); runs.execute(f"INSERT INTO runs({','.join(columns)}) VALUES({','.join('?' for _ in columns)})",tuple(values[c] for c in columns))
-            for row in payload["entitlements"]:
-                entitlements.execute("INSERT INTO principal_plans(principal,plan,updated_at) VALUES(?,?,?)",(target,row["plan"],row["updated_at"]))
-            entitlements.commit(); runs.commit(); jobs.commit()
-        except Exception:
-            jobs.rollback(); runs.rollback(); entitlements.rollback(); jobs.close(); runs.close(); entitlements.close()
-            for path,backup in backups.items(): shutil.copy2(backup,path)
-            raise
-        finally:
-            jobs.close()
-            runs.close()
-            entitlements.close()
-    return {key:plan[key] for key in ("source_principal","target_principal","jobs","runs","entitlements","sha256")}
+        db.close()
+    return {key: plan[key] for key in ("source_principal", "target_principal", "jobs", "runs", "entitlements", "sha256")}

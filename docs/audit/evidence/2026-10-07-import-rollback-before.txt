@@ -1,0 +1,54 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+____________ test_import_failure_preserves_unrelated_committed_job _____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-296/test_import_failure_preserves_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fd081c7f970>
+
+    def test_import_failure_preserves_unrelated_committed_job(tmp_path, monkeypatch):
+        source = tmp_path / 'source'
+        source.mkdir()
+        JobStore(source / 'jobs.sqlite3').db.close()
+        RunStore(source / 'runs.sqlite3').db.close()
+        EntitlementStore(source / 'entitlements.sqlite3').db.close()
+        export = tmp_path / 'export.json'
+        export_account(source, 'u', export)
+        envelope = json.loads(export.read_text())
+        envelope['payload']['jobs'] = [{'id': 'broken-import', 'unsupported_column': 1}]
+        envelope['sha256'] = hashlib.sha256(json.dumps(envelope['payload'], sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+        export.write_text(json.dumps(envelope))
+        target = tmp_path / 'target'
+        target.mkdir()
+        stores = [JobStore(target / 'jobs.sqlite3'), RunStore(target / 'runs.sqlite3'), EntitlementStore(target / 'entitlements.sqlite3')]
+        for store in stores:
+            store.db.execute('PRAGMA journal_mode=DELETE')
+            store.db.close()
+        copy = shutil.copy2
+        injected = []
+    
+        def concurrent_commit(src, dest, *args, **kwargs):
+            result = copy(src, dest, *args, **kwargs)
+            if str(src).endswith('entitlements.sqlite3') and not injected:
+                jobstore = JobStore(target / 'jobs.sqlite3')
+                injected.append(jobstore.enqueue('unrelated committed work', principal='other'))
+                jobstore.db.execute('PRAGMA wal_checkpoint(TRUNCATE)')
+                jobstore.db.close()
+            return result
+    
+        monkeypatch.setattr(shutil, 'copy2', concurrent_commit)
+        with pytest.raises(Exception):
+            import_account(target, export, 'new')
+        if not injected:
+            # Implementations without file backup hooks are checked by supplemental
+            # transactional rollback test; this fixture targets the old copy race.
+            return
+>       assert JobStore(target / 'jobs.sqlite3').get(injected[0]) is not None
+E       AssertionError: assert None is not None
+E        +  where None = get('d74f4021e0304294b119634fe2e0ac38')
+E        +    where get = <meemee.jobs.JobStore object at 0x7fd081cd4490>.get
+E        +      where <meemee.jobs.JobStore object at 0x7fd081cd4490> = JobStore((PosixPath('/tmp/pytest-of-sandbox/pytest-296/test_import_failure_preserves_0/target') / 'jobs.sqlite3'))
+
+tests/test_account_import_rollback_canary.py:51: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_account_import_rollback_canary.py::test_import_failure_preserves_unrelated_committed_job
+1 failed in 0.12s
