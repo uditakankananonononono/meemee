@@ -376,14 +376,14 @@ class CompanionStore:
             self.db.execute("COMMIT")
         return dict(row) if changed else None
 
-    def finish_local_checkin(self, checkin_id: str, conversation_id: str, message: str) -> None:
+    def finish_local_checkin(self, checkin_id: str, conversation_id: str, message: str) -> bool:
         """Commit local message and completion together; never cover external delivery."""
         now = _now()
         clean = scrub_text(message)
         with self.lock, self.db:
             self.db.execute("BEGIN IMMEDIATE")
             row = self.db.execute(
-                "SELECT user_id FROM companion_checkins WHERE id=? AND status='running'",
+                "SELECT user_id,address FROM companion_checkins WHERE id=? AND status='running'",
                 (checkin_id,),
             ).fetchone()
             conversation = self.db.execute(
@@ -391,6 +391,20 @@ class CompanionStore:
             ).fetchone()
             if row is None or conversation is None or row["user_id"] != conversation["user_id"]:
                 raise ValueError("check-in or local conversation is no longer eligible")
+            # Read current delivery permission inside the same write transaction.
+            profile = self.profile(row["user_id"])
+            from .checkins import in_quiet_hours
+
+            prefs = profile.checkins if profile is not None else None
+            if (prefs is None or not prefs.enabled or prefs.channel != "local"
+                    or prefs.address != row["address"]
+                    or (prefs.quiet_hours is not None and in_quiet_hours(
+                        datetime.now(timezone.utc).astimezone(profile.tz()), prefs.quiet_hours))):
+                self.db.execute(
+                    "UPDATE companion_checkins SET status='cancelled',updated_at=? WHERE id=?",
+                    (now, checkin_id),
+                )
+                return False
             self.db.execute(
                 "INSERT INTO companion_messages(conversation_id,role,content,created_at) VALUES(?,'assistant',?,?)",
                 (conversation_id, clean, now),
@@ -403,6 +417,7 @@ class CompanionStore:
                 "UPDATE companion_checkins SET status='done',message=?,last_error=NULL,updated_at=? WHERE id=?",
                 (clean, now, checkin_id),
             )
+        return True
 
     def finish_checkin(self, checkin_id: str, message: str) -> None:
         with self.lock, self.db:
