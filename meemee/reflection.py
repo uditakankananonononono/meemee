@@ -66,7 +66,10 @@ class PersonalModelReflector:
                 kind=claim.kind, title=claim.title, value=claim.value, confidence=claim.confidence,
                 source_id=claim.source_id, source_record_id=claim.source_record_id,
                 valid_from=claim.valid_from, valid_until=claim.valid_until,
-            ))
+            ), preserve_user=True)
+            if item.pop("reflection_preserved_user", False):
+                rejected += 1
+                continue
             item["evidence_hash"] = evidence_hash
             items.append(item); accepted += 1
         return {"considered": len(records), "accepted": accepted, "rejected": rejected, "items": items}

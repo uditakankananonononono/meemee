@@ -109,7 +109,7 @@ class PersonalModelStore:
         with self.lock:
             return self.db.execute("SELECT 1").fetchone() is not None
 
-    def upsert(self, owner_id: str, item: PersonalItemInput) -> dict:
+    def upsert(self, owner_id: str, item: PersonalItemInput, *, preserve_user: bool = False) -> dict:
         if not owner_id:
             raise ValueError("owner is required")
         now = datetime.now(timezone.utc).isoformat()
@@ -118,6 +118,13 @@ class PersonalModelStore:
                 "SELECT * FROM personal_items WHERE owner_id=? AND kind=? AND title=? AND status='active'",
                 (owner_id, item.kind, item.title.strip()),
             ).fetchone()
+            if preserve_user and current:
+                confirmed = self.db.execute(
+                    "SELECT 1 FROM personal_evidence WHERE item_id=? AND owner_id=? AND source_id='user' LIMIT 1",
+                    (current["id"], owner_id),
+                ).fetchone()
+                if confirmed:
+                    return {**dict(current), "reflection_preserved_user": True}
             if current and current["value"] == item.value.strip():
                 ident = current["id"]
                 combined = max(float(current["confidence"]), item.confidence)
