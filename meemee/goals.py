@@ -149,6 +149,8 @@ class GoalStore:
                     raise GoalConflict(f"version conflict: expected {expected_version}, actual {row['version']}")
                 if row["lease_owner"] and worker_id != row["lease_owner"]:
                     raise GoalConflict("active lease is owned by another worker")
+                if row["lease_owner"] and (not row["lease_until"] or row["lease_until"] <= now):
+                    raise GoalConflict("worker lease has expired")
                 if status == "completed":
                     waiting = self.db.execute("""SELECT 1 FROM agency_goal_dependencies d
                         JOIN agency_goals dep ON dep.id=d.dependency_id

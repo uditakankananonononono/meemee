@@ -1,0 +1,18 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+______________ test_expired_worker_cannot_complete_before_reclaim ______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-276/test_expired_worker_cannot_com0')
+
+    def test_expired_worker_cannot_complete_before_reclaim(tmp_path):
+        store = GoalStore(tmp_path / 'g.db')
+        goal = store.create('owner', 'fixture goal')
+        store.claim('owner', 'worker')
+        store.db.execute("UPDATE agency_goals SET lease_until='2000-01-01T00:00:00+00:00'")
+>       with pytest.raises(GoalConflict, match='expired'):
+E       Failed: DID NOT RAISE <class 'meemee.goals.GoalConflict'>
+
+tests/test_goal_expired_publication_canary.py:12: Failed
+=========================== short test summary info ============================
+FAILED tests/test_goal_expired_publication_canary.py::test_expired_worker_cannot_complete_before_reclaim
+1 failed in 0.05s
