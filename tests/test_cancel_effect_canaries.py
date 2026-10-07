@@ -49,3 +49,28 @@ async def test_cancel_arriving_during_model_decision_prevents_tool(tmp_path):
     assert tool.calls == 0
     assert report.final.startswith('Cancelled')
     assert report.tool_results == []
+
+
+@pytest.mark.asyncio
+async def test_outer_registry_cancellation_cleans_running_child():
+    cleaned = asyncio.Event()
+    began = asyncio.Event()
+    class Slow(Tool):
+        name = 'slow'
+        description = 'slow'
+        arguments_model = Args
+        async def run(self, arguments):
+            began.set()
+            try:
+                await asyncio.sleep(10)
+            finally:
+                cleaned.set()
+    registry = ToolRegistry()
+    registry.register(Slow())
+    task = asyncio.create_task(registry.execute('slow', {}, cancel=Event(), owner_id='owner'))
+    await began.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    await asyncio.sleep(0)
+    assert cleaned.is_set(), 'cancelled registry left tool task running'

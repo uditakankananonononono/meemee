@@ -78,15 +78,20 @@ class ToolRegistry:
             value = tool.run(parsed, **options)
             if inspect.isawaitable(value):
                 task = asyncio.create_task(value)
-                if cancel is not None:
-                    while not task.done():
-                        if cancel.is_set():
-                            task.cancel()
-                            try: await task
-                            except asyncio.CancelledError: pass
-                            return ToolResult(ok=False, error="tool cancelled", elapsed_ms=round((time.perf_counter()-started)*1000))
-                        await asyncio.sleep(0.05)
-                content = await task
+                try:
+                    if cancel is not None:
+                        while not task.done():
+                            if cancel.is_set():
+                                task.cancel()
+                                try: await task
+                                except asyncio.CancelledError: pass
+                                return ToolResult(ok=False, error="tool cancelled", elapsed_ms=round((time.perf_counter()-started)*1000))
+                            await asyncio.sleep(0.05)
+                    content = await task
+                except asyncio.CancelledError:
+                    task.cancel()
+                    await asyncio.gather(task, return_exceptions=True)
+                    raise
             else:
                 content = value
             return ToolResult(
