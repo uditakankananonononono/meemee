@@ -51,6 +51,13 @@ class CheckInScheduler:
         profile = self.store.profile(user_id)
         if profile is None or not profile.checkins.enabled:
             return None
+        # Polling must not turn cadence_minutes into one check-in per poll.
+        # Reuse queued/running work until it reaches a terminal state.
+        pending = self.store.list_checkins(user_id, status="queued", limit=1)
+        if not pending:
+            pending = self.store.list_checkins(user_id, status="running", limit=1)
+        if pending:
+            return pending[0]
         moment = after or datetime.now(timezone.utc)
         due = next_due(profile.checkins, profile.tz(), moment)
         row, _created = self.store.schedule_checkin(
