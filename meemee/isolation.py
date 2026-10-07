@@ -172,4 +172,24 @@ async def run_isolated(
     *, owner_id: str = "default",
 ) -> IsolatedOutcome:
     """Async wrapper: supervises the child from a worker thread so the event loop stays free."""
-    return await asyncio.to_thread(run_isolated_sync, tool, arguments, policy, cancel, owner_id=owner_id)
+    local_cancel = threading.Event()
+
+    class CombinedCancellation:
+        def is_set(self):
+            return local_cancel.is_set() or _cancel_requested(cancel)
+
+    supervisor = asyncio.create_task(asyncio.to_thread(
+        run_isolated_sync, tool, arguments, policy, CombinedCancellation(), owner_id=owner_id))
+    try:
+        # Cancelling the caller must not cancel our ability to await reaping.
+        return await asyncio.shield(supervisor)
+    except asyncio.CancelledError:
+        local_cancel.set()
+        # A second cancellation still cannot release a running child silently.
+        while not supervisor.done():
+            try:
+                await asyncio.shield(supervisor)
+            except asyncio.CancelledError:
+                continue
+        supervisor.result()
+        raise
