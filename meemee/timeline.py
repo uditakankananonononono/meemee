@@ -30,6 +30,13 @@ class Timeline:
         self.store = context_store
 
     @staticmethod
+    def _utc(value: str) -> str:
+        moment = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=timezone.utc)
+        return moment.astimezone(timezone.utc).isoformat(timespec="microseconds")
+
+    @staticmethod
     def _event(row: sqlite3.Row) -> TimelineEvent:
         return TimelineEvent(
             id=int(row["id"]),
@@ -61,13 +68,13 @@ class Timeline:
         clauses = ["owner_id=?"]
         args: list[Any] = [owner_id]
         if start is not None:
-            clauses.append("occurred_at>=?")
+            clauses.append("timeline_utc(occurred_at)>=timeline_utc(?)")
             args.append(start)
         if end is not None:
-            clauses.append("occurred_at<?")
+            clauses.append("timeline_utc(occurred_at)<timeline_utc(?)")
             args.append(end)
         if before is not None:
-            clauses.append("(occurred_at<? OR (occurred_at=? AND id<?))")
+            clauses.append("(timeline_utc(occurred_at)<timeline_utc(?) OR (timeline_utc(occurred_at)=timeline_utc(?) AND id<?))")
             args.extend((before[0], before[0], before[1]))
         for column, values in (("source_id", sources), ("kind", kinds)):
             selected = sorted(set(values or []))
@@ -75,8 +82,9 @@ class Timeline:
                 clauses.append(f"{column} IN ({','.join('?' for _ in selected)})")
                 args.extend(selected)
         args.append(max(1, min(int(limit), 500)))
-        sql = f"SELECT * FROM context_records WHERE {' AND '.join(clauses)} ORDER BY occurred_at DESC,id DESC LIMIT ?"
+        sql = f"SELECT * FROM context_records WHERE {' AND '.join(clauses)} ORDER BY timeline_utc(occurred_at) DESC,id DESC LIMIT ?"
         with self.store.lock:
+            self.store.db.create_function("timeline_utc", 1, self._utc, deterministic=True)
             rows = self.store.db.execute(sql, args).fetchall()
         return [self._event(row) for row in rows]
 
