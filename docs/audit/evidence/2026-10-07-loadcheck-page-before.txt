@@ -1,0 +1,14 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______________ test_loadcheck_counts_more_than_one_page_of_jobs _______________
+
+    def test_loadcheck_counts_more_than_one_page_of_jobs():
+        result = run_loadcheck(operations=2004, workers=8)
+        assert result['counts']['job'] == 501
+>       assert result['stored_jobs'] == 501
+E       assert 500 == 501
+
+tests/test_loadcheck_pagination.py:9: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_loadcheck_pagination.py::test_loadcheck_counts_more_than_one_page_of_jobs
+1 failed in 0.85s
