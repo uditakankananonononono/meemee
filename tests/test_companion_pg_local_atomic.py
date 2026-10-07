@@ -32,3 +32,75 @@ async def test_local_completion_failure_does_not_publish_message(store):  # noqa
     conversation = store.latest_conversation('owner', 'local')
     assert store.history(conversation['id']) == []
     assert store.list_checkins('owner')[0]['id'] == row['id']
+
+
+@pytest.mark.asyncio
+async def test_local_commit_rechecks_changed_preferences(store, monkeypatch):  # noqa: F811
+    store.upsert_user(UserProfile(user_id='owner', display_name='Owner', checkins=CheckInPreferences(enabled=True)))
+    store.schedule_checkin('owner', datetime.now(timezone.utc), 'slot', 'local', None)
+    original = store.finish_local_checkin
+
+    def preference_changed(checkin, conversation, message):
+        store.upsert_user(UserProfile(user_id='owner', display_name='Owner', checkins=CheckInPreferences(enabled=False)))
+        return original(checkin, conversation, message)
+
+    monkeypatch.setattr(store, 'finish_local_checkin', preference_changed)
+
+    class Engine:
+        async def checkin_message(self, user):
+            return 'must not publish'
+
+    result = await deliver_due_once(store, Engine(), {'local': LocalChannel(store)})
+    assert result['status'] == 'cancelled' and not result['delivered']
+    assert store.history(store.latest_conversation('owner', 'local')['id']) == []
+    assert store.list_checkins('owner')[0]['status'] == 'cancelled'
+
+
+def test_pg_process_death_rolls_back_local_publication():
+    import os
+    import subprocess
+    import sys
+
+    from test_token_audit_backends import PG_DSN, _pg_dsn
+
+    if not PG_DSN:
+        pytest.skip('requires real PostgreSQL')
+    from meemee_persist_pg import CompanionStore, Database, MigrationStore
+
+    dsn, drop = _pg_dsn()
+    db = Database(dsn)
+    MigrationStore(db).apply()
+    try:
+        pg = CompanionStore(db)
+        pg.upsert_user(UserProfile(user_id='owner', display_name='Owner', checkins=CheckInPreferences(enabled=True)))
+        pg.schedule_checkin('owner', datetime.now(timezone.utc), 'slot', 'local', None)
+        script = '''
+import asyncio, os, sys
+from contextlib import contextmanager
+from meemee_persist_pg import CompanionStore, Database
+from meemee.companion.channels import LocalChannel
+from meemee.companion.worker import deliver_due_once
+db = Database(sys.argv[1])
+original = db.transaction
+class Proxy:
+    def __init__(self, c): self.c = c
+    def execute(self, sql, args=()):
+        if "UPDATE meemee_companion_checkins SET status='done'" in sql: os._exit(73)
+        return self.c.execute(sql, args)
+@contextmanager
+def transaction():
+    with original() as c: yield Proxy(c)
+db.transaction = transaction
+store = CompanionStore(db)
+class Engine:
+    async def checkin_message(self, user): return 'uncommitted local message'
+asyncio.run(deliver_due_once(store, Engine(), {'local': LocalChannel(store)}))
+'''
+        process = subprocess.run([sys.executable, '-c', script, dsn], env=os.environ.copy(), check=False, timeout=15)
+        assert process.returncode == 73
+        conversation = pg.latest_conversation('owner', 'local')
+        assert pg.history(conversation['id']) == []
+        assert pg.list_checkins('owner')[0]['status'] == 'running'
+    finally:
+        db.close()
+        drop()
