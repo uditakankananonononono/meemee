@@ -20,6 +20,8 @@ class JobStore:
         return result
     def _event(self,c,ident,kind,payload): c.execute("INSERT INTO meemee_job_events(job_id,kind,payload) VALUES(%s,%s,%s)",(ident,kind,Jsonb(payload)))
     def enqueue(self,goal:str,run_at:datetime|None=None,max_attempts:int=3,principal:str|None=None)->str:
+        if run_at is not None and (run_at.tzinfo is None or run_at.utcoffset() is None):
+            raise ValueError("run_at requires a timezone")
         if not goal.strip() or max_attempts<1: raise ValueError("goal and positive max_attempts required")
         ident=uuid.uuid4()
         with self.db.transaction() as c:
