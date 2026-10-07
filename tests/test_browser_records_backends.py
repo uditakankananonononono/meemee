@@ -134,3 +134,15 @@ def test_notice_enqueue_replay_returns_existing_durable_id(make):
     replay = notices.enqueue(takeover, 'session', 'owner')
     assert replay == first
     assert [row['id'] for row in notices.list()] == [first]
+
+
+@pytest.mark.parametrize('session,user', [('other-session', 'owner'), ('session', 'other-owner')])
+def test_notice_enqueue_replay_rejects_recipient_rebinding(make, session, user):
+    _, notices = make('host-a')
+    takeover = {'takeover_id': 'bound', 'reason': 'captcha', 'url': 'https://example.test/t',
+                'expires_at': (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()}
+    first = notices.enqueue(takeover, 'session', 'owner')
+    with pytest.raises(ValueError, match='notice'):
+        notices.enqueue(takeover, session, user)
+    [saved] = notices.list()
+    assert (saved['id'], saved['session_id'], saved['user_id']) == (first, 'session', 'owner')
