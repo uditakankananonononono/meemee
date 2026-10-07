@@ -1,0 +1,45 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+____________ test_accepted_notice_with_failed_completion_no_replay _____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-231/test_accepted_notice_with_fail0')
+
+    async def test_accepted_notice_with_failed_completion_no_replay(tmp_path):
+        sessions = BrowserSessionStore(tmp_path / 's.db', 'fixture')
+        queue = TakeoverNoticeQueue(tmp_path / 'n.db')
+        sessions.create_session('s', 'o', None, [])
+        expires = datetime.now(timezone.utc) + timedelta(minutes=10)
+        sessions.create_takeover('t', 's', 'fixture-token', 'captcha', 'agent', expires)
+        queue.enqueue({'takeover_id': 't', 'reason': 'captcha', 'expires_at': expires.isoformat(),
+                       'url': 'https://fixture.invalid/t'}, 's', 'o')
+        sends = []
+        original_finish = queue._finish
+    
+        def lose_completion(ident, status, *args, **kwargs):
+            if status == 'delivered':
+                raise RuntimeError('completion publication unavailable')
+            return original_finish(ident, status, *args, **kwargs)
+    
+        queue._finish = lose_completion
+    
+        class Companion:
+            def profile(self, user):
+                return SimpleNamespace(checkins=SimpleNamespace(channel='fixture', address='dest'))
+    
+        class Accepted:
+            async def send(self, address, text):
+                sends.append(text)
+                return DeliveryResult('fixture', address, True, 'accepted')
+    
+        channels = {'fixture': Accepted()}
+        result = await queue.deliver_pending(sessions, Companion(), channels)
+>       assert result[0]['status'] == 'failed'
+E       AssertionError: assert 'queued' == 'failed'
+E         
+E         - failed
+E         + queued
+
+tests/test_notice_publish_unknown_canary.py:39: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_notice_publish_unknown_canary.py::test_accepted_notice_with_failed_completion_no_replay
+1 failed in 0.19s

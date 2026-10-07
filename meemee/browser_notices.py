@@ -129,6 +129,7 @@ async def deliver_notices(queue, sessions_store, companion_store, channels: dict
             continue
         channel_name = profile.checkins.channel
         adapter = channels.get(channel_name)
+        delivery_accepted = False
         try:
             if adapter is None:
                 raise ChannelError(f"unknown companion channel: {channel_name}")
@@ -150,13 +151,24 @@ async def deliver_notices(queue, sessions_store, companion_store, channels: dict
                 raise DeliveryOutcomeUnknown(f"delivery outcome unknown: {exc}") from exc
             if getattr(result, "delivered", None) is not True:
                 raise ChannelError(result.detail or "channel did not deliver takeover notice")
-            queue._finish(notice["id"], "delivered", result.detail, channel_name)
+            delivery_accepted = True
+            try:
+                queue._finish(notice["id"], "delivered", result.detail, channel_name)
+            except Exception as exc:  # noqa: BLE001 - acceptance already occurred
+                detail = f"delivery accepted; completion publication outcome unknown: {exc}"
+                # If even this terminal write fails, propagate instead of clearing the lease for retry.
+                queue._finish(notice["id"], "failed", detail, channel_name)
+                results.append({"id": notice["id"], "status": "failed", "delivered": True,
+                                "error": detail[:200]})
+                continue
             results.append({"id": notice["id"], "status": "delivered", "channel": channel_name})
         except DeliveryOutcomeUnknown as exc:
             # A lost provider response is not evidence that retrying is safe.
             queue._finish(notice["id"], "failed", str(exc), channel_name)
             results.append({"id": notice["id"], "status": "failed", "error": str(exc)[:200]})
         except (ChannelError, ValueError, RuntimeError) as exc:
+            if delivery_accepted:
+                raise
             attempts = queue._record_failure(notice["id"], str(exc), channel_name)
             if attempts >= queue.max_attempts:
                 queue._finish(notice["id"], "failed", str(exc))
