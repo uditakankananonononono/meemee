@@ -114,6 +114,16 @@ class ContextStore:
         with self.lock:rows=self.db.execute(f"SELECT * FROM context_records WHERE owner_id=? AND visibility IN ({placeholders}) ORDER BY occurred_at DESC,id DESC LIMIT ?",(owner_id,*sorted(visibility),max(1,min(limit,100)))).fetchall()
         return [self._record(row) for row in rows]
 
+    def reflection_batch(self, owner_id: str, after: int, through: int, limit: int = 50) -> list[dict]:
+        """Read eligible evidence in ingestion order within a fixed snapshot boundary."""
+        with self.lock:
+            rows = self.db.execute(
+                "SELECT * FROM context_records WHERE owner_id=? AND id>? AND id<=?"
+                " AND visibility IN ('private','agent') ORDER BY id LIMIT ?",
+                (owner_id, after, through, max(1, min(limit, 100))),
+            ).fetchall()
+        return [self._record(row) for row in rows]
+
     @staticmethod
     def _record(row) -> dict:
         result=dict(row);result["provenance"]=json.loads(result["provenance"]);result["metadata"]=json.loads(result["metadata"]);return result

@@ -104,7 +104,14 @@ async def reflect_due_once(
     summaries = []
     for owner in schedule.due(watermarks, interval, now):
         try:
-            result = await reflector.reflect(owner)
+            state = schedule.state(owner)
+            after = state["watermark"] if state else 0
+            records = context.reflection_batch(owner, after, watermarks[owner], 50)
+            result = await reflector.reflect_records(owner, records)
+            # A full batch may leave eligible evidence unseen. Advance only through
+            # supplied records; a short batch exhausted this snapshot (including
+            # records intentionally excluded by visibility).
+            processed = max(row["id"] for row in records) if len(records) == 50 else watermarks[owner]
         except Exception as exc:  # noqa: BLE001 - one owner's failure must not stop the pass
             info = {"error": f"{type(exc).__name__}: {str(exc)[:300]}", "model_trace": last_model_trace(model)}
             schedule.record(owner, "failed", info, None, now)
@@ -113,7 +120,7 @@ async def reflect_due_once(
         else:
             info = {"considered": result["considered"], "accepted": result["accepted"],
                     "rejected": result["rejected"], "model_trace": last_model_trace(model)}
-            schedule.record(owner, "ok", info, watermarks[owner], now)
+            schedule.record(owner, "ok", info, processed, now)
             summary = {"owner_id": owner, "status": "ok", **info}
         if audit is not None:
             audit.append("reflection-scheduler", "personal_model.reflect.scheduled", owner, summary["status"],
