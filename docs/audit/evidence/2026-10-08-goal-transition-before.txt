@@ -1,0 +1,35 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+______________ test_goal_transition_checks_expiry_after_lock_wait ______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-493/test_goal_transition_checks_ex0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f20cbc169e0>
+
+    def test_goal_transition_checks_expiry_after_lock_wait(tmp_path, monkeypatch):
+        clock = [datetime(2026, 10, 8, tzinfo=timezone.utc)]
+        monkeypatch.setattr(goals, '_now', lambda: clock[0])
+        store = goals.GoalStore(tmp_path / 'goals.sqlite3')
+        goal = store.create('owner', 'work')
+        store.claim('owner', 'worker', lease_seconds=1)
+        original = store.lock
+    
+        class DelayedLock:
+            waited = False
+    
+            def __enter__(self):
+                original.acquire()
+                if not self.waited:
+                    clock[0] += timedelta(seconds=100)
+                    self.waited = True
+    
+            def __exit__(self, *args):
+                original.release()
+    
+        store.lock = DelayedLock()
+>       with pytest.raises(goals.GoalConflict, match='expired'):
+E       Failed: DID NOT RAISE <class 'meemee.goals.GoalConflict'>
+
+tests/test_goal_lease_clock.py:58: Failed
+=========================== short test summary info ============================
+FAILED tests/test_goal_lease_clock.py::test_goal_transition_checks_expiry_after_lock_wait
+1 failed, 2 deselected in 0.08s

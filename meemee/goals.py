@@ -141,9 +141,9 @@ class GoalStore:
     def transition(self, principal: str, goal_id: str, status: GoalStatus, *, worker_id: str | None = None,
                    expected_version: int | None = None, outcome: str | None = None,
                    failure: str | None = None) -> dict[str, Any]:
-        now = _iso()
         with self.lock, self.db:
             self.db.execute("BEGIN IMMEDIATE")
+            now = _iso()
             try:
                 row = self._owned(principal, goal_id)
                 if status not in _TRANSITIONS[row["status"]]:
