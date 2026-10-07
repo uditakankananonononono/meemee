@@ -68,6 +68,8 @@ class IdempotencyStore:
                       (principal, route, key, PENDING))
 
     def put(self, principal: str, route: str, key: str, payload: Any, status: int, response: Any) -> None:
+        if type(status) is not int or not 100 <= status <= 599:
+            raise ValueError("response status must be an HTTP status integer (100-599)")
         if not key or len(key) > 200:
             raise ValueError("idempotency key must contain 1-200 characters")
         now = datetime.now(timezone.utc)

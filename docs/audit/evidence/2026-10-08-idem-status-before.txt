@@ -1,0 +1,28 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+__________ test_pending_sentinel_cannot_be_published_response[sqlite] __________
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7fbb9219c820>, jobs=<meemee.jobs.JobStore ...Store object at 0x7fbb921f0ac0>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7fbb921f0a60>)
+
+    def test_pending_sentinel_cannot_be_published_response(persistence):  # noqa: F811
+        store = persistence.idempotency
+        assert store.claim('owner', '/route', 'key', {}) is None
+>       with pytest.raises(ValueError, match='status'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_idempotency_response_status.py:12: Failed
+________ test_pending_sentinel_cannot_be_published_response[postgresql] ________
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7fbb90bec550>, jobs=<meemee...re object at 0x7fbb90bed2d0>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7fbb90bed300>)
+
+    def test_pending_sentinel_cannot_be_published_response(persistence):  # noqa: F811
+        store = persistence.idempotency
+        assert store.claim('owner', '/route', 'key', {}) is None
+>       with pytest.raises(ValueError, match='status'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_idempotency_response_status.py:12: Failed
+=========================== short test summary info ============================
+FAILED tests/test_idempotency_response_status.py::test_pending_sentinel_cannot_be_published_response[sqlite]
+FAILED tests/test_idempotency_response_status.py::test_pending_sentinel_cannot_be_published_response[postgresql]
+2 failed in 0.85s
