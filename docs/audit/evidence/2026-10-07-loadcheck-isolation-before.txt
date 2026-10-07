@@ -1,0 +1,21 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_____________ test_repeated_loadchecks_use_distinct_job_namespaces _____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-414/test_repeated_loadchecks_use_d0')
+
+    def test_repeated_loadchecks_use_distinct_job_namespaces(tmp_path):
+        existing = JobStore(tmp_path / 'jobs.sqlite3')
+        prior = existing.enqueue('unrelated', principal='loadcheck')
+        first = run_loadcheck(operations=8, workers=2, data_dir=tmp_path)
+        second = run_loadcheck(operations=8, workers=2, data_dir=tmp_path)
+>       assert first['status'] == second['status'] == 'pass'
+E       AssertionError: assert 'fail' == 'pass'
+E         
+E         - pass
+E         + fail
+
+tests/test_loadcheck_run_isolation.py:12: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_loadcheck_run_isolation.py::test_repeated_loadchecks_use_distinct_job_namespaces
+1 failed in 0.30s
