@@ -1,0 +1,31 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+______________________ test_trace_rejects_missing_message ______________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-339/test_trace_rejects_missing_mes0')
+
+    def test_trace_rejects_missing_message(tmp_path):
+        store = CompanionStore(tmp_path / 'companion.sqlite3')
+        conversation = store.start_conversation('owner', 'local')
+>       with pytest.raises(ValueError, match='message'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_companion_trace_binding.py:11: Failed
+_____ test_trace_rejects_wrong_conversation_without_replacing_valid_trace ______
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-339/test_trace_rejects_wrong_conve0')
+
+    def test_trace_rejects_wrong_conversation_without_replacing_valid_trace(tmp_path):
+        store = CompanionStore(tmp_path / 'companion.sqlite3')
+        own = store.start_conversation('owner', 'local')
+        other = store.start_conversation('other', 'local')
+        message = store.add_message(own['id'], 'assistant', 'reply')
+        store.record_model_trace(message['id'], own['id'], {'model': 'original'})
+>       with pytest.raises(ValueError, match='conversation'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_companion_trace_binding.py:22: Failed
+=========================== short test summary info ============================
+FAILED tests/test_companion_trace_binding.py::test_trace_rejects_missing_message
+FAILED tests/test_companion_trace_binding.py::test_trace_rejects_wrong_conversation_without_replacing_valid_trace
+2 failed in 0.19s

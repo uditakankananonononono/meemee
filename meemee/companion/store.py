@@ -485,8 +485,16 @@ class CompanionStore:
         return [dict(row) for row in rows]
 
     def record_model_trace(self, message_id: int, conversation_id: str, trace: dict[str, Any]) -> None:
-        """Durably record which model profile produced an assistant message."""
+        """Durably record model provenance bound to its stored message."""
         with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            message = self.db.execute(
+                "SELECT conversation_id FROM companion_messages WHERE id=?", (message_id,)
+            ).fetchone()
+            if message is None:
+                raise ValueError("Unknown message for model trace")
+            if message["conversation_id"] != conversation_id:
+                raise ValueError("Model trace conversation does not match message")
             self.db.execute(
                 "INSERT OR REPLACE INTO companion_message_models(message_id,conversation_id,role,profile,model,attempts,created_at)"
                 " VALUES(?,?,?,?,?,?,?)",
