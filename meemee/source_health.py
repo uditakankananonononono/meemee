@@ -137,7 +137,10 @@ class SourceHealthStore:
             }
         clock = now or datetime.now(timezone.utc)
         success = datetime.fromisoformat(row["last_success_at"]) if row["last_success_at"] else None
-        if row["consecutive_failures"] >= failure_threshold:
+        attempt = datetime.fromisoformat(row["last_attempt_at"])
+        if attempt > clock or (success is not None and success > clock):
+            state, reason = "unknown", "future_check_timestamp"
+        elif row["consecutive_failures"] >= failure_threshold:
             state, reason = "down", "failure_threshold"
         elif success is None or clock - success > timedelta(seconds=stale_after):
             state, reason = "stale", "no_recent_success"
