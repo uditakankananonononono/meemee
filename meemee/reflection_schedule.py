@@ -78,7 +78,7 @@ class ReflectionSchedule:
             self.db.execute(
                 "INSERT INTO reflection_runs(owner_id,watermark,last_attempt_at,last_success_at,last_status,last_result)"
                 " VALUES(?,?,?,?,?,?) ON CONFLICT(owner_id) DO UPDATE SET"
-                " watermark=COALESCE(?, watermark), last_attempt_at=excluded.last_attempt_at,"
+                " watermark=MAX(watermark, COALESCE(?, watermark)), last_attempt_at=excluded.last_attempt_at,"
                 " last_success_at=COALESCE(excluded.last_success_at, last_success_at),"
                 " last_status=excluded.last_status, last_result=excluded.last_result",
                 (owner_id, watermark or 0, at, at if status == "ok" else None, status,

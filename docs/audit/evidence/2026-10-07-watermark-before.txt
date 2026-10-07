@@ -1,0 +1,19 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______________ test_late_completion_does_not_regress_watermark ________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-120/test_late_completion_does_not_0')
+
+    def test_late_completion_does_not_regress_watermark(tmp_path):
+        early = ReflectionSchedule(tmp_path / 's.db')
+        late = ReflectionSchedule(tmp_path / 's.db')
+        now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        late.record('owner', 'ok', {}, 100, now)
+        early.record('owner', 'ok', {}, 50, now + timedelta(seconds=1))
+>       assert early.state('owner')['watermark'] == 100
+E       assert 50 == 100
+
+tests/test_reflection_watermark_canary.py:13: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_reflection_watermark_canary.py::test_late_completion_does_not_regress_watermark
+1 failed in 0.09s
