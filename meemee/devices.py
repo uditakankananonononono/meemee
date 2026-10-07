@@ -53,6 +53,7 @@ class DeviceRegistry:
     ) -> dict[str, Any]:
         now = datetime.now(timezone.utc)
         with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
             row = self.db.execute(
                 "SELECT * FROM device_pairings WHERE id=?", (pairing_id,)
             ).fetchone()
