@@ -120,6 +120,20 @@ class CompanionStore:
 
     def supersede_fact(self, fact_id: int, replacement_id: int | None = None) -> bool:
         with self.db.transaction() as c:
+            # Lock both records in ID order to fence deletion and avoid reversed-pair deadlocks.
+            rows = c.execute(
+                "SELECT id,user_id,superseded_by FROM meemee_companion_facts "
+                "WHERE id=ANY(%s::bigint[]) ORDER BY id FOR UPDATE",
+                ([fact_id] if replacement_id is None else [fact_id, replacement_id],),
+            ).fetchall()
+            facts = {row["id"]: row for row in rows}
+            original = facts.get(fact_id)
+            if original is None or original["superseded_by"] is not None:
+                return False
+            if replacement_id is not None:
+                replacement = facts.get(replacement_id)
+                if replacement is None or replacement["user_id"] != original["user_id"]:
+                    raise ValueError("Fact replacement must exist and belong to the same user")
             return bool(c.execute("""UPDATE meemee_companion_facts SET superseded_by=COALESCE(%s::bigint, id), updated_at=%s
                                      WHERE id=%s AND superseded_by IS NULL""", (replacement_id, _now(), fact_id)).rowcount)
 
@@ -253,6 +267,14 @@ class CompanionStore:
 
     def record_model_trace(self, message_id: int, conversation_id: str, trace: dict[str, Any]) -> None:
         with self.db.transaction() as c:
+            message = c.execute(
+                "SELECT conversation_id FROM meemee_companion_messages WHERE id=%s FOR SHARE",
+                (message_id,),
+            ).fetchone()
+            if message is None:
+                raise ValueError("Unknown message for model trace")
+            if message["conversation_id"] != conversation_id:
+                raise ValueError("Model trace conversation does not match message")
             c.execute("""INSERT INTO meemee_companion_message_models(message_id,conversation_id,role,profile,model,attempts,created_at)
                          VALUES (%s,%s,%s,%s,%s,%s,%s)
                          ON CONFLICT (message_id) DO UPDATE SET conversation_id=EXCLUDED.conversation_id, role=EXCLUDED.role,
