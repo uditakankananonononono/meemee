@@ -350,6 +350,8 @@ class CompanionStore:
         max_attempts: int = 3,
         *, reuse_pending: bool = False,
     ) -> tuple[dict[str, Any], bool]:
+        if due_at.tzinfo is None or due_at.utcoffset() is None:
+            raise ValueError("check-in due_at requires a timezone")
         ident = uuid.uuid4().hex
         now = _now()
         with self.lock, self.db:
@@ -374,6 +376,8 @@ class CompanionStore:
         return dict(row), bool(created)
 
     def claim_checkin(self, now: datetime | None = None) -> dict[str, Any] | None:
+        if now is not None and (now.tzinfo is None or now.utcoffset() is None):
+            raise ValueError("check-in clock requires a timezone")
         moment = (now or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
         with self.lock, self.db:
             self.db.execute("BEGIN IMMEDIATE")
