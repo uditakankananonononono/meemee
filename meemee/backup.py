@@ -76,9 +76,11 @@ class BackupManager:
         else:
             destination.mkdir(parents=True)
         restored=[]
+        started=[]
         try:
             for expected in manifest["files"]:
                 source=BackupManager._file(directory, expected["name"]); target=BackupManager._file(destination, expected["name"])
+                started.append(expected["name"])
                 source_db=sqlite3.connect(f"file:{source}?mode=ro",uri=True); target_db=sqlite3.connect(target)
                 try:
                     source_db.backup(target_db)
@@ -89,6 +91,6 @@ class BackupManager:
                     raise RuntimeError(f"restored checksum mismatch: {expected['name']}")
                 restored.append(expected["name"])
         except Exception:
-            for name in restored: (destination/name).unlink(missing_ok=True)
+            for name in started: (destination/name).unlink(missing_ok=True)
             raise
         return {"status":"restored","files":restored,"source_created_at":manifest["created_at"]}
