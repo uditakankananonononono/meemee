@@ -1,0 +1,80 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+_____________ test_contains_present_falsy_value_fires[sqlite-0-0] ______________
+
+stores = <function stores.<locals>.<lambda> at 0x7f2ba817d3f0>, value = 0
+expected = '0'
+
+    @pytest.mark.parametrize('value, expected', [(0, '0'), (False, 'false')])
+    def test_contains_present_falsy_value_fires(stores, value, expected):  # noqa: F811
+        # Both backend implementations share predicate evaluation.
+        monitors, _ = stores()
+        item = monitors.create('owner', MonitorInput(name='signal', source_id='source', field='value',
+                                                    operator='contains', expected=expected))
+>       assert monitors.evaluate('owner', 'source', {'value': value}) == [item['id']]
+E       AssertionError: assert [] == ['79eb4566afd...ee00cb3f014f']
+E         
+E         Right contains one more item: '79eb4566afd343abb1d1ee00cb3f014f'
+E         Use -v to get more diff
+
+tests/test_monitor_contains_falsy.py:15: AssertionError
+_________ test_contains_present_falsy_value_fires[sqlite-False-false] __________
+
+stores = <function stores.<locals>.<lambda> at 0x7f2ba81c5cf0>, value = False
+expected = 'false'
+
+    @pytest.mark.parametrize('value, expected', [(0, '0'), (False, 'false')])
+    def test_contains_present_falsy_value_fires(stores, value, expected):  # noqa: F811
+        # Both backend implementations share predicate evaluation.
+        monitors, _ = stores()
+        item = monitors.create('owner', MonitorInput(name='signal', source_id='source', field='value',
+                                                    operator='contains', expected=expected))
+>       assert monitors.evaluate('owner', 'source', {'value': value}) == [item['id']]
+E       AssertionError: assert [] == ['6e4faba688b...b129fc284b91']
+E         
+E         Right contains one more item: '6e4faba688b544c8ba88b129fc284b91'
+E         Use -v to get more diff
+
+tests/test_monitor_contains_falsy.py:15: AssertionError
+___________ test_contains_present_falsy_value_fires[postgresql-0-0] ____________
+
+stores = <function stores.<locals>.<lambda> at 0x7f2ba81c5d80>, value = 0
+expected = '0'
+
+    @pytest.mark.parametrize('value, expected', [(0, '0'), (False, 'false')])
+    def test_contains_present_falsy_value_fires(stores, value, expected):  # noqa: F811
+        # Both backend implementations share predicate evaluation.
+        monitors, _ = stores()
+        item = monitors.create('owner', MonitorInput(name='signal', source_id='source', field='value',
+                                                    operator='contains', expected=expected))
+>       assert monitors.evaluate('owner', 'source', {'value': value}) == [item['id']]
+E       AssertionError: assert [] == ['ea22e66452f...fd94432cc469']
+E         
+E         Right contains one more item: 'ea22e66452f24f83a0cbfd94432cc469'
+E         Use -v to get more diff
+
+tests/test_monitor_contains_falsy.py:15: AssertionError
+_______ test_contains_present_falsy_value_fires[postgresql-False-false] ________
+
+stores = <function stores.<locals>.<lambda> at 0x7f2ba81c7370>, value = False
+expected = 'false'
+
+    @pytest.mark.parametrize('value, expected', [(0, '0'), (False, 'false')])
+    def test_contains_present_falsy_value_fires(stores, value, expected):  # noqa: F811
+        # Both backend implementations share predicate evaluation.
+        monitors, _ = stores()
+        item = monitors.create('owner', MonitorInput(name='signal', source_id='source', field='value',
+                                                    operator='contains', expected=expected))
+>       assert monitors.evaluate('owner', 'source', {'value': value}) == [item['id']]
+E       AssertionError: assert [] == ['17ea37d4a01...cbadd53bb16c']
+E         
+E         Right contains one more item: '17ea37d4a01f446c9bcfcbadd53bb16c'
+E         Use -v to get more diff
+
+tests/test_monitor_contains_falsy.py:15: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_monitor_contains_falsy.py::test_contains_present_falsy_value_fires[sqlite-0-0]
+FAILED tests/test_monitor_contains_falsy.py::test_contains_present_falsy_value_fires[sqlite-False-false]
+FAILED tests/test_monitor_contains_falsy.py::test_contains_present_falsy_value_fires[postgresql-0-0]
+FAILED tests/test_monitor_contains_falsy.py::test_contains_present_falsy_value_fires[postgresql-False-false]
+4 failed in 1.11s
