@@ -83,53 +83,57 @@ class BrowserNavigate(Tool):
         screenshot = None
         events: list[dict[str, object]] = []
         async with async_playwright() as playwright:
-            if arguments.profile:
-                context = await playwright.chromium.launch_persistent_context(
-                    str(self.profiles_dir / arguments.profile), headless=self.headless
-                )
-                page = context.pages[0] if context.pages else await context.new_page()
-                close = context.close
-            else:
-                browser = await playwright.chromium.launch(headless=self.headless)
-                context = await browser.new_context()
-                page = await context.new_page()
-                close = browser.close
-            downloads: list[dict[str, object]] = []
-            download_root = self.safe_screenshot(arguments.download_dir) if arguments.download_dir else None
-            if download_root: download_root.mkdir(parents=True, exist_ok=True)
-            async def save_download(download):
-                if not download_root: return
-                suggested = Path(download.suggested_filename).name
-                target = download_root / suggested
-                await download.save_as(target)
-                downloads.append({"filename":suggested,"path":str(target.relative_to(self.workspace))})
-            page.on("download", save_download)
-            response = await page.goto(url, wait_until="domcontentloaded", timeout=30_000)
-            for index, action in enumerate(arguments.actions):
-                if action.kind == "wait":
-                    await page.wait_for_timeout(action.milliseconds or 0)
+            close = None
+            try:
+                if arguments.profile:
+                    context = await playwright.chromium.launch_persistent_context(
+                        str(self.profiles_dir / arguments.profile), headless=self.headless
+                    )
+                    close = context.close
+                    page = context.pages[0] if context.pages else await context.new_page()
                 else:
-                    if not action.selector:
-                        raise ValueError(f"action {index} requires selector")
-                    locator = page.locator(action.selector).first
-                    if action.kind == "click":
-                        await locator.click(timeout=10_000)
-                    elif action.kind == "fill":
-                        await locator.fill(action.value or "", timeout=10_000)
-                    elif action.kind == "press":
-                        await locator.press(action.value or "Enter", timeout=10_000)
-                    elif action.kind == "select":
-                        await locator.select_option(action.value or "", timeout=10_000)
-                events.append({"index": index, "kind": action.kind, "url": page.url})
-            await page.wait_for_timeout(arguments.wait_ms)
-            if arguments.screenshot_path:
-                target = self.safe_screenshot(arguments.screenshot_path)
-                target.parent.mkdir(parents=True, exist_ok=True)
-                await page.screenshot(path=str(target), full_page=True)
-                screenshot = str(target.relative_to(self.workspace))
-            text = (await page.locator("body").inner_text())[:200_000]
-            lowered = text.lower()
-            challenge = any(marker in lowered for marker in ("verify you are human", "captcha", "security challenge", "checking your browser"))
-            result = {"url": page.url, "title": await page.title(), "text": text, "status": response.status if response else None, "screenshot": screenshot, "actions": events, "downloads": downloads, "challenge": {"detected":challenge,"requires_human":challenge}}
-            await close()
-            return result
+                    browser = await playwright.chromium.launch(headless=self.headless)
+                    close = browser.close
+                    context = await browser.new_context()
+                    page = await context.new_page()
+                downloads: list[dict[str, object]] = []
+                download_root = self.safe_screenshot(arguments.download_dir) if arguments.download_dir else None
+                if download_root: download_root.mkdir(parents=True, exist_ok=True)
+                async def save_download(download):
+                    if not download_root: return
+                    suggested = Path(download.suggested_filename).name
+                    target = download_root / suggested
+                    await download.save_as(target)
+                    downloads.append({"filename":suggested,"path":str(target.relative_to(self.workspace))})
+                page.on("download", save_download)
+                response = await page.goto(url, wait_until="domcontentloaded", timeout=30_000)
+                for index, action in enumerate(arguments.actions):
+                    if action.kind == "wait":
+                        await page.wait_for_timeout(action.milliseconds or 0)
+                    else:
+                        if not action.selector:
+                            raise ValueError(f"action {index} requires selector")
+                        locator = page.locator(action.selector).first
+                        if action.kind == "click":
+                            await locator.click(timeout=10_000)
+                        elif action.kind == "fill":
+                            await locator.fill(action.value or "", timeout=10_000)
+                        elif action.kind == "press":
+                            await locator.press(action.value or "Enter", timeout=10_000)
+                        elif action.kind == "select":
+                            await locator.select_option(action.value or "", timeout=10_000)
+                    events.append({"index": index, "kind": action.kind, "url": page.url})
+                await page.wait_for_timeout(arguments.wait_ms)
+                if arguments.screenshot_path:
+                    target = self.safe_screenshot(arguments.screenshot_path)
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    await page.screenshot(path=str(target), full_page=True)
+                    screenshot = str(target.relative_to(self.workspace))
+                text = (await page.locator("body").inner_text())[:200_000]
+                lowered = text.lower()
+                challenge = any(marker in lowered for marker in ("verify you are human", "captcha", "security challenge", "checking your browser"))
+                result = {"url": page.url, "title": await page.title(), "text": text, "status": response.status if response else None, "screenshot": screenshot, "actions": events, "downloads": downloads, "challenge": {"detected":challenge,"requires_human":challenge}}
+                return result
+            finally:
+                if close is not None:
+                    await close()

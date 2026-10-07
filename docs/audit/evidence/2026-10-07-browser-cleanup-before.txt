@@ -1,0 +1,24 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+______________ test_browser_failure_closes_context_before_return _______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-74/test_browser_failure_closes_co0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f7e9bff0c40>
+
+    @pytest.mark.asyncio
+    async def test_browser_failure_closes_context_before_return(tmp_path, monkeypatch):
+        browser = BrowserContract()
+        monkeypatch.setitem(sys.modules, 'playwright', SimpleNamespace())
+        monkeypatch.setitem(sys.modules, 'playwright.async_api', SimpleNamespace(async_playwright=lambda:browser))
+        monkeypatch.setattr('meemee.tools.browser.validate_public_url', lambda url:url)
+        with pytest.raises(RuntimeError, match='navigation crashed'):
+            await BrowserNavigate(tmp_path).run(BrowseArgs(url='https://example.com'))
+>       assert browser.closed, 'navigation failure left browser context open'
+E       AssertionError: navigation failure left browser context open
+E       assert False
+E        +  where False = <test_browser_cleanup_canary.BrowserContract object at 0x7f7e9bff0df0>.closed
+
+tests/test_browser_cleanup_canary.py:38: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_browser_cleanup_canary.py::test_browser_failure_closes_context_before_return
+1 failed in 0.11s
