@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import sqlite3
 import threading
 from datetime import datetime, timezone
@@ -35,12 +36,55 @@ def utc_moment(now: datetime | None = None) -> datetime:
     return moment.astimezone(timezone.utc)
 
 
+def validate_constraints(value: dict | None) -> None:
+    if value is None:
+        return
+    if not isinstance(value, dict):
+        raise ValueError("argument_constraints must be an object")
+
+    def valid(item):
+        if item is None or isinstance(item, (str, bool, int)):
+            return
+        if isinstance(item, float) and math.isfinite(item):
+            return
+        if isinstance(item, list):
+            for child in item:
+                valid(child)
+            return
+        if isinstance(item, dict) and all(isinstance(key, str) for key in item):
+            for child in item.values():
+                valid(child)
+            return
+        raise ValueError("argument_constraints must contain finite JSON values")
+    valid(value)
+
+
 def constraints_match(constraints: dict | None, arguments: dict | None) -> bool:
-    """A grant with no constraints allows any arguments; otherwise every constrained key must match exactly."""
+    """Exact JSON-value constraints, keeping booleans distinct from numbers."""
     if constraints is None:
         return True
+    try:
+        validate_constraints(constraints)
+    except ValueError:
+        return False
     supplied = arguments or {}
-    return all(key in supplied and supplied[key] == value for key, value in constraints.items())
+    if not isinstance(supplied, dict):
+        return False
+
+    def equal(left, right):
+        if isinstance(left, bool) or isinstance(right, bool):
+            return type(left) is type(right) and left == right
+        if isinstance(left, dict):
+            return isinstance(right, dict) and left.keys() == right.keys() and all(
+                equal(value, right[key]) for key, value in left.items())
+        if isinstance(left, list):
+            return isinstance(right, list) and len(left) == len(right) and all(
+                equal(a, b) for a, b in zip(left, right))
+        if isinstance(left, (int, float)):
+            return isinstance(right, (int, float)) and math.isfinite(right) and left == right
+        return type(left) is type(right) and left == right
+
+    return all(key in supplied and equal(value, supplied[key]) for key, value in constraints.items())
 
 
 class ApprovalStore:
@@ -65,6 +109,7 @@ class ApprovalStore:
     def grant(self, principal: str, tool: str, granted_by: str, expires_at: str | None = None, argument_constraints: dict | None = None) -> None:
         if not principal or not tool or not granted_by:
             raise ValueError("principal, tool and granted_by are required")
+        validate_constraints(argument_constraints)
         expires_at = normalize_expiry(expires_at)
         now = datetime.now(timezone.utc).isoformat()
         with self.lock, self.db:
