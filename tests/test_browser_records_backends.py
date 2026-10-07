@@ -77,6 +77,7 @@ def test_notice_queue_and_delivery(make):
             return Profile()
 
     class Result:
+        delivered = True
         detail = "sent"
 
     sent = []
