@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import sqlite3
 import threading
 from datetime import datetime, timedelta, timezone
@@ -60,8 +61,8 @@ class SourceHealthStore:
             raise ValueError("owner_id and source_id are required")
         if ok and error:
             raise ValueError("successful check cannot have an error")
-        if latency_ms is not None and latency_ms < 0:
-            raise ValueError("latency_ms cannot be negative")
+        if latency_ms is not None and (not math.isfinite(latency_ms) or latency_ms < 0):
+            raise ValueError("latency_ms must be finite and nonnegative")
         moment = datetime.fromisoformat(checked_at) if checked_at else datetime.now(timezone.utc)
         if moment.tzinfo is None:
             raise ValueError("checked_at must include a timezone")
