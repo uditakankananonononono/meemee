@@ -221,6 +221,15 @@ class ContextStore:
                                 ORDER BY occurred_at DESC,id DESC LIMIT %s""", (owner_id, visibility, max(1, min(limit, 100)))).fetchall()
         return [self._record(row) for row in rows]
 
+    def reflection_batch(self, owner_id: str, after: int, through: int, limit: int = 50) -> list[dict]:
+        with self.db.transaction() as c:
+            rows = c.execute(
+                "SELECT * FROM meemee_context_records WHERE owner_id=%s AND id>%s AND id<=%s"
+                " AND visibility IN ('private','agent') ORDER BY id LIMIT %s",
+                (owner_id, after, through, max(1, min(limit, 100))),
+            ).fetchall()
+        return [self._record(row) for row in rows]
+
     @staticmethod
     def _record(row: dict[str, Any]) -> dict:
         result = {k: v for k, v in row.items() if k != "fts"}

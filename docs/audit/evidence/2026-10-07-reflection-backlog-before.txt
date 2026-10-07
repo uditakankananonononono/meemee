@@ -1,0 +1,48 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_____________ test_backlog_is_processed_before_watermark_advances ______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-112/test_backlog_is_processed_befo0')
+
+    async def test_backlog_is_processed_before_watermark_advances(tmp_path):
+        context = ContextStore(tmp_path / 'c.db')
+        context.register_source('o', 's', 'fixture', {})
+        for i in range(101):
+            context.ingest(ContextRecord('o', 's', str(i), 'document', 'record', str(i), '2026-01-01T00:00:00Z', {}))
+        model = CaptureModel()
+        schedule = ReflectionSchedule(tmp_path / 'r.db')
+        personal = PersonalModelStore(tmp_path / 'p.db')
+        for _ in range(3):
+            await reflect_due_once(context, personal, model, schedule, timedelta(0))
+>       assert len(model.seen) == 101
+E       AssertionError: assert 50 == 101
+E        +  where 50 = len(['100', '99', '98', '97', '96', '95', ...])
+E        +    where ['100', '99', '98', '97', '96', '95', ...] = <test_reflection_backlog_canary.CaptureModel object at 0x7f1ece597f40>.seen
+
+tests/test_reflection_backlog_canary.py:29: AssertionError
+______________ test_late_old_event_is_not_skipped_by_recent_sort _______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-112/test_late_old_event_is_not_ski0')
+
+    async def test_late_old_event_is_not_skipped_by_recent_sort(tmp_path):
+        context = ContextStore(tmp_path / 'c.db')
+        context.register_source('o', 's', 'fixture', {})
+        for i in range(50):
+            context.ingest(ContextRecord('o', 's', str(i), 'document', 'record', str(i), '2026-10-01T00:00:00Z', {}))
+        model = CaptureModel()
+        schedule = ReflectionSchedule(tmp_path / 'r.db')
+        personal = PersonalModelStore(tmp_path / 'p.db')
+        await reflect_due_once(context, personal, model, schedule, timedelta(0))
+        context.ingest(ContextRecord('o', 's', 'late', 'document', 'record', 'old event', '2025-01-01T00:00:00Z', {}))
+        await reflect_due_once(context, personal, model, schedule, timedelta(0))
+>       assert model.seen.count('late') == 1
+E       AssertionError: assert 0 == 1
+E        +  where 0 = <built-in method count of list object at 0x7f1ece41a4c0>('late')
+E        +    where <built-in method count of list object at 0x7f1ece41a4c0> = ['49', '48', '47', '46', '45', '44', ...].count
+E        +      where ['49', '48', '47', '46', '45', '44', ...] = <test_reflection_backlog_canary.CaptureModel object at 0x7f1ece595c60>.seen
+
+tests/test_reflection_backlog_canary.py:44: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_reflection_backlog_canary.py::test_backlog_is_processed_before_watermark_advances
+FAILED tests/test_reflection_backlog_canary.py::test_late_old_event_is_not_skipped_by_recent_sort
+2 failed in 0.24s

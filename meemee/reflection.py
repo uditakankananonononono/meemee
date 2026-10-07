@@ -41,6 +41,10 @@ class PersonalModelReflector:
 
     async def reflect(self, owner_id: str, limit: int = 50) -> dict:
         records = self.context.recent(owner_id, limit)
+        return await self.reflect_records(owner_id, records)
+
+    async def reflect_records(self, owner_id: str, records: list[dict]) -> dict:
+        """Reflect precisely the caller-supplied batch, retaining citation checks."""
         if not records:
             return {"considered": 0, "accepted": 0, "rejected": 0, "items": []}
         supplied = {(row["source_id"], row["external_id"]) for row in records}
