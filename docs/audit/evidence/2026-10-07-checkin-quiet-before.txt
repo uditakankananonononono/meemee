@@ -1,0 +1,21 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+____________ test_overdue_checkin_is_silent_in_current_quiet_window ____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-190/test_overdue_checkin_is_silent0')
+
+    async def test_overdue_checkin_is_silent_in_current_quiet_window(tmp_path):
+        store, engine, channels = setup(tmp_path)
+        queue_checkin(store)
+        profile = store.profile('udita')
+        # Whole-day quiet window, independent of wall clock, to reproduce overdue behavior.
+        profile.checkins.quiet_hours = QuietHours(start='00:00', end='00:00')
+        store.upsert_user(profile)
+        result = await deliver_due_once(store, engine, channels)
+>       assert not result['delivered']
+E       assert not True
+
+tests/test_checkin_quiet_delivery_canary.py:18: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_checkin_quiet_delivery_canary.py::test_overdue_checkin_is_silent_in_current_quiet_window
+1 failed in 0.14s

@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import datetime, timezone
 
 from ..config import Settings
 from .channels import ChannelError, validate_delivery_address
-from .checkins import CheckInScheduler
+from .checkins import CheckInScheduler, in_quiet_hours
 from .engine import CompanionEngine
 from .store import CompanionStore
 
@@ -44,6 +45,10 @@ async def deliver_due_once(
             store.cancel_claimed_checkin(checkin["id"])
             return {"claimed": True, "checkin_id": checkin["id"], "user_id": checkin["user_id"],
                     "delivered": False, "status": "cancelled", "detail": "check-in preferences changed before delivery"}
+        if profile.checkins.quiet_hours and in_quiet_hours(datetime.now(timezone.utc).astimezone(profile.tz()), profile.checkins.quiet_hours):
+            store.cancel_claimed_checkin(checkin["id"])
+            return {"claimed": True, "checkin_id": checkin["id"], "user_id": checkin["user_id"],
+                    "delivered": False, "status": "cancelled", "detail": "current time is inside quiet hours"}
         address = checkin["address"]
         if not address:
             if channel_name != "local":
