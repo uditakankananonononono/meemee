@@ -1,0 +1,62 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+____ test_accepted_http_message_with_lost_response_is_not_retried[webhook] _____
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-219/test_accepted_http_message_wit0')
+kind = 'webhook'
+
+    @pytest.mark.parametrize('kind', ['webhook', 'whatsapp'])
+    async def test_accepted_http_message_with_lost_response_is_not_retried(tmp_path, kind):
+        store, engine, channels = setup(tmp_path)
+        calls = []
+    
+        def lost_response(request):
+            calls.append(request.content)
+            raise httpx.ReadError('response lost after provider acceptance', request=request)
+    
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lost_response)) as client:
+            channels[kind] = (WebhookChannel(client=client) if kind == 'webhook'
+                              else ProviderChannel(kind, 'https://example.com', 'synthetic-token', client=client))
+            queue_checkin(store, channel=kind, address='https://example.com/inbox' if kind == 'webhook' else 'synthetic-recipient')
+            summary = await deliver_due_once(store, engine, channels)
+>           assert summary['status'] == 'failed'
+E           AssertionError: assert 'queued' == 'failed'
+E             
+E             - failed
+E             + queued
+
+tests/test_companion_http_unknown_canary.py:24: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  meemee.companion.worker:worker.py:87 check-in 70ef2d4796574c5c92032b3e103ff7e7 delivery failed (webhook delivery failed: response lost after provider acceptance)
+____ test_accepted_http_message_with_lost_response_is_not_retried[whatsapp] ____
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-219/test_accepted_http_message_wit1')
+kind = 'whatsapp'
+
+    @pytest.mark.parametrize('kind', ['webhook', 'whatsapp'])
+    async def test_accepted_http_message_with_lost_response_is_not_retried(tmp_path, kind):
+        store, engine, channels = setup(tmp_path)
+        calls = []
+    
+        def lost_response(request):
+            calls.append(request.content)
+            raise httpx.ReadError('response lost after provider acceptance', request=request)
+    
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lost_response)) as client:
+            channels[kind] = (WebhookChannel(client=client) if kind == 'webhook'
+                              else ProviderChannel(kind, 'https://example.com', 'synthetic-token', client=client))
+            queue_checkin(store, channel=kind, address='https://example.com/inbox' if kind == 'webhook' else 'synthetic-recipient')
+            summary = await deliver_due_once(store, engine, channels)
+>           assert summary['status'] == 'failed'
+E           AssertionError: assert 'queued' == 'failed'
+E             
+E             - failed
+E             + queued
+
+tests/test_companion_http_unknown_canary.py:24: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  meemee.companion.worker:worker.py:87 check-in e4c6f18811b749b580f82514285d5455 delivery failed (whatsapp provider delivery failed: response lost after provider acceptance)
+=========================== short test summary info ============================
+FAILED tests/test_companion_http_unknown_canary.py::test_accepted_http_message_with_lost_response_is_not_retried[webhook]
+FAILED tests/test_companion_http_unknown_canary.py::test_accepted_http_message_with_lost_response_is_not_retried[whatsapp]
+2 failed in 0.19s

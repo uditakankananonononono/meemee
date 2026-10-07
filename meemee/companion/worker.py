@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, timezone
 
 from ..config import Settings
-from .channels import ChannelError, validate_delivery_address
+from .channels import ChannelError, DeliveryOutcomeUnknown, validate_delivery_address
 from .checkins import CheckInScheduler, in_quiet_hours
 from .engine import CompanionEngine
 from .store import CompanionStore
@@ -65,6 +65,10 @@ async def deliver_due_once(
         except asyncio.CancelledError:
             store.mark_checkin_unknown(checkin["id"], "delivery outcome unknown: send cancelled")
             raise
+        except DeliveryOutcomeUnknown as exc:
+            store.mark_checkin_unknown(checkin["id"], str(exc))
+            return {"claimed": True, "checkin_id": checkin["id"], "user_id": checkin["user_id"],
+                    "delivered": False, "status": "failed", "detail": str(exc)}
         except ChannelError:
             # Preserve the existing explicit adapter failure/retry contract.
             raise
