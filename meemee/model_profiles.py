@@ -390,8 +390,13 @@ async def probe_profile(profile: ModelProfile, timeout: float = 5.0, client: htt
         )
         if response.status_code >= 400:
             return {"name": profile.name, "reachable": False, "error": f"HTTP {response.status_code}"}
-        data = response.json().get("data", [])
-        ids = [m.get("id") for m in data if isinstance(m, dict)]
+        payload = response.json()
+        if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
+            raise ValueError("invalid model listing: expected an object with a data list")  # noqa: TRY004 - invalid provider payload
+        data = payload["data"]
+        if any(not isinstance(m, dict) or not isinstance(m.get("id"), str) or not m["id"] for m in data):
+            raise ValueError("invalid model listing: each entry must have a non-empty string id")
+        ids = [m["id"] for m in data]
         return {"name": profile.name, "reachable": True, "model_listed": profile.model in ids, "served": ids[:20]}
     except (httpx.HTTPError, ValueError) as exc:
         return {"name": profile.name, "reachable": False, "error": type(exc).__name__ + ": " + str(exc)[:200]}
