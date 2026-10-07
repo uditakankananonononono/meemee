@@ -1,0 +1,104 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_____________ test_interrupted_notice_send_terminal_unknown[True] ______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-225/test_interrupted_notice_send_t0')
+cancel = True
+
+    @pytest.mark.parametrize('cancel', [True, False])
+    async def test_interrupted_notice_send_terminal_unknown(tmp_path, cancel):
+        sessions = BrowserSessionStore(tmp_path / 's.db', 'fixture')
+        queue = TakeoverNoticeQueue(tmp_path / 'n.db')
+        sessions.create_session('s', 'o', None, [])
+        expires = datetime.now(timezone.utc) + timedelta(minutes=10)
+        sessions.create_takeover('t', 's', 'fixture-token', 'captcha', 'agent', expires)
+        queue.enqueue({'takeover_id': 't', 'reason': 'captcha', 'expires_at': expires.isoformat(),
+                       'url': 'https://fixture.invalid/t'}, 's', 'o')
+        entered = asyncio.Event()
+        sends = []
+    
+        class Companion:
+            def profile(self, user):
+                return SimpleNamespace(checkins=SimpleNamespace(channel='fixture', address='dest'))
+    
+        class Interrupted:
+            async def send(self, address, text):
+                sends.append(text)
+                entered.set()
+                if cancel:
+                    await asyncio.Event().wait()
+                raise OSError('reply lost after acceptance')
+    
+        channels = {'fixture': Interrupted()}
+        task = asyncio.create_task(queue.deliver_pending(sessions, Companion(), channels))
+        await entered.wait()
+        if cancel:
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        else:
+            try:
+                await task
+            except OSError:
+                pass
+        row = queue.db.execute('SELECT text,status,detail FROM browser_takeover_notices').fetchone()
+>       assert row['status'] == 'failed'
+E       AssertionError: assert 'queued' == 'failed'
+E         
+E         - failed
+E         + queued
+
+tests/test_notice_interrupted_send_canary.py:49: AssertionError
+_____________ test_interrupted_notice_send_terminal_unknown[False] _____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-225/test_interrupted_notice_send_t1')
+cancel = False
+
+    @pytest.mark.parametrize('cancel', [True, False])
+    async def test_interrupted_notice_send_terminal_unknown(tmp_path, cancel):
+        sessions = BrowserSessionStore(tmp_path / 's.db', 'fixture')
+        queue = TakeoverNoticeQueue(tmp_path / 'n.db')
+        sessions.create_session('s', 'o', None, [])
+        expires = datetime.now(timezone.utc) + timedelta(minutes=10)
+        sessions.create_takeover('t', 's', 'fixture-token', 'captcha', 'agent', expires)
+        queue.enqueue({'takeover_id': 't', 'reason': 'captcha', 'expires_at': expires.isoformat(),
+                       'url': 'https://fixture.invalid/t'}, 's', 'o')
+        entered = asyncio.Event()
+        sends = []
+    
+        class Companion:
+            def profile(self, user):
+                return SimpleNamespace(checkins=SimpleNamespace(channel='fixture', address='dest'))
+    
+        class Interrupted:
+            async def send(self, address, text):
+                sends.append(text)
+                entered.set()
+                if cancel:
+                    await asyncio.Event().wait()
+                raise OSError('reply lost after acceptance')
+    
+        channels = {'fixture': Interrupted()}
+        task = asyncio.create_task(queue.deliver_pending(sessions, Companion(), channels))
+        await entered.wait()
+        if cancel:
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        else:
+            try:
+                await task
+            except OSError:
+                pass
+        row = queue.db.execute('SELECT text,status,detail FROM browser_takeover_notices').fetchone()
+>       assert row['status'] == 'failed'
+E       AssertionError: assert 'queued' == 'failed'
+E         
+E         - failed
+E         + queued
+
+tests/test_notice_interrupted_send_canary.py:49: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_notice_interrupted_send_canary.py::test_interrupted_notice_send_terminal_unknown[True]
+FAILED tests/test_notice_interrupted_send_canary.py::test_interrupted_notice_send_terminal_unknown[False]
+2 failed in 0.21s
