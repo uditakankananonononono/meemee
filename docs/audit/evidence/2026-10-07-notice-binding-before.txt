@@ -1,0 +1,68 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+_ test_notice_enqueue_replay_rejects_recipient_rebinding[sqlite-other-session-owner] _
+
+make = <function make.<locals>.<lambda> at 0x7ff121be8310>
+session = 'other-session', user = 'owner'
+
+    @pytest.mark.parametrize('session,user', [('other-session', 'owner'), ('session', 'other-owner')])
+    def test_notice_enqueue_replay_rejects_recipient_rebinding(make, session, user):
+        _, notices = make('host-a')
+        takeover = {'takeover_id': 'bound', 'reason': 'captcha', 'url': 'https://example.test/t',
+                    'expires_at': (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()}
+        first = notices.enqueue(takeover, 'session', 'owner')
+>       with pytest.raises(ValueError, match='notice'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_browser_records_backends.py:145: Failed
+_ test_notice_enqueue_replay_rejects_recipient_rebinding[sqlite-session-other-owner] _
+
+make = <function make.<locals>.<lambda> at 0x7ff121a0beb0>, session = 'session'
+user = 'other-owner'
+
+    @pytest.mark.parametrize('session,user', [('other-session', 'owner'), ('session', 'other-owner')])
+    def test_notice_enqueue_replay_rejects_recipient_rebinding(make, session, user):
+        _, notices = make('host-a')
+        takeover = {'takeover_id': 'bound', 'reason': 'captcha', 'url': 'https://example.test/t',
+                    'expires_at': (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()}
+        first = notices.enqueue(takeover, 'session', 'owner')
+>       with pytest.raises(ValueError, match='notice'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_browser_records_backends.py:145: Failed
+_ test_notice_enqueue_replay_rejects_recipient_rebinding[postgresql-other-session-owner] _
+
+make = <function make.<locals>.<lambda> at 0x7ff1205827a0>
+session = 'other-session', user = 'owner'
+
+    @pytest.mark.parametrize('session,user', [('other-session', 'owner'), ('session', 'other-owner')])
+    def test_notice_enqueue_replay_rejects_recipient_rebinding(make, session, user):
+        _, notices = make('host-a')
+        takeover = {'takeover_id': 'bound', 'reason': 'captcha', 'url': 'https://example.test/t',
+                    'expires_at': (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()}
+        first = notices.enqueue(takeover, 'session', 'owner')
+>       with pytest.raises(ValueError, match='notice'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_browser_records_backends.py:145: Failed
+_ test_notice_enqueue_replay_rejects_recipient_rebinding[postgresql-session-other-owner] _
+
+make = <function make.<locals>.<lambda> at 0x7ff120582950>, session = 'session'
+user = 'other-owner'
+
+    @pytest.mark.parametrize('session,user', [('other-session', 'owner'), ('session', 'other-owner')])
+    def test_notice_enqueue_replay_rejects_recipient_rebinding(make, session, user):
+        _, notices = make('host-a')
+        takeover = {'takeover_id': 'bound', 'reason': 'captcha', 'url': 'https://example.test/t',
+                    'expires_at': (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()}
+        first = notices.enqueue(takeover, 'session', 'owner')
+>       with pytest.raises(ValueError, match='notice'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_browser_records_backends.py:145: Failed
+=========================== short test summary info ============================
+FAILED tests/test_browser_records_backends.py::test_notice_enqueue_replay_rejects_recipient_rebinding[sqlite-other-session-owner]
+FAILED tests/test_browser_records_backends.py::test_notice_enqueue_replay_rejects_recipient_rebinding[sqlite-session-other-owner]
+FAILED tests/test_browser_records_backends.py::test_notice_enqueue_replay_rejects_recipient_rebinding[postgresql-other-session-owner]
+FAILED tests/test_browser_records_backends.py::test_notice_enqueue_replay_rejects_recipient_rebinding[postgresql-session-other-owner]
+4 failed, 9 deselected in 1.00s

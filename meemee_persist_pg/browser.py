@@ -147,9 +147,11 @@ class TakeoverNoticeQueue:
                          VALUES (%s,%s,%s,%s,%s,'queued',%s,%s) ON CONFLICT (takeover_id) DO NOTHING""",
                       (notice_id, takeover["takeover_id"], session_id, user_id, text, now, now))
             row = c.execute(
-                "SELECT id FROM meemee_browser_takeover_notices WHERE takeover_id=%s FOR SHARE",
+                "SELECT id,session_id,user_id FROM meemee_browser_takeover_notices WHERE takeover_id=%s FOR SHARE",
                 (takeover["takeover_id"],),
             ).fetchone()
+            if row["session_id"] != session_id or row["user_id"] != user_id:
+                raise ValueError("Existing takeover notice belongs to a different session or user")
             return row["id"]
 
     def _finish(self, notice_id: str, status: str, detail: str, channel: str | None = None, keep_text: bool = False) -> None:
