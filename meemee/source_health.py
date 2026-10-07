@@ -57,6 +57,8 @@ class SourceHealthStore:
         metadata: dict[str, Any] | None = None,
         checked_at: str | None = None,
     ) -> dict[str, Any]:
+        if type(ok) is not bool:
+            raise TypeError("ok must be an explicit boolean")
         if not owner_id or not source_id:
             raise ValueError("owner_id and source_id are required")
         if ok and error:
