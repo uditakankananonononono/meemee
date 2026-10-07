@@ -60,7 +60,7 @@ class ToolRegistry:
             tool = self.get(name)
             parsed = tool.arguments_model.model_validate(arguments)
             if tool.isolation is not None:
-                outcome = await run_isolated(tool, parsed, tool.isolation, cancel)
+                outcome = await run_isolated(tool, parsed, tool.isolation, cancel, owner_id=owner_id)
                 elapsed = round((time.perf_counter() - started) * 1000)
                 if outcome.ok:
                     return ToolResult(ok=True, content=outcome.value, elapsed_ms=elapsed)

@@ -61,9 +61,12 @@ class IsolatedOutcome:
         return self.status == "ok"
 
 
-def _child_main(conn: Connection, tool: Any, arguments: BaseModel) -> None:
+def _child_main(conn: Connection, tool: Any, arguments: BaseModel, owner_id: str) -> None:
     try:
-        value = tool.run(arguments)
+        options = {}
+        if "owner_id" in inspect.signature(tool.run).parameters:
+            options["owner_id"] = owner_id
+        value = tool.run(arguments, **options)
         if inspect.isawaitable(value):
             value = asyncio.run(_await(value))
         conn.send(("ok", value))
@@ -104,12 +107,13 @@ def run_isolated_sync(
     arguments: BaseModel,
     policy: IsolationPolicy | None = None,
     cancel: threading.Event | asyncio.Event | None = None,
+    *, owner_id: str = "default",
 ) -> IsolatedOutcome:
     """Run ``tool.run(arguments)`` in a child process and block until it settles."""
     policy = policy or IsolationPolicy()
     ctx = mp.get_context("spawn")
     parent_conn, child_conn = ctx.Pipe(duplex=False)
-    process = ctx.Process(target=_child_main, args=(child_conn, tool, arguments), daemon=True)
+    process = ctx.Process(target=_child_main, args=(child_conn, tool, arguments, owner_id), daemon=True)
     started = time.perf_counter()
 
     def elapsed() -> int:
@@ -165,6 +169,7 @@ async def run_isolated(
     arguments: BaseModel,
     policy: IsolationPolicy | None = None,
     cancel: threading.Event | asyncio.Event | None = None,
+    *, owner_id: str = "default",
 ) -> IsolatedOutcome:
     """Async wrapper: supervises the child from a worker thread so the event loop stays free."""
-    return await asyncio.to_thread(run_isolated_sync, tool, arguments, policy, cancel)
+    return await asyncio.to_thread(run_isolated_sync, tool, arguments, policy, cancel, owner_id=owner_id)

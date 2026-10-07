@@ -1,0 +1,21 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______________ test_isolated_tool_receives_authenticated_owner ________________
+
+    @pytest.mark.asyncio
+    async def test_isolated_tool_receives_authenticated_owner():
+        registry = ToolRegistry()
+        registry.register(OwnerTool())
+        result = await registry.execute('owner', {}, owner_id='tenant-alice')
+        assert result.ok
+>       assert result.content == {'owner_id': 'tenant-alice'}
+E       AssertionError: assert {'owner_id': 'default'} == {'owner_id': 'tenant-alice'}
+E         
+E         Differing items:
+E         {'owner_id': 'default'} != {'owner_id': 'tenant-alice'}
+E         Use -v to get more diff
+
+tests/test_isolated_owner_canary.py:28: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_isolated_owner_canary.py::test_isolated_tool_receives_authenticated_owner
+1 failed in 0.33s
