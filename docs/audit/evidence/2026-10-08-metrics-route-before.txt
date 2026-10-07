@@ -1,0 +1,23 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______________ test_unmatched_paths_use_one_metric_route_label ________________
+
+    @pytest.mark.asyncio
+    async def test_unmatched_paths_use_one_metric_route_label():
+        app = Starlette()
+        app.add_middleware(MetricsMiddleware)
+        paths = ['/missing-cardinality-fixture-a', '/missing-cardinality-fixture-b']
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test') as client:
+            for path in paths:
+                assert (await client.get(path)).status_code == 404
+        routes = {sample.labels['route'] for metric in HTTP_REQUESTS.collect() for sample in metric.samples
+                  if sample.name == 'meemee_http_requests_total'}
+>       assert not routes.intersection(paths)
+E       AssertionError: assert not {'/missing-cardinality-fixture-a', '/missing-cardinality-fixture-b'}
+E        +  where {'/missing-cardinality-fixture-a', '/missing-cardinality-fixture-b'} = <built-in method intersection of set object at 0x7f5b718889e0>(['/missing-cardinality-fixture-a', '/missing-cardinality-fixture-b'])
+E        +    where <built-in method intersection of set object at 0x7f5b718889e0> = {'/missing-cardinality-fixture-a', '/missing-cardinality-fixture-b'}.intersection
+
+tests/test_metrics_unmatched_route.py:20: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_metrics_unmatched_route.py::test_unmatched_paths_use_one_metric_route_label
+1 failed in 0.09s

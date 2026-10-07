@@ -30,7 +30,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             status = str(response.status_code)
             return response
         finally:
-            route = getattr(request.scope.get("route"), "path", request.url.path)
+            route = getattr(request.scope.get("route"), "path", "__unmatched__")
             HTTP_INFLIGHT.dec()
             HTTP_REQUESTS.labels(request.method, route, status).inc()
             HTTP_DURATION.labels(request.method, route).observe(time.perf_counter() - started)
