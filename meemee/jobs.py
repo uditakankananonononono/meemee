@@ -180,20 +180,22 @@ class JobStore:
             return True
         now = datetime.now(timezone.utc).isoformat()
         with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
             changed = self.db.execute("UPDATE jobs SET status='cancelled', error='cancelled', updated_at=? WHERE id=? AND status='cancel_requested'", (now, ident)).rowcount
-        if changed:
-            self.event(ident, "cancelled", {})
+            if changed:
+                self.db.execute("INSERT INTO job_events(job_id,kind,payload,created_at) VALUES(?,?,?,?)", (ident, "cancelled", "{}", now))
         return bool(changed)
 
     def cancel(self, ident: str) -> bool:
         now = datetime.now(timezone.utc).isoformat()
         with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
             changed = self.db.execute(
                 "UPDATE jobs SET status='cancelled', error='cancelled', updated_at=? WHERE id=? AND status='queued'",
                 (now, ident),
             ).rowcount
-        if changed:
-            self.event(ident, "cancelled", {})
+            if changed:
+                self.db.execute("INSERT INTO job_events(job_id,kind,payload,created_at) VALUES(?,?,?,?)", (ident, "cancelled", "{}", now))
         return bool(changed)
 
     def list_for_principal(
