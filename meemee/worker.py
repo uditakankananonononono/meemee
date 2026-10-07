@@ -6,16 +6,31 @@ import uuid
 
 from .approvals import ApprovalStore
 from .config import Settings
+from .job_errors import LeaseLostError
 from .persistence import persistence_from_settings
 from .runtime import build_agent
 from .webhooks import WebhookStore
 
 
-def cancellation_watcher(jobs, job_id: str, event: threading.Event, stop: threading.Event) -> None:
-    while not stop.wait(0.25):
-        job = jobs.get(job_id)
-        if job and job["status"] == "cancel_requested":
-            event.set()
+def cancellation_watcher(jobs, job_id: str, event: threading.Event, stop: threading.Event,
+                         lease_token: str | None = None, lease_lost: threading.Event | None = None) -> None:
+    interval = min(0.25, float(getattr(jobs, "lease_seconds", 60)) / 3) if lease_token else 0.25
+    while not stop.wait(max(interval, 0.01)):
+        try:
+            if lease_token and not jobs.heartbeat(job_id, lease_token):
+                lease_lost.set()
+                event.set()
+                return
+            job = jobs.get(job_id)
+            if job and job["status"] == "cancel_requested":
+                event.set()
+                # Keep renewing leased ownership while cancellation settles.
+                if not lease_token:
+                    return
+        except (OSError, ValueError, RuntimeError):
+            if lease_token:
+                lease_lost.set()
+                event.set()
             return
 
 
@@ -54,8 +69,11 @@ async def work_forever(settings: Settings | None = None) -> None:
         if job is None:
             await asyncio.sleep(settings.worker_poll_seconds)
             continue
-        cancel, stop = threading.Event(), threading.Event()
-        watcher = threading.Thread(target=cancellation_watcher, args=(jobs, job["id"], cancel, stop), daemon=True)
+        cancel, stop, lease_lost = threading.Event(), threading.Event(), threading.Event()
+        lease_token = job.get("lease_token")
+        terminal_kwargs = {"lease_token": lease_token} if lease_token else {}
+        watcher = threading.Thread(target=cancellation_watcher,
+            args=(jobs, job["id"], cancel, stop, lease_token, lease_lost), daemon=True)
         watcher.start()
         run_id = uuid.uuid4().hex
         try:
@@ -64,20 +82,34 @@ async def work_forever(settings: Settings | None = None) -> None:
                 # Fail closed: every creation path sets a principal, so a
                 # principal-less job is legacy or corrupt. Running it under the
                 # shared "default" bucket would leak its memory across owners.
-                jobs.fail(job["id"], "job has no principal owner; refusing to run unowned work")
+                jobs.fail(job["id"], "job has no principal owner; refusing to run unowned work", **terminal_kwargs)
                 continue
             report = await build_agent(settings, memory=persistence.memory, persistence=persistence).run(
                 job["goal"], approve=job_approval(approvals, owner), cancel=cancel, owner_id=owner, run_id=run_id)
+            if lease_lost.is_set():
+                # A different claimant may own the row. Never fail, finish,
+                # cancel or announce work through the old claim.
+                continue
             if cancel.is_set():
-                jobs.cancel_running(job["id"])
+                settled = jobs.cancel_running(job["id"], **terminal_kwargs)
+                if lease_token and not settled:
+                    continue
                 if not purge_if_deleted(jobs, persistence.memory, job["id"], run_id, owner):
                     webhooks.enqueue(f"job:{job['id']}:cancelled", "job.cancelled", {"job_id": job["id"], "status": "cancelled"}, principal=owner)
             else:
-                jobs.finish(job["id"], report.model_dump())
+                jobs.finish(job["id"], report.model_dump(), **terminal_kwargs)
                 if not purge_if_deleted(jobs, persistence.memory, job["id"], run_id, owner):
                     webhooks.enqueue(f"job:{job['id']}:done", "job.done", {"job_id": job["id"], "status": "done", "blocked": report.blocked, "result": report.model_dump()}, principal=owner)
+        except LeaseLostError:
+            # Fencing refusal is not a task failure under this stale lease.
+            continue
         except (OSError, ValueError, RuntimeError) as exc:
-            jobs.fail(job["id"], str(exc))
+            if lease_lost.is_set():
+                continue
+            try:
+                jobs.fail(job["id"], str(exc), **terminal_kwargs)
+            except LeaseLostError:
+                continue
             if not purge_if_deleted(jobs, persistence.memory, job["id"], run_id, owner):
                 state = jobs.get(job["id"])["status"]
                 if state == "failed":

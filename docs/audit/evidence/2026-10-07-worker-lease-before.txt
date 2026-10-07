@@ -1,0 +1,176 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_________ test_worker_renews_lease_and_never_settles_lost_work[False] __________
+
+self = <test_worker_lease_canaries.test_worker_renews_lease_and_never_settles_lost_work.<locals>.Jobs object at 0x7ff4f9515930>
+ident = 'j'
+result = {'approvals_required': [], 'blocked': False, 'final': 'done', 'goal': 'work', ...}
+lease_token = None
+
+    def finish(self, ident, result, lease_token=None):
+        self.terminals.append(('finish', lease_token))
+        if lost or time.monotonic() >= self.deadline:
+>           raise LeaseLostError('expired')
+E           meemee_persist_pg.jobs.LeaseLostError: expired
+
+tests/test_worker_lease_canaries.py:45: LeaseLostError
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-35/test_worker_renews_lease_and_n0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ff4f95156c0>
+lost = False
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('lost', [False, True])
+    async def test_worker_renews_lease_and_never_settles_lost_work(tmp_path, monkeypatch, lost):
+        from meemee_persist_pg.jobs import LeaseLostError
+        import meemee.worker as worker
+        class Jobs:
+            lease_seconds = 0.15
+            claimed = False
+            deadline = 0
+            beats = 0
+            terminals = []
+            def claim(self):
+                if self.claimed:
+                    raise EndLoop()
+                self.claimed = True
+                self.deadline = time.monotonic() + self.lease_seconds
+                return {'id':'j', 'goal':'work', 'principal':'owner', 'lease_token':'original'}
+            def get(self, ident):
+                return {'status':'running', 'lease_token':'original'}
+            def heartbeat(self, ident, token):
+                self.beats += 1
+                if lost or token != 'original' or time.monotonic() >= self.deadline:
+                    return False
+                self.deadline = time.monotonic() + self.lease_seconds
+                return True
+            def finish(self, ident, result, lease_token=None):
+                self.terminals.append(('finish', lease_token))
+                if lost or time.monotonic() >= self.deadline:
+                    raise LeaseLostError('expired')
+                return False
+            def fail(self, ident, error, lease_token=None):
+                self.terminals.append(('fail', lease_token))
+                raise LeaseLostError('expired')
+            def cancel_running(self, ident, lease_token=None):
+                self.terminals.append(('cancel', lease_token))
+                return False
+        jobs = Jobs()
+        events = []
+        class Agent:
+            async def run(self, goal, **kwargs):
+                await asyncio.sleep(0.35)
+                return RunReport(run_id='r', goal=goal, final='done', steps_used=1, tool_results=[])
+        persistence = SimpleNamespace(jobs=jobs, webhooks=SimpleNamespace(enqueue=lambda *a, **kw: events.append(a)),
+            memory=SimpleNamespace(delete_runs=lambda *a, **kw: None), approvals=SimpleNamespace(allows=lambda *a, **kw: False))
+        monkeypatch.setattr(worker, 'persistence_from_settings', lambda settings: persistence)
+        monkeypatch.setattr(worker, 'build_agent', lambda *a, **kw: Agent())
+        with pytest.raises(EndLoop):
+>           await work_forever(Settings(data_dir=tmp_path))
+
+tests/test_worker_lease_canaries.py:64: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee/worker.py:80: in work_forever
+    jobs.fail(job["id"], str(exc))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <test_worker_lease_canaries.test_worker_renews_lease_and_never_settles_lost_work.<locals>.Jobs object at 0x7ff4f9515930>
+ident = 'j', error = 'expired', lease_token = None
+
+    def fail(self, ident, error, lease_token=None):
+        self.terminals.append(('fail', lease_token))
+>       raise LeaseLostError('expired')
+E       meemee_persist_pg.jobs.LeaseLostError: expired
+
+tests/test_worker_lease_canaries.py:49: LeaseLostError
+__________ test_worker_renews_lease_and_never_settles_lost_work[True] __________
+
+self = <test_worker_lease_canaries.test_worker_renews_lease_and_never_settles_lost_work.<locals>.Jobs object at 0x7ff4f6f1a920>
+ident = 'j'
+result = {'approvals_required': [], 'blocked': False, 'final': 'done', 'goal': 'work', ...}
+lease_token = None
+
+    def finish(self, ident, result, lease_token=None):
+        self.terminals.append(('finish', lease_token))
+        if lost or time.monotonic() >= self.deadline:
+>           raise LeaseLostError('expired')
+E           meemee_persist_pg.jobs.LeaseLostError: expired
+
+tests/test_worker_lease_canaries.py:45: LeaseLostError
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-35/test_worker_renews_lease_and_n1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ff4f6f1b0a0>
+lost = True
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('lost', [False, True])
+    async def test_worker_renews_lease_and_never_settles_lost_work(tmp_path, monkeypatch, lost):
+        from meemee_persist_pg.jobs import LeaseLostError
+        import meemee.worker as worker
+        class Jobs:
+            lease_seconds = 0.15
+            claimed = False
+            deadline = 0
+            beats = 0
+            terminals = []
+            def claim(self):
+                if self.claimed:
+                    raise EndLoop()
+                self.claimed = True
+                self.deadline = time.monotonic() + self.lease_seconds
+                return {'id':'j', 'goal':'work', 'principal':'owner', 'lease_token':'original'}
+            def get(self, ident):
+                return {'status':'running', 'lease_token':'original'}
+            def heartbeat(self, ident, token):
+                self.beats += 1
+                if lost or token != 'original' or time.monotonic() >= self.deadline:
+                    return False
+                self.deadline = time.monotonic() + self.lease_seconds
+                return True
+            def finish(self, ident, result, lease_token=None):
+                self.terminals.append(('finish', lease_token))
+                if lost or time.monotonic() >= self.deadline:
+                    raise LeaseLostError('expired')
+                return False
+            def fail(self, ident, error, lease_token=None):
+                self.terminals.append(('fail', lease_token))
+                raise LeaseLostError('expired')
+            def cancel_running(self, ident, lease_token=None):
+                self.terminals.append(('cancel', lease_token))
+                return False
+        jobs = Jobs()
+        events = []
+        class Agent:
+            async def run(self, goal, **kwargs):
+                await asyncio.sleep(0.35)
+                return RunReport(run_id='r', goal=goal, final='done', steps_used=1, tool_results=[])
+        persistence = SimpleNamespace(jobs=jobs, webhooks=SimpleNamespace(enqueue=lambda *a, **kw: events.append(a)),
+            memory=SimpleNamespace(delete_runs=lambda *a, **kw: None), approvals=SimpleNamespace(allows=lambda *a, **kw: False))
+        monkeypatch.setattr(worker, 'persistence_from_settings', lambda settings: persistence)
+        monkeypatch.setattr(worker, 'build_agent', lambda *a, **kw: Agent())
+        with pytest.raises(EndLoop):
+>           await work_forever(Settings(data_dir=tmp_path))
+
+tests/test_worker_lease_canaries.py:64: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee/worker.py:80: in work_forever
+    jobs.fail(job["id"], str(exc))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <test_worker_lease_canaries.test_worker_renews_lease_and_never_settles_lost_work.<locals>.Jobs object at 0x7ff4f6f1a920>
+ident = 'j', error = 'expired', lease_token = None
+
+    def fail(self, ident, error, lease_token=None):
+        self.terminals.append(('fail', lease_token))
+>       raise LeaseLostError('expired')
+E       meemee_persist_pg.jobs.LeaseLostError: expired
+
+tests/test_worker_lease_canaries.py:49: LeaseLostError
+=========================== short test summary info ============================
+FAILED tests/test_worker_lease_canaries.py::test_worker_renews_lease_and_never_settles_lost_work[False]
+FAILED tests/test_worker_lease_canaries.py::test_worker_renews_lease_and_never_settles_lost_work[True]
+2 failed in 1.08s
