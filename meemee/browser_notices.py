@@ -12,7 +12,7 @@ from __future__ import annotations
 import sqlite3
 import threading
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -43,6 +43,11 @@ class TakeoverNoticeQueue:
                 CREATE INDEX IF NOT EXISTS browser_notices_status ON browser_takeover_notices(status, created_at);
             """)
 
+            self.db.execute("BEGIN IMMEDIATE")
+            columns = {row[1] for row in self.db.execute("PRAGMA table_info(browser_takeover_notices)")}
+            if "lease_until" not in columns:
+                self.db.execute("ALTER TABLE browser_takeover_notices ADD COLUMN lease_until TEXT")
+
     def ping(self) -> bool:
         with self.lock:
             return self.db.execute("SELECT 1").fetchone() is not None
@@ -63,7 +68,7 @@ class TakeoverNoticeQueue:
     def _finish(self, notice_id: str, status: str, detail: str, channel: str | None = None, keep_text: bool = False) -> None:
         with self.lock, self.db:
             self.db.execute(
-                f"UPDATE browser_takeover_notices SET status=?, detail=?, channel=COALESCE(?, channel), updated_at=?{'' if keep_text else ', text=NULL'} WHERE id=?",
+                f"UPDATE browser_takeover_notices SET status=?, detail=?, channel=COALESCE(?, channel), updated_at=?,lease_until=NULL{'' if keep_text else ', text=NULL'} WHERE id=?",
                 (status, detail[:500], channel, _now(), notice_id),
             )
 
@@ -84,13 +89,22 @@ class TakeoverNoticeQueue:
         return [dict(r) for r in rows]
 
     def _claim(self, limit: int) -> list[dict[str, Any]]:
-        with self.lock:
-            return [dict(r) for r in self.db.execute(
-                "SELECT * FROM browser_takeover_notices WHERE status='queued' ORDER BY created_at LIMIT ?", (limit,)).fetchall()]
+        now = datetime.now(timezone.utc)
+        lease = (now + timedelta(minutes=5)).isoformat()
+        with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            rows = self.db.execute(
+                "SELECT * FROM browser_takeover_notices WHERE status='queued' AND"
+                " (lease_until IS NULL OR lease_until<?) ORDER BY created_at LIMIT ?",
+                (now.isoformat(), max(1, min(limit, 100))),
+            ).fetchall()
+            for row in rows:
+                self.db.execute("UPDATE browser_takeover_notices SET lease_until=? WHERE id=?", (lease, row["id"]))
+        return [dict(row) for row in rows]
 
     def _record_failure(self, notice_id: str, detail: str, channel: str | None) -> int:
         with self.lock, self.db:
-            self.db.execute("UPDATE browser_takeover_notices SET attempts=attempts+1, detail=?, channel=?, updated_at=? WHERE id=?",
+            self.db.execute("UPDATE browser_takeover_notices SET attempts=attempts+1, detail=?, channel=?, updated_at=?,lease_until=NULL WHERE id=?",
                             (detail[:500], channel, _now(), notice_id))
             return self.db.execute("SELECT attempts FROM browser_takeover_notices WHERE id=?", (notice_id,)).fetchone()[0]
 
