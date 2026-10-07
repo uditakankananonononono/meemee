@@ -25,7 +25,8 @@ def export_account(data_dir: Path, principal: str, destination: Path) -> dict:
     canonical=json.dumps(payload,sort_keys=True,separators=(",",":"))
     envelope={"payload":payload,"sha256":hashlib.sha256(canonical.encode()).hexdigest()}
     destination.parent.mkdir(parents=True,exist_ok=True)
-    destination.write_text(json.dumps(envelope,indent=2,sort_keys=True)+"\n")
+    with destination.open("x", encoding="utf-8") as output:
+        output.write(json.dumps(envelope,indent=2,sort_keys=True)+"\n")
     return {"principal":principal,"jobs":len(jobs),"runs":len(runs),"entitlements":len(entitlements),"sha256":envelope["sha256"]}
 
 
