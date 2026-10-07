@@ -207,6 +207,8 @@ class CompanionStore:
     def schedule_checkin(self, user_id: str, due_at: datetime, slot: str, channel: str, address: str | None,
                          max_attempts: int = 3, *, reuse_pending: bool = False) -> tuple[dict[str, Any], bool]:
         now = _now()
+        if due_at.tzinfo is None or due_at.utcoffset() is None:
+            raise ValueError("check-in due_at requires a timezone")
         with self.db.transaction() as c:
             if reuse_pending:
                 c.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (f"checkin-plan:{user_id}",))
@@ -224,6 +226,8 @@ class CompanionStore:
         return _row(row), bool(created)  # type: ignore[return-value]
 
     def claim_checkin(self, now: datetime | None = None) -> dict[str, Any] | None:
+        if now is not None and (now.tzinfo is None or now.utcoffset() is None):
+            raise ValueError("check-in clock requires a timezone")
         moment = (now or _now()).astimezone(timezone.utc)
         with self.db.transaction() as c:
             row = c.execute("""SELECT * FROM meemee_companion_checkins WHERE status='queued' AND due_at<=%s

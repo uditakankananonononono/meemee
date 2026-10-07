@@ -1,0 +1,56 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+____ test_checkin_rejects_naive_clock_without_state_change[sqlite-schedule] ____
+
+store = <meemee.companion.store.CompanionStore object at 0x7f9828d51d50>
+operation = 'schedule'
+
+    @pytest.mark.parametrize('operation', ['schedule', 'claim'])
+    def test_checkin_rejects_naive_clock_without_state_change(store, operation):  # noqa: F811
+        moment = datetime(2026, 10, 8, 9)
+>       with pytest.raises(ValueError, match='timezone'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_checkin_naive_clock.py:12: Failed
+_____ test_checkin_rejects_naive_clock_without_state_change[sqlite-claim] ______
+
+store = <meemee.companion.store.CompanionStore object at 0x7f9828d53be0>
+operation = 'claim'
+
+    @pytest.mark.parametrize('operation', ['schedule', 'claim'])
+    def test_checkin_rejects_naive_clock_without_state_change(store, operation):  # noqa: F811
+        moment = datetime(2026, 10, 8, 9)
+>       with pytest.raises(ValueError, match='timezone'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_checkin_naive_clock.py:12: Failed
+__ test_checkin_rejects_naive_clock_without_state_change[postgresql-schedule] __
+
+store = <meemee_persist_pg.companion.CompanionStore object at 0x7f9828d52dd0>
+operation = 'schedule'
+
+    @pytest.mark.parametrize('operation', ['schedule', 'claim'])
+    def test_checkin_rejects_naive_clock_without_state_change(store, operation):  # noqa: F811
+        moment = datetime(2026, 10, 8, 9)
+>       with pytest.raises(ValueError, match='timezone'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_checkin_naive_clock.py:12: Failed
+___ test_checkin_rejects_naive_clock_without_state_change[postgresql-claim] ____
+
+store = <meemee_persist_pg.companion.CompanionStore object at 0x7f9828d53910>
+operation = 'claim'
+
+    @pytest.mark.parametrize('operation', ['schedule', 'claim'])
+    def test_checkin_rejects_naive_clock_without_state_change(store, operation):  # noqa: F811
+        moment = datetime(2026, 10, 8, 9)
+>       with pytest.raises(ValueError, match='timezone'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_checkin_naive_clock.py:12: Failed
+=========================== short test summary info ============================
+FAILED tests/test_checkin_naive_clock.py::test_checkin_rejects_naive_clock_without_state_change[sqlite-schedule]
+FAILED tests/test_checkin_naive_clock.py::test_checkin_rejects_naive_clock_without_state_change[sqlite-claim]
+FAILED tests/test_checkin_naive_clock.py::test_checkin_rejects_naive_clock_without_state_change[postgresql-schedule]
+FAILED tests/test_checkin_naive_clock.py::test_checkin_rejects_naive_clock_without_state_change[postgresql-claim]
+4 failed in 1.12s
