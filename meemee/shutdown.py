@@ -27,9 +27,9 @@ class RunGate:
 
     async def leave(self) -> None:
         async with self._condition:
-            self._active -= 1
-            if self._active < 0:
+            if self._active == 0:
                 raise RuntimeError("run gate underflow")
+            self._active -= 1
             if self._active == 0:
                 self._condition.notify_all()
 
