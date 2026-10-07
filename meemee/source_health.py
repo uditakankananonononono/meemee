@@ -52,7 +52,10 @@ class SourceHealthStore:
             raise ValueError("successful check cannot have an error")
         if latency_ms is not None and latency_ms < 0:
             raise ValueError("latency_ms cannot be negative")
-        stamp = checked_at or datetime.now(timezone.utc).isoformat()
+        moment = datetime.fromisoformat(checked_at) if checked_at else datetime.now(timezone.utc)
+        if moment.tzinfo is None:
+            raise ValueError("checked_at must include a timezone")
+        stamp = moment.astimezone(timezone.utc).isoformat()
         encoded = json.dumps(metadata or {}, sort_keys=True)
         with self.lock, self.db:
             self.db.execute(
@@ -65,13 +68,15 @@ class SourceHealthStore:
                   consecutive_failures,total_successes,total_failures,latency_ms,last_error,metadata)
                 VALUES(?,?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(owner_id,source_id) DO UPDATE SET
-                  last_attempt_at=excluded.last_attempt_at,
-                  last_success_at=CASE WHEN excluded.last_success_at IS NOT NULL THEN excluded.last_success_at ELSE source_health.last_success_at END,
-                  last_cursor=CASE WHEN excluded.last_cursor IS NOT NULL THEN excluded.last_cursor ELSE source_health.last_cursor END,
-                  consecutive_failures=CASE WHEN excluded.last_success_at IS NOT NULL THEN 0 ELSE source_health.consecutive_failures+1 END,
+                  last_attempt_at=MAX(excluded.last_attempt_at,source_health.last_attempt_at),
+                  last_success_at=CASE WHEN excluded.last_success_at IS NOT NULL AND (source_health.last_success_at IS NULL OR excluded.last_success_at>=source_health.last_success_at) THEN excluded.last_success_at ELSE source_health.last_success_at END,
+                  last_cursor=CASE WHEN excluded.last_cursor IS NOT NULL AND excluded.last_attempt_at>=source_health.last_attempt_at THEN excluded.last_cursor ELSE source_health.last_cursor END,
+                  consecutive_failures=CASE WHEN excluded.last_attempt_at<source_health.last_attempt_at THEN source_health.consecutive_failures WHEN excluded.last_success_at IS NOT NULL THEN 0 ELSE source_health.consecutive_failures+1 END,
                   total_successes=source_health.total_successes+excluded.total_successes,
                   total_failures=source_health.total_failures+excluded.total_failures,
-                  latency_ms=excluded.latency_ms,last_error=excluded.last_error,metadata=excluded.metadata
+                  latency_ms=CASE WHEN excluded.last_attempt_at>=source_health.last_attempt_at THEN excluded.latency_ms ELSE source_health.latency_ms END,
+                  last_error=CASE WHEN excluded.last_attempt_at>=source_health.last_attempt_at THEN excluded.last_error ELSE source_health.last_error END,
+                  metadata=CASE WHEN excluded.last_attempt_at>=source_health.last_attempt_at THEN excluded.metadata ELSE source_health.metadata END
             """,
                 (
                     owner_id,
@@ -86,6 +91,18 @@ class SourceHealthStore:
                     None if ok else (error or "unknown error"),
                     encoded,
                 ),
+            )
+            # Reconstruct the chronological streak, including late failures after
+            # the latest success. Equal timestamps use insertion id as tie-break.
+            self.db.execute(
+                """UPDATE source_health SET consecutive_failures=(
+                    SELECT count(*) FROM source_health_checks c
+                    WHERE c.owner_id=? AND c.source_id=? AND c.ok=0 AND NOT EXISTS (
+                        SELECT 1 FROM source_health_checks s WHERE s.owner_id=c.owner_id
+                        AND s.source_id=c.source_id AND s.ok=1
+                        AND (s.checked_at>c.checked_at OR (s.checked_at=c.checked_at AND s.id>c.id))
+                    )) WHERE owner_id=? AND source_id=?""",
+                (owner_id, source_id, owner_id, source_id),
             )
         return self.get(owner_id, source_id) or {}
 
