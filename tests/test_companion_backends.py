@@ -161,3 +161,12 @@ def test_model_trace_binding(store, target_kind):
         store.record_model_trace(ident, 'c2', {'model': 'wrong'})
     assert store.model_traces('c1')[0]['model'] == 'original'
     assert store.model_traces('c2') == []
+
+
+@pytest.mark.parametrize('user_id,channel', [('u2', 'local'), ('u1', 'sms')])
+def test_explicit_conversation_collision_binding(store, user_id, channel):
+    original = store.start_conversation('u1', 'local', 'bound')
+    with pytest.raises(ValueError, match='conversation'):
+        store.start_conversation(user_id, channel, 'bound')
+    assert store.get_conversation('bound') == original
+    assert store.start_conversation('u1', 'local', 'bound') == original

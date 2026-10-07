@@ -1,0 +1,30 @@
+..FF                                                                     [100%]
+=================================== FAILURES ===================================
+______ test_explicit_conversation_collision_binding[postgresql-u2-local] _______
+
+store = <meemee_persist_pg.companion.CompanionStore object at 0x7f38b536c100>
+user_id = 'u2', channel = 'local'
+
+    @pytest.mark.parametrize('user_id,channel', [('u2', 'local'), ('u1', 'sms')])
+    def test_explicit_conversation_collision_binding(store, user_id, channel):
+        original = store.start_conversation('u1', 'local', 'bound')
+>       with pytest.raises(ValueError, match='conversation'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_companion_backends.py:169: Failed
+_______ test_explicit_conversation_collision_binding[postgresql-u1-sms] ________
+
+store = <meemee_persist_pg.companion.CompanionStore object at 0x7f38b536ebf0>
+user_id = 'u1', channel = 'sms'
+
+    @pytest.mark.parametrize('user_id,channel', [('u2', 'local'), ('u1', 'sms')])
+    def test_explicit_conversation_collision_binding(store, user_id, channel):
+        original = store.start_conversation('u1', 'local', 'bound')
+>       with pytest.raises(ValueError, match='conversation'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_companion_backends.py:169: Failed
+=========================== short test summary info ============================
+FAILED tests/test_companion_backends.py::test_explicit_conversation_collision_binding[postgresql-u2-local]
+FAILED tests/test_companion_backends.py::test_explicit_conversation_collision_binding[postgresql-u1-sms]
+2 failed, 2 passed, 20 deselected in 0.94s

@@ -160,7 +160,12 @@ class CompanionStore:
         with self.db.transaction() as c:
             c.execute("""INSERT INTO meemee_companion_conversations(id,user_id,channel,created_at,last_message_at)
                          VALUES (%s,%s,%s,%s,%s) ON CONFLICT (id) DO NOTHING""", (ident, user_id, channel, now, now))
-        return self.get_conversation(ident)  # type: ignore[return-value]
+            row = c.execute(
+                "SELECT * FROM meemee_companion_conversations WHERE id=%s FOR SHARE", (ident,)
+            ).fetchone()
+            if row is None or row["user_id"] != user_id or row["channel"] != channel:
+                raise ValueError("Explicit conversation belongs to a different user or channel")
+            return _row(row)  # type: ignore[return-value]
 
     def get_conversation(self, conversation_id: str) -> dict[str, Any] | None:
         with self.db.transaction() as c:
