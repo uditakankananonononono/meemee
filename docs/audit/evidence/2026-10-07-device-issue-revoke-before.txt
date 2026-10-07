@@ -1,0 +1,36 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+________ test_revoke_cannot_commit_before_authorized_issue_publication _________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-234/test_revoke_cannot_commit_befo0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f641b619cc0>
+
+    def test_revoke_cannot_commit_before_authorized_issue_publication(tmp_path, monkeypatch):
+        registries = [DeviceRegistry(tmp_path / 'd.db'), DeviceRegistry(tmp_path / 'd.db')]
+        pairing = registries[0].create_pairing('owner')
+        registries[0].pair(pairing['pairing_id'], pairing['code'], device_id='d', name='fixture',
+                           capabilities={'echo': {}})
+        entered = threading.Event()
+        original = devices.make_command
+    
+        def paused_command(*args, **kwargs):
+            entered.set()
+            time.sleep(0.15)
+            return original(*args, **kwargs)
+    
+        monkeypatch.setattr(devices, 'make_command', paused_command)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            issued = pool.submit(registries[0].issue, 'owner', 'd', 'echo', {})
+            assert entered.wait(2)
+            revoked = pool.submit(registries[1].revoke, 'owner', 'd')
+            envelope = issued.result(timeout=3)
+            assert revoked.result(timeout=3)
+        command = registries[0].command(envelope['command_id'])
+        device = registries[1].get('owner', 'd')
+>       assert command['created_at'] <= device['revoked_at']
+E       AssertionError: assert '2026-10-07T12:15:27.277576+00:00' <= '2026-10-07T12:15:27.127353+00:00'
+
+tests/test_device_issue_revocation_canary.py:32: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_device_issue_revocation_canary.py::test_revoke_cannot_commit_before_authorized_issue_publication
+1 failed in 0.21s
