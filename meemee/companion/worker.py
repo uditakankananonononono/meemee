@@ -24,6 +24,7 @@ async def deliver_due_once(
         return {"claimed": False}
     channel_name = checkin["channel"]
     adapter = channels.get(channel_name)
+    delivery_accepted = False
     try:
         if adapter is None:
             raise ChannelError(f"unknown companion channel: {channel_name}")
@@ -78,7 +79,15 @@ async def deliver_due_once(
                     "delivered": False, "status": "failed", "detail": f"delivery outcome unknown: {exc}"}
         if not result.delivered:
             raise ChannelError(result.detail or "channel did not deliver check-in")
-        store.finish_checkin(checkin["id"], message)
+        delivery_accepted = True
+        try:
+            store.finish_checkin(checkin["id"], message)
+        except Exception as exc:  # noqa: BLE001 - publication may fail after accepted delivery
+            detail = f"delivery accepted; completion publication outcome unknown: {exc}"
+            # If this fallback write also fails, propagate. Never put accepted work back in the queue.
+            store.mark_checkin_unknown(checkin["id"], detail)
+            return {"claimed": True, "checkin_id": checkin["id"], "user_id": checkin["user_id"],
+                    "delivered": True, "status": "failed", "detail": detail}
         return {
             "claimed": True,
             "checkin_id": checkin["id"],
@@ -87,6 +96,8 @@ async def deliver_due_once(
             "detail": result.detail,
         }
     except (ChannelError, ValueError, RuntimeError) as exc:
+        if delivery_accepted:
+            raise
         state = store.fail_checkin(checkin["id"], str(exc))
         log.warning("check-in %s delivery failed (%s)", checkin["id"], exc)
         return {
