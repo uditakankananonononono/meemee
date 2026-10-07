@@ -39,7 +39,7 @@ class PersonalModelStore:
             c.execute("SELECT 1 FROM meemee_personal_items LIMIT 0")
         return True
 
-    def upsert(self, owner_id: str, item: PersonalItemInput) -> dict:
+    def upsert(self, owner_id: str, item: PersonalItemInput, *, preserve_user: bool = False) -> dict:
         if not owner_id:
             raise ValueError("owner is required")
         now, title, value = _now(), item.title.strip(), item.value.strip()
@@ -49,6 +49,13 @@ class PersonalModelStore:
             current = c.execute(
                 "SELECT * FROM meemee_personal_items WHERE owner_id=%s AND kind=%s AND title=%s AND status='active'",
                 (owner_id, item.kind, title)).fetchone()
+            if preserve_user and current:
+                confirmed = c.execute(
+                    "SELECT 1 FROM meemee_personal_evidence WHERE item_id=%s AND owner_id=%s AND source_id='user' LIMIT 1",
+                    (current["id"], owner_id),
+                ).fetchone()
+                if confirmed:
+                    return {**dict(current), "reflection_preserved_user": True}
             if current and current["value"] == value:
                 ident = current["id"]
                 c.execute("UPDATE meemee_personal_items SET confidence=%s,valid_from=%s,valid_until=%s,updated_at=%s WHERE id=%s",

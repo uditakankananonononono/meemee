@@ -1,0 +1,29 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___________ test_generated_conflict_cannot_replace_owner_correction ____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-177/test_generated_conflict_cannot0')
+
+    async def test_generated_conflict_cannot_replace_owner_correction(tmp_path):
+        context = ContextStore(tmp_path / 'c.db')
+        context.register_source('o', 's', 'fixture', {})
+        context.ingest(ContextRecord('o','s','r','document','preference','likes tea','2026-01-01T00:00:00Z',{}))
+        personal = PersonalModelStore(tmp_path / 'p.db')
+        row = personal.upsert('o', PersonalItemInput(kind='preference', title='drink', value='tea', source_id='s', source_record_id='r'))
+        corrected = personal.correct('o', row['id'], 'coffee')
+    
+        class Model:
+            async def chat(self, messages, **kwargs):
+                return json.dumps({'claims':[{'kind':'preference','title':'drink','value':'tea','confidence':0.9,'source_id':'s','source_record_id':'r'}]})
+    
+        result = await PersonalModelReflector(context, personal, Model()).reflect('o')
+>       assert personal.list('o')[0]['id'] == corrected['id']
+E       AssertionError: assert 'a8701a38d859...d2b376cc08044' == '0525a284b0d5...5b7558f8366ab'
+E         
+E         - 0525a284b0d544208825b7558f8366ab
+E         + a8701a38d8594b4796cd2b376cc08044
+
+tests/test_reflection_correction_canary.py:22: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_reflection_correction_canary.py::test_generated_conflict_cannot_replace_owner_correction
+1 failed in 0.11s
