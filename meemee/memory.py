@@ -105,7 +105,7 @@ class MemoryStore:
             return memory_id
 
     def search(self, query: str, limit: int = 8, *, owner_id: str) -> list[dict[str, Any]]:
-        safe = " OR ".join(f'"{part}"' for part in query.split() if part) or '""'
+        safe = " OR ".join('"' + part.replace('"', '""') + '"' for part in query.split() if part) or '""'
         with self.lock:
             rows = self.connection.execute(
                 """SELECT m.*, bm25(memories_fts) AS score FROM memories_fts
