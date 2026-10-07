@@ -240,6 +240,34 @@ class CompanionStore:
                       (_now(), row["id"]))
         return _row(row)  # the row as it was before the claim, like SQLite
 
+    def finish_local_checkin(self, checkin_id: str, conversation_id: str, message: str) -> bool:
+        """Publish a local message and its check-in completion in one transaction."""
+        from meemee.companion.checkins import in_quiet_hours
+
+        now, clean = _now(), scrub_text(message)
+        with self.db.transaction() as c:
+            row = c.execute("SELECT user_id,address,channel FROM meemee_companion_checkins WHERE id=%s AND status='running' FOR UPDATE",
+                            (checkin_id,)).fetchone()
+            conversation = c.execute("SELECT user_id,channel FROM meemee_companion_conversations WHERE id=%s FOR UPDATE",
+                                     (conversation_id,)).fetchone()
+            if (row is None or conversation is None or row["user_id"] != conversation["user_id"]
+                    or row["channel"] != "local" or conversation["channel"] != "local"
+                    or (row["address"] is not None and row["address"] != conversation_id)):
+                raise ValueError("check-in or local conversation is no longer eligible")
+            user = c.execute("SELECT * FROM meemee_companion_users WHERE user_id=%s FOR SHARE", (row["user_id"],)).fetchone()
+            profile = UserProfile(**{k: self._profile(user)[k] for k in ("user_id", "display_name", "timezone", "persona", "checkins")}) if user else None
+            prefs = profile.checkins if profile is not None else None
+            if (prefs is None or not prefs.enabled or prefs.channel != "local" or prefs.address != row["address"]
+                    or (prefs.quiet_hours is not None and in_quiet_hours(now.astimezone(profile.tz()), prefs.quiet_hours))):
+                c.execute("UPDATE meemee_companion_checkins SET status='cancelled',updated_at=%s WHERE id=%s", (now, checkin_id))
+                return False
+            c.execute("INSERT INTO meemee_companion_messages(conversation_id,role,content,created_at) VALUES(%s,'assistant',%s,%s)",
+                      (conversation_id, clean, now))
+            c.execute("UPDATE meemee_companion_conversations SET last_message_at=%s WHERE id=%s", (now, conversation_id))
+            c.execute("UPDATE meemee_companion_checkins SET status='done',message=%s,last_error=NULL,updated_at=%s WHERE id=%s",
+                      (clean, now, checkin_id))
+        return True
+
     def finish_checkin(self, checkin_id: str, message: str) -> None:
         with self.db.transaction() as c:
             c.execute("""UPDATE meemee_companion_checkins SET status='done', message=%s, last_error=NULL, updated_at=%s
