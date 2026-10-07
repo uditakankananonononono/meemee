@@ -1,0 +1,39 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+__________________ test_loadcheck_handles_native_sqlite_error __________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-411/test_loadcheck_handles_native_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f2063674d60>
+
+    def test_loadcheck_handles_native_sqlite_error(tmp_path, monkeypatch):
+        def broken(*args, **kwargs):
+            raise sqlite3.OperationalError('private fixture detail')
+    
+        monkeypatch.setattr(JobStore, 'enqueue', broken)
+>       result = run_loadcheck(operations=8, workers=2, data_dir=tmp_path)
+
+tests/test_loadcheck_driver_error.py:14: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee/loadcheck.py:51: in run_loadcheck
+    try: counts[future.result()] += 1
+/usr/lib/python3.10/concurrent/futures/_base.py:451: in result
+    return self.__get_result()
+/usr/lib/python3.10/concurrent/futures/_base.py:403: in __get_result
+    raise self._exception
+/usr/lib/python3.10/concurrent/futures/thread.py:58: in run
+    result = self.fn(*self.args, **self.kwargs)
+meemee/loadcheck.py:41: in operation
+    jobs.enqueue(f"load operation {index}", principal="loadcheck")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = (<meemee.jobs.JobStore object at 0x7f20636749a0>, 'load operation 2')
+kwargs = {'principal': 'loadcheck'}
+
+    def broken(*args, **kwargs):
+>       raise sqlite3.OperationalError('private fixture detail')
+E       sqlite3.OperationalError: private fixture detail
+
+tests/test_loadcheck_driver_error.py:11: OperationalError
+=========================== short test summary info ============================
+FAILED tests/test_loadcheck_driver_error.py::test_loadcheck_handles_native_sqlite_error
+1 failed in 0.33s

@@ -49,7 +49,8 @@ def run_loadcheck(
         futures = [pool.submit(operation, index) for index in range(operations)]
         for future in futures:
             try: counts[future.result()] += 1
-            except (OSError, RuntimeError, ValueError) as exc: errors.append(type(exc).__name__)
+            except Exception as exc:  # noqa: BLE001 - native driver failures are failed operations
+                errors.append(type(exc).__name__)
     audit_valid, broken_at = audit.verify()
     stored_jobs, cursor = 0, None
     while True:
