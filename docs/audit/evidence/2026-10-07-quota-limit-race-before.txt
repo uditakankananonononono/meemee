@@ -1,0 +1,40 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+________ test_limit_reduction_does_not_commit_before_stale_consumption _________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-237/test_limit_reduction_does_not_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fd1dc65a5f0>
+
+    def test_limit_reduction_does_not_commit_before_stale_consumption(tmp_path, monkeypatch):
+        stores = [QuotaStore(tmp_path / 'q.db', default_daily_jobs=2), QuotaStore(tmp_path / 'q.db', default_daily_jobs=2)]
+        stores[0].consume_job('owner')
+        read_limit = threading.Event()
+        original = stores[0].limit
+    
+        def pause_after_read(principal):
+            maximum = original(principal)
+            read_limit.set()
+            time.sleep(0.15)
+            return maximum
+    
+        monkeypatch.setattr(stores[0], 'limit', pause_after_read)
+    
+        def reduce():
+            stores[1].set_limit('owner', 1)
+            return stores[1].status('owner')['used']
+    
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            consumed = pool.submit(stores[0].consume_job, 'owner')
+            assert read_limit.wait(2)
+            reduced = pool.submit(reduce)
+            assert consumed.result(timeout=3)['used'] == 2
+            # Reduction may follow an in-flight consumption, but not precede its publication.
+>           assert reduced.result(timeout=3) == 2
+E           assert 1 == 2
+E            +  where 1 = result(timeout=3)
+E            +    where result = <Future at 0x7fd1dc65bd90 state=finished returned int>.result
+
+tests/test_quota_limit_race_canary.py:33: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_quota_limit_race_canary.py::test_limit_reduction_does_not_commit_before_stale_consumption
+1 failed in 0.20s
