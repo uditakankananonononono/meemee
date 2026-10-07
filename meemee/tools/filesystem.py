@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import stat
+import tempfile
 from pathlib import Path
 
 from pydantic import BaseModel, Field
@@ -46,5 +49,19 @@ class WriteFile(WorkspaceTool):
     async def run(self, arguments: WriteArgs) -> dict[str, object]:
         path = self.resolve(arguments.path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(arguments.content, encoding="utf-8")
+        # Publish only a complete same-filesystem write. A disk/encoding error
+        # must leave the old destination intact, not a truncated user file.
+        old_mode = stat.S_IMODE(path.stat().st_mode) if path.exists() else None
+        fd, temporary_name = tempfile.mkstemp(prefix=".meemee-write-", dir=path.parent)
+        os.close(fd)
+        temporary = Path(temporary_name)
+        try:
+            temporary.write_text(arguments.content, encoding="utf-8")
+            if old_mode is not None:
+                temporary.chmod(old_mode)
+            with temporary.open("rb") as saved:
+                os.fsync(saved.fileno())
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
         return {"path": str(path.relative_to(self.root)), "bytes": len(arguments.content.encode())}

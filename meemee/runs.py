@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -19,8 +20,18 @@ class RunStore:
         self.db=sqlite3.connect(path,check_same_thread=False)
         self.db.row_factory=sqlite3.Row
         self.lock=threading.RLock()
+        self.db.execute("PRAGMA busy_timeout=5000")
+        deadline = time.monotonic() + 5
+        while True:
+            try:
+                self.db.execute("PRAGMA journal_mode=WAL")
+                break
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower() or time.monotonic() >= deadline:
+                    self.db.close()
+                    raise
+                time.sleep(0.01)
         self.db.executescript("""
-            PRAGMA journal_mode=WAL;
             CREATE TABLE IF NOT EXISTS runs(
                 run_id TEXT PRIMARY KEY, principal TEXT NOT NULL, goal TEXT NOT NULL,
                 final TEXT NOT NULL, steps_used INTEGER NOT NULL, tool_results TEXT NOT NULL,
@@ -28,9 +39,10 @@ class RunStore:
             );
             CREATE INDEX IF NOT EXISTS runs_principal_created ON runs(principal,created_at DESC,run_id DESC);
         """)
-        columns = {row["name"] for row in self.db.execute("PRAGMA table_info(runs)")}
-        if "approvals_required" not in columns:  # additive v2 column; older rows read as []
-            with self.db:
+        with self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            columns = {row["name"] for row in self.db.execute("PRAGMA table_info(runs)")}
+            if "approvals_required" not in columns:  # older rows read as []
                 self.db.execute("ALTER TABLE runs ADD COLUMN approvals_required TEXT NOT NULL DEFAULT '[]'")
         register_schema(self.db, "runs", 2, ["principal owned completed run reports",
                                              "approvals_required refusal list per run"])

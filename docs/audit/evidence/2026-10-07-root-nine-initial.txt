@@ -1,0 +1,116 @@
+..........................................s.s.s.s.s.s.s.s.s.s.s......... [  9%]
+...................s.s..ss.....................s.s.s.s.s.s.............. [ 19%]
+.......................s................................................ [ 29%]
+............s.sss..............sss.....s.s.s.s.s.s...................... [ 38%]
+...........................ss.sssss...........ssFsssssssssssss.......... [ 48%]
+..s.s.ss.s.........................ss..............s..............sss.s. [ 58%]
+s.s.s.....................sss.................s.s.s.s.s..s.........ss... [ 68%]
+.........................s.s.s.s.s.s..s.ss......................s.s.s.s. [ 77%]
+s.s.s.ssss...........................................s.s.s.s.s.sss....ss [ 87%]
+s..................sss............s.s.s.s.s.s.s.s....................... [ 97%]
+.......sss..........                                                     [100%]
+=================================== FAILURES ===================================
+_ test_signed_job_webhooks_reach_a_real_receiver_retry_and_stay_in_tenant[sqlite] _
+
+stack = {'backend': 'sqlite', 'base': 'http://127.0.0.1:44333', 'dispatcher_logs': PosixPath('/tmp/pytest-of-sandbox/pytest-48/e2e-sqlite-data0/webhook-worker.log'), 'env_ref': <function stack.<locals>.<lambda> at 0x7f4fb26edfc0>, ...}
+receiver = 'https://127.0.0.1:41545'
+
+    def test_signed_job_webhooks_reach_a_real_receiver_retry_and_stay_in_tenant(stack, receiver):
+        """job.done reaches a real local HTTPS receiver with `blocked` in the payload, the signature
+        verifies under the documented scheme, a 500 is retried with the same delivery and a fresh
+        signature, and another principal's subscription receives nothing."""
+        from meemee.webhook_verify import verify_signature
+    
+        base = stack["base"]
+        alice, bob = _minted(base)["token"], _minted(base)["token"]
+        tag = uuid.uuid4().hex[:8]
+        alice_path, bob_path = f"/fail-once/alice-{tag}", f"/bob-{tag}"
+        alice_hook = _subscribe(base, alice, receiver + alice_path, ["job.done"])
+        _subscribe(base, bob, receiver + bob_path, ["*"])
+    
+        created = httpx.post(f"{base}/v1/jobs", headers=_headers(alice), json={"goal": "WRITE hooks/x.txt y"}, timeout=10)
+        assert created.status_code in (200, 201, 202), created.text
+        job_id = created.json()["id"]
+>       first, second = _wait_hits(alice_path, 2, stack)[:2]
+
+tests/test_live_runs_e2e.py:608: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = '/fail-once/alice-f3573c3b', count = 2
+stack = {'backend': 'sqlite', 'base': 'http://127.0.0.1:44333', 'dispatcher_logs': PosixPath('/tmp/pytest-of-sandbox/pytest-48/e2e-sqlite-data0/webhook-worker.log'), 'env_ref': <function stack.<locals>.<lambda> at 0x7f4fb26edfc0>, ...}
+seconds = 20
+
+    def _wait_hits(path: str, count: int, stack, seconds: float = 20) -> list[dict]:
+        deadline = time.monotonic() + seconds
+        while time.monotonic() < deadline:
+            hits = [hit for hit in WebhookReceiver.hits if hit["path"] == path]
+            if len(hits) >= count:
+                return hits
+            time.sleep(0.1)
+>       pytest.fail(f"{path}: {len(hits)}/{count} deliveries\n{stack['dispatcher_logs'].read_text()[-3000:]}")
+E       Failed: /fail-once/alice-f3573c3b: 0/2 deliveries
+E       _persistence          │
+E       │                                                                              │
+E       │   115 │   │   │   │   │   │                                                  │
+E       │       email_verifications=SQLiteEmailVerificationStore(data_dir /            │
+E       │       "email-verifications.sqlite3"),                                        │
+E       │   116 │   │   │   │   │   │      quotas=SQLiteQuotaStore(data_dir /          │
+E       │       "quotas.sqlite3", default_daily_jobs),                                 │
+E       │   117 │   │   │   │   │   │                                                  │
+E       │       entitlements=SQLiteEntitlementStore(data_dir / "entitlements.sqlite3", │
+E       │       default_plan),                                                         │
+E       │ ❱ 118 │   │   │   │   │   │      runs=SQLiteRunStore(data_dir /              │
+E       │       "runs.sqlite3"), idempotency=SQLiteIdempotencyStore(data_dir /         │
+E       │       "idempotency.sqlite3"),                                                │
+E       │   119 │   │   │   │   │   │      webhooks=SQLiteWebhookStore(data_dir /      │
+E       │       "webhooks.sqlite3", webhook_max_payload_bytes, vault_key) if vault_key │
+E       │       else None,                                                             │
+E       │   120 │   │   │   │   │   │      companion=SQLiteCompanionStore(data_dir /   │
+E       │       "companion.sqlite3"),                                                  │
+E       │   121 │   │   │   │   │   │                                                  │
+E       │       personal_model=SQLitePersonalModelStore(data_dir /                     │
+E       │       "personal-model.sqlite3"),                                             │
+E       │                                                                              │
+E       │ /home/sandbox/meemee/meemee/runs.py:34 in __init__                           │
+E       │                                                                              │
+E       │   31 │   │   columns = {row["name"] for row in self.db.execute("PRAGMA       │
+E       │      table_info(runs)")}                                                     │
+E       │   32 │   │   if "approvals_required" not in columns:  # additive v2 column;  │
+E       │      older rows read as []                                                   │
+E       │   33 │   │   │   with self.db:                                               │
+E       │ ❱ 34 │   │   │   │   self.db.execute("ALTER TABLE runs ADD COLUMN            │
+E       │      approvals_required TEXT NOT NULL DEFAULT '[]'")                         │
+E       │   35 │   │   register_schema(self.db, "runs", 2, ["principal owned completed │
+E       │      run reports",                                                           │
+E       │   36 │   │   │   │   │   │   │   │   │   │   │    "approvals_required        │
+E       │      refusal list per run"])                                                 │
+E       │   37                                                                         │
+E       ╰──────────────────────────────────────────────────────────────────────────────╯
+E       OperationalError: duplicate column name: approvals_required
+
+tests/test_live_runs_e2e.py:589: Failed
+----------------------------- Captured stderr call -----------------------------
+{"timestamp":"2026-10-07T08:14:15.806434+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: POST http://127.0.0.1:44333/v1/tokens \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-07T08:14:15.849296+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: POST http://127.0.0.1:44333/v1/tokens \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-07T08:14:15.898005+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: POST http://127.0.0.1:44333/v1/webhooks \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-07T08:14:15.946187+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: POST http://127.0.0.1:44333/v1/webhooks \"HTTP/1.1 200 OK\""}
+{"timestamp":"2026-10-07T08:14:15.995969+00:00","level":"INFO","logger":"httpx","message":"HTTP Request: POST http://127.0.0.1:44333/v1/jobs \"HTTP/1.1 200 OK\""}
+------------------------------ Captured log call -------------------------------
+INFO     httpx:_client.py:1025 HTTP Request: POST http://127.0.0.1:44333/v1/tokens "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1025 HTTP Request: POST http://127.0.0.1:44333/v1/tokens "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1025 HTTP Request: POST http://127.0.0.1:44333/v1/webhooks "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1025 HTTP Request: POST http://127.0.0.1:44333/v1/webhooks "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1025 HTTP Request: POST http://127.0.0.1:44333/v1/jobs "HTTP/1.1 200 OK"
+=============================== warnings summary ===============================
+.venv/lib/python3.10/site-packages/fastapi/testclient.py:1
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+.venv/lib/python3.10/site-packages/starlette/testclient.py:53
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_live_runs_e2e.py::test_signed_job_webhooks_reach_a_real_receiver_retry_and_stay_in_tenant[sqlite]
+1 failed, 611 passed, 130 skipped, 2 warnings in 82.68s (0:01:22)
