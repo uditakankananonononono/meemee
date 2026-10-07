@@ -7,6 +7,7 @@ import logging
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
@@ -200,6 +201,11 @@ class MonitorRequest(MonitorInput):
 
 class PersonalModelRequest(PersonalItemInput):
     pass
+
+
+class MonitorEventRequest(BaseModel):
+    source_id: str = Field(min_length=1, max_length=240)
+    event: dict[str, Any]
 
 
 class PersonalModelCorrection(BaseModel):
@@ -418,6 +424,20 @@ def create_monitor(request: MonitorRequest, principal=runs_write_dependency):
     result = monitors.create(principal.id, MonitorInput(**request.model_dump()))
     audit.append(principal.id, "monitor.create", result["id"], "success")
     return result
+
+
+@app.post("/v1/monitors/evaluate")
+def evaluate_monitors(request: MonitorEventRequest, principal=runs_write_dependency):
+    """Feed caller-supplied facts to this owner's monitors, without external effects."""
+    try:
+        encoded = json.dumps(request.event, allow_nan=False)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(422, "event must contain finite JSON values") from exc
+    if len(encoded.encode()) > 32_768 or len(request.event) > 100:
+        raise HTTPException(422, "event exceeds monitor input limits")
+    fired = monitors.evaluate(principal.id, request.source_id, request.event)
+    audit.append(principal.id, "monitor.evaluate", request.source_id, "success", {"fired": fired})
+    return {"fired": fired, "source_id": request.source_id}
 
 
 @app.delete("/v1/monitors/{monitor_id}")
