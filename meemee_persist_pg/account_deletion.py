@@ -54,11 +54,12 @@ class DeletionLedger:
             c.execute("UPDATE meemee_account_deletions SET status='completed', completed_at=%s WHERE id=%s", (_now(), deletion_id))
 
     def get(self, deletion_id: str) -> dict | None:
-        with self.db.transaction() as c:
+        with self.db.transaction(isolation="REPEATABLE READ") as c:
             row = c.execute("SELECT * FROM meemee_account_deletions WHERE id=%s", (deletion_id,)).fetchone()
-        if not row:
-            return None
-        return {**dict(row), "steps": self.done_steps(deletion_id)}
+            if not row:
+                return None
+            steps = c.execute("SELECT step,counts FROM meemee_account_deletion_steps WHERE deletion_id=%s", (deletion_id,)).fetchall()
+            return {**dict(row), "steps": {item["step"]: json.loads(item["counts"]) for item in steps}}
 
     def incomplete(self) -> list[dict]:
         with self.db.transaction() as c:

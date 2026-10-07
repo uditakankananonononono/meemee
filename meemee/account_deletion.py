@@ -108,11 +108,12 @@ class DeletionLedger:
             )
 
     def get(self, deletion_id: str) -> dict | None:
-        with self.lock:
+        with self.lock, self.db:
+            self.db.execute("BEGIN")
             row = self.db.execute("SELECT * FROM account_deletions WHERE id=?", (deletion_id,)).fetchone()
-        if not row:
-            return None
-        return {**dict(row), "steps": self.done_steps(deletion_id)}
+            if not row:
+                return None
+            return {**dict(row), "steps": self.done_steps(deletion_id)}
 
     def incomplete(self) -> list[dict]:
         with self.lock:
