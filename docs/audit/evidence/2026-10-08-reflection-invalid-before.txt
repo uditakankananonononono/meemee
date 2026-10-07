@@ -1,0 +1,56 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_______ test_invalid_later_claim_does_not_publish_earlier_claim[sqlite] ________
+
+stores = <function stores.<locals>.<lambda> at 0x7fcc7c1511b0>
+
+    def test_invalid_later_claim_does_not_publish_earlier_claim(stores):  # noqa: F811
+        personal, context = stores()
+        context.register_source('owner', 'source', 'test', {})
+        context.ingest(ContextRecord('owner', 'source', 'event', 'event', 'preferences', 'likes tea and swimming', '2026-10-08', {}))
+        claim = {'kind': 'preference', 'title': 'drink', 'value': 'tea', 'confidence': 0.8,
+                 'source_id': 'source', 'source_record_id': 'event'}
+    
+        class Model:
+            async def chat(self, *args, **kwargs):
+                return json.dumps({'claims': [claim, {**claim, 'title': 'exercise', 'value': 'swimming',
+                                                     'valid_until': 'invalid-timestamp'}]})
+    
+        with pytest.raises(ValueError):
+            asyncio.run(PersonalModelReflector(context, personal, Model()).reflect('owner'))
+>       assert personal.list('owner', include_history=True) == []
+E       AssertionError: assert [{'confidence...9ebb4f', ...}] == []
+E         
+E         Left contains one more item: {'confidence': 0.8, 'created_at': '2026-10-07T20:07:56.939707+00:00', 'evidence': [{'confidence': 0.8, 'observed_at': ...56.939707+00:00', 'observed_value': 'tea', 'source_id': 'source', ...}], 'id': '56d350fb093d42b7818cac2e609ebb4f', ...}
+E         Use -v to get more diff
+
+tests/test_reflection_invalid_batch.py:27: AssertionError
+_____ test_invalid_later_claim_does_not_publish_earlier_claim[postgresql] ______
+
+stores = <function stores.<locals>.<lambda> at 0x7fcc7c150700>
+
+    def test_invalid_later_claim_does_not_publish_earlier_claim(stores):  # noqa: F811
+        personal, context = stores()
+        context.register_source('owner', 'source', 'test', {})
+        context.ingest(ContextRecord('owner', 'source', 'event', 'event', 'preferences', 'likes tea and swimming', '2026-10-08', {}))
+        claim = {'kind': 'preference', 'title': 'drink', 'value': 'tea', 'confidence': 0.8,
+                 'source_id': 'source', 'source_record_id': 'event'}
+    
+        class Model:
+            async def chat(self, *args, **kwargs):
+                return json.dumps({'claims': [claim, {**claim, 'title': 'exercise', 'value': 'swimming',
+                                                     'valid_until': 'invalid-timestamp'}]})
+    
+        with pytest.raises(ValueError):
+            asyncio.run(PersonalModelReflector(context, personal, Model()).reflect('owner'))
+>       assert personal.list('owner', include_history=True) == []
+E       AssertionError: assert [{'confidence...5ef371', ...}] == []
+E         
+E         Left contains one more item: {'confidence': 0.8, 'created_at': '2026-10-07T20:07:57.194371+00:00', 'evidence': [{'confidence': 0.8, 'observed_at': ...57.194371+00:00', 'observed_value': 'tea', 'source_id': 'source', ...}], 'id': 'c698fe8db42d44a4a8c6c95c095ef371', ...}
+E         Use -v to get more diff
+
+tests/test_reflection_invalid_batch.py:27: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_reflection_invalid_batch.py::test_invalid_later_claim_does_not_publish_earlier_claim[sqlite]
+FAILED tests/test_reflection_invalid_batch.py::test_invalid_later_claim_does_not_publish_earlier_claim[postgresql]
+2 failed in 0.67s

@@ -61,16 +61,22 @@ class PersonalModelReflector:
             raise ValueError(f"reflection model returned invalid claims: {exc}") from exc
         accepted, rejected, items = 0, 0, []
         allowed = {"goal", "relationship", "project", "preference", "routine", "constraint"}
+        # Validate the whole eligible batch before publishing any claim. A later
+        # malformed validity must not strand earlier durable writes on a failed pass.
+        prepared = []
         for claim in payload.claims:
             if claim.kind not in allowed or (claim.source_id, claim.source_record_id) not in supplied:
                 rejected += 1
                 continue
-            evidence_hash = hashlib.sha256(f"{claim.source_id}\0{claim.source_record_id}".encode()).hexdigest()
-            item = self.personal.upsert(owner_id, PersonalItemInput(
+            value = PersonalItemInput(
                 kind=claim.kind, title=claim.title, value=claim.value, confidence=claim.confidence,
                 source_id=claim.source_id, source_record_id=claim.source_record_id,
                 valid_from=claim.valid_from, valid_until=claim.valid_until,
-            ), preserve_user=True)
+            )
+            prepared.append((claim, value))
+        for claim, value in prepared:
+            evidence_hash = hashlib.sha256(f"{claim.source_id}\0{claim.source_record_id}".encode()).hexdigest()
+            item = self.personal.upsert(owner_id, value, preserve_user=True)
             if item.pop("reflection_preserved_user", False):
                 rejected += 1
                 continue
