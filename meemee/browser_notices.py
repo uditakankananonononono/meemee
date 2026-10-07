@@ -125,6 +125,8 @@ async def deliver_notices(queue, sessions_store, companion_store, channels: dict
                 address = conversation["id"]
             validate_delivery_address(companion_store, notice["user_id"], channel_name, address)
             result = await adapter.send(address, notice["text"])
+            if getattr(result, "delivered", None) is not True:
+                raise ChannelError(result.detail or "channel did not deliver takeover notice")
             queue._finish(notice["id"], "delivered", result.detail, channel_name)
             results.append({"id": notice["id"], "status": "delivered", "channel": channel_name})
         except (ChannelError, ValueError, RuntimeError) as exc:

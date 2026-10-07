@@ -1,0 +1,33 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______________ test_declined_notice_delivery_keeps_queued_text ________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-166/test_declined_notice_delivery_0')
+
+    async def test_declined_notice_delivery_keeps_queued_text(tmp_path):
+        sessions = BrowserSessionStore(tmp_path / 's.db', 'fixture')
+        queue = TakeoverNoticeQueue(tmp_path / 'n.db')
+        sessions.create_session('s', 'o', None, [])
+        expires = datetime.now(timezone.utc) + timedelta(minutes=5)
+        sessions.create_takeover('t', 's', 'fixture-token', 'captcha', 'agent', expires)
+        queue.enqueue({'takeover_id':'t','reason':'captcha','expires_at':expires.isoformat(),'url':'https://fixture.invalid/t'}, 's', 'o')
+    
+        class Companion:
+            def profile(self, user):
+                return SimpleNamespace(checkins=SimpleNamespace(channel='fixture', address='dest'))
+    
+        class Declined:
+            async def send(self, address, text):
+                return DeliveryResult('fixture', address, False, 'declined')
+    
+        result = await queue.deliver_pending(sessions, Companion(), {'fixture':Declined()})
+>       assert result[0]['status'] == 'queued'
+E       AssertionError: assert 'delivered' == 'queued'
+E         
+E         - queued
+E         + delivered
+
+tests/test_notice_delivery_truth_canary.py:27: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_notice_delivery_truth_canary.py::test_declined_notice_delivery_keeps_queued_text
+1 failed in 0.18s
