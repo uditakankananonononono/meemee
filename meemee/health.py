@@ -36,9 +36,9 @@ class ReadinessChecker:
         components: dict[str, dict] = {}
         for name, check in self.database_checks.items():
             try:
-                check()
-                components[name] = {"ok": True}
-            except (OSError, RuntimeError, ValueError) as exc:
+                outcome = check()
+                components[name] = {"ok": outcome is not False}
+            except Exception as exc:  # noqa: BLE001 - driver failures must become not_ready, not HTTP 500
                 components[name] = {"ok": False, "error": type(exc).__name__}
         try:
             probe = self.data_dir if self.data_dir.exists() else self.data_dir.parent
