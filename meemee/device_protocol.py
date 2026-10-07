@@ -124,8 +124,13 @@ def verify_command(
         "signature",
     }
     if (
-        set(envelope) != required
+        not isinstance(envelope, dict)
+        or set(envelope) != required
+        or type(envelope["version"]) is not int
         or envelope["version"] != 1
+        or type(envelope["issued_at"]) is not int
+        or not all(isinstance(envelope[field], str) and envelope[field]
+                   for field in ("command_id", "device_id", "capability", "nonce"))
         or not isinstance(envelope["arguments"], dict)
     ):
         raise ValueError("invalid command envelope")

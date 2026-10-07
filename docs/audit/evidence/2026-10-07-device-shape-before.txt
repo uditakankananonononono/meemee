@@ -1,0 +1,106 @@
+FFFFFF                                                                   [100%]
+=================================== FAILURES ===================================
+_____ test_signed_malformed_field_rejected_before_execution[version-True] ______
+
+field = 'version', value = True
+
+    @pytest.mark.parametrize(('field', 'value'), [
+        ('version', True), ('command_id', ''), ('device_id', 123),
+        ('capability', ['echo']), ('issued_at', 1000.9), ('nonce', {}),
+    ])
+    def test_signed_malformed_field_rejected_before_execution(field, value):
+        envelope = make_command('d', 'echo', {}, b'fixture', issued_at=1000)
+        envelope[field] = value
+        envelope['signature'] = sign(b'fixture', envelope)
+>       with pytest.raises(ValueError, match='envelope'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_device_envelope_shape_canary.py:15: Failed
+______ test_signed_malformed_field_rejected_before_execution[command_id-] ______
+
+field = 'command_id', value = ''
+
+    @pytest.mark.parametrize(('field', 'value'), [
+        ('version', True), ('command_id', ''), ('device_id', 123),
+        ('capability', ['echo']), ('issued_at', 1000.9), ('nonce', {}),
+    ])
+    def test_signed_malformed_field_rejected_before_execution(field, value):
+        envelope = make_command('d', 'echo', {}, b'fixture', issued_at=1000)
+        envelope[field] = value
+        envelope['signature'] = sign(b'fixture', envelope)
+>       with pytest.raises(ValueError, match='envelope'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_device_envelope_shape_canary.py:15: Failed
+_____ test_signed_malformed_field_rejected_before_execution[device_id-123] _____
+
+field = 'device_id', value = 123
+
+    @pytest.mark.parametrize(('field', 'value'), [
+        ('version', True), ('command_id', ''), ('device_id', 123),
+        ('capability', ['echo']), ('issued_at', 1000.9), ('nonce', {}),
+    ])
+    def test_signed_malformed_field_rejected_before_execution(field, value):
+        envelope = make_command('d', 'echo', {}, b'fixture', issued_at=1000)
+        envelope[field] = value
+        envelope['signature'] = sign(b'fixture', envelope)
+>       with pytest.raises(ValueError, match='envelope'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_device_envelope_shape_canary.py:15: Failed
+___ test_signed_malformed_field_rejected_before_execution[capability-value3] ___
+
+field = 'capability', value = ['echo']
+
+    @pytest.mark.parametrize(('field', 'value'), [
+        ('version', True), ('command_id', ''), ('device_id', 123),
+        ('capability', ['echo']), ('issued_at', 1000.9), ('nonce', {}),
+    ])
+    def test_signed_malformed_field_rejected_before_execution(field, value):
+        envelope = make_command('d', 'echo', {}, b'fixture', issued_at=1000)
+        envelope[field] = value
+        envelope['signature'] = sign(b'fixture', envelope)
+>       with pytest.raises(ValueError, match='envelope'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_device_envelope_shape_canary.py:15: Failed
+___ test_signed_malformed_field_rejected_before_execution[issued_at-1000.9] ____
+
+field = 'issued_at', value = 1000.9
+
+    @pytest.mark.parametrize(('field', 'value'), [
+        ('version', True), ('command_id', ''), ('device_id', 123),
+        ('capability', ['echo']), ('issued_at', 1000.9), ('nonce', {}),
+    ])
+    def test_signed_malformed_field_rejected_before_execution(field, value):
+        envelope = make_command('d', 'echo', {}, b'fixture', issued_at=1000)
+        envelope[field] = value
+        envelope['signature'] = sign(b'fixture', envelope)
+>       with pytest.raises(ValueError, match='envelope'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_device_envelope_shape_canary.py:15: Failed
+_____ test_signed_malformed_field_rejected_before_execution[nonce-value5] ______
+
+field = 'nonce', value = {}
+
+    @pytest.mark.parametrize(('field', 'value'), [
+        ('version', True), ('command_id', ''), ('device_id', 123),
+        ('capability', ['echo']), ('issued_at', 1000.9), ('nonce', {}),
+    ])
+    def test_signed_malformed_field_rejected_before_execution(field, value):
+        envelope = make_command('d', 'echo', {}, b'fixture', issued_at=1000)
+        envelope[field] = value
+        envelope['signature'] = sign(b'fixture', envelope)
+>       with pytest.raises(ValueError, match='envelope'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_device_envelope_shape_canary.py:15: Failed
+=========================== short test summary info ============================
+FAILED tests/test_device_envelope_shape_canary.py::test_signed_malformed_field_rejected_before_execution[version-True]
+FAILED tests/test_device_envelope_shape_canary.py::test_signed_malformed_field_rejected_before_execution[command_id-]
+FAILED tests/test_device_envelope_shape_canary.py::test_signed_malformed_field_rejected_before_execution[device_id-123]
+FAILED tests/test_device_envelope_shape_canary.py::test_signed_malformed_field_rejected_before_execution[capability-value3]
+FAILED tests/test_device_envelope_shape_canary.py::test_signed_malformed_field_rejected_before_execution[issued_at-1000.9]
+FAILED tests/test_device_envelope_shape_canary.py::test_signed_malformed_field_rejected_before_execution[nonce-value5]
+6 failed in 0.06s
