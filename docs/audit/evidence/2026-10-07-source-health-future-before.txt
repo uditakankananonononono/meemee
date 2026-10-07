@@ -1,0 +1,20 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+______________________ test_future_success_is_not_healthy ______________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-248/test_future_success_is_not_hea0')
+
+    def test_future_success_is_not_healthy(tmp_path):
+        store = SourceHealthStore(tmp_path / 'h.db')
+        store.record('u', 'mail', ok=True, checked_at='2026-10-08T10:00:00+00:00')
+        row = store.status('u', 'mail', now=datetime(2026, 10, 7, 10, tzinfo=timezone.utc))
+>       assert row['status'] == 'unknown'
+E       AssertionError: assert 'healthy' == 'unknown'
+E         
+E         - unknown
+E         + healthy
+
+tests/test_source_health_future_canary.py:11: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_source_health_future_canary.py::test_future_success_is_not_healthy
+1 failed in 0.05s
