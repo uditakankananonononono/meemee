@@ -1,0 +1,45 @@
+F.                                                                       [100%]
+=================================== FAILURES ===================================
+_________ test_loadcheck_reports_application_exception_without_details _________
+
+    @pytest.mark.asyncio
+    async def test_loadcheck_reports_application_exception_without_details():
+        async def broken(scope, receive, send):
+            raise RuntimeError('private fixture detail')
+    
+>       result = await run_api_loadcheck(broken, 'dummy', requests=6, concurrency=2)
+
+tests/test_api_loadcheck_failures.py:13: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee/api_loadcheck.py:30: in run_api_loadcheck
+    await asyncio.gather(*(one(index) for index in range(requests)))
+meemee/api_loadcheck.py:25: in one
+    response = await client.get(route, headers=headers)
+.venv/lib/python3.10/site-packages/httpx/_client.py:1768: in get
+    return await self.request(
+.venv/lib/python3.10/site-packages/httpx/_client.py:1540: in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+.venv/lib/python3.10/site-packages/httpx/_client.py:1629: in send
+    response = await self._send_handling_auth(
+.venv/lib/python3.10/site-packages/httpx/_client.py:1657: in _send_handling_auth
+    response = await self._send_handling_redirects(
+.venv/lib/python3.10/site-packages/httpx/_client.py:1694: in _send_handling_redirects
+    response = await self._send_single_request(request)
+.venv/lib/python3.10/site-packages/httpx/_client.py:1730: in _send_single_request
+    response = await transport.handle_async_request(request)
+.venv/lib/python3.10/site-packages/httpx/_transports/asgi.py:170: in handle_async_request
+    await self.app(scope, receive, send)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scope = {'asgi': {'version': '3.0'}, 'client': ('127.0.0.1', 123), 'headers': [(b'host', b'testserver'), (b'accept', b'*/*'), ...'gzip, deflate'), (b'connection', b'keep-alive'), (b'user-agent', b'python-httpx/0.28.1')], 'http_version': '1.1', ...}
+receive = <function ASGITransport.handle_async_request.<locals>.receive at 0x7fd8845f5990>
+send = <function ASGITransport.handle_async_request.<locals>.send at 0x7fd8845f5a20>
+
+    async def broken(scope, receive, send):
+>       raise RuntimeError('private fixture detail')
+E       RuntimeError: private fixture detail
+
+tests/test_api_loadcheck_failures.py:11: RuntimeError
+=========================== short test summary info ============================
+FAILED tests/test_api_loadcheck_failures.py::test_loadcheck_reports_application_exception_without_details
+1 failed, 1 passed in 0.12s

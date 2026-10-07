@@ -25,7 +25,7 @@ async def run_api_loadcheck(app, token: str, requests: int = 200, concurrency: i
                     response = await client.get(route, headers=headers)
                 key = str(response.status_code); statuses[key] = statuses.get(key, 0) + 1
                 if "x-request-id" not in response.headers: missing_request_ids += 1
-            except httpx.HTTPError as exc:
+            except Exception as exc:  # noqa: BLE001 - ASGI app failures are failed loadcheck requests
                 errors.append(type(exc).__name__)
         await asyncio.gather(*(one(index) for index in range(requests)))
     unexpected_5xx = sum(count for status, count in statuses.items() if int(status) >= 500)
