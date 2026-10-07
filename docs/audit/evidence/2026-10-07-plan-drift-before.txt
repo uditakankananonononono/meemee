@@ -1,0 +1,20 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___________________ test_polling_reuses_pending_cadence_slot ___________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-157/test_polling_reuses_pending_ca0')
+
+    def test_polling_reuses_pending_cadence_slot(tmp_path):
+        store = CompanionStore(tmp_path / 'c.db')
+        store.upsert_user(UserProfile(user_id='o', display_name='Owner', checkins=CheckInPreferences(enabled=True, cadence_minutes=30)))
+        scheduler = CheckInScheduler(store)
+        start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        slots = [scheduler.plan_user('o', start + timedelta(minutes=i)) for i in range(10)]
+>       assert len({row['id'] for row in slots}) == 1
+E       AssertionError: assert 10 == 1
+E        +  where 10 = len({'06d26d914a4b462a8eba5c94612584e8', '123b6aba3d1645b7b090c4306bf9f8f7', '1b571212cb6842de8fae5a4629d4a755', '3acda474c53a4f24953bb3191f0ec519', '5aed561ee2f34acf84d616944c859a9a', '8d6c198ecb0d4b0ea7050d76d7b0863f', ...})
+
+tests/test_companion_plan_drift_canary.py:15: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_companion_plan_drift_canary.py::test_polling_reuses_pending_cadence_slot
+1 failed in 0.14s
