@@ -1,0 +1,42 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+___________ test_empty_allowed_visibility_returns_no_records[recent] ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-131/test_empty_allowed_visibility_0')
+method = 'recent'
+
+    @pytest.mark.parametrize('method', ['recent', 'search'])
+    def test_empty_allowed_visibility_returns_no_records(tmp_path, method):
+        context = ContextStore(tmp_path / 'c.db')
+        context.register_source('o', 's', 'fixture', {})
+        context.ingest(ContextRecord('o', 's', 'r', 'document', 'fixture', 'privatecanary', '2026-01-01T00:00:00Z', {}))
+        args = ('o', 'privatecanary') if method == 'search' else ('o',)
+>       assert getattr(context, method)(*args, allowed=set()) == []
+E       AssertionError: assert [{'content': ...d': 'r', ...}] == []
+E         
+E         Left contains one more item: {'content': 'privatecanary', 'content_hash': 'e73fddd3e641c0877c6ecc70d40c26471d79587cef7019a7d3c4716acb090ae8', 'cursor': None, 'external_id': 'r', ...}
+E         Use -v to get more diff
+
+tests/test_context_empty_permission_canary.py:13: AssertionError
+___________ test_empty_allowed_visibility_returns_no_records[search] ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-131/test_empty_allowed_visibility_1')
+method = 'search'
+
+    @pytest.mark.parametrize('method', ['recent', 'search'])
+    def test_empty_allowed_visibility_returns_no_records(tmp_path, method):
+        context = ContextStore(tmp_path / 'c.db')
+        context.register_source('o', 's', 'fixture', {})
+        context.ingest(ContextRecord('o', 's', 'r', 'document', 'fixture', 'privatecanary', '2026-01-01T00:00:00Z', {}))
+        args = ('o', 'privatecanary') if method == 'search' else ('o',)
+>       assert getattr(context, method)(*args, allowed=set()) == []
+E       AssertionError: assert [{'content': ...d': 'r', ...}] == []
+E         
+E         Left contains one more item: {'content': 'privatecanary', 'content_hash': 'e73fddd3e641c0877c6ecc70d40c26471d79587cef7019a7d3c4716acb090ae8', 'cursor': None, 'external_id': 'r', ...}
+E         Use -v to get more diff
+
+tests/test_context_empty_permission_canary.py:13: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_context_empty_permission_canary.py::test_empty_allowed_visibility_returns_no_records[recent]
+FAILED tests/test_context_empty_permission_canary.py::test_empty_allowed_visibility_returns_no_records[search]
+2 failed in 0.06s
