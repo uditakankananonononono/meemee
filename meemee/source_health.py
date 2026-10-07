@@ -69,7 +69,7 @@ class SourceHealthStore:
         if moment.tzinfo is None:
             raise ValueError("checked_at must include a timezone")
         stamp = moment.astimezone(timezone.utc).isoformat()
-        encoded = json.dumps(metadata or {}, sort_keys=True)
+        encoded = json.dumps(metadata or {}, sort_keys=True, allow_nan=False)
         with self.lock, self.db:
             # Normalize this source's legacy timestamps in the same write transaction.
             self.db.execute(
