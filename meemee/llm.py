@@ -66,6 +66,8 @@ class OpenAICompatibleModel:
                 response.raise_for_status()
                 payload: dict[str, Any] = response.json()
                 choice = payload["choices"][0]
+                if not isinstance(choice, dict):
+                    raise ValueError("invalid completion choice object")  # noqa: TRY004 - invalid provider payload
                 if choice.get("finish_reason") == "length":
                     raise ModelError("model completion was truncated by the token limit")
                 if choice.get("finish_reason") == "content_filter":
@@ -122,6 +124,8 @@ class OpenAICompatibleModel:
                 response.raise_for_status()
                 payload: dict[str, Any] = response.json()
                 choice = payload["choices"][0]
+                if not isinstance(choice, dict):
+                    raise ValueError("invalid completion choice object")  # noqa: TRY004 - invalid provider payload
                 if choice.get("finish_reason") == "length":
                     raise ModelError("model completion was truncated by the token limit")
                 if choice.get("finish_reason") == "content_filter":
