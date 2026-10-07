@@ -95,8 +95,8 @@ async def run_preflight(
                     postgres_ok = not pending
                     error = f"pending migrations: {pending}" if pending else None
                 finally: database.close()
-            except (RuntimeError, OSError, ValueError) as exc:
-                error = f"{type(exc).__name__}: {exc}"
+            except Exception as exc:  # noqa: BLE001 - contain native driver errors without DSN details
+                error = type(exc).__name__
         checks.append(_result("postgresql_connection_and_schema", postgres_ok, error=error))
         checks.append(_result("deployment_boundary", True, "warning", supported_shape="PostgreSQL memory and owner-scoped jobs; validate remaining SQLite commercial stores per host"))
     elif settings.persistence_backend.lower() == "sqlite":
