@@ -1,0 +1,67 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+_____ test_local_commit_rejects_unbound_destination[conversation_channel] ______
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-370/test_local_commit_rejects_unbo0')
+case = 'conversation_channel'
+
+    @pytest.mark.parametrize('case', ['conversation_channel', 'checkin_channel', 'configured_address'])
+    def test_local_commit_rejects_unbound_destination(tmp_path, case):
+        store = CompanionStore(tmp_path / 'companion.sqlite3')
+        prefs = CheckInPreferences(enabled=True, address='configured' if case == 'configured_address' else None)
+        store.upsert_user(UserProfile(user_id='owner', display_name='Owner', checkins=prefs))
+        conversation = store.start_conversation('owner', 'webhook' if case == 'conversation_channel' else 'local', 'other')
+        row, _ = store.schedule_checkin(
+            'owner', datetime.now(timezone.utc), 'slot',
+            'webhook' if case == 'checkin_channel' else 'local', prefs.address,
+        )
+        store.claim_checkin()
+>       with pytest.raises(ValueError, match='eligible'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_local_checkin_destination_binding.py:22: Failed
+________ test_local_commit_rejects_unbound_destination[checkin_channel] ________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-370/test_local_commit_rejects_unbo1')
+case = 'checkin_channel'
+
+    @pytest.mark.parametrize('case', ['conversation_channel', 'checkin_channel', 'configured_address'])
+    def test_local_commit_rejects_unbound_destination(tmp_path, case):
+        store = CompanionStore(tmp_path / 'companion.sqlite3')
+        prefs = CheckInPreferences(enabled=True, address='configured' if case == 'configured_address' else None)
+        store.upsert_user(UserProfile(user_id='owner', display_name='Owner', checkins=prefs))
+        conversation = store.start_conversation('owner', 'webhook' if case == 'conversation_channel' else 'local', 'other')
+        row, _ = store.schedule_checkin(
+            'owner', datetime.now(timezone.utc), 'slot',
+            'webhook' if case == 'checkin_channel' else 'local', prefs.address,
+        )
+        store.claim_checkin()
+>       with pytest.raises(ValueError, match='eligible'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_local_checkin_destination_binding.py:22: Failed
+______ test_local_commit_rejects_unbound_destination[configured_address] _______
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-370/test_local_commit_rejects_unbo2')
+case = 'configured_address'
+
+    @pytest.mark.parametrize('case', ['conversation_channel', 'checkin_channel', 'configured_address'])
+    def test_local_commit_rejects_unbound_destination(tmp_path, case):
+        store = CompanionStore(tmp_path / 'companion.sqlite3')
+        prefs = CheckInPreferences(enabled=True, address='configured' if case == 'configured_address' else None)
+        store.upsert_user(UserProfile(user_id='owner', display_name='Owner', checkins=prefs))
+        conversation = store.start_conversation('owner', 'webhook' if case == 'conversation_channel' else 'local', 'other')
+        row, _ = store.schedule_checkin(
+            'owner', datetime.now(timezone.utc), 'slot',
+            'webhook' if case == 'checkin_channel' else 'local', prefs.address,
+        )
+        store.claim_checkin()
+>       with pytest.raises(ValueError, match='eligible'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_local_checkin_destination_binding.py:22: Failed
+=========================== short test summary info ============================
+FAILED tests/test_local_checkin_destination_binding.py::test_local_commit_rejects_unbound_destination[conversation_channel]
+FAILED tests/test_local_checkin_destination_binding.py::test_local_commit_rejects_unbound_destination[checkin_channel]
+FAILED tests/test_local_checkin_destination_binding.py::test_local_commit_rejects_unbound_destination[configured_address]
+3 failed in 0.21s

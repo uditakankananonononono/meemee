@@ -400,13 +400,15 @@ class CompanionStore:
         with self.lock, self.db:
             self.db.execute("BEGIN IMMEDIATE")
             row = self.db.execute(
-                "SELECT user_id,address FROM companion_checkins WHERE id=? AND status='running'",
+                "SELECT user_id,address,channel FROM companion_checkins WHERE id=? AND status='running'",
                 (checkin_id,),
             ).fetchone()
             conversation = self.db.execute(
-                "SELECT user_id FROM companion_conversations WHERE id=?", (conversation_id,)
+                "SELECT user_id,channel FROM companion_conversations WHERE id=?", (conversation_id,)
             ).fetchone()
-            if row is None or conversation is None or row["user_id"] != conversation["user_id"]:
+            if (row is None or conversation is None or row["user_id"] != conversation["user_id"]
+                    or row["channel"] != "local" or conversation["channel"] != "local"
+                    or (row["address"] is not None and row["address"] != conversation_id)):
                 raise ValueError("check-in or local conversation is no longer eligible")
             # Read current delivery permission inside the same write transaction.
             profile = self.profile(row["user_id"])
