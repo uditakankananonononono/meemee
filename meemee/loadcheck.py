@@ -51,7 +51,12 @@ def run_loadcheck(
             try: counts[future.result()] += 1
             except (OSError, RuntimeError, ValueError) as exc: errors.append(type(exc).__name__)
     audit_valid, broken_at = audit.verify()
-    stored_jobs = len(jobs.list_for_principal("loadcheck", limit=500)[0])
+    stored_jobs, cursor = 0, None
+    while True:
+        page, cursor = jobs.list_for_principal("loadcheck", limit=500, cursor=cursor)
+        stored_jobs += len(page)
+        if cursor is None:
+            break
     expected_jobs = counts["job"]
     status = "pass" if not errors and audit_valid and stored_jobs == expected_jobs else "fail"
     result = {
