@@ -1,0 +1,88 @@
+FFFFFF                                                                   [100%]
+=================================== FAILURES ===================================
+___________ test_idempotency_rejects_nonfinite_request[sqlite-claim] ___________
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7fecc7782fe0>, jobs=<meemee.jobs.JobStore ...Store object at 0x7fecc760beb0>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7fecc760be50>)
+operation = 'claim'
+
+    @pytest.mark.parametrize('operation', ['claim', 'get', 'put'])
+    def test_idempotency_rejects_nonfinite_request(persistence, operation):  # noqa: F811
+        store = persistence.idempotency
+        payload = {'value': float('nan')}
+>       with pytest.raises(ValueError, match='JSON'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_idempotency_finite_request.py:11: Failed
+____________ test_idempotency_rejects_nonfinite_request[sqlite-get] ____________
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7fecc760bf40>, jobs=<meemee.jobs.JobStore ...Store object at 0x7fecc7782380>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7fecc77826b0>)
+operation = 'get'
+
+    @pytest.mark.parametrize('operation', ['claim', 'get', 'put'])
+    def test_idempotency_rejects_nonfinite_request(persistence, operation):  # noqa: F811
+        store = persistence.idempotency
+        payload = {'value': float('nan')}
+>       with pytest.raises(ValueError, match='JSON'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_idempotency_finite_request.py:11: Failed
+____________ test_idempotency_rejects_nonfinite_request[sqlite-put] ____________
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7fecc76081c0>, jobs=<meemee.jobs.JobStore ...Store object at 0x7fecc7608d30>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7fecc7608cd0>)
+operation = 'put'
+
+    @pytest.mark.parametrize('operation', ['claim', 'get', 'put'])
+    def test_idempotency_rejects_nonfinite_request(persistence, operation):  # noqa: F811
+        store = persistence.idempotency
+        payload = {'value': float('nan')}
+>       with pytest.raises(ValueError, match='JSON'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_idempotency_finite_request.py:11: Failed
+_________ test_idempotency_rejects_nonfinite_request[postgresql-claim] _________
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7fecc61c1cc0>, jobs=<meemee...re object at 0x7fecc61c2a40>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7fecc61c2a70>)
+operation = 'claim'
+
+    @pytest.mark.parametrize('operation', ['claim', 'get', 'put'])
+    def test_idempotency_rejects_nonfinite_request(persistence, operation):  # noqa: F811
+        store = persistence.idempotency
+        payload = {'value': float('nan')}
+>       with pytest.raises(ValueError, match='JSON'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_idempotency_finite_request.py:11: Failed
+__________ test_idempotency_rejects_nonfinite_request[postgresql-get] __________
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7fecc9663010>, jobs=<meemee...re object at 0x7fecc967c790>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7fecc967c7c0>)
+operation = 'get'
+
+    @pytest.mark.parametrize('operation', ['claim', 'get', 'put'])
+    def test_idempotency_rejects_nonfinite_request(persistence, operation):  # noqa: F811
+        store = persistence.idempotency
+        payload = {'value': float('nan')}
+>       with pytest.raises(ValueError, match='JSON'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_idempotency_finite_request.py:11: Failed
+__________ test_idempotency_rejects_nonfinite_request[postgresql-put] __________
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7fecc964add0>, jobs=<meemee...re object at 0x7fecc96497e0>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7fecc96494b0>)
+operation = 'put'
+
+    @pytest.mark.parametrize('operation', ['claim', 'get', 'put'])
+    def test_idempotency_rejects_nonfinite_request(persistence, operation):  # noqa: F811
+        store = persistence.idempotency
+        payload = {'value': float('nan')}
+>       with pytest.raises(ValueError, match='JSON'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_idempotency_finite_request.py:11: Failed
+=========================== short test summary info ============================
+FAILED tests/test_idempotency_finite_request.py::test_idempotency_rejects_nonfinite_request[sqlite-claim]
+FAILED tests/test_idempotency_finite_request.py::test_idempotency_rejects_nonfinite_request[sqlite-get]
+FAILED tests/test_idempotency_finite_request.py::test_idempotency_rejects_nonfinite_request[sqlite-put]
+FAILED tests/test_idempotency_finite_request.py::test_idempotency_rejects_nonfinite_request[postgresql-claim]
+FAILED tests/test_idempotency_finite_request.py::test_idempotency_rejects_nonfinite_request[postgresql-get]
+FAILED tests/test_idempotency_finite_request.py::test_idempotency_rejects_nonfinite_request[postgresql-put]
+6 failed in 1.66s

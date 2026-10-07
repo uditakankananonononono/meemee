@@ -41,7 +41,7 @@ class IdempotencyStore:
 
     @staticmethod
     def request_hash(payload: Any) -> str:
-        return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()
+        return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str, allow_nan=False).encode()).hexdigest()
 
     def get(self, principal: str, route: str, key: str, payload: Any) -> tuple[int, Any] | None:
         now = datetime.now(timezone.utc).isoformat()
@@ -69,11 +69,12 @@ class IdempotencyStore:
         if not key or len(key) > 200:
             raise ValueError("idempotency key must contain 1-200 characters")
         now = datetime.now(timezone.utc)
+        digest = self.request_hash(payload)
         with self.lock, self.db:
             self.db.execute("DELETE FROM idempotency WHERE expires_at<=?", (now.isoformat(),))
             inserted = self.db.execute(
                 "INSERT OR IGNORE INTO idempotency VALUES(?,?,?,?,?,?,?,?)",
-                (principal, route, key, self.request_hash(payload), "null", PENDING,
+                (principal, route, key, digest, "null", PENDING,
                  now.isoformat(), (now + CLAIM_LEASE).isoformat()),
             ).rowcount
         return None if inserted else self.get(principal, route, key, payload)
