@@ -1,0 +1,60 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+________ test_independent_challenge_consumers_have_one_success[verify] _________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-163/test_independent_challenge_con0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f35cadcc2e0>
+method = 'verify'
+
+    @pytest.mark.parametrize('method', ['verify', 'consume_password_reset'])
+    def test_independent_challenge_consumers_have_one_success(tmp_path, monkeypatch, method):
+        stores = [EmailVerificationStore(tmp_path / 'e.db'), EmailVerificationStore(tmp_path / 'e.db')]
+        issue = stores[0].issue if method == 'verify' else stores[0].issue_password_reset
+        token = issue('fixture')
+        barrier = threading.Barrier(2)
+        compare = secrets.compare_digest
+    
+        def synchronized(left, right):
+            barrier.wait()
+            return compare(left, right)
+    
+        monkeypatch.setattr(secrets, 'compare_digest', synchronized)
+        with ThreadPoolExecutor(2) as pool:
+            results = list(pool.map(lambda store: getattr(store, method)('fixture', token), stores))
+>       assert results.count(True) == 1
+E       assert 2 == 1
+E        +  where 2 = <built-in method count of list object at 0x7f35cadade40>(True)
+E        +    where <built-in method count of list object at 0x7f35cadade40> = [True, True].count
+
+tests/test_challenge_concurrency_canary.py:26: AssertionError
+_ test_independent_challenge_consumers_have_one_success[consume_password_reset] _
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-163/test_independent_challenge_con1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f35cadcc580>
+method = 'consume_password_reset'
+
+    @pytest.mark.parametrize('method', ['verify', 'consume_password_reset'])
+    def test_independent_challenge_consumers_have_one_success(tmp_path, monkeypatch, method):
+        stores = [EmailVerificationStore(tmp_path / 'e.db'), EmailVerificationStore(tmp_path / 'e.db')]
+        issue = stores[0].issue if method == 'verify' else stores[0].issue_password_reset
+        token = issue('fixture')
+        barrier = threading.Barrier(2)
+        compare = secrets.compare_digest
+    
+        def synchronized(left, right):
+            barrier.wait()
+            return compare(left, right)
+    
+        monkeypatch.setattr(secrets, 'compare_digest', synchronized)
+        with ThreadPoolExecutor(2) as pool:
+            results = list(pool.map(lambda store: getattr(store, method)('fixture', token), stores))
+>       assert results.count(True) == 1
+E       assert 2 == 1
+E        +  where 2 = <built-in method count of list object at 0x7f35cae2bcc0>(True)
+E        +    where <built-in method count of list object at 0x7f35cae2bcc0> = [True, True].count
+
+tests/test_challenge_concurrency_canary.py:26: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_challenge_concurrency_canary.py::test_independent_challenge_consumers_have_one_success[verify]
+FAILED tests/test_challenge_concurrency_canary.py::test_independent_challenge_consumers_have_one_success[consume_password_reset]
+2 failed in 0.06s
