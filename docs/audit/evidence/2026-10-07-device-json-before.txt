@@ -1,0 +1,74 @@
+FFFFF                                                                    [100%]
+=================================== FAILURES ===================================
+_________ test_command_producer_rejects_non_json_arguments[arguments0] _________
+
+arguments = {'value': nan}
+
+    @pytest.mark.parametrize('arguments', [
+        {'value': float('nan')}, {'value': float('inf')}, {'nested': [float('-inf')]},
+        {1: 'numeric key'}, {'nested': {2: 'numeric key'}},
+    ])
+    def test_command_producer_rejects_non_json_arguments(arguments):
+>       with pytest.raises(ValueError, match='JSON'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_device_json_boundary_canary.py:12: Failed
+_________ test_command_producer_rejects_non_json_arguments[arguments1] _________
+
+arguments = {'value': inf}
+
+    @pytest.mark.parametrize('arguments', [
+        {'value': float('nan')}, {'value': float('inf')}, {'nested': [float('-inf')]},
+        {1: 'numeric key'}, {'nested': {2: 'numeric key'}},
+    ])
+    def test_command_producer_rejects_non_json_arguments(arguments):
+>       with pytest.raises(ValueError, match='JSON'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_device_json_boundary_canary.py:12: Failed
+_________ test_command_producer_rejects_non_json_arguments[arguments2] _________
+
+arguments = {'nested': [-inf]}
+
+    @pytest.mark.parametrize('arguments', [
+        {'value': float('nan')}, {'value': float('inf')}, {'nested': [float('-inf')]},
+        {1: 'numeric key'}, {'nested': {2: 'numeric key'}},
+    ])
+    def test_command_producer_rejects_non_json_arguments(arguments):
+>       with pytest.raises(ValueError, match='JSON'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_device_json_boundary_canary.py:12: Failed
+_________ test_command_producer_rejects_non_json_arguments[arguments3] _________
+
+arguments = {1: 'numeric key'}
+
+    @pytest.mark.parametrize('arguments', [
+        {'value': float('nan')}, {'value': float('inf')}, {'nested': [float('-inf')]},
+        {1: 'numeric key'}, {'nested': {2: 'numeric key'}},
+    ])
+    def test_command_producer_rejects_non_json_arguments(arguments):
+>       with pytest.raises(ValueError, match='JSON'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_device_json_boundary_canary.py:12: Failed
+_________ test_command_producer_rejects_non_json_arguments[arguments4] _________
+
+arguments = {'nested': {2: 'numeric key'}}
+
+    @pytest.mark.parametrize('arguments', [
+        {'value': float('nan')}, {'value': float('inf')}, {'nested': [float('-inf')]},
+        {1: 'numeric key'}, {'nested': {2: 'numeric key'}},
+    ])
+    def test_command_producer_rejects_non_json_arguments(arguments):
+>       with pytest.raises(ValueError, match='JSON'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_device_json_boundary_canary.py:12: Failed
+=========================== short test summary info ============================
+FAILED tests/test_device_json_boundary_canary.py::test_command_producer_rejects_non_json_arguments[arguments0]
+FAILED tests/test_device_json_boundary_canary.py::test_command_producer_rejects_non_json_arguments[arguments1]
+FAILED tests/test_device_json_boundary_canary.py::test_command_producer_rejects_non_json_arguments[arguments2]
+FAILED tests/test_device_json_boundary_canary.py::test_command_producer_rejects_non_json_arguments[arguments3]
+FAILED tests/test_device_json_boundary_canary.py::test_command_producer_rejects_non_json_arguments[arguments4]
+5 failed in 0.05s
