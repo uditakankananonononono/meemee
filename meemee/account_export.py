@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sqlite3
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -25,8 +27,18 @@ def export_account(data_dir: Path, principal: str, destination: Path) -> dict:
     canonical=json.dumps(payload,sort_keys=True,separators=(",",":"))
     envelope={"payload":payload,"sha256":hashlib.sha256(canonical.encode()).hexdigest()}
     destination.parent.mkdir(parents=True,exist_ok=True)
-    with destination.open("x", encoding="utf-8") as output:
-        output.write(json.dumps(envelope,indent=2,sort_keys=True)+"\n")
+    fd, name = tempfile.mkstemp(prefix=".meemee-export-", dir=destination.parent)
+    os.close(fd)
+    temporary = Path(name)
+    try:
+        with temporary.open("w", encoding="utf-8") as output:
+            output.write(json.dumps(envelope,indent=2,sort_keys=True)+"\n")
+            output.flush()
+            os.fsync(output.fileno())
+        # Same-directory hard-link publication is atomic and refuses overwrite.
+        os.link(temporary, destination)
+    finally:
+        temporary.unlink(missing_ok=True)
     return {"principal":principal,"jobs":len(jobs),"runs":len(runs),"entitlements":len(entitlements),"sha256":envelope["sha256"]}
 
 
