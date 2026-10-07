@@ -1,0 +1,30 @@
+FF.                                                                      [100%]
+=================================== FAILURES ===================================
+____ test_source_health_rejects_nonfinite_latency_without_publication[nan] _____
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-417/test_source_health_rejects_non0')
+latency = nan
+
+    @pytest.mark.parametrize('latency', [float('nan'), float('inf'), float('-inf')])
+    def test_source_health_rejects_nonfinite_latency_without_publication(tmp_path, latency):
+        store = SourceHealthStore(tmp_path / 'health.sqlite3')
+>       with pytest.raises(ValueError, match='latency'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_source_health_finite_latency.py:11: Failed
+____ test_source_health_rejects_nonfinite_latency_without_publication[inf] _____
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-417/test_source_health_rejects_non1')
+latency = inf
+
+    @pytest.mark.parametrize('latency', [float('nan'), float('inf'), float('-inf')])
+    def test_source_health_rejects_nonfinite_latency_without_publication(tmp_path, latency):
+        store = SourceHealthStore(tmp_path / 'health.sqlite3')
+>       with pytest.raises(ValueError, match='latency'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_source_health_finite_latency.py:11: Failed
+=========================== short test summary info ============================
+FAILED tests/test_source_health_finite_latency.py::test_source_health_rejects_nonfinite_latency_without_publication[nan]
+FAILED tests/test_source_health_finite_latency.py::test_source_health_rejects_nonfinite_latency_without_publication[inf]
+2 failed, 1 passed in 0.08s
