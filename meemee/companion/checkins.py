@@ -51,6 +51,10 @@ class CheckInScheduler:
         profile = self.store.profile(user_id)
         if profile is None or not profile.checkins.enabled:
             return None
+        quiet = profile.checkins.quiet_hours
+        if quiet is not None and quiet.start == quiet.end:
+            # The defined all-day quiet preference has no eligible slot.
+            return None
         # Polling must not turn cadence_minutes into one check-in per poll.
         # Reuse queued/running work until it reaches a terminal state.
         pending = self.store.list_checkins(user_id, status="queued", limit=1)

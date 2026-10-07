@@ -1,0 +1,41 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+______________ test_whole_day_quiet_owner_does_not_abort_plan_all ______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-193/test_whole_day_quiet_owner_doe0')
+
+    def test_whole_day_quiet_owner_does_not_abort_plan_all(tmp_path):
+        store = CompanionStore(tmp_path / 'c.db')
+        store.upsert_user(UserProfile(user_id='quiet',display_name='Quiet',checkins=CheckInPreferences(enabled=True,quiet_hours=QuietHours(start='00:00',end='00:00'))))
+        store.upsert_user(UserProfile(user_id='ready',display_name='Ready',checkins=CheckInPreferences(enabled=True)))
+>       planned = CheckInScheduler(store).plan_all(datetime(2026,1,1,tzinfo=timezone.utc))
+
+tests/test_checkin_plan_isolation_canary.py:13: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee/companion/checkins.py:71: in plan_all
+    row = self.plan_user(record["user_id"], after)
+meemee/companion/checkins.py:62: in plan_user
+    due = next_due(profile.checkins, profile.tz(), moment)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+prefs = CheckInPreferences(enabled=True, cadence_minutes=360, quiet_hours=QuietHours(start='00:00', end='00:00'), channel='local', address=None)
+tz = zoneinfo.ZoneInfo(key='UTC')
+after = datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
+
+    def next_due(prefs: CheckInPreferences, tz, after: datetime) -> datetime:
+        """Next check-in instant strictly after `after`, honoring quiet hours."""
+        candidate = (after.astimezone(timezone.utc) + timedelta(minutes=prefs.cadence_minutes)).astimezone(tz)
+        if prefs.quiet_hours is None:
+            return candidate.astimezone(timezone.utc)
+        guard = 0
+        while in_quiet_hours(candidate, prefs.quiet_hours):
+            candidate = (candidate.astimezone(timezone.utc) + timedelta(minutes=15)).astimezone(tz)
+            guard += 1
+            if guard > 4 * 24 * 14:
+>               raise ValueError("quiet hours leave no deliverable slot in two weeks")
+E               ValueError: quiet hours leave no deliverable slot in two weeks
+
+meemee/companion/checkins.py:36: ValueError
+=========================== short test summary info ============================
+FAILED tests/test_checkin_plan_isolation_canary.py::test_whole_day_quiet_owner_does_not_abort_plan_all
+1 failed in 0.18s
