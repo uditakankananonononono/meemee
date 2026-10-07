@@ -7,15 +7,11 @@ across hosts under concurrent submissions.
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import datetime
 
-from meemee.quotas import QuotaExceeded
+from meemee.quotas import QuotaExceeded, quota_day
 
 from ._db import Database
-
-
-def _day(now: datetime | None) -> date:
-    return (now or datetime.now(timezone.utc)).astimezone(timezone.utc).date()
 
 
 class _Rollback(Exception):
@@ -46,7 +42,7 @@ class QuotaStore:
                          ON CONFLICT (principal) DO UPDATE SET daily_jobs = excluded.daily_jobs""", (principal, daily_jobs))
 
     def consume_job(self, principal: str, now: datetime | None = None) -> dict[str, int | str]:
-        day = _day(now)
+        day = quota_day(now)
         try:
             with self.db.transaction() as c:
                 # The upsert takes the row lock; the limit is read after it, inside the same transaction.
@@ -61,7 +57,7 @@ class QuotaStore:
         return {"day": day.isoformat(), "used": used, "limit": maximum, "remaining": maximum - used}
 
     def status(self, principal: str, now: datetime | None = None) -> dict[str, int | str]:
-        day = _day(now)
+        day = quota_day(now)
         with self.db.transaction(isolation="REPEATABLE READ") as c:
             maximum = self._limit(c, principal)
             row = c.execute("SELECT jobs FROM meemee_quota_usage WHERE principal=%s AND day=%s", (principal, day)).fetchone()

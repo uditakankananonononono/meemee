@@ -2,8 +2,15 @@ from __future__ import annotations
 
 import sqlite3
 import threading
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
+
+
+def quota_day(now: datetime | None = None) -> date:
+    instant = now if now is not None else datetime.now(timezone.utc)
+    if instant.tzinfo is None or instant.utcoffset() is None:
+        raise ValueError("quota clock must include a timezone")
+    return instant.astimezone(timezone.utc).date()
 
 
 class QuotaExceeded(ValueError):
@@ -44,7 +51,7 @@ class QuotaStore:
             self.db.execute("INSERT INTO quota_limits VALUES(?,?) ON CONFLICT(principal) DO UPDATE SET daily_jobs=excluded.daily_jobs", (principal, daily_jobs))
 
     def consume_job(self, principal: str, now: datetime | None = None) -> dict[str, int | str]:
-        day = (now or datetime.now(timezone.utc)).astimezone(timezone.utc).date().isoformat()
+        day = quota_day(now).isoformat()
         with self.lock, self.db:
             self.db.execute("BEGIN IMMEDIATE")
             maximum = self.limit(principal)
@@ -57,7 +64,7 @@ class QuotaStore:
         return {"day": day, "used": used, "limit": maximum, "remaining": maximum-used}
 
     def status(self, principal: str, now: datetime | None = None) -> dict[str, int | str]:
-        day = (now or datetime.now(timezone.utc)).astimezone(timezone.utc).date().isoformat()
+        day = quota_day(now).isoformat()
         with self.lock, self.db:
             self.db.execute("BEGIN")
             maximum = self.limit(principal)

@@ -1,0 +1,56 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+______ test_quota_rejects_naive_clock_before_effects[sqlite-consume_job] _______
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7f37c2b94970>, jobs=<meemee.jobs.JobStore ...Store object at 0x7f37c270feb0>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7f37c270fe50>)
+method = 'consume_job'
+
+    @pytest.mark.parametrize('method', ['consume_job', 'status'])
+    def test_quota_rejects_naive_clock_before_effects(persistence, method):  # noqa: F811
+        quota = persistence.quotas
+>       with pytest.raises(ValueError, match='timezone'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_quota_naive_time.py:12: Failed
+_________ test_quota_rejects_naive_clock_before_effects[sqlite-status] _________
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7f37c270dcc0>, jobs=<meemee.jobs.JobStore ...Store object at 0x7f37c270d750>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7f37c270d7b0>)
+method = 'status'
+
+    @pytest.mark.parametrize('method', ['consume_job', 'status'])
+    def test_quota_rejects_naive_clock_before_effects(persistence, method):  # noqa: F811
+        quota = persistence.quotas
+>       with pytest.raises(ValueError, match='timezone'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_quota_naive_time.py:12: Failed
+____ test_quota_rejects_naive_clock_before_effects[postgresql-consume_job] _____
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f37c15e50f0>, jobs=<meemee...re object at 0x7f37c15e5e70>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f37c15e5ea0>)
+method = 'consume_job'
+
+    @pytest.mark.parametrize('method', ['consume_job', 'status'])
+    def test_quota_rejects_naive_clock_before_effects(persistence, method):  # noqa: F811
+        quota = persistence.quotas
+>       with pytest.raises(ValueError, match='timezone'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_quota_naive_time.py:12: Failed
+_______ test_quota_rejects_naive_clock_before_effects[postgresql-status] _______
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f37c15e75b0>, jobs=<meemee...re object at 0x7f37c15e6980>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f37c15e69b0>)
+method = 'status'
+
+    @pytest.mark.parametrize('method', ['consume_job', 'status'])
+    def test_quota_rejects_naive_clock_before_effects(persistence, method):  # noqa: F811
+        quota = persistence.quotas
+>       with pytest.raises(ValueError, match='timezone'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_quota_naive_time.py:12: Failed
+=========================== short test summary info ============================
+FAILED tests/test_quota_naive_time.py::test_quota_rejects_naive_clock_before_effects[sqlite-consume_job]
+FAILED tests/test_quota_naive_time.py::test_quota_rejects_naive_clock_before_effects[sqlite-status]
+FAILED tests/test_quota_naive_time.py::test_quota_rejects_naive_clock_before_effects[postgresql-consume_job]
+FAILED tests/test_quota_naive_time.py::test_quota_rejects_naive_clock_before_effects[postgresql-status]
+4 failed in 1.12s
