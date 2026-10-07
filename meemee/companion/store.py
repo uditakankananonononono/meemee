@@ -452,8 +452,9 @@ class CompanionStore:
         return [{**dict(r), "attempts": json.loads(r["attempts"])} for r in rows]
 
     def export_user_data(self, user_id: str) -> dict[str, Any]:
-        """Return one user's complete companion state as JSON-safe records."""
-        with self.lock:
+        """Return one user's companion state from a single SQLite read snapshot."""
+        with self.lock, self.db:
+            self.db.execute("BEGIN")
             user = self.db.execute("SELECT * FROM companion_users WHERE user_id=?", (user_id,)).fetchone()
             facts = self.db.execute("SELECT * FROM companion_facts WHERE user_id=? ORDER BY id", (user_id,)).fetchall()
             conversations = self.db.execute("SELECT * FROM companion_conversations WHERE user_id=? ORDER BY created_at", (user_id,)).fetchall()
