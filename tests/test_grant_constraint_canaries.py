@@ -14,3 +14,9 @@ def test_malformed_grant_constraint_is_not_persisted(tmp_path):
     with pytest.raises(ValueError):
         store.grant('owner','effect','owner',argument_constraints={'amount':float('nan')})
     assert store.list('owner') == []
+
+
+def test_large_exact_integer_constraints_do_not_overflow():
+    value = 10**1000
+    assert constraints_match({'value':value},{'value':value})
+    assert not constraints_match({'value':value},{'value':True})
