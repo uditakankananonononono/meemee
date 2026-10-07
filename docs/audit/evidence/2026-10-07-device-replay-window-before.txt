@@ -1,0 +1,30 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+____ test_future_dated_valid_command_cannot_replay_after_default_guard_ttl _____
+
+    def test_future_dated_valid_command_cannot_replay_after_default_guard_ttl():
+        clock = [1000]
+        guard = ReplayGuard(clock=lambda: clock[0])
+        envelope = make_command('d', 'echo', {}, b'fixture', issued_at=1300)
+        verify_command(envelope, b'fixture', replay_guard=guard, now=1000)
+        clock[0] = 1301
+>       with pytest.raises(ValueError, match='replayed'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_device_replay_window_canary.py:13: Failed
+_______ test_short_guard_ttl_cannot_allow_replay_within_signature_window _______
+
+    def test_short_guard_ttl_cannot_allow_replay_within_signature_window():
+        clock = [1000]
+        guard = ReplayGuard(ttl_seconds=1, clock=lambda: clock[0])
+        envelope = make_command('d', 'echo', {}, b'fixture', issued_at=1000)
+        verify_command(envelope, b'fixture', replay_guard=guard, now=1000)
+        clock[0] = 1002
+>       with pytest.raises(ValueError, match='replayed'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_device_replay_window_canary.py:23: Failed
+=========================== short test summary info ============================
+FAILED tests/test_device_replay_window_canary.py::test_future_dated_valid_command_cannot_replay_after_default_guard_ttl
+FAILED tests/test_device_replay_window_canary.py::test_short_guard_ttl_cannot_allow_replay_within_signature_window
+2 failed in 0.04s

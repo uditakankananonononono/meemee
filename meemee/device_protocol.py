@@ -51,13 +51,13 @@ class ReplayGuard:
         self._seen: dict[str, float] = {}
         self._lock = threading.Lock()
 
-    def claim(self, nonce: str) -> bool:
+    def claim(self, nonce: str, *, retain_seconds: float | None = None) -> bool:
         now = self.clock()
         with self._lock:
             self._seen = {key: expiry for key, expiry in self._seen.items() if expiry > now}
             if nonce in self._seen:
                 return False
-            self._seen[nonce] = now + self.ttl
+            self._seen[nonce] = now + max(self.ttl, retain_seconds or 0)
             return True
 
 
@@ -107,7 +107,12 @@ def verify_command(
         raise ValueError("command addressed to another device")
     if allowed_capabilities is not None and envelope["capability"] not in allowed_capabilities:
         raise PermissionError("capability not declared by device")
-    if replay_guard is not None and not replay_guard.claim(str(envelope["nonce"])):
+    # Future-dated envelopes can remain valid for almost twice the tolerance.
+    # Keep the nonce through the inclusive final accepted integer second, even
+    # when the guard's configured TTL is shorter than the signature window.
+    if replay_guard is not None and not replay_guard.claim(
+        str(envelope["nonce"]), retain_seconds=int(envelope["issued_at"]) + tolerance - clock + 1
+    ):
         raise ValueError("replayed command")
     return VerifiedCommand(
         str(envelope["command_id"]),
