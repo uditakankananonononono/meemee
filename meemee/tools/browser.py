@@ -87,15 +87,42 @@ class BrowserNavigate(Tool):
             try:
                 if arguments.profile:
                     context = await playwright.chromium.launch_persistent_context(
-                        str(self.profiles_dir / arguments.profile), headless=self.headless
+                        str(self.profiles_dir / arguments.profile), headless=self.headless, service_workers="block"
                     )
                     close = context.close
                     page = context.pages[0] if context.pages else await context.new_page()
                 else:
                     browser = await playwright.chromium.launch(headless=self.headless)
                     close = browser.close
-                    context = await browser.new_context()
+                    context = await browser.new_context(service_workers="block")
                     page = await context.new_page()
+                blocked_requests: list[str] = []
+
+                def allowed_request(request_url):
+                    validate_public_url(request_url)
+                    host = (urlparse(request_url).hostname or "").lower()
+                    if arguments.allowed_domains and not any(
+                        host == domain.lower() or host.endswith("." + domain.lower())
+                        for domain in arguments.allowed_domains):
+                        raise ValueError("request is outside per-run domain policy")
+
+                async def guarded_request(route):
+                    current = route.request.url
+                    try:
+                        allowed_request(current)
+                        # Chromium routing does not re-intercept every redirect
+                        # hop. Fail closed rather than automatically follow a hop
+                        # that could bypass this policy or forward credentials.
+                        response = await route.fetch(max_redirects=0)
+                        if response.status in {301, 302, 303, 307, 308} and "location" in response.headers:
+                            await response.dispose()
+                            raise ValueError("automatic redirects are blocked; use verified final URL")
+                        await route.fulfill(response=response)
+                    except (ValueError, OSError):
+                        blocked_requests.append(current)
+                        await route.abort("blockedbyclient")
+
+                await context.route("**/*", guarded_request)
                 downloads: list[dict[str, object]] = []
                 download_root = self.safe_screenshot(arguments.download_dir) if arguments.download_dir else None
                 if download_root: download_root.mkdir(parents=True, exist_ok=True)
@@ -132,7 +159,7 @@ class BrowserNavigate(Tool):
                 text = (await page.locator("body").inner_text())[:200_000]
                 lowered = text.lower()
                 challenge = any(marker in lowered for marker in ("verify you are human", "captcha", "security challenge", "checking your browser"))
-                result = {"url": page.url, "title": await page.title(), "text": text, "status": response.status if response else None, "screenshot": screenshot, "actions": events, "downloads": downloads, "challenge": {"detected":challenge,"requires_human":challenge}}
+                result = {"url": page.url, "title": await page.title(), "text": text, "status": response.status if response else None, "screenshot": screenshot, "actions": events, "downloads": downloads, "blocked_requests": blocked_requests, "challenge": {"detected":challenge,"requires_human":challenge}}
                 return result
             finally:
                 if close is not None:
