@@ -97,6 +97,7 @@ class MemoryStore:
             )
             memory_id = int(cursor.lastrowid)
             embedding = self.embedder.embed(scrub_text(content))
+            validate_embedding_batch([embedding], 1, self.embedder.dimensions)
             self.connection.execute(
                 "INSERT INTO memory_embeddings(memory_id,dimensions,embedding,space_id) VALUES(?,?,?,?)",
                 (memory_id, len(embedding), json.dumps(embedding, separators=(",", ":")), embedding_space(self.embedder)),
