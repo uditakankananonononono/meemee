@@ -72,6 +72,7 @@ class IdempotencyStore:
             raise ValueError("response status must be an HTTP status integer (100-599)")
         if not key or len(key) > 200:
             raise ValueError("idempotency key must contain 1-200 characters")
+        encoded_response = json.dumps(response, default=str, allow_nan=False)
         now = datetime.now(timezone.utc)
         digest = self.request_hash(payload)
         with self.db.transaction() as c:
@@ -84,7 +85,7 @@ class IdempotencyStore:
                            expires_at=EXCLUDED.expires_at WHERE meemee_idempotency.status = 0
                            AND meemee_idempotency.request_hash=EXCLUDED.request_hash
                          RETURNING request_hash""",
-                      (principal, route, key, digest, Jsonb(json.loads(json.dumps(response, default=str))),
+                      (principal, route, key, digest, Jsonb(json.loads(encoded_response)),
                        status, now, now + self.ttl)).fetchone()
             if published is None:
                 reserved = c.execute(

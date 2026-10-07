@@ -89,6 +89,7 @@ class IdempotencyStore:
             raise ValueError("response status must be an HTTP status integer (100-599)")
         if not key or len(key) > 200:
             raise ValueError("idempotency key must contain 1-200 characters")
+        encoded_response = json.dumps(response, default=str, allow_nan=False)
         now = datetime.now(timezone.utc)
         digest = self.request_hash(payload)
         with self.lock, self.db:
@@ -104,7 +105,7 @@ class IdempotencyStore:
                    ON CONFLICT(principal, route, key) DO UPDATE SET request_hash=excluded.request_hash,
                    response=excluded.response, status=excluded.status, created_at=excluded.created_at,
                    expires_at=excluded.expires_at WHERE idempotency.status=0""",
-                (principal, route, key, self.request_hash(payload), json.dumps(response, default=str), status,
+                (principal, route, key, self.request_hash(payload), encoded_response, status,
                  now.isoformat(), (now + self.ttl).isoformat()),
             )
 

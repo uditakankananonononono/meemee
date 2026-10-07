@@ -1,0 +1,67 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_______ test_nonfinite_response_rejected_without_consuming_claim[sqlite] _______
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7f239f790ac0>, jobs=<meemee.jobs.JobStore ...Store object at 0x7f239f3006d0>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7f239f303eb0>)
+
+    def test_nonfinite_response_rejected_without_consuming_claim(persistence):  # noqa: F811
+        store = persistence.idempotency
+        store.claim('owner', '/route', 'key', {})
+>       with pytest.raises(ValueError):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_idempotency_finite_response.py:12: Failed
+_____ test_nonfinite_response_rejected_without_consuming_claim[postgresql] _____
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f239e1e0760>, jobs=<meemee...re object at 0x7f239e1e14e0>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f239e1e1510>)
+
+    def test_nonfinite_response_rejected_without_consuming_claim(persistence):  # noqa: F811
+        store = persistence.idempotency
+        store.claim('owner', '/route', 'key', {})
+        with pytest.raises(ValueError):
+>           store.put('owner', '/route', 'key', {}, 200, {'value': float('nan')})
+
+tests/test_idempotency_finite_response.py:13: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee_persist_pg/idempotency.py:80: in put
+    published = c.execute("""INSERT INTO meemee_idempotency(principal, route, key, request_hash, response, status, created_at, expires_at)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <psycopg.Connection [IDLE] (host=127.0.0.1 port=55439 user=sandbox database=meemee_tok_071dfe6cbb16) at 0x7f239e1e09d0>
+query = 'INSERT INTO meemee_idempotency(principal, route, key, request_hash, response, status, created_at, expires_at)\n      ...            AND meemee_idempotency.request_hash=EXCLUDED.request_hash\n                         RETURNING request_hash'
+params = ('owner', '/route', 'key', '44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a', Jsonb({'value': nan}), 200, ...)
+
+    def execute(
+        self,
+        query: Query,
+        params: Params | None = None,
+        *,
+        prepare: bool | None = None,
+        binary: bool = False,
+    ) -> Cursor[Row]:
+        """Execute a query and return a cursor to read its results."""
+        try:
+            cur = self.cursor()
+            if binary:
+                cur.format = BINARY
+    
+            if isinstance(query, Template):
+                if params is not None:
+                    raise TypeError(
+                        "'execute()' with string template query doesn't support parameters"
+                    )
+                return cur.execute(query, prepare=prepare)
+            else:
+                return cur.execute(query, params, prepare=prepare)
+        except e._NO_TRACEBACK as ex:
+>           raise ex.with_traceback(None)
+E           psycopg.errors.InvalidTextRepresentation: invalid input syntax for type json
+E           DETAIL:  Token "NaN" is invalid.
+E           CONTEXT:  JSON data, line 1: {"value": NaN...
+E           unnamed portal parameter $5 = '...'
+
+.venv/lib/python3.10/site-packages/psycopg/connection.py:304: InvalidTextRepresentation
+=========================== short test summary info ============================
+FAILED tests/test_idempotency_finite_response.py::test_nonfinite_response_rejected_without_consuming_claim[sqlite]
+FAILED tests/test_idempotency_finite_response.py::test_nonfinite_response_rejected_without_consuming_claim[postgresql]
+2 failed in 0.92s
