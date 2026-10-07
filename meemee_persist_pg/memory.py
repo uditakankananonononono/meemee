@@ -92,6 +92,13 @@ class MemoryStore:
         return [{**rows[ident], "hybrid_score": scores[ident], "retrieval_mode": "learned-hybrid"}
                 for ident in ordered]
 
+    def purge_owner(self, owner_id: str) -> int:
+        """Delete all owner memories; embedding rows cascade on deletion."""
+        if not owner_id.strip():
+            raise ValueError("owner_id is required")
+        with self.db.transaction() as c:
+            return c.execute("DELETE FROM meemee_memories WHERE owner_id=%s", (owner_id,)).rowcount
+
     def delete_runs(self, run_ids: list[str], *, owner_id: str) -> int:
         """Hard-delete one owner's memories written by the given runs (embeddings cascade)."""
         if not owner_id.strip():

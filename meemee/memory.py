@@ -151,6 +151,17 @@ class MemoryStore:
             ).fetchall()
         return [{**dict(row), "metadata": json.loads(row["metadata"])} for row in rows]
 
+    def purge_owner(self, owner_id: str) -> int:
+        """Delete all owned memories, including those with missing run reports."""
+        if not owner_id.strip():
+            raise ValueError("owner_id is required")
+        with self.lock, self.connection:
+            self.connection.execute(
+                "DELETE FROM memory_embeddings WHERE memory_id IN"
+                " (SELECT id FROM memories WHERE owner_id=?)", (owner_id,),
+            )
+            return self.connection.execute("DELETE FROM memories WHERE owner_id=?", (owner_id,)).rowcount
+
     def delete_runs(self, run_ids: list[str], *, owner_id: str) -> int:
         """Hard-delete one owner's memories (and embeddings/full-text rows) for the given runs.
 

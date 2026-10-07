@@ -1,0 +1,35 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+__________ test_account_purge_removes_orphan_memories_only_for_owner ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-115/test_account_purge_removes_orp0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f27444e8880>
+
+    def test_account_purge_removes_orphan_memories_only_for_owner(tmp_path, monkeypatch):
+        targets = build_targets(tmp_path, monkeypatch)
+        targets.memory.add('lost-run', 'goal', 'ownerorphan private fact', owner_id='alice')
+        targets.memory.add('lost-run', 'goal', 'otherorphan private fact', owner_id='bob')
+        assert targets.runs.run_ids('alice') == []
+        assert targets.jobs.run_ids_for_principal('alice') == []
+        result = AccountPurger(targets, DeletionLedger(tmp_path / 'd.db')).purge('alice', 'alice')
+        assert result['status'] == 'completed'
+>       assert targets.memory.recent(owner_id='alice') == []
+E       AssertionError: assert [{'content': ... 'goal', ...}] == []
+E         
+E         Left contains one more item: {'content': 'ownerorphan private fact', 'created_at': '2026-10-07T09:17:51.592373+00:00', 'id': 1, 'kind': 'goal', ...}
+E         Use -v to get more diff
+
+tests/test_account_orphan_memory_canary.py:15: AssertionError
+=============================== warnings summary ===============================
+.venv/lib/python3.10/site-packages/fastapi/testclient.py:1
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+.venv/lib/python3.10/site-packages/starlette/testclient.py:53
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_account_orphan_memory_canary.py::test_account_purge_removes_orphan_memories_only_for_owner
+1 failed, 2 warnings in 0.79s
