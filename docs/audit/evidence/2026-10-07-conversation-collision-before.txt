@@ -1,0 +1,32 @@
+FF.                                                                      [100%]
+=================================== FAILURES ===================================
+_______ test_conversation_collision_fails_without_rebinding[other-local] _______
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-336/test_conversation_collision_fa0')
+owner = 'other', channel = 'local'
+
+    @pytest.mark.parametrize('owner,channel', [('other', 'local'), ('owner', 'webhook')])
+    def test_conversation_collision_fails_without_rebinding(tmp_path, owner, channel):
+        store = CompanionStore(tmp_path / 'c.db')
+        original = store.start_conversation('owner', 'local', 'explicit')
+>       with pytest.raises(ValueError, match='conversation.*already'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_companion_conversation_collision_canary.py:11: Failed
+______ test_conversation_collision_fails_without_rebinding[owner-webhook] ______
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-336/test_conversation_collision_fa1')
+owner = 'owner', channel = 'webhook'
+
+    @pytest.mark.parametrize('owner,channel', [('other', 'local'), ('owner', 'webhook')])
+    def test_conversation_collision_fails_without_rebinding(tmp_path, owner, channel):
+        store = CompanionStore(tmp_path / 'c.db')
+        original = store.start_conversation('owner', 'local', 'explicit')
+>       with pytest.raises(ValueError, match='conversation.*already'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_companion_conversation_collision_canary.py:11: Failed
+=========================== short test summary info ============================
+FAILED tests/test_companion_conversation_collision_canary.py::test_conversation_collision_fails_without_rebinding[other-local]
+FAILED tests/test_companion_conversation_collision_canary.py::test_conversation_collision_fails_without_rebinding[owner-webhook]
+2 failed, 1 passed in 0.18s
