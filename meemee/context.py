@@ -97,7 +97,7 @@ class ContextStore:
         return bool(inserted)
 
     def search(self, owner_id: str, query: str, limit: int = 12, allowed: set[str] | None = None) -> list[dict]:
-        visibility=allowed or {"private","agent"};placeholders=','.join('?' for _ in visibility)
+        visibility=({"private","agent"} if allowed is None else allowed);placeholders=','.join('?' for _ in visibility)
         sql=f"""SELECT r.*,bm25(context_fts) score FROM context_fts JOIN context_records r ON r.id=context_fts.rowid
         WHERE context_fts MATCH ? AND r.owner_id=? AND r.visibility IN ({placeholders}) ORDER BY score,r.occurred_at DESC LIMIT ?"""
         with self.lock: rows=self.db.execute(sql,(query,owner_id,*sorted(visibility),max(1,min(limit,100)))).fetchall()
@@ -110,7 +110,7 @@ class ContextStore:
         return {row["owner_id"]: int(row["top"]) for row in rows}
 
     def recent(self, owner_id: str, limit: int = 12, allowed: set[str] | None = None) -> list[dict]:
-        visibility=allowed or {"private","agent"};placeholders=','.join('?' for _ in visibility)
+        visibility=({"private","agent"} if allowed is None else allowed);placeholders=','.join('?' for _ in visibility)
         with self.lock:rows=self.db.execute(f"SELECT * FROM context_records WHERE owner_id=? AND visibility IN ({placeholders}) ORDER BY occurred_at DESC,id DESC LIMIT ?",(owner_id,*sorted(visibility),max(1,min(limit,100)))).fetchall()
         return [self._record(row) for row in rows]
 

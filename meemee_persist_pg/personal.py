@@ -198,7 +198,7 @@ class ContextStore:
         return bool(inserted)
 
     def search(self, owner_id: str, query: str, limit: int = 12, allowed: set[str] | None = None) -> list[dict]:
-        visibility = sorted(allowed or {"private", "agent"})
+        visibility = sorted({"private", "agent"} if allowed is None else allowed)
         if not query.split():
             return []
         with self.db.transaction() as c:
@@ -215,7 +215,7 @@ class ContextStore:
         return {row["owner_id"]: int(row["top"]) for row in rows}
 
     def recent(self, owner_id: str, limit: int = 12, allowed: set[str] | None = None) -> list[dict]:
-        visibility = sorted(allowed or {"private", "agent"})
+        visibility = sorted({"private", "agent"} if allowed is None else allowed)
         with self.db.transaction() as c:
             rows = c.execute("""SELECT * FROM meemee_context_records WHERE owner_id=%s AND visibility = ANY(%s)
                                 ORDER BY occurred_at DESC,id DESC LIMIT %s""", (owner_id, visibility, max(1, min(limit, 100)))).fetchall()
