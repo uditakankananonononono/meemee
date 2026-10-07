@@ -40,10 +40,20 @@ class BackupManager:
         return manifest
 
     @staticmethod
+    def _file(directory: Path, name: str) -> Path:
+        if (not isinstance(name, str) or not name or name in {".", ".."}
+                or "/" in name or "\\" in name or not name.endswith(".sqlite3")):
+            raise ValueError("invalid backup file name")
+        path = directory / name
+        if path.is_symlink() or path.resolve().parent != directory.resolve():
+            raise ValueError("backup file must stay within its directory and not be a symlink")
+        return path
+
+    @staticmethod
     def verify(directory: Path) -> dict[str, object]:
         manifest = json.loads((directory / "manifest.json").read_text())
         for expected in manifest["files"]:
-            path = directory / expected["name"]
+            path = BackupManager._file(directory, expected["name"])
             if not path.is_file() or path.stat().st_size != expected["bytes"]:
                 raise RuntimeError(f"backup file missing or wrong size: {expected['name']}")
             if hashlib.sha256(path.read_bytes()).hexdigest() != expected["sha256"]:
@@ -68,7 +78,7 @@ class BackupManager:
         restored=[]
         try:
             for expected in manifest["files"]:
-                source=directory/expected["name"]; target=destination/expected["name"]
+                source=BackupManager._file(directory, expected["name"]); target=BackupManager._file(destination, expected["name"])
                 source_db=sqlite3.connect(f"file:{source}?mode=ro",uri=True); target_db=sqlite3.connect(target)
                 try:
                     source_db.backup(target_db)

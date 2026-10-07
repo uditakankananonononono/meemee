@@ -1,0 +1,52 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_____________ test_backup_manifest_cannot_escape_directory[False] ______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-254/test_backup_manifest_cannot_es0')
+symlink = False
+
+    @pytest.mark.parametrize('symlink', [False, True])
+    def test_backup_manifest_cannot_escape_directory(tmp_path, symlink):
+        outside = tmp_path / 'outside.sqlite3'
+        with sqlite3.connect(outside) as db:
+            db.execute('CREATE TABLE fixture(n INTEGER)')
+        folder = tmp_path / 'backup'
+        folder.mkdir()
+        name = '../outside.sqlite3'
+        if symlink:
+            (folder / 'linked.sqlite3').symlink_to(outside)
+            name = 'linked.sqlite3'
+        (folder / 'manifest.json').write_text(json.dumps({'format': 1, 'created_at': 'fixture', 'files': [
+            {'name': name, 'bytes': outside.stat().st_size, 'sha256': hashlib.sha256(outside.read_bytes()).hexdigest()}
+        ]}))
+>       with pytest.raises(ValueError, match='backup file'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_backup_manifest_boundary_canary.py:25: Failed
+______________ test_backup_manifest_cannot_escape_directory[True] ______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-254/test_backup_manifest_cannot_es1')
+symlink = True
+
+    @pytest.mark.parametrize('symlink', [False, True])
+    def test_backup_manifest_cannot_escape_directory(tmp_path, symlink):
+        outside = tmp_path / 'outside.sqlite3'
+        with sqlite3.connect(outside) as db:
+            db.execute('CREATE TABLE fixture(n INTEGER)')
+        folder = tmp_path / 'backup'
+        folder.mkdir()
+        name = '../outside.sqlite3'
+        if symlink:
+            (folder / 'linked.sqlite3').symlink_to(outside)
+            name = 'linked.sqlite3'
+        (folder / 'manifest.json').write_text(json.dumps({'format': 1, 'created_at': 'fixture', 'files': [
+            {'name': name, 'bytes': outside.stat().st_size, 'sha256': hashlib.sha256(outside.read_bytes()).hexdigest()}
+        ]}))
+>       with pytest.raises(ValueError, match='backup file'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_backup_manifest_boundary_canary.py:25: Failed
+=========================== short test summary info ============================
+FAILED tests/test_backup_manifest_boundary_canary.py::test_backup_manifest_cannot_escape_directory[False]
+FAILED tests/test_backup_manifest_boundary_canary.py::test_backup_manifest_cannot_escape_directory[True]
+2 failed in 0.05s
