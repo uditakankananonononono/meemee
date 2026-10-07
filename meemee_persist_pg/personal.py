@@ -18,7 +18,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from meemee.context import ContextRecord, context_record_hash
+from meemee.context import ContextRecord, context_record_hash, context_utc
 from meemee.personal_model import PersonalItemInput, PersonalKind, currently_valid, validity_instant
 
 from ._db import Database
@@ -187,6 +187,7 @@ class ContextStore:
         row = self.source(owner_id, source_id); return row["cursor"] if row else None
 
     def ingest(self, record: ContextRecord) -> bool:
+        context_utc(record.occurred_at)
         if record.visibility not in {"private", "agent", "shared"}:
             raise ValueError("invalid visibility")
         digest = context_record_hash(record); now = _now()

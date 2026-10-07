@@ -97,6 +97,7 @@ class ContextStore:
         row=self.source(owner_id,source_id);return row["cursor"] if row else None
 
     def ingest(self, record: ContextRecord) -> bool:
+        context_utc(record.occurred_at)
         if record.visibility not in {"private","agent","shared"}: raise ValueError("invalid visibility")
         digest=context_record_hash(record);now=datetime.now(timezone.utc).isoformat()
         with self.lock,self.db:
