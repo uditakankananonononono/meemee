@@ -1,0 +1,64 @@
+FF.                                                                      [100%]
+=================================== FAILURES ===================================
+______________ test_quotes_in_query_do_not_raise_sqlite_error["] _______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-154/test_quotes_in_query_do_not_ra0')
+query = '"'
+
+    @pytest.mark.parametrize('query', ['"', 'hello"world', '"hello"'])
+    def test_quotes_in_query_do_not_raise_sqlite_error(tmp_path, query):
+        memory = MemoryStore(tmp_path / 'm.db')
+        memory.add('r', 'goal', 'hello world', owner_id='o')
+>       result = memory.search(query, owner_id='o')
+
+tests/test_memory_query_quote_canary.py:11: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <meemee.memory.MemoryStore object at 0x7f26b3b2dc30>, query = '"'
+limit = 8
+
+    def search(self, query: str, limit: int = 8, *, owner_id: str) -> list[dict[str, Any]]:
+        safe = " OR ".join(f'"{part}"' for part in query.split() if part) or '""'
+        with self.lock:
+>           rows = self.connection.execute(
+                """SELECT m.*, bm25(memories_fts) AS score FROM memories_fts
+                   JOIN memories m ON m.id = memories_fts.rowid
+                   WHERE memories_fts MATCH ? AND m.owner_id=? ORDER BY score LIMIT ?""",
+                (safe, owner_id, limit),
+            ).fetchall()
+E           sqlite3.OperationalError: unterminated string
+
+meemee/memory.py:110: OperationalError
+_________ test_quotes_in_query_do_not_raise_sqlite_error[hello"world] __________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-154/test_quotes_in_query_do_not_ra1')
+query = 'hello"world'
+
+    @pytest.mark.parametrize('query', ['"', 'hello"world', '"hello"'])
+    def test_quotes_in_query_do_not_raise_sqlite_error(tmp_path, query):
+        memory = MemoryStore(tmp_path / 'm.db')
+        memory.add('r', 'goal', 'hello world', owner_id='o')
+>       result = memory.search(query, owner_id='o')
+
+tests/test_memory_query_quote_canary.py:11: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <meemee.memory.MemoryStore object at 0x7f26b383f3a0>
+query = 'hello"world', limit = 8
+
+    def search(self, query: str, limit: int = 8, *, owner_id: str) -> list[dict[str, Any]]:
+        safe = " OR ".join(f'"{part}"' for part in query.split() if part) or '""'
+        with self.lock:
+>           rows = self.connection.execute(
+                """SELECT m.*, bm25(memories_fts) AS score FROM memories_fts
+                   JOIN memories m ON m.id = memories_fts.rowid
+                   WHERE memories_fts MATCH ? AND m.owner_id=? ORDER BY score LIMIT ?""",
+                (safe, owner_id, limit),
+            ).fetchall()
+E           sqlite3.OperationalError: unterminated string
+
+meemee/memory.py:110: OperationalError
+=========================== short test summary info ============================
+FAILED tests/test_memory_query_quote_canary.py::test_quotes_in_query_do_not_raise_sqlite_error["]
+FAILED tests/test_memory_query_quote_canary.py::test_quotes_in_query_do_not_raise_sqlite_error[hello"world]
+2 failed, 1 passed in 0.07s
