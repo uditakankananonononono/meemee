@@ -1,0 +1,24 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_____________ test_independent_deletion_open_returns_one_active_id _____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-522/test_independent_deletion_open0')
+
+    def test_independent_deletion_open_returns_one_active_id(tmp_path):
+        ledgers = [DeletionLedger(tmp_path / 'deletions.sqlite3') for _ in range(2)]
+        barrier = Barrier(2)
+        for ledger in ledgers:
+            ledger.db.set_trace_callback(lambda sql: barrier.wait(timeout=2)
+                                         if sql.startswith('SELECT id FROM account_deletions') else None)
+        with ThreadPoolExecutor(2) as pool:
+            ids = list(pool.map(lambda ledger: ledger.open('owner', 'admin'), ledgers))
+>       assert ids[0] == ids[1]
+E       AssertionError: assert '58c88fcd031a...36afff93b1d0e' == '3203577e34f5...d424253c87642'
+E         
+E         - 3203577e34f54de9b33d424253c87642
+E         + 58c88fcd031a460b93236afff93b1d0e
+
+tests/test_deletion_open_race.py:17: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_deletion_open_race.py::test_independent_deletion_open_returns_one_active_id
+1 failed in 0.08s
