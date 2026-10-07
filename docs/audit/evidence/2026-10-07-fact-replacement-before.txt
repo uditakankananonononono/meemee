@@ -1,0 +1,40 @@
+FF.                                                                      [100%]
+=================================== FAILURES ===================================
+______ test_fact_replacement_preserves_source_on_invalid_target[missing] _______
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-342/test_fact_replacement_preserve0')
+replacement_kind = 'missing'
+
+    @pytest.mark.parametrize('replacement_kind', ['missing', 'other_owner'])
+    def test_fact_replacement_preserves_source_on_invalid_target(tmp_path, replacement_kind):
+        store = CompanionStore(tmp_path / 'companion.sqlite3')
+        original = store.add_fact('owner', FactInput(text='Likes tea'), 'test')
+        if replacement_kind == 'missing':
+            target = original['id'] + 100
+        else:
+            target = store.add_fact('other', FactInput(text='Likes coffee'), 'test')['id']
+>       with pytest.raises(ValueError, match='replacement'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_companion_fact_replacement.py:17: Failed
+____ test_fact_replacement_preserves_source_on_invalid_target[other_owner] _____
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-342/test_fact_replacement_preserve1')
+replacement_kind = 'other_owner'
+
+    @pytest.mark.parametrize('replacement_kind', ['missing', 'other_owner'])
+    def test_fact_replacement_preserves_source_on_invalid_target(tmp_path, replacement_kind):
+        store = CompanionStore(tmp_path / 'companion.sqlite3')
+        original = store.add_fact('owner', FactInput(text='Likes tea'), 'test')
+        if replacement_kind == 'missing':
+            target = original['id'] + 100
+        else:
+            target = store.add_fact('other', FactInput(text='Likes coffee'), 'test')['id']
+>       with pytest.raises(ValueError, match='replacement'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_companion_fact_replacement.py:17: Failed
+=========================== short test summary info ============================
+FAILED tests/test_companion_fact_replacement.py::test_fact_replacement_preserves_source_on_invalid_target[missing]
+FAILED tests/test_companion_fact_replacement.py::test_fact_replacement_preserves_source_on_invalid_target[other_owner]
+2 failed, 1 passed in 0.22s

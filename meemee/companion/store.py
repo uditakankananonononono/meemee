@@ -220,6 +220,18 @@ class CompanionStore:
 
     def supersede_fact(self, fact_id: int, replacement_id: int | None = None) -> bool:
         with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            original = self.db.execute(
+                "SELECT user_id, superseded_by FROM companion_facts WHERE id=?", (fact_id,)
+            ).fetchone()
+            if original is None or original["superseded_by"] is not None:
+                return False
+            if replacement_id is not None:
+                replacement = self.db.execute(
+                    "SELECT user_id FROM companion_facts WHERE id=?", (replacement_id,)
+                ).fetchone()
+                if replacement is None or replacement["user_id"] != original["user_id"]:
+                    raise ValueError("Fact replacement must exist and belong to the same user")
             changed = self.db.execute(
                 "UPDATE companion_facts SET superseded_by=COALESCE(?, id), updated_at=? WHERE id=? AND superseded_by IS NULL",
                 (replacement_id, _now(), fact_id),
