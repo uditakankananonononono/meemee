@@ -1,0 +1,47 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______________ test_restore_cleans_current_file_on_copy_failure _______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-257/test_restore_cleans_current_fi0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fdd2916b250>
+
+    def test_restore_cleans_current_file_on_copy_failure(tmp_path, monkeypatch):
+        data = tmp_path / 'data'
+        data.mkdir()
+        with sqlite3.connect(data / 'first.sqlite3') as db:
+            db.execute('CREATE TABLE fixture(n INTEGER)')
+        folder = tmp_path / 'backup'
+        BackupManager(data).create(folder)
+        BackupManager.verify(folder)
+        connect = sqlite3.connect
+        # Allow verification to finish first, then inject only the restore copy fault.
+        monkeypatch.setattr(BackupManager, 'verify', staticmethod(lambda path: __import__('json').loads((path / 'manifest.json').read_text())))
+    
+        class BrokenSource:
+            def backup(self, target):
+                target.execute('CREATE TABLE partial(n INTEGER)')
+                target.commit()
+                raise RuntimeError('fixture copy failed midway')
+    
+            def close(self):
+                pass
+    
+        def fault_connect(path, *args, **kwargs):
+            if kwargs.get('uri'):
+                return BrokenSource()
+            return connect(path, *args, **kwargs)
+    
+        monkeypatch.setattr(backup.sqlite3, 'connect', fault_connect)
+        destination = tmp_path / 'restore'
+        with pytest.raises(RuntimeError, match='copy failed'):
+            BackupManager.restore(folder, destination)
+>       assert list(destination.iterdir()) == []
+E       AssertionError: assert [PosixPath('/...rst.sqlite3')] == []
+E         
+E         Left contains one more item: PosixPath('/tmp/pytest-of-sandbox/pytest-257/test_restore_cleans_current_fi0/restore/first.sqlite3')
+E         Use -v to get more diff
+
+tests/test_backup_restore_cleanup_canary.py:40: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_backup_restore_cleanup_canary.py::test_restore_cleans_current_file_on_copy_failure
+1 failed in 0.05s
