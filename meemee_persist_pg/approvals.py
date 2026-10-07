@@ -12,7 +12,7 @@ from typing import Any
 
 from psycopg.types.json import Jsonb
 
-from meemee.approvals import constraints_match, normalize_expiry, utc_moment
+from meemee.approvals import constraints_match, normalize_expiry, utc_moment, validate_constraints
 
 from ._db import Database
 
@@ -36,6 +36,7 @@ class ApprovalStore:
             raise ValueError("principal, tool and granted_by are required")
         if argument_constraints is not None and not isinstance(argument_constraints, dict):
             raise ValueError("argument_constraints must be an object")
+        validate_constraints(argument_constraints)
         expiry = normalize_expiry(expires_at)
         with self.db.transaction() as c:
             c.execute(
