@@ -1,0 +1,22 @@
+{
+  "mode": "temporary SQLite + real loopback HTTP, no model",
+  "restarted": true,
+  "observations": [
+    [],
+    [
+      "2bef4f43573240dbab3fe8ca67d37d3c"
+    ],
+    []
+  ],
+  "status": "completed",
+  "fire_count": 1,
+  "event_kinds": [
+    "created",
+    "triggered"
+  ],
+  "trigger_payload": {
+    "price": 5
+  },
+  "external_truth_verified": false,
+  "notifications_sent": false
+}
