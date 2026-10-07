@@ -49,3 +49,29 @@ async def test_browser_rechecks_requests_before_private_target(tmp_path, monkeyp
     finally:
         server.shutdown()
         thread.join()
+
+
+@pytest.mark.asyncio
+async def test_guarded_browser_keeps_normal_page_navigation_functional(tmp_path, monkeypatch):
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = b'<html><head><title>Normal fixture</title></head><body><p id="msg">hello</p></body></html>'
+            self.send_response(200)
+            self.send_header('Content-Type','text/html')
+            self.end_headers()
+            self.wfile.write(body)
+        def log_message(self, *args):
+            pass
+    server = ThreadingHTTPServer(('127.0.0.1',0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    monkeypatch.setattr('meemee.tools.browser.validate_public_url', lambda url:url)
+    try:
+        result = await BrowserNavigate(tmp_path).run(BrowseArgs(url=f'http://127.0.0.1:{server.server_port}/',wait_ms=0))
+        assert result['title'] == 'Normal fixture'
+        assert result['text'] == 'hello'
+        assert result['blocked_requests'] == []
+        assert result['status'] == 200
+    finally:
+        server.shutdown()
+        thread.join()

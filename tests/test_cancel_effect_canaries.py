@@ -74,3 +74,26 @@ async def test_outer_registry_cancellation_cleans_running_child():
         await task
     await asyncio.sleep(0)
     assert cleaned.is_set(), 'cancelled registry left tool task running'
+
+
+@pytest.mark.asyncio
+async def test_cancel_stops_model_wait_without_waiting_for_generation(tmp_path):
+    began, cleaned, cancel = asyncio.Event(), asyncio.Event(), Event()
+    class SlowModel:
+        async def decide(self, messages):
+            began.set()
+            try:
+                await asyncio.sleep(10)
+                return AgentDecision(final='late answer')
+            finally:
+                cleaned.set()
+    agent = Agent(SlowModel(), ToolRegistry(), MemoryStore(tmp_path / 'memory.db'))
+    task = asyncio.create_task(agent.run('work', owner_id='owner', cancel=cancel))
+    await began.wait()
+    cancel.set()
+    try:
+        report = await asyncio.wait_for(task, 0.5)
+    except asyncio.TimeoutError:
+        pytest.fail('cancellation waits for model generation timeout')
+    assert cleaned.is_set()
+    assert report.final.startswith('Cancelled')
