@@ -60,7 +60,18 @@ async def deliver_due_once(
                 conversation = store.start_conversation(checkin["user_id"], "local")
             address = conversation["id"]
         validate_delivery_address(store, checkin["user_id"], channel_name, address)
-        result = await adapter.send(address, message)
+        try:
+            result = await adapter.send(address, message)
+        except asyncio.CancelledError:
+            store.mark_checkin_unknown(checkin["id"], "delivery outcome unknown: send cancelled")
+            raise
+        except ChannelError:
+            # Preserve the existing explicit adapter failure/retry contract.
+            raise
+        except Exception as exc:  # noqa: BLE001 - adapter may already have sent
+            store.mark_checkin_unknown(checkin["id"], f"delivery outcome unknown: {exc}")
+            return {"claimed": True, "checkin_id": checkin["id"], "user_id": checkin["user_id"],
+                    "delivered": False, "status": "failed", "detail": f"delivery outcome unknown: {exc}"}
         if not result.delivered:
             raise ChannelError(result.detail or "channel did not deliver check-in")
         store.finish_checkin(checkin["id"], message)

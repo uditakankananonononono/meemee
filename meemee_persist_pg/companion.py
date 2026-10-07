@@ -221,6 +221,14 @@ class CompanionStore:
                          WHERE id=%s AND status='running'""", (error[:500], _now(), checkin_id))
             return c.execute("SELECT status FROM meemee_companion_checkins WHERE id=%s", (checkin_id,)).fetchone()["status"]
 
+    def mark_checkin_unknown(self, checkin_id: str, error: str) -> bool:
+        """Stop automatic retries when an interrupted send may have taken effect."""
+        with self.db.transaction() as c:
+            return bool(c.execute(
+                "UPDATE meemee_companion_checkins SET status='failed',last_error=%s,updated_at=%s WHERE id=%s AND status='running'",
+                (error[:500], _now(), checkin_id),
+            ).rowcount)
+
     def cancel_claimed_checkin(self, checkin_id: str) -> bool:
         with self.db.transaction() as c:
             return bool(c.execute(

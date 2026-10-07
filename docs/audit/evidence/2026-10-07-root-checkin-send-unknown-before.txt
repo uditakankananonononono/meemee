@@ -1,0 +1,82 @@
+.............................................s.s.s.s.s.s.s.s.s.s.s...... [  8%]
+.......................s.s..ss.......................................... [ 16%]
+.....s.s.s.s.s.s...........................................s........FF.. [ 25%]
+..........................................................s.sss......... [ 33%]
+......sss.....s.s.s.s.s.s............................................... [ 41%]
+....................ss.sssss..............sssssssssssss...............s. [ 50%]
+s.ss.s.............................ss.................s................. [ 58%]
+.....sss.s.s.s.s...............................sss.................s.s.s [ 66%]
+.s.s..s..........ss.........................................s.s.s.s.s.s. [ 75%]
+.s.ss..............................s.s.s.s.s.s.s.ssss................... [ 83%]
+..............................s.s.s.s.s.sss....sss..................sss. [ 91%]
+...........s.s.s.s.s.s.s.s..............................sss..........    [100%]
+=================================== FAILURES ===================================
+_________________ test_cancel_during_send_is_terminal_unknown __________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-216/test_cancel_during_send_is_ter0')
+
+    async def test_cancel_during_send_is_terminal_unknown(tmp_path):
+        store, engine, channels = setup(tmp_path)
+        queue_checkin(store)
+        entered = asyncio.Event()
+    
+        class Interrupted:
+            async def send(self, address, message):
+                entered.set()
+                await asyncio.Event().wait()
+    
+        channels['local'] = Interrupted()
+        task = asyncio.create_task(deliver_due_once(store, engine, channels))
+        await entered.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        row = store.list_checkins('udita')[0]
+>       assert row['status'] == 'failed'
+E       AssertionError: assert 'running' == 'failed'
+E         
+E         - failed
+E         + running
+
+tests/test_companion_send_unknown_canary.py:27: AssertionError
+_________ test_unexpected_send_error_after_effect_is_terminal_unknown __________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-216/test_unexpected_send_error_aft0')
+
+    async def test_unexpected_send_error_after_effect_is_terminal_unknown(tmp_path):
+        store, engine, channels = setup(tmp_path)
+        queue_checkin(store)
+        calls = []
+    
+        class Interrupted:
+            async def send(self, address, message):
+                calls.append(message)  # Simulates provider accepting before socket error.
+                raise OSError('reply lost after acceptance')
+    
+        channels['local'] = Interrupted()
+        try:
+            await deliver_due_once(store, engine, channels)
+        except OSError:
+            pass
+        row = store.list_checkins('udita')[0]
+>       assert row['status'] == 'failed'
+E       AssertionError: assert 'running' == 'failed'
+E         
+E         - failed
+E         + running
+
+tests/test_companion_send_unknown_canary.py:48: AssertionError
+=============================== warnings summary ===============================
+.venv/lib/python3.10/site-packages/fastapi/testclient.py:1
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+.venv/lib/python3.10/site-packages/starlette/testclient.py:53
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_companion_send_unknown_canary.py::test_cancel_during_send_is_terminal_unknown
+FAILED tests/test_companion_send_unknown_canary.py::test_unexpected_send_error_after_effect_is_terminal_unknown
+2 failed, 733 passed, 126 skipped, 2 warnings in 91.15s (0:01:31)
