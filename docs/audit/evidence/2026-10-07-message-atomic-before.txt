@@ -1,0 +1,34 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+______________ test_failed_conversation_update_rolls_back_message ______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-309/test_failed_conversation_updat0')
+
+    def test_failed_conversation_update_rolls_back_message(tmp_path):
+        store = CompanionStore(tmp_path / 'companion.db')
+        conv = store.start_conversation('owner', 'local')
+        store.db.execute("""CREATE TRIGGER reject_message_timestamp BEFORE UPDATE ON companion_conversations
+                          BEGIN SELECT RAISE(ABORT, 'timestamp blocked'); END""")
+        with pytest.raises(sqlite3.IntegrityError, match='timestamp blocked'):
+            store.add_message(conv['id'], 'assistant', 'must not survive')
+>       assert store.history(conv['id']) == []
+E       AssertionError: assert [{'content': ...'id': 1, ...}] == []
+E         
+E         Left contains one more item: {'content': 'must not survive', 'conversation_id': '9d32a1d744644b5091821a2cbcb8ac41', 'created_at': '2026-10-07T14:20:07.022203+00:00', 'id': 1, ...}
+E         Use -v to get more diff
+
+tests/test_companion_message_atomic_canary.py:16: AssertionError
+____________ test_unknown_conversation_cannot_create_orphan_message ____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-309/test_unknown_conversation_cann0')
+
+    def test_unknown_conversation_cannot_create_orphan_message(tmp_path):
+        store = CompanionStore(tmp_path / 'companion.db')
+>       with pytest.raises(ValueError, match='unknown conversation'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_companion_message_atomic_canary.py:21: Failed
+=========================== short test summary info ============================
+FAILED tests/test_companion_message_atomic_canary.py::test_failed_conversation_update_rolls_back_message
+FAILED tests/test_companion_message_atomic_canary.py::test_unknown_conversation_cannot_create_orphan_message
+2 failed in 0.18s

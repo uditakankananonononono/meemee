@@ -288,6 +288,11 @@ class CompanionStore:
     def add_message(self, conversation_id: str, role: str, content: str) -> dict[str, Any]:
         now = _now()
         with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            if self.db.execute(
+                "SELECT 1 FROM companion_conversations WHERE id=?", (conversation_id,)
+            ).fetchone() is None:
+                raise ValueError(f"unknown conversation: {conversation_id}")
             cursor = self.db.execute(
                 "INSERT INTO companion_messages(conversation_id,role,content,created_at) VALUES(?,?,?,?)",
                 (conversation_id, role, scrub_text(content), now),
