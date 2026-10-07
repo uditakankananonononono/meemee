@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import fnmatch
 import json
+import posixpath
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -44,10 +45,18 @@ class PolicyEngine:
         encoded = json.dumps(arguments, sort_keys=True, default=str).encode()
         if len(encoded) > self.max_argument_bytes:
             return PolicyDecision(False, "arguments exceed policy size limit", False)
-        for key in ("path", "screenshot_path"):
-            raw = arguments.get(key)
-            if isinstance(raw, str) and any(fnmatch.fnmatch(raw, pattern) for pattern in self.denied_paths):
+        def path_denied(raw):
+            if not isinstance(raw, str):
+                return False
+            normalized = posixpath.normpath(raw)
+            return any(fnmatch.fnmatch(raw, pattern) or fnmatch.fnmatch(normalized, pattern)
+                       for pattern in self.denied_paths)
+
+        for key in ("path", "screenshot_path", "download_dir"):
+            if path_denied(arguments.get(key)):
                 return PolicyDecision(False, f"{key} matches a denied pattern", False)
+        if isinstance(arguments.get("paths"), list) and any(path_denied(raw) for raw in arguments["paths"]):
+            return PolicyDecision(False, "paths match a denied pattern", False)
         raw_url = arguments.get("url")
         if isinstance(raw_url, str):
             from urllib.parse import urlparse

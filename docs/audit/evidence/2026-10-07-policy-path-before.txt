@@ -1,0 +1,65 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+_______ test_path_deny_policy_covers_equivalent_normalized_paths[./.env] _______
+
+path = './.env'
+
+    @pytest.mark.parametrize('path', ['./.env','sub/../.env','sub//../.env'])
+    def test_path_deny_policy_covers_equivalent_normalized_paths(path):
+        policy = PolicyEngine({'deny_paths':['.env']})
+>       assert not policy.evaluate('workspace.read_file',{'path':path},Risk.READ).allowed
+E       AssertionError: assert not True
+E        +  where True = PolicyDecision(allowed=True, reason='allowed', require_approval=False).allowed
+E        +    where PolicyDecision(allowed=True, reason='allowed', require_approval=False) = evaluate('workspace.read_file', {'path': './.env'}, <Risk.READ: 'read'>)
+E        +      where evaluate = <meemee.policy.PolicyEngine object at 0x7fa078d3bcd0>.evaluate
+E        +      and   <Risk.READ: 'read'> = Risk.READ
+
+tests/test_policy_path_canaries.py:11: AssertionError
+____ test_path_deny_policy_covers_equivalent_normalized_paths[sub/../.env] _____
+
+path = 'sub/../.env'
+
+    @pytest.mark.parametrize('path', ['./.env','sub/../.env','sub//../.env'])
+    def test_path_deny_policy_covers_equivalent_normalized_paths(path):
+        policy = PolicyEngine({'deny_paths':['.env']})
+>       assert not policy.evaluate('workspace.read_file',{'path':path},Risk.READ).allowed
+E       AssertionError: assert not True
+E        +  where True = PolicyDecision(allowed=True, reason='allowed', require_approval=False).allowed
+E        +    where PolicyDecision(allowed=True, reason='allowed', require_approval=False) = evaluate('workspace.read_file', {'path': 'sub/../.env'}, <Risk.READ: 'read'>)
+E        +      where evaluate = <meemee.policy.PolicyEngine object at 0x7fa078d39c30>.evaluate
+E        +      and   <Risk.READ: 'read'> = Risk.READ
+
+tests/test_policy_path_canaries.py:11: AssertionError
+____ test_path_deny_policy_covers_equivalent_normalized_paths[sub//../.env] ____
+
+path = 'sub//../.env'
+
+    @pytest.mark.parametrize('path', ['./.env','sub/../.env','sub//../.env'])
+    def test_path_deny_policy_covers_equivalent_normalized_paths(path):
+        policy = PolicyEngine({'deny_paths':['.env']})
+>       assert not policy.evaluate('workspace.read_file',{'path':path},Risk.READ).allowed
+E       AssertionError: assert not True
+E        +  where True = PolicyDecision(allowed=True, reason='allowed', require_approval=False).allowed
+E        +    where PolicyDecision(allowed=True, reason='allowed', require_approval=False) = evaluate('workspace.read_file', {'path': 'sub//../.env'}, <Risk.READ: 'read'>)
+E        +      where evaluate = <meemee.policy.PolicyEngine object at 0x7fa078d3aad0>.evaluate
+E        +      and   <Risk.READ: 'read'> = Risk.READ
+
+tests/test_policy_path_canaries.py:11: AssertionError
+______________ test_download_destination_obeys_denied_path_policy ______________
+
+    def test_download_destination_obeys_denied_path_policy():
+        policy = PolicyEngine({'deny_paths':['private/*']})
+>       assert not policy.evaluate('browser.navigate',{'download_dir':'private/files'},Risk.WRITE).allowed
+E       AssertionError: assert not True
+E        +  where True = PolicyDecision(allowed=True, reason='allowed', require_approval=True).allowed
+E        +    where PolicyDecision(allowed=True, reason='allowed', require_approval=True) = evaluate('browser.navigate', {'download_dir': 'private/files'}, <Risk.WRITE: 'write'>)
+E        +      where evaluate = <meemee.policy.PolicyEngine object at 0x7fa078d39d20>.evaluate
+E        +      and   <Risk.WRITE: 'write'> = Risk.WRITE
+
+tests/test_policy_path_canaries.py:16: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_policy_path_canaries.py::test_path_deny_policy_covers_equivalent_normalized_paths[./.env]
+FAILED tests/test_policy_path_canaries.py::test_path_deny_policy_covers_equivalent_normalized_paths[sub/../.env]
+FAILED tests/test_policy_path_canaries.py::test_path_deny_policy_covers_equivalent_normalized_paths[sub//../.env]
+FAILED tests/test_policy_path_canaries.py::test_download_destination_obeys_denied_path_policy
+4 failed in 0.10s
