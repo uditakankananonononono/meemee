@@ -1,0 +1,70 @@
+FF.                                                                      [100%]
+=================================== FAILURES ===================================
+________________ test_extraction_outage_preserves_reply[error0] ________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-320/test_extraction_outage_preserv0')
+error = RuntimeError('provider outage')
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('error', [RuntimeError('provider outage'), OSError('connection lost')])
+    async def test_extraction_outage_preserves_reply(tmp_path, error):
+        store = CompanionStore(tmp_path / 'c.db')
+        model = ExtractionOutage(error)
+>       reply = await CompanionEngine(model, store).reply('owner', 'hello')
+
+tests/test_companion_extraction_outage_canary.py:27: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee/companion/engine.py:139: in reply
+    learned = await self._extract_facts(profile.user_id, text, reply_text, conversation["id"])
+meemee/companion/engine.py:170: in _extract_facts
+    raw = await self.model.chat(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <test_companion_extraction_outage_canary.ExtractionOutage object at 0x7f911372a6e0>
+messages = [{'content': 'Extract durable facts worth remembering about the user from this exchange.\nOnly long-lived facts (prefe...tems,\nor {"facts": []} when nothing is durable.\n\nUser said: hello\nAssistant replied: Saved reply', 'role': 'user'}]
+kwargs = {'max_tokens': 600, 'temperature': 0.0}
+
+    async def chat(self, messages, **kwargs):
+        self.calls += 1
+        if self.calls == 1:
+            return 'Saved reply'
+>       raise self.error
+E       RuntimeError: provider outage
+
+tests/test_companion_extraction_outage_canary.py:19: RuntimeError
+________________ test_extraction_outage_preserves_reply[error1] ________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-320/test_extraction_outage_preserv1')
+error = OSError('connection lost')
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('error', [RuntimeError('provider outage'), OSError('connection lost')])
+    async def test_extraction_outage_preserves_reply(tmp_path, error):
+        store = CompanionStore(tmp_path / 'c.db')
+        model = ExtractionOutage(error)
+>       reply = await CompanionEngine(model, store).reply('owner', 'hello')
+
+tests/test_companion_extraction_outage_canary.py:27: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee/companion/engine.py:139: in reply
+    learned = await self._extract_facts(profile.user_id, text, reply_text, conversation["id"])
+meemee/companion/engine.py:170: in _extract_facts
+    raw = await self.model.chat(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <test_companion_extraction_outage_canary.ExtractionOutage object at 0x7f91137cfeb0>
+messages = [{'content': 'Extract durable facts worth remembering about the user from this exchange.\nOnly long-lived facts (prefe...tems,\nor {"facts": []} when nothing is durable.\n\nUser said: hello\nAssistant replied: Saved reply', 'role': 'user'}]
+kwargs = {'max_tokens': 600, 'temperature': 0.0}
+
+    async def chat(self, messages, **kwargs):
+        self.calls += 1
+        if self.calls == 1:
+            return 'Saved reply'
+>       raise self.error
+E       OSError: connection lost
+
+tests/test_companion_extraction_outage_canary.py:19: OSError
+=========================== short test summary info ============================
+FAILED tests/test_companion_extraction_outage_canary.py::test_extraction_outage_preserves_reply[error0]
+FAILED tests/test_companion_extraction_outage_canary.py::test_extraction_outage_preserves_reply[error1]
+2 failed, 1 passed in 0.20s

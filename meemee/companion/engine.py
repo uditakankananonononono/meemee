@@ -172,7 +172,8 @@ class CompanionEngine:
             )
             payload = json.loads(raw[raw.index("{"): raw.rindex("}") + 1])
             candidates = payload.get("facts", [])[: self.extract_limit]
-        except (ValueError, KeyError, TypeError) as exc:
+        except Exception as exc:  # noqa: BLE001 - optional model enrichment must not invalidate the reply
+            # Cancellation and process-exit exceptions remain outside this boundary.
             log.warning("fact extraction skipped: %s", exc)
             return 0
         learned = 0
