@@ -177,6 +177,19 @@ class CompanionStore:
             ).fetchall()
         return [self._profile(row) for row in rows]
 
+    def iter_user_ids(self, batch_size: int = 200):
+        """Keyset census for workers, independent of the UI's recent-user cap."""
+        after = ""
+        while True:
+            with self.lock:
+                rows = self.db.execute("SELECT user_id FROM companion_users WHERE user_id>? ORDER BY user_id LIMIT ?",
+                                       (after, max(1, min(batch_size, 500)))).fetchall()
+            if not rows:
+                return
+            for row in rows:
+                yield row["user_id"]
+            after = rows[-1]["user_id"]
+
     # facts ------------------------------------------------------------
     def add_fact(self, user_id: str, fact: FactInput, source: str) -> dict[str, Any]:
         now = _now()
