@@ -1,0 +1,49 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+______________ test_independent_personal_writers_merge_one_claim _______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-180/test_independent_personal_writ0')
+
+    def test_independent_personal_writers_merge_one_claim(tmp_path):
+        stores = [PersonalModelStore(tmp_path / 'p.db'), PersonalModelStore(tmp_path / 'p.db')]
+        for store in stores:
+            store.db = SlowConnection(store.db)
+        ready = threading.Barrier(2)
+    
+        def write(i):
+            ready.wait()
+            return stores[i].upsert('o', PersonalItemInput(kind='preference', title='drink', value='tea', source_id='fixture', source_record_id=str(i)))
+    
+        with ThreadPoolExecutor(2) as pool:
+>           rows = list(pool.map(write, range(2)))
+
+tests/test_personal_cross_connection_canary.py:38: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.10/concurrent/futures/_base.py:621: in result_iterator
+    yield _result_or_cancel(fs.pop())
+/usr/lib/python3.10/concurrent/futures/_base.py:319: in _result_or_cancel
+    return fut.result(timeout)
+/usr/lib/python3.10/concurrent/futures/_base.py:458: in result
+    return self.__get_result()
+/usr/lib/python3.10/concurrent/futures/_base.py:403: in __get_result
+    raise self._exception
+/usr/lib/python3.10/concurrent/futures/thread.py:58: in run
+    result = self.fn(*self.args, **self.kwargs)
+tests/test_personal_cross_connection_canary.py:35: in write
+    return stores[i].upsert('o', PersonalItemInput(kind='preference', title='drink', value='tea', source_id='fixture', source_record_id=str(i)))
+meemee/personal_model.py:137: in upsert
+    self.db.execute(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <test_personal_cross_connection_canary.SlowConnection object at 0x7fed0187c160>
+sql = "INSERT INTO personal_items VALUES(?,?,?,?,?,?,'active',?,?,?,?,?)"
+args = ('99e260c68f8b4d67b2b0cce76250a3ae', 'o', 'preference', 'drink', 'tea', 1.0, ...)
+
+    def execute(self, sql, args=()):
+>       result = self.db.execute(sql, args)
+E       sqlite3.IntegrityError: UNIQUE constraint failed: personal_items.owner_id, personal_items.kind, personal_items.title
+
+tests/test_personal_cross_connection_canary.py:21: IntegrityError
+=========================== short test summary info ============================
+FAILED tests/test_personal_cross_connection_canary.py::test_independent_personal_writers_merge_one_claim
+1 failed in 0.20s

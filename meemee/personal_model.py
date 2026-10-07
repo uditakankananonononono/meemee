@@ -114,6 +114,7 @@ class PersonalModelStore:
             raise ValueError("owner is required")
         now = datetime.now(timezone.utc).isoformat()
         with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
             current = self.db.execute(
                 "SELECT * FROM personal_items WHERE owner_id=? AND kind=? AND title=? AND status='active'",
                 (owner_id, item.kind, item.title.strip()),
