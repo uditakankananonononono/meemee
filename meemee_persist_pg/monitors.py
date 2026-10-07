@@ -70,6 +70,7 @@ class MonitorStore:
         return [self.get(owner_id, row["id"]) for row in rows]
 
     def evaluate(self, owner_id, source_id, event, at=None):
+        json.dumps(event, allow_nan=False)
         instant = datetime.fromisoformat(at.replace('Z', '+00:00')) if at else _now()
         if instant.tzinfo is None:
             raise ValueError('evaluation time must include a timezone')

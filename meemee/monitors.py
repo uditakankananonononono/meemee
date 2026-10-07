@@ -77,6 +77,7 @@ class MonitorStore:
             return {'gt':value>expected,'gte':value>=expected,'lt':value<expected,'lte':value<=expected}[op]
         except (TypeError,KeyError):return False
     def evaluate(self,owner_id,source_id,event,at=None):
+        json.dumps(event, allow_nan=False)
         instant=datetime.fromisoformat(at.replace('Z','+00:00')) if at else datetime.now(timezone.utc)
         if instant.tzinfo is None:raise ValueError('evaluation time must include a timezone')
         clock=instant.astimezone(timezone.utc).isoformat();fired=[]
