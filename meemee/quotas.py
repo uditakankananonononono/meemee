@@ -45,9 +45,9 @@ class QuotaStore:
 
     def consume_job(self, principal: str, now: datetime | None = None) -> dict[str, int | str]:
         day = (now or datetime.now(timezone.utc)).astimezone(timezone.utc).date().isoformat()
-        maximum = self.limit(principal)
         with self.lock, self.db:
             self.db.execute("BEGIN IMMEDIATE")
+            maximum = self.limit(principal)
             self.db.execute("INSERT INTO quota_usage VALUES(?,?,1) ON CONFLICT(principal,day) DO UPDATE SET jobs=jobs+1", (principal, day))
             used = int(self.db.execute("SELECT jobs FROM quota_usage WHERE principal=? AND day=?", (principal, day)).fetchone()[0])
             if used > maximum:
