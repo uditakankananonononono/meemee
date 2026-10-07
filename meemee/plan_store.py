@@ -69,6 +69,26 @@ class PlanStore:
 
     def update_status(self, ident: str, step_id: str, status: str, expected_version: int) -> dict[str, Any]:
         current = self.get(ident)
+        if current["version"] != expected_version:
+            raise ValueError(f"version conflict: expected {expected_version}, actual {current['version']}")
+        by_id = {step.id: step for step in current["plan"].steps}
+        selected = by_id.get(step_id)
+        if selected is None:
+            raise KeyError(step_id)
+        transitions = {
+            "pending": {"pending", "running", "done", "failed"},
+            "running": {"running", "done", "failed"},
+            "done": {"done"},
+            "failed": {"failed", "pending"},
+        }
+        if status not in transitions[selected.status]:
+            raise ValueError(f"invalid status transition: {selected.status} -> {status}")
+        if status in {"running", "done"}:
+            incomplete = [dep for dep in selected.depends_on if by_id[dep].status != "done"]
+            if incomplete:
+                raise ValueError(f"incomplete dependencies: {', '.join(incomplete)}")
+        if status == selected.status:
+            return current
         steps = []
         found = False
         for step in current["plan"].steps:

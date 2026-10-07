@@ -46,6 +46,7 @@ class AuditLog:
         occurred = datetime.now(timezone.utc).isoformat()
         encoded = json.dumps(metadata or {}, sort_keys=True, separators=(",", ":"))
         with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
             previous_row = self.db.execute("SELECT entry_hash FROM audit_log ORDER BY sequence DESC LIMIT 1").fetchone()
             if previous_row:
                 previous = previous_row[0]

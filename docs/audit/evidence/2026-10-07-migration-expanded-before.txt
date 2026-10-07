@@ -1,0 +1,111 @@
+FFF.F.FFF.......                                                         [100%]
+=================================== FAILURES ===================================
+______________________ test_failed_ddl_rolls_back_schema _______________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-1/test_failed_ddl_rolls_back_sch0')
+
+    def test_failed_ddl_rolls_back_schema(tmp_path):
+        db = tmp_path / 'ddl.db'
+        with pytest.raises(sqlite3.Error):
+            Migrator(db, [Migration(1, 'bad-ddl', 'CREATE TABLE leaked(id INT); NOT SQL;')]).migrate()
+        with sqlite3.connect(db) as connection:
+>           assert connection.execute("SELECT name FROM sqlite_master WHERE name='leaked'").fetchone() is None
+E           assert ('leaked',) is None
+E            +  where ('leaked',) = <built-in method fetchone of sqlite3.Cursor object at 0x7f441c3b9b40>()
+E            +    where <built-in method fetchone of sqlite3.Cursor object at 0x7f441c3b9b40> = <sqlite3.Cursor object at 0x7f441c3b9b40>.fetchone
+E            +      where <sqlite3.Cursor object at 0x7f441c3b9b40> = <built-in method execute of sqlite3.Connection object at 0x7f441c3a8240>("SELECT name FROM sqlite_master WHERE name='leaked'")
+E            +        where <built-in method execute of sqlite3.Connection object at 0x7f441c3a8240> = <sqlite3.Connection object at 0x7f441c3a8240>.execute
+
+tests/test_migration_atomicity_canaries.py:14: AssertionError
+_______________________ test_failed_dml_rolls_back_data ________________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-1/test_failed_dml_rolls_back_dat0')
+
+    def test_failed_dml_rolls_back_data(tmp_path):
+        db = tmp_path / 'dml.db'
+        initial = Migration(1, 'initial', 'CREATE TABLE items(value TEXT); INSERT INTO items VALUES(\'original\');')
+        Migrator(db, [initial]).migrate()
+        with pytest.raises(sqlite3.Error):
+            Migrator(db, [initial, Migration(2, 'bad-dml', "UPDATE items SET value='leaked'; NOT SQL;")]).migrate()
+        with sqlite3.connect(db) as connection:
+>           assert connection.execute('SELECT value FROM items').fetchone()[0] == 'original'
+E           AssertionError: assert 'leaked' == 'original'
+E             
+E             - original
+E             + leaked
+
+tests/test_migration_atomicity_canaries.py:25: AssertionError
+___________________ test_script_cannot_commit_before_failure ___________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-1/test_script_cannot_commit_befo0')
+
+    def test_script_cannot_commit_before_failure(tmp_path):
+        db = tmp_path / 'commit.db'
+        with pytest.raises(sqlite3.Error):
+            Migrator(db, [Migration(1, 'commit', 'CREATE TABLE leaked(id INT); COMMIT; NOT SQL;')]).migrate()
+        with sqlite3.connect(db) as connection:
+>           assert connection.execute("SELECT name FROM sqlite_master WHERE name='leaked'").fetchone() is None
+E           assert ('leaked',) is None
+E            +  where ('leaked',) = <built-in method fetchone of sqlite3.Cursor object at 0x7f441c3ba240>()
+E            +    where <built-in method fetchone of sqlite3.Cursor object at 0x7f441c3ba240> = <sqlite3.Cursor object at 0x7f441c3ba240>.fetchone
+E            +      where <sqlite3.Cursor object at 0x7f441c3ba240> = <built-in method execute of sqlite3.Connection object at 0x7f441c3a8240>("SELECT name FROM sqlite_master WHERE name='leaked'")
+E            +        where <built-in method execute of sqlite3.Connection object at 0x7f441c3a8240> = <sqlite3.Connection object at 0x7f441c3a8240>.execute
+
+tests/test_migration_atomicity_canaries.py:34: AssertionError
+___________ test_script_cannot_control_transaction_or_ledger[BEGIN;] ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-1/test_script_cannot_control_tra0')
+sql = 'BEGIN;'
+
+    @pytest.mark.parametrize('sql', ['BEGIN;', 'ROLLBACK;', 'SAVEPOINT bypass;', 'PRAGMA journal_mode=OFF;', 'DELETE FROM schema_migrations;'])
+    def test_script_cannot_control_transaction_or_ledger(tmp_path, sql):
+        db = tmp_path / 'protected.db'
+>       with pytest.raises(sqlite3.Error):
+E       Failed: DID NOT RAISE <class 'sqlite3.Error'>
+
+tests/test_migration_atomicity_canaries.py:57: Failed
+_____ test_script_cannot_control_transaction_or_ledger[SAVEPOINT bypass;] ______
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-1/test_script_cannot_control_tra2')
+sql = 'SAVEPOINT bypass;'
+
+    @pytest.mark.parametrize('sql', ['BEGIN;', 'ROLLBACK;', 'SAVEPOINT bypass;', 'PRAGMA journal_mode=OFF;', 'DELETE FROM schema_migrations;'])
+    def test_script_cannot_control_transaction_or_ledger(tmp_path, sql):
+        db = tmp_path / 'protected.db'
+>       with pytest.raises(sqlite3.Error):
+E       Failed: DID NOT RAISE <class 'sqlite3.Error'>
+
+tests/test_migration_atomicity_canaries.py:57: Failed
+__ test_script_cannot_control_transaction_or_ledger[PRAGMA journal_mode=OFF;] __
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-1/test_script_cannot_control_tra3')
+sql = 'PRAGMA journal_mode=OFF;'
+
+    @pytest.mark.parametrize('sql', ['BEGIN;', 'ROLLBACK;', 'SAVEPOINT bypass;', 'PRAGMA journal_mode=OFF;', 'DELETE FROM schema_migrations;'])
+    def test_script_cannot_control_transaction_or_ledger(tmp_path, sql):
+        db = tmp_path / 'protected.db'
+>       with pytest.raises(sqlite3.Error):
+E       Failed: DID NOT RAISE <class 'sqlite3.Error'>
+
+tests/test_migration_atomicity_canaries.py:57: Failed
+_ test_script_cannot_control_transaction_or_ledger[DELETE FROM schema_migrations;] _
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-1/test_script_cannot_control_tra4')
+sql = 'DELETE FROM schema_migrations;'
+
+    @pytest.mark.parametrize('sql', ['BEGIN;', 'ROLLBACK;', 'SAVEPOINT bypass;', 'PRAGMA journal_mode=OFF;', 'DELETE FROM schema_migrations;'])
+    def test_script_cannot_control_transaction_or_ledger(tmp_path, sql):
+        db = tmp_path / 'protected.db'
+>       with pytest.raises(sqlite3.Error):
+E       Failed: DID NOT RAISE <class 'sqlite3.Error'>
+
+tests/test_migration_atomicity_canaries.py:57: Failed
+=========================== short test summary info ============================
+FAILED tests/test_migration_atomicity_canaries.py::test_failed_ddl_rolls_back_schema
+FAILED tests/test_migration_atomicity_canaries.py::test_failed_dml_rolls_back_data
+FAILED tests/test_migration_atomicity_canaries.py::test_script_cannot_commit_before_failure
+FAILED tests/test_migration_atomicity_canaries.py::test_script_cannot_control_transaction_or_ledger[BEGIN;]
+FAILED tests/test_migration_atomicity_canaries.py::test_script_cannot_control_transaction_or_ledger[SAVEPOINT bypass;]
+FAILED tests/test_migration_atomicity_canaries.py::test_script_cannot_control_transaction_or_ledger[PRAGMA journal_mode=OFF;]
+FAILED tests/test_migration_atomicity_canaries.py::test_script_cannot_control_transaction_or_ledger[DELETE FROM schema_migrations;]
+7 failed, 9 passed in 0.17s

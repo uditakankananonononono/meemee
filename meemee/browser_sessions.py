@@ -137,10 +137,21 @@ class BrowserSessionStore:
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.lock = threading.RLock()
+        # SQLite can return SQLITE_BUSY immediately for concurrent journal-mode
+        # changes despite busy_timeout. Retry only that startup operation.
+        self.db.execute("PRAGMA busy_timeout=5000")
+        deadline = time.monotonic() + 5
+        while True:
+            try:
+                self.db.execute("PRAGMA journal_mode=WAL")
+                break
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower() or time.monotonic() >= deadline:
+                    self.db.close()
+                    raise
+                time.sleep(0.01)
         with self.lock, self.db:
             self.db.executescript("""
-                PRAGMA journal_mode=WAL;
-                PRAGMA busy_timeout=5000;
                 CREATE TABLE IF NOT EXISTS browser_sessions (
                     id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, state TEXT NOT NULL,
                     profile TEXT, allowed_domains TEXT NOT NULL, url TEXT, title TEXT,
@@ -160,6 +171,7 @@ class BrowserSessionStore:
                 CREATE INDEX IF NOT EXISTS browser_events_session ON browser_session_events(session_id, id);
                 CREATE INDEX IF NOT EXISTS browser_takeovers_session ON browser_takeovers(session_id);
             """)
+            self.db.execute("BEGIN IMMEDIATE")
             columns = {row["name"] for row in self.db.execute("PRAGMA table_info(browser_sessions)")}
             if "host_id" not in columns:  # the host whose process holds the live browser
                 self.db.execute("ALTER TABLE browser_sessions ADD COLUMN host_id TEXT")

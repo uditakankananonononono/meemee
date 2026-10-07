@@ -1,0 +1,32 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_____________ test_independent_audit_connections_cannot_fork_chain _____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-8/test_independent_audit_connect0')
+
+    def test_independent_audit_connections_cannot_fork_chain(tmp_path):
+        logs = [AuditLog(tmp_path / 'shared.db') for _ in range(2)]
+        barrier = threading.Barrier(2)
+        # Original code reads the predecessor before acquiring the write lock.
+        # If fixed code holds BEGIN IMMEDIATE, the first writer times out this
+        # test-only barrier and commits; the second sees the committed predecessor.
+        def sync_before_read(statement):
+            if statement.startswith('SELECT entry_hash FROM audit_log'):
+                try:
+                    barrier.wait(timeout=0.2)
+                except threading.BrokenBarrierError:
+                    pass
+        for log in logs:
+            log.db.set_trace_callback(sync_before_read)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            list(pool.map(lambda log: log.append('actor', 'test', 'resource', 'ok'), logs))
+>       assert logs[0].verify() == (True, None)
+E       assert (False, 2) == (True, None)
+E         
+E         At index 0 diff: False != True
+E         Use -v to get more diff
+
+tests/test_audit_concurrency_canary.py:24: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_audit_concurrency_canary.py::test_independent_audit_connections_cannot_fork_chain
+1 failed in 0.05s

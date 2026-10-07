@@ -1,0 +1,40 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_________________ test_allowlist_cannot_run_workspace_impostor _________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-4/test_allowlist_cannot_run_work0')
+
+    @pytest.mark.asyncio
+    async def test_allowlist_cannot_run_workspace_impostor(tmp_path):
+        impostor = tmp_path / 'printf'
+        impostor.write_text('#!/bin/sh\necho bypassed\n')
+        impostor.chmod(0o755)
+>       with pytest.raises(ValueError, match='allowlisted|executable'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_shell_boundary_canaries.py:15: Failed
+________________ test_output_capture_has_streaming_memory_bound ________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-4/test_output_capture_has_stream0')
+
+    @pytest.mark.asyncio
+    async def test_output_capture_has_streaming_memory_bound(tmp_path):
+        tool = ShellCommand(tmp_path, {sys.executable.split('/')[-1]})
+        tracemalloc.start()
+        try:
+            result = await tool.run(ShellArgs(argv=[sys.executable, '-c',
+                "import os; [os.write(1, b'x'*65536) for _ in range(256)]" ]))
+            _, peak = tracemalloc.get_traced_memory()
+        finally:
+            tracemalloc.stop()
+        assert result['exit_code'] == 0
+        assert result['truncated'] is True and len(result['stdout']) == 200_000
+>       assert peak < 4_000_000, f'captured unlimited output: peak={peak}'
+E       AssertionError: captured unlimited output: peak=33595267
+E       assert 33595267 < 4000000
+
+tests/test_shell_boundary_canaries.py:31: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_shell_boundary_canaries.py::test_allowlist_cannot_run_workspace_impostor
+FAILED tests/test_shell_boundary_canaries.py::test_output_capture_has_streaming_memory_bound
+2 failed in 0.26s
