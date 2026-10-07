@@ -1,0 +1,74 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+__________ test_pg_connection_failure_does_not_escape_or_leak[False] ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-379/test_pg_connection_failure_doe0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fc9bc2a06a0>
+driver_error = False
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('driver_error', [False, True])
+    async def test_pg_connection_failure_does_not_escape_or_leak(tmp_path, monkeypatch, driver_error):
+        from psycopg import OperationalError
+    
+        secret = 'postgresql://owner:private-password@db.example/app'
+    
+        def broken(*args, **kwargs):
+            error_type = OperationalError if driver_error else RuntimeError
+            raise error_type('connection rejected: ' + secret)
+    
+        monkeypatch.setattr('meemee_persist_pg.Database', broken)
+        settings = Settings(data_dir=tmp_path, persistence_backend='postgresql', postgres_dsn=secret)
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(200))) as client:
+            result = await run_preflight(settings, client)
+        check = next(row for row in result['checks'] if row['name'] == 'postgresql_connection_and_schema')
+        assert check['ok'] is False
+>       assert check['error'] == ('OperationalError' if driver_error else 'RuntimeError')
+E       AssertionError: assert 'RuntimeError...b.example/app' == 'RuntimeError'
+E         
+E         - RuntimeError
+E         + RuntimeError: connection rejected: postgresql://owner:private-password@db.example/app
+
+tests/test_preflight_pg_failure.py:27: AssertionError
+___________ test_pg_connection_failure_does_not_escape_or_leak[True] ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-379/test_pg_connection_failure_doe1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fc9b97e6b30>
+driver_error = True
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('driver_error', [False, True])
+    async def test_pg_connection_failure_does_not_escape_or_leak(tmp_path, monkeypatch, driver_error):
+        from psycopg import OperationalError
+    
+        secret = 'postgresql://owner:private-password@db.example/app'
+    
+        def broken(*args, **kwargs):
+            error_type = OperationalError if driver_error else RuntimeError
+            raise error_type('connection rejected: ' + secret)
+    
+        monkeypatch.setattr('meemee_persist_pg.Database', broken)
+        settings = Settings(data_dir=tmp_path, persistence_backend='postgresql', postgres_dsn=secret)
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(200))) as client:
+>           result = await run_preflight(settings, client)
+
+tests/test_preflight_pg_failure.py:24: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee/preflight.py:92: in run_preflight
+    database = Database(settings.postgres_dsn, min_size=1, max_size=2, timeout=5)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = ('postgresql://owner:private-password@db.example/app',)
+kwargs = {'max_size': 2, 'min_size': 1, 'timeout': 5}
+error_type = <class 'psycopg.OperationalError'>
+
+    def broken(*args, **kwargs):
+        error_type = OperationalError if driver_error else RuntimeError
+>       raise error_type('connection rejected: ' + secret)
+E       psycopg.OperationalError: connection rejected: postgresql://owner:private-password@db.example/app
+
+tests/test_preflight_pg_failure.py:19: OperationalError
+=========================== short test summary info ============================
+FAILED tests/test_preflight_pg_failure.py::test_pg_connection_failure_does_not_escape_or_leak[False]
+FAILED tests/test_preflight_pg_failure.py::test_pg_connection_failure_does_not_escape_or_leak[True]
+2 failed in 0.30s
