@@ -88,10 +88,12 @@ class ContextStore:
         row=self.source(owner_id,source_id);return row["cursor"] if row else None
 
     def ingest(self, record: ContextRecord) -> bool:
-        if self.source(record.owner_id,record.source_id) is None: raise ValueError("source is not registered for owner")
         if record.visibility not in {"private","agent","shared"}: raise ValueError("invalid visibility")
         digest=context_record_hash(record);now=datetime.now(timezone.utc).isoformat()
         with self.lock,self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            if self.source(record.owner_id, record.source_id) is None:
+                raise ValueError("source is not registered for owner")
             inserted=self.db.execute("INSERT OR IGNORE INTO context_records(owner_id,source_id,external_id,content_hash,kind,title,content,occurred_at,provenance,visibility,cursor,metadata,ingested_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",(record.owner_id,record.source_id,record.external_id,digest,record.kind,record.title,record.content,record.occurred_at,json.dumps(record.provenance,sort_keys=True),record.visibility,record.cursor,json.dumps(record.metadata or {},sort_keys=True),now)).rowcount
             if record.cursor is not None:self.db.execute("UPDATE context_sources SET cursor=?,updated_at=? WHERE owner_id=? AND source_id=?",(record.cursor,now,record.owner_id,record.source_id))
         return bool(inserted)
