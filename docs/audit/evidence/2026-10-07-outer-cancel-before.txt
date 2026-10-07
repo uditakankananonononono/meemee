@@ -1,0 +1,38 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+____________ test_outer_registry_cancellation_cleans_running_child _____________
+
+    @pytest.mark.asyncio
+    async def test_outer_registry_cancellation_cleans_running_child():
+        cleaned = asyncio.Event()
+        began = asyncio.Event()
+        class Slow(Tool):
+            name = 'slow'
+            description = 'slow'
+            arguments_model = Args
+            async def run(self, arguments):
+                began.set()
+                try:
+                    await asyncio.sleep(10)
+                finally:
+                    cleaned.set()
+        registry = ToolRegistry()
+        registry.register(Slow())
+        task = asyncio.create_task(registry.execute('slow', {}, cancel=Event(), owner_id='owner'))
+        await began.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        await asyncio.sleep(0)
+>       assert cleaned.is_set(), 'cancelled registry left tool task running'
+E       AssertionError: cancelled registry left tool task running
+E       assert False
+E        +  where False = is_set()
+E        +    where is_set = <asyncio.locks.Event object at 0x7f89278dcb80 [unset]>.is_set
+
+tests/test_cancel_effect_canaries.py:76: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_cancel_effect_canaries.py::test_outer_registry_cancellation_cleans_running_child
+1 failed in 0.12s
+Task was destroyed but it is pending!
+task: <Task pending name='Task-3' coro=<test_outer_registry_cancellation_cleans_running_child.<locals>.Slow.run() done, defined at /home/sandbox/meemee/tests/test_cancel_effect_canaries.py:62> wait_for=<Future pending cb=[Task.task_wakeup()]>>
