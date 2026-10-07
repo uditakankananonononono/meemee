@@ -236,7 +236,10 @@ class CompanionStore:
         return dict(row) if row else None
 
     def search_facts(self, user_id: str, query: str, limit: int = 8) -> list[dict[str, Any]]:
-        safe = " OR ".join(f'"{part}"' for part in query.split() if part) or '""'
+        # FTS5 double quotes inside a quoted phrase must be doubled.
+        # Search text is data, never an operator or an unterminated phrase.
+        safe = " OR ".join('"' + part.replace('"', '""') + '"'
+                           for part in query.split() if part) or '""'
         with self.lock:
             rows = self.db.execute(
                 """SELECT f.*, bm25(companion_facts_fts) AS score FROM companion_facts_fts
