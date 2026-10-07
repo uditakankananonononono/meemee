@@ -1,0 +1,103 @@
+FFFFF                                                                    [100%]
+=================================== FAILURES ===================================
+_____________ test_required_model_http_rejection_is_not_ready[401] _____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-376/test_required_model_http_rejec0')
+status = 401
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('status', [401, 404, 429, 302])
+    async def test_required_model_http_rejection_is_not_ready(tmp_path, status):
+        checker = ReadinessChecker(tmp_path, {}, 'https://model.test', min_free_bytes=1, require_model=True)
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(status))) as client:
+            result = await checker.check(client)
+>       assert result['components']['model'] == {'ok': False, 'status': status}
+E       AssertionError: assert {'ok': True, 'status': 401} == {'ok': False, 'status': 401}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Differing items:
+E         {'ok': True} != {'ok': False}
+E         Use -v to get more diff
+
+tests/test_readiness_model_http.py:15: AssertionError
+_____________ test_required_model_http_rejection_is_not_ready[404] _____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-376/test_required_model_http_rejec1')
+status = 404
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('status', [401, 404, 429, 302])
+    async def test_required_model_http_rejection_is_not_ready(tmp_path, status):
+        checker = ReadinessChecker(tmp_path, {}, 'https://model.test', min_free_bytes=1, require_model=True)
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(status))) as client:
+            result = await checker.check(client)
+>       assert result['components']['model'] == {'ok': False, 'status': status}
+E       AssertionError: assert {'ok': True, 'status': 404} == {'ok': False, 'status': 404}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Differing items:
+E         {'ok': True} != {'ok': False}
+E         Use -v to get more diff
+
+tests/test_readiness_model_http.py:15: AssertionError
+_____________ test_required_model_http_rejection_is_not_ready[429] _____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-376/test_required_model_http_rejec2')
+status = 429
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('status', [401, 404, 429, 302])
+    async def test_required_model_http_rejection_is_not_ready(tmp_path, status):
+        checker = ReadinessChecker(tmp_path, {}, 'https://model.test', min_free_bytes=1, require_model=True)
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(status))) as client:
+            result = await checker.check(client)
+>       assert result['components']['model'] == {'ok': False, 'status': status}
+E       AssertionError: assert {'ok': True, 'status': 429} == {'ok': False, 'status': 429}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Differing items:
+E         {'ok': True} != {'ok': False}
+E         Use -v to get more diff
+
+tests/test_readiness_model_http.py:15: AssertionError
+_____________ test_required_model_http_rejection_is_not_ready[302] _____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-376/test_required_model_http_rejec3')
+status = 302
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('status', [401, 404, 429, 302])
+    async def test_required_model_http_rejection_is_not_ready(tmp_path, status):
+        checker = ReadinessChecker(tmp_path, {}, 'https://model.test', min_free_bytes=1, require_model=True)
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(status))) as client:
+            result = await checker.check(client)
+>       assert result['components']['model'] == {'ok': False, 'status': status}
+E       AssertionError: assert {'ok': True, 'status': 302} == {'ok': False, 'status': 302}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Differing items:
+E         {'ok': True} != {'ok': False}
+E         Use -v to get more diff
+
+tests/test_readiness_model_http.py:15: AssertionError
+_________ test_optional_failed_model_does_not_gate_database_readiness __________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-376/test_optional_failed_model_doe0')
+
+    @pytest.mark.asyncio
+    async def test_optional_failed_model_does_not_gate_database_readiness(tmp_path):
+        checker = ReadinessChecker(tmp_path, {}, 'https://model.test', min_free_bytes=1)
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(401))) as client:
+            result = await checker.check(client)
+        assert result['status'] == 'ready'
+>       assert result['components']['model']['ok'] is False
+E       assert True is False
+
+tests/test_readiness_model_http.py:25: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_readiness_model_http.py::test_required_model_http_rejection_is_not_ready[401]
+FAILED tests/test_readiness_model_http.py::test_required_model_http_rejection_is_not_ready[404]
+FAILED tests/test_readiness_model_http.py::test_required_model_http_rejection_is_not_ready[429]
+FAILED tests/test_readiness_model_http.py::test_required_model_http_rejection_is_not_ready[302]
+FAILED tests/test_readiness_model_http.py::test_optional_failed_model_does_not_gate_database_readiness
+5 failed in 0.08s

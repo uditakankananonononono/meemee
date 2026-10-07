@@ -50,7 +50,7 @@ class ReadinessChecker:
         client = client or httpx.AsyncClient(timeout=httpx.Timeout(3, connect=2))
         try:
             response = await client.get(f"{self.model_url}/models")
-            components["model"] = {"ok": response.status_code < 500, "status": response.status_code}
+            components["model"] = {"ok": response.is_success, "status": response.status_code}
         except httpx.HTTPError as exc:
             components["model"] = {"ok": False, "error": type(exc).__name__}
         finally:
