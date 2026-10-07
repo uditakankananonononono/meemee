@@ -1,0 +1,31 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_________________ test_generation_cancellation_releases_claim __________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-135/test_generation_cancellation_r0')
+
+    async def test_generation_cancellation_releases_claim(tmp_path):
+        store, engine, channels = setup(tmp_path)
+        queue_checkin(store)
+        started = asyncio.Event()
+    
+        async def blocked(user):
+            started.set()
+            await asyncio.Event().wait()
+    
+        engine.checkin_message = blocked
+        task = asyncio.create_task(deliver_due_once(store, engine, channels))
+        await started.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+>       assert store.list_checkins('udita')[0]['status'] == 'queued'
+E       AssertionError: assert 'running' == 'queued'
+E         
+E         - queued
+E         + running
+
+tests/test_companion_generation_cancel_canary.py:25: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_companion_generation_cancel_canary.py::test_generation_cancellation_releases_claim
+1 failed in 0.16s

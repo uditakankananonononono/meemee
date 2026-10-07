@@ -28,6 +28,10 @@ async def deliver_due_once(
             raise ChannelError(f"unknown companion channel: {channel_name}")
         try:
             message = await engine.checkin_message(checkin["user_id"])
+        except asyncio.CancelledError:
+            # No adapter has been invoked yet, so this retry cannot duplicate delivery.
+            store.fail_checkin(checkin["id"], "generation cancelled before delivery")
+            raise
         except Exception as exc:  # noqa: BLE001 - generation has no delivery side effect
             state = store.fail_checkin(checkin["id"], str(exc))
             log.warning("check-in %s generation failed (%s)", checkin["id"], exc)
