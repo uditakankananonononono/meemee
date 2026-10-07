@@ -40,7 +40,7 @@ def validate_constraints(value: dict | None) -> None:
     if value is None:
         return
     if not isinstance(value, dict):
-        raise ValueError("argument_constraints must be an object")
+        raise ValueError("argument_constraints must be an object")  # noqa: TRY004 - public input-validation contract
 
     def valid(item):
         if item is None or isinstance(item, (str, bool, int)):
@@ -81,7 +81,7 @@ def constraints_match(constraints: dict | None, arguments: dict | None) -> bool:
             return isinstance(right, list) and len(left) == len(right) and all(
                 equal(a, b) for a, b in zip(left, right))
         if isinstance(left, (int, float)):
-            return isinstance(right, (int, float)) and math.isfinite(right) and left == right
+            return isinstance(right, (int, float)) and (not isinstance(right, float) or math.isfinite(right)) and left == right
         return type(left) is type(right) and left == right
 
     return all(key in supplied and equal(value, supplied[key]) for key, value in constraints.items())

@@ -1,0 +1,36 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_____________ test_large_exact_integer_constraints_do_not_overflow _____________
+
+    def test_large_exact_integer_constraints_do_not_overflow():
+        value = 10**1000
+>       assert constraints_match({'value':value},{'value':value})
+
+tests/test_grant_constraint_canaries.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee/approvals.py:87: in constraints_match
+    return all(key in supplied and equal(value, supplied[key]) for key, value in constraints.items())
+meemee/approvals.py:87: in <genexpr>
+    return all(key in supplied and equal(value, supplied[key]) for key, value in constraints.items())
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+left = 100000000000000000...0000000000000000000
+right = 100000000000000000...0000000000000000000
+
+    def equal(left, right):
+        if isinstance(left, bool) or isinstance(right, bool):
+            return type(left) is type(right) and left == right
+        if isinstance(left, dict):
+            return isinstance(right, dict) and left.keys() == right.keys() and all(
+                equal(value, right[key]) for key, value in left.items())
+        if isinstance(left, list):
+            return isinstance(right, list) and len(left) == len(right) and all(
+                equal(a, b) for a, b in zip(left, right))
+        if isinstance(left, (int, float)):
+>           return isinstance(right, (int, float)) and math.isfinite(right) and left == right
+E           OverflowError: int too large to convert to float
+
+meemee/approvals.py:84: OverflowError
+=========================== short test summary info ============================
+FAILED tests/test_grant_constraint_canaries.py::test_large_exact_integer_constraints_do_not_overflow
+1 failed in 0.04s
