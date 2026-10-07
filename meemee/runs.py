@@ -48,11 +48,13 @@ class RunStore:
                                              "approvals_required refusal list per run"])
 
     def add(self, principal: str, report: RunReport) -> None:
+        results = json.dumps(report.tool_results, allow_nan=False)
+        approvals = json.dumps([item.model_dump() for item in report.approvals_required], allow_nan=False)
         with self.lock,self.db:
             self.db.execute(
                 "INSERT INTO runs(run_id,principal,goal,final,steps_used,tool_results,created_at,approvals_required) VALUES(?,?,?,?,?,?,?,?)",
-                (report.run_id,principal,report.goal,report.final,report.steps_used,json.dumps(report.tool_results),datetime.now(timezone.utc).isoformat(),
-                 json.dumps([item.model_dump() for item in report.approvals_required])),
+                (report.run_id,principal,report.goal,report.final,report.steps_used,results,datetime.now(timezone.utc).isoformat(),
+                 approvals),
             )
 
     def get(self, principal: str, run_id: str) -> dict | None:
