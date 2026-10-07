@@ -73,7 +73,8 @@ class DeletionLedger:
             return self.db.execute("SELECT 1").fetchone() is not None
 
     def open(self, principal: str, requested_by: str) -> str:
-        with self.lock:
+        with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
             row = self.db.execute(
                 "SELECT id FROM account_deletions WHERE principal=? AND status='in_progress'", (principal,)
             ).fetchone()
