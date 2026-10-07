@@ -1,0 +1,64 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+_______________ test_make_command_rejects_invalid_field[kwargs0] _______________
+
+kwargs = {'device_id': 123}
+
+    @pytest.mark.parametrize('kwargs', [
+        {'device_id': 123}, {'capability': ['echo']}, {'arguments': []}, {'issued_at': True},
+    ])
+    def test_make_command_rejects_invalid_field(kwargs):
+        values = {'device_id': 'd', 'capability': 'echo', 'arguments': {}, 'secret': b'fixture'}
+        values.update(kwargs)
+>       with pytest.raises(ValueError, match='command'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_device_issue_shape_canary.py:13: Failed
+_______________ test_make_command_rejects_invalid_field[kwargs1] _______________
+
+kwargs = {'capability': ['echo']}
+
+    @pytest.mark.parametrize('kwargs', [
+        {'device_id': 123}, {'capability': ['echo']}, {'arguments': []}, {'issued_at': True},
+    ])
+    def test_make_command_rejects_invalid_field(kwargs):
+        values = {'device_id': 'd', 'capability': 'echo', 'arguments': {}, 'secret': b'fixture'}
+        values.update(kwargs)
+>       with pytest.raises(ValueError, match='command'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_device_issue_shape_canary.py:13: Failed
+_______________ test_make_command_rejects_invalid_field[kwargs2] _______________
+
+kwargs = {'arguments': []}
+
+    @pytest.mark.parametrize('kwargs', [
+        {'device_id': 123}, {'capability': ['echo']}, {'arguments': []}, {'issued_at': True},
+    ])
+    def test_make_command_rejects_invalid_field(kwargs):
+        values = {'device_id': 'd', 'capability': 'echo', 'arguments': {}, 'secret': b'fixture'}
+        values.update(kwargs)
+>       with pytest.raises(ValueError, match='command'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_device_issue_shape_canary.py:13: Failed
+_______________ test_make_command_rejects_invalid_field[kwargs3] _______________
+
+kwargs = {'issued_at': True}
+
+    @pytest.mark.parametrize('kwargs', [
+        {'device_id': 123}, {'capability': ['echo']}, {'arguments': []}, {'issued_at': True},
+    ])
+    def test_make_command_rejects_invalid_field(kwargs):
+        values = {'device_id': 'd', 'capability': 'echo', 'arguments': {}, 'secret': b'fixture'}
+        values.update(kwargs)
+>       with pytest.raises(ValueError, match='command'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_device_issue_shape_canary.py:13: Failed
+=========================== short test summary info ============================
+FAILED tests/test_device_issue_shape_canary.py::test_make_command_rejects_invalid_field[kwargs0]
+FAILED tests/test_device_issue_shape_canary.py::test_make_command_rejects_invalid_field[kwargs1]
+FAILED tests/test_device_issue_shape_canary.py::test_make_command_rejects_invalid_field[kwargs2]
+FAILED tests/test_device_issue_shape_canary.py::test_make_command_rejects_invalid_field[kwargs3]
+4 failed in 0.06s
