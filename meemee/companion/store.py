@@ -390,6 +390,14 @@ class CompanionStore:
             ).fetchone()
         return row["status"]
 
+    def mark_checkin_unknown(self, checkin_id: str, error: str) -> bool:
+        """Stop automatic retries when an interrupted send may have taken effect."""
+        with self.lock, self.db:
+            return bool(self.db.execute(
+                "UPDATE companion_checkins SET status='failed',last_error=?,updated_at=? WHERE id=? AND status='running'",
+                (error[:500], _now(), checkin_id),
+            ).rowcount)
+
     def cancel_claimed_checkin(self, checkin_id: str) -> bool:
         with self.lock, self.db:
             return bool(self.db.execute(
