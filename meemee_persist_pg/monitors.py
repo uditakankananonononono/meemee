@@ -17,7 +17,6 @@ from typing import Any
 
 from meemee.monitors import MonitorInput
 from meemee.monitors import MonitorStore as _SQLiteMonitors
-
 from meemee.reflection_schedule import reflection_clock
 
 from ._db import Database
