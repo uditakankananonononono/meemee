@@ -62,7 +62,7 @@ class QuotaStore:
 
     def status(self, principal: str, now: datetime | None = None) -> dict[str, int | str]:
         day = _day(now)
-        with self.db.transaction() as c:
+        with self.db.transaction(isolation="REPEATABLE READ") as c:
             maximum = self._limit(c, principal)
             row = c.execute("SELECT jobs FROM meemee_quota_usage WHERE principal=%s AND day=%s", (principal, day)).fetchone()
         used = int(row["jobs"]) if row else 0

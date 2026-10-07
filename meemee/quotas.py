@@ -58,9 +58,11 @@ class QuotaStore:
 
     def status(self, principal: str, now: datetime | None = None) -> dict[str, int | str]:
         day = (now or datetime.now(timezone.utc)).astimezone(timezone.utc).date().isoformat()
-        maximum = self.limit(principal)
-        row = self.db.execute("SELECT jobs FROM quota_usage WHERE principal=? AND day=?", (principal, day)).fetchone()
-        used = int(row[0]) if row else 0
+        with self.lock, self.db:
+            self.db.execute("BEGIN")
+            maximum = self.limit(principal)
+            row = self.db.execute("SELECT jobs FROM quota_usage WHERE principal=? AND day=?", (principal, day)).fetchone()
+            used = int(row[0]) if row else 0
         return {"day": day, "used": used, "limit": maximum, "remaining": max(maximum-used, 0)}
 
     def ping(self) -> bool:
