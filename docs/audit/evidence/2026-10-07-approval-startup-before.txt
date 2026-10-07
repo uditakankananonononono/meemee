@@ -1,0 +1,69 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+__________________ test_legacy_approval_upgrade_is_serialized __________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-107/test_legacy_approval_upgrade_i0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f711c2526e0>
+
+    def test_legacy_approval_upgrade_is_serialized(tmp_path,monkeypatch):
+        path=tmp_path/'grants.db'
+        with sqlite3.connect(path) as db:
+            db.execute('''CREATE TABLE tool_approvals(principal TEXT NOT NULL, tool TEXT NOT NULL,
+                granted_at TEXT NOT NULL,expires_at TEXT,revoked_at TEXT,granted_by TEXT NOT NULL,
+                PRIMARY KEY(principal,tool))''')
+        connect=sqlite3.connect
+        barrier=threading.Barrier(2)
+        def traced(*args,**kwargs):
+            db=connect(*args,**kwargs)
+            def trace(sql):
+                if sql.startswith('ALTER TABLE tool_approvals ADD COLUMN'):
+                    try:
+                        barrier.wait(timeout=0.2)
+                    except threading.BrokenBarrierError:
+                        pass
+            db.set_trace_callback(trace)
+            return db
+        monkeypatch.setattr(sqlite3,'connect',traced)
+        with ThreadPoolExecutor(2) as pool:
+>           stores=list(pool.map(lambda _:ApprovalStore(path),range(2)))
+
+tests/test_approval_startup_canary.py:29: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.10/concurrent/futures/_base.py:621: in result_iterator
+    yield _result_or_cancel(fs.pop())
+/usr/lib/python3.10/concurrent/futures/_base.py:319: in _result_or_cancel
+    return fut.result(timeout)
+/usr/lib/python3.10/concurrent/futures/_base.py:458: in result
+    return self.__get_result()
+/usr/lib/python3.10/concurrent/futures/_base.py:403: in __get_result
+    raise self._exception
+/usr/lib/python3.10/concurrent/futures/thread.py:58: in run
+    result = self.fn(*self.args, **self.kwargs)
+tests/test_approval_startup_canary.py:29: in <lambda>
+    stores=list(pool.map(lambda _:ApprovalStore(path),range(2)))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <meemee.approvals.ApprovalStore object at 0x7f711c251720>
+path = PosixPath('/tmp/pytest-of-sandbox/pytest-107/test_legacy_approval_upgrade_i0/grants.db')
+
+    def __init__(self, path: Path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self.db = sqlite3.connect(path, check_same_thread=False)
+        self.db.row_factory = sqlite3.Row
+        self.lock = threading.RLock()
+        with self.lock, self.db:
+            self.db.execute("""CREATE TABLE IF NOT EXISTS tool_approvals (
+                principal TEXT NOT NULL, tool TEXT NOT NULL, granted_at TEXT NOT NULL,
+                expires_at TEXT, revoked_at TEXT, granted_by TEXT NOT NULL,
+                argument_constraints TEXT,
+                PRIMARY KEY(principal, tool)
+            )""")
+            columns={row[1] for row in self.db.execute("PRAGMA table_info(tool_approvals)")}
+            if "argument_constraints" not in columns:
+>               self.db.execute("ALTER TABLE tool_approvals ADD COLUMN argument_constraints TEXT")
+E               sqlite3.OperationalError: duplicate column name: argument_constraints
+
+meemee/approvals.py:107: OperationalError
+=========================== short test summary info ============================
+FAILED tests/test_approval_startup_canary.py::test_legacy_approval_upgrade_is_serialized
+1 failed in 0.07s
