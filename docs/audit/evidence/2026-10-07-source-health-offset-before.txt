@@ -1,0 +1,46 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+__________ test_legacy_positive_offset_does_not_block_newer_utc_check __________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-251/test_legacy_positive_offset_do0')
+
+    def test_legacy_positive_offset_does_not_block_newer_utc_check(tmp_path):
+        store = SourceHealthStore(tmp_path / 'h.db')
+        store.record('u', 'mail', ok=True, cursor='old', checked_at='2026-10-07T09:00:00+00:00')
+        # Simulate an existing row written before UTC normalization was introduced.
+        with store.db:
+            store.db.execute("UPDATE source_health SET last_attempt_at='2026-10-07T14:30:00+05:30',last_success_at='2026-10-07T14:30:00+05:30'")
+            store.db.execute("UPDATE source_health_checks SET checked_at='2026-10-07T14:30:00+05:30'")
+        store.record('u', 'mail', ok=True, cursor='new', checked_at='2026-10-07T10:00:00+00:00')
+        row = store.status('u', 'mail', now=datetime(2026, 10, 7, 10, 5, tzinfo=timezone.utc))
+>       assert row['status'] == 'healthy'
+E       AssertionError: assert 'stale' == 'healthy'
+E         
+E         - healthy
+E         + stale
+
+tests/test_source_health_legacy_offset_canary.py:16: AssertionError
+__________ test_legacy_offset_success_cannot_hide_newer_utc_failures ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-251/test_legacy_offset_success_can0')
+
+    def test_legacy_offset_success_cannot_hide_newer_utc_failures(tmp_path):
+        store = SourceHealthStore(tmp_path / 'h.db')
+        store.record('u', 'mail', ok=True, checked_at='2026-10-07T09:00:00+00:00')
+        with store.db:
+            store.db.execute("UPDATE source_health SET last_attempt_at='2026-10-07T14:30:00+05:30',last_success_at='2026-10-07T14:30:00+05:30'")
+            store.db.execute("UPDATE source_health_checks SET checked_at='2026-10-07T14:30:00+05:30'")
+        for minute in [1, 2, 3]:
+            store.record('u', 'mail', ok=False, error='timeout', checked_at=f'2026-10-07T10:0{minute}:00+00:00')
+        row = store.status('u', 'mail', now=datetime(2026, 10, 7, 10, 5, tzinfo=timezone.utc))
+>       assert row['status'] == 'down'
+E       AssertionError: assert 'stale' == 'down'
+E         
+E         - down
+E         + stale
+
+tests/test_source_health_legacy_offset_canary.py:29: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_source_health_legacy_offset_canary.py::test_legacy_positive_offset_does_not_block_newer_utc_check
+FAILED tests/test_source_health_legacy_offset_canary.py::test_legacy_offset_success_cannot_hide_newer_utc_failures
+2 failed in 0.08s

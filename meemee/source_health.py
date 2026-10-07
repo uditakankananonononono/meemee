@@ -15,6 +15,7 @@ class SourceHealthStore:
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
+        self.db.create_function("health_utc", 1, self._utc_timestamp, deterministic=True)
         self.lock = threading.RLock()
         with self.db:
             self.db.executescript("""
@@ -33,6 +34,15 @@ class SourceHealthStore:
                 CREATE INDEX IF NOT EXISTS source_health_checks_source
                   ON source_health_checks(owner_id,source_id,checked_at DESC);
             """)
+
+    @staticmethod
+    def _utc_timestamp(value: str | None) -> str | None:
+        if value is None:
+            return None
+        moment = datetime.fromisoformat(value)
+        if moment.tzinfo is None:
+            raise ValueError("stored health timestamp must include a timezone")
+        return moment.astimezone(timezone.utc).isoformat()
 
     def record(
         self,
@@ -58,6 +68,15 @@ class SourceHealthStore:
         stamp = moment.astimezone(timezone.utc).isoformat()
         encoded = json.dumps(metadata or {}, sort_keys=True)
         with self.lock, self.db:
+            # Normalize this source's legacy timestamps in the same write transaction.
+            self.db.execute(
+                "UPDATE source_health SET last_attempt_at=health_utc(last_attempt_at),last_success_at=health_utc(last_success_at) WHERE owner_id=? AND source_id=?",
+                (owner_id, source_id),
+            )
+            self.db.execute(
+                "UPDATE source_health_checks SET checked_at=health_utc(checked_at) WHERE owner_id=? AND source_id=?",
+                (owner_id, source_id),
+            )
             self.db.execute(
                 "INSERT INTO source_health_checks(owner_id,source_id,checked_at,ok,latency_ms,cursor,error,metadata) VALUES(?,?,?,?,?,?,?,?)",
                 (owner_id, source_id, stamp, int(ok), latency_ms, cursor, error, encoded),
