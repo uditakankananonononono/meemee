@@ -44,9 +44,11 @@ def _check_databases(path: Path) -> list[dict]:
     checks: list[dict] = []
     for database in sorted(path.glob("*.sqlite3")) if path.exists() else []:
         try:
-            connection = sqlite3.connect(f"file:{database}?mode=ro", uri=True, timeout=2)
-            integrity = connection.execute("PRAGMA quick_check").fetchone()[0]
-            connection.close()
+            connection = sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True, timeout=2)
+            try:
+                integrity = connection.execute("PRAGMA quick_check").fetchone()[0]
+            finally:
+                connection.close()
             checks.append(_result(
                 f"database_integrity:{database.name}", integrity == "ok", result=integrity
             ))
