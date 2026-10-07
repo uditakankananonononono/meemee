@@ -7,7 +7,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .semantic_memory import Embedder, HashingEmbedder, cosine, embedding_space
+from .semantic_memory import (
+    Embedder,
+    HashingEmbedder,
+    cosine,
+    embedding_space,
+    validate_embedding_batch,
+)
 from .sensitive import scrub_text
 
 
@@ -72,6 +78,7 @@ class MemoryStore:
                 texts = [row["content"] for row in rows]
                 vectors = (self.embedder.embed_many(texts) if hasattr(self.embedder, "embed_many")
                            else [self.embedder.embed(text) for text in texts])
+                validate_embedding_batch(vectors, len(rows), self.embedder.dimensions)
                 with self.connection:
                     for row, vector in zip(rows, vectors):
                         self.connection.execute(

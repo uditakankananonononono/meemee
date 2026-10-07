@@ -1,0 +1,88 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+________ test_invalid_encoder_batch_fails_without_partial_write[short] _________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-139/test_invalid_encoder_batch_fai0')
+mode = 'short'
+
+    @pytest.mark.parametrize('mode', ['short', 'nan', 'dimension'])
+    def test_invalid_encoder_batch_fails_without_partial_write(tmp_path, mode):
+        store = MemoryStore(tmp_path / 'm.db', HashingEmbedder(32))
+        store.add('r', 'goal', 'fixture one', owner_id='o')
+        store.add('r', 'goal', 'fixture two', owner_id='o')
+    
+        class Broken:
+            dimensions = 32
+            space_id = 'fixture-broken'
+    
+            def embed_many(self, texts):
+                if mode == 'short':
+                    return [[1.0] * 32]
+                if mode == 'nan':
+                    return [[float('nan')] * 32 for _ in texts]
+                return [[1.0] for _ in texts]
+    
+        store.embedder = Broken()
+>       with pytest.raises(ValueError):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_embedding_batch_canary.py:26: Failed
+_________ test_invalid_encoder_batch_fails_without_partial_write[nan] __________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-139/test_invalid_encoder_batch_fai1')
+mode = 'nan'
+
+    @pytest.mark.parametrize('mode', ['short', 'nan', 'dimension'])
+    def test_invalid_encoder_batch_fails_without_partial_write(tmp_path, mode):
+        store = MemoryStore(tmp_path / 'm.db', HashingEmbedder(32))
+        store.add('r', 'goal', 'fixture one', owner_id='o')
+        store.add('r', 'goal', 'fixture two', owner_id='o')
+    
+        class Broken:
+            dimensions = 32
+            space_id = 'fixture-broken'
+    
+            def embed_many(self, texts):
+                if mode == 'short':
+                    return [[1.0] * 32]
+                if mode == 'nan':
+                    return [[float('nan')] * 32 for _ in texts]
+                return [[1.0] for _ in texts]
+    
+        store.embedder = Broken()
+>       with pytest.raises(ValueError):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_embedding_batch_canary.py:26: Failed
+______ test_invalid_encoder_batch_fails_without_partial_write[dimension] _______
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-139/test_invalid_encoder_batch_fai2')
+mode = 'dimension'
+
+    @pytest.mark.parametrize('mode', ['short', 'nan', 'dimension'])
+    def test_invalid_encoder_batch_fails_without_partial_write(tmp_path, mode):
+        store = MemoryStore(tmp_path / 'm.db', HashingEmbedder(32))
+        store.add('r', 'goal', 'fixture one', owner_id='o')
+        store.add('r', 'goal', 'fixture two', owner_id='o')
+    
+        class Broken:
+            dimensions = 32
+            space_id = 'fixture-broken'
+    
+            def embed_many(self, texts):
+                if mode == 'short':
+                    return [[1.0] * 32]
+                if mode == 'nan':
+                    return [[float('nan')] * 32 for _ in texts]
+                return [[1.0] for _ in texts]
+    
+        store.embedder = Broken()
+>       with pytest.raises(ValueError):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_embedding_batch_canary.py:26: Failed
+=========================== short test summary info ============================
+FAILED tests/test_embedding_batch_canary.py::test_invalid_encoder_batch_fails_without_partial_write[short]
+FAILED tests/test_embedding_batch_canary.py::test_invalid_encoder_batch_fails_without_partial_write[nan]
+FAILED tests/test_embedding_batch_canary.py::test_invalid_encoder_batch_fails_without_partial_write[dimension]
+3 failed in 0.07s

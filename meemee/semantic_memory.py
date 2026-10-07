@@ -129,6 +129,17 @@ class MiniLMEmbedder:
         return self.embed_many([text])[0]
 
 
+def validate_embedding_batch(vectors, count: int, dimensions: int) -> None:
+    """Reject incomplete or invalid encoder output before any persistence."""
+    if not isinstance(vectors, (list, tuple)) or len(vectors) != count:
+        raise ValueError("encoder batch length does not match input count")
+    for vector in vectors:
+        if not isinstance(vector, (list, tuple)) or len(vector) != dimensions:
+            raise ValueError("encoder vector has incorrect dimensions")
+        if any(type(value) not in (int, float) or not math.isfinite(value) for value in vector):
+            raise ValueError("encoder vector must contain finite numbers")
+
+
 def embedding_space(embedder: Embedder) -> str:
     """Legacy injected encoders have their own space, never the trained model's."""
     return getattr(embedder, "space_id", f"custom:{type(embedder).__module__}.{type(embedder).__qualname__}:{embedder.dimensions}")
