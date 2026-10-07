@@ -170,3 +170,9 @@ def test_explicit_conversation_collision_binding(store, user_id, channel):
         store.start_conversation(user_id, channel, 'bound')
     assert store.get_conversation('bound') == original
     assert store.start_conversation('u1', 'local', 'bound') == original
+
+
+def test_message_rejects_unknown_conversation(store):
+    with pytest.raises(ValueError, match='conversation'):
+        store.add_message('missing', 'assistant', 'orphan')
+    assert store.history('missing') == []
