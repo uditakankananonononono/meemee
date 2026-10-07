@@ -310,10 +310,19 @@ class CompanionStore:
         channel: str,
         address: str | None,
         max_attempts: int = 3,
+        *, reuse_pending: bool = False,
     ) -> tuple[dict[str, Any], bool]:
         ident = uuid.uuid4().hex
         now = _now()
         with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            if reuse_pending:
+                pending = self.db.execute(
+                    "SELECT * FROM companion_checkins WHERE user_id=? AND status IN ('queued','running') ORDER BY due_at,id LIMIT 1",
+                    (user_id,),
+                ).fetchone()
+                if pending is not None:
+                    return dict(pending), False
             created = self.db.execute(
                 """INSERT INTO companion_checkins(id,user_id,slot,due_at,status,max_attempts,channel,address,created_at,updated_at)
                    VALUES(?,?,?,?,'queued',?,?,?,?,?)
