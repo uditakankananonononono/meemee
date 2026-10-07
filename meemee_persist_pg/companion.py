@@ -209,6 +209,13 @@ class CompanionStore:
                          WHERE id=%s AND status='running'""", (error[:500], _now(), checkin_id))
             return c.execute("SELECT status FROM meemee_companion_checkins WHERE id=%s", (checkin_id,)).fetchone()["status"]
 
+    def cancel_claimed_checkin(self, checkin_id: str) -> bool:
+        with self.db.transaction() as c:
+            return bool(c.execute(
+                "UPDATE meemee_companion_checkins SET status='cancelled',updated_at=%s WHERE id=%s AND status='running'",
+                (_now(), checkin_id),
+            ).rowcount)
+
     def cancel_pending_checkins(self, user_id: str) -> int:
         with self.db.transaction() as c:
             return c.execute("""UPDATE meemee_companion_checkins SET status='cancelled', updated_at=%s
