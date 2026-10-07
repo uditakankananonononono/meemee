@@ -1,0 +1,27 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_______________ test_cosine_normalizes_arbitrary_finite_vectors ________________
+
+    def test_cosine_normalizes_arbitrary_finite_vectors():
+>       assert cosine([2.0, 0.0], [20.0, 0.0]) == pytest.approx(1.0)
+E       assert 40.0 == 1.0 ± 1.0e-06
+E         
+E         comparison failed
+E         Obtained: 40.0
+E         Expected: 1.0 ± 1.0e-06
+
+tests/test_cosine_metric_canary.py:8: AssertionError
+____________ test_cosine_preserves_direction_ranking_over_magnitude ____________
+
+    def test_cosine_preserves_direction_ranking_over_magnitude():
+        target = [1.0, 0.0]
+>       assert cosine(target, [1.0, 0.0]) > cosine(target, [100.0, 100.0])
+E       assert 1.0 > 100.0
+E        +  where 1.0 = cosine([1.0, 0.0], [1.0, 0.0])
+E        +  and   100.0 = cosine([1.0, 0.0], [100.0, 100.0])
+
+tests/test_cosine_metric_canary.py:13: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_cosine_metric_canary.py::test_cosine_normalizes_arbitrary_finite_vectors
+FAILED tests/test_cosine_metric_canary.py::test_cosine_preserves_direction_ranking_over_magnitude
+2 failed in 0.04s

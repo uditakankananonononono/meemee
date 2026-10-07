@@ -43,7 +43,15 @@ def cosine(left: list[float], right: list[float]) -> float:
         raise ValueError("cannot compare vectors of different dimensions")
     if not all(math.isfinite(v) for v in (*left, *right)):
         raise ValueError("vectors must be finite")
-    return sum(a * b for a, b in zip(left, right))
+    # Scale before norms/products so finite large encoders do not overflow.
+    left_scale = max((abs(v) for v in left), default=0.0)
+    right_scale = max((abs(v) for v in right), default=0.0)
+    if not left_scale or not right_scale:
+        return 0.0
+    a = [v / left_scale for v in left]
+    b = [v / right_scale for v in right]
+    score = sum(x * y for x, y in zip(a, b)) / (math.sqrt(sum(x * x for x in a)) * math.sqrt(sum(y * y for y in b)))
+    return max(-1.0, min(1.0, score))
 
 
 MINILM_REPO = "sentence-transformers/all-MiniLM-L6-v2"
