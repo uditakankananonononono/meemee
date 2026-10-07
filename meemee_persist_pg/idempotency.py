@@ -71,14 +71,26 @@ class IdempotencyStore:
         if not key or len(key) > 200:
             raise ValueError("idempotency key must contain 1-200 characters")
         now = datetime.now(timezone.utc)
+        digest = self.request_hash(payload)
         with self.db.transaction() as c:
-            c.execute("""INSERT INTO meemee_idempotency(principal, route, key, request_hash, response, status, created_at, expires_at)
+            # ON CONFLICT locks the existing row even when its WHERE rejects the update.
+            # Check the digest while that lock is held, including completed-key replays.
+            published = c.execute("""INSERT INTO meemee_idempotency(principal, route, key, request_hash, response, status, created_at, expires_at)
                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                         ON CONFLICT (principal, route, key) DO UPDATE SET request_hash=EXCLUDED.request_hash,
+                         ON CONFLICT (principal, route, key) DO UPDATE SET
                            response=EXCLUDED.response, status=EXCLUDED.status, created_at=EXCLUDED.created_at,
-                           expires_at=EXCLUDED.expires_at WHERE meemee_idempotency.status = 0""",
-                      (principal, route, key, self.request_hash(payload), Jsonb(json.loads(json.dumps(response, default=str))),
-                       status, now, now + self.ttl))
+                           expires_at=EXCLUDED.expires_at WHERE meemee_idempotency.status = 0
+                           AND meemee_idempotency.request_hash=EXCLUDED.request_hash
+                         RETURNING request_hash""",
+                      (principal, route, key, digest, Jsonb(json.loads(json.dumps(response, default=str))),
+                       status, now, now + self.ttl)).fetchone()
+            if published is None:
+                reserved = c.execute(
+                    "SELECT request_hash FROM meemee_idempotency WHERE principal=%s AND route=%s AND key=%s",
+                    (principal, route, key),
+                ).fetchone()
+                if reserved is not None and reserved["request_hash"] != digest:
+                    raise IdempotencyConflict("idempotency key was already used with a different request")
 
     def delete_principal(self, principal: str) -> int:
         with self.db.transaction() as c:

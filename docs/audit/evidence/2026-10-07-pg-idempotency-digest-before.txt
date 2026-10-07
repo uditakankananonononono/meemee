@@ -1,0 +1,38 @@
+..FF                                                                     [100%]
+=================================== FAILURES ===================================
+________ test_idempotency_publication_digest_binding[postgresql-False] _________
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7efc8edbc910>, jobs=<meemee...re object at 0x7efc8edbf3d0>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7efc8edbf3a0>)
+completed = False
+
+    @pytest.mark.parametrize('completed', [False, True])
+    def test_idempotency_publication_digest_binding(persistence, completed):  # noqa: F811
+        store = persistence.idempotency
+        payload = {'goal': 'original'}
+        store.claim('owner', '/jobs', 'key', payload)
+        if completed:
+            store.put('owner', '/jobs', 'key', payload, 201, {'id': 'original'})
+>       with pytest.raises(IdempotencyConflict):
+E       Failed: DID NOT RAISE <class 'meemee.idempotency.IdempotencyConflict'>
+
+tests/test_runs_idempotency_backends.py:138: Failed
+_________ test_idempotency_publication_digest_binding[postgresql-True] _________
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7efc8e926e90>, jobs=<meemee...re object at 0x7efc8e925960>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7efc8e925990>)
+completed = True
+
+    @pytest.mark.parametrize('completed', [False, True])
+    def test_idempotency_publication_digest_binding(persistence, completed):  # noqa: F811
+        store = persistence.idempotency
+        payload = {'goal': 'original'}
+        store.claim('owner', '/jobs', 'key', payload)
+        if completed:
+            store.put('owner', '/jobs', 'key', payload, 201, {'id': 'original'})
+>       with pytest.raises(IdempotencyConflict):
+E       Failed: DID NOT RAISE <class 'meemee.idempotency.IdempotencyConflict'>
+
+tests/test_runs_idempotency_backends.py:138: Failed
+=========================== short test summary info ============================
+FAILED tests/test_runs_idempotency_backends.py::test_idempotency_publication_digest_binding[postgresql-False]
+FAILED tests/test_runs_idempotency_backends.py::test_idempotency_publication_digest_binding[postgresql-True]
+2 failed, 2 passed, 15 deselected in 0.95s
