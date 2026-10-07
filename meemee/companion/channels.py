@@ -93,10 +93,10 @@ class WebhookChannel:
             headers["X-Meemee-Timestamp"] = timestamp
             headers["X-Meemee-Signature"] = f"sha256={signature}"
         try:
-            response = await self.client.post(url, content=body, headers=headers)
+            response = await self.client.post(url, content=body, headers=headers, follow_redirects=False)
         except httpx.HTTPError as exc:
             raise ChannelError(f"webhook delivery failed: {exc}") from exc
-        if response.status_code >= 400:
+        if not 200 <= response.status_code < 300:
             raise ChannelError(f"webhook endpoint returned HTTP {response.status_code}")
         return DeliveryResult(self.name, url, True, f"HTTP {response.status_code}")
 
@@ -142,10 +142,11 @@ class ProviderChannel:
                 f"{url.rstrip('/')}/messages",
                 headers={"Authorization": f"Bearer {self.provider_token}"},
                 json={"to": address, "text": text},
+                follow_redirects=False,
             )
         except httpx.HTTPError as exc:
             raise ChannelError(f"{self.name} provider delivery failed: {exc}") from exc
-        if response.status_code >= 400:
+        if not 200 <= response.status_code < 300:
             raise ChannelError(f"{self.name} provider returned HTTP {response.status_code}")
         return DeliveryResult(self.name, address, True, f"HTTP {response.status_code}")
 
