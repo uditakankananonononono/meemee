@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
@@ -44,6 +47,32 @@ class OIDCValidator:
         self.config = config
         self.jwks = jwks_client or PyJWKClient(config.jwks_url, cache_keys=True, lifespan=300)
         self.role_scopes = config.mapping()
+
+    def validate_id_token(self, token: str, client_id: str, nonce: str, access_token: str) -> str | None:
+        """Validate signed ID-token identity and bind it to this login request."""
+        try:
+            header = jwt.get_unverified_header(token)
+            algorithm = header.get("alg")
+            if algorithm not in {"RS256", "RS384", "RS512", "ES256", "ES384", "ES512"}:
+                return None
+            key = self.jwks.get_signing_key_from_jwt(token)
+            claims = jwt.decode(token, key.key, algorithms=[algorithm], audience=client_id,
+                issuer=self.config.issuer, options={"require": ["exp", "iat", "iss", "aud", "sub", "nonce"]})
+            if not isinstance(claims["nonce"], str) or not hmac.compare_digest(claims["nonce"], nonce):
+                return None
+            audience = claims["aud"]
+            if isinstance(audience, list) and len(audience) > 1 and claims.get("azp") != client_id:
+                return None
+            if claims.get("azp") is not None and claims["azp"] != client_id:
+                return None
+            if claims.get("at_hash") is not None:
+                digest = getattr(hashlib, "sha" + algorithm[-3:])(access_token.encode("ascii")).digest()
+                expected = base64.urlsafe_b64encode(digest[:len(digest)//2]).rstrip(b"=").decode()
+                if not isinstance(claims["at_hash"], str) or not hmac.compare_digest(expected, claims["at_hash"]):
+                    return None
+            return claims["sub"]
+        except (jwt.PyJWTError, KeyError, TypeError, ValueError, UnicodeError):
+            return None
 
     def authenticate(self, token: str) -> Principal | None:
         try:
