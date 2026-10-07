@@ -8,10 +8,12 @@ next due pass; they never advance the watermark.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import sqlite3
 import threading
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -30,6 +32,7 @@ def _now() -> datetime:
 
 class ReflectionSchedule:
     def __init__(self, path: Path):
+        self.guard_dir = path.parent / (path.name + ".owner-locks")
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
@@ -47,6 +50,24 @@ class ReflectionSchedule:
                   last_result TEXT
                 );
             """)
+
+    @contextmanager
+    def owner_guard(self, owner_id: str):
+        """Nonblocking process lock for the entire SQLite reflection pass (POSIX)."""
+        import fcntl
+
+        self.guard_dir.mkdir(parents=True, exist_ok=True)
+        path = self.guard_dir / hashlib.sha256(owner_id.encode()).hexdigest()
+        with path.open("a") as stream:
+            try:
+                fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                yield False
+            else:
+                try:
+                    yield True
+                finally:
+                    fcntl.flock(stream, fcntl.LOCK_UN)
 
     def ping(self) -> bool:
         with self.lock:
@@ -103,29 +124,32 @@ async def reflect_due_once(
     reflector = PersonalModelReflector(context, personal, model)
     summaries = []
     for owner in schedule.due(watermarks, interval, now):
-        try:
-            state = schedule.state(owner)
-            after = state["watermark"] if state else 0
-            records = context.reflection_batch(owner, after, watermarks[owner], 50)
-            result = await reflector.reflect_records(owner, records)
-            # A full batch may leave eligible evidence unseen. Advance only through
-            # supplied records; a short batch exhausted this snapshot (including
-            # records intentionally excluded by visibility).
-            processed = max(row["id"] for row in records) if len(records) == 50 else watermarks[owner]
-        except Exception as exc:  # noqa: BLE001 - one owner's failure must not stop the pass
-            info = {"error": f"{type(exc).__name__}: {str(exc)[:300]}", "model_trace": last_model_trace(model)}
-            schedule.record(owner, "failed", info, None, now)
-            log.warning("scheduled reflection failed for %s: %s", owner, info["error"])
-            summary = {"owner_id": owner, "status": "failed", **info}
-        else:
-            info = {"considered": result["considered"], "accepted": result["accepted"],
-                    "rejected": result["rejected"], "model_trace": last_model_trace(model)}
-            schedule.record(owner, "ok", info, processed, now)
-            summary = {"owner_id": owner, "status": "ok", **info}
-        if audit is not None:
-            audit.append("reflection-scheduler", "personal_model.reflect.scheduled", owner, summary["status"],
-                         {k: v for k, v in summary.items() if k != "owner_id"})
-        summaries.append(summary)
+        with schedule.owner_guard(owner) as claimed:
+            if not claimed or owner not in schedule.due(watermarks, interval, now):
+                continue
+            try:
+                state = schedule.state(owner)
+                after = state["watermark"] if state else 0
+                records = context.reflection_batch(owner, after, watermarks[owner], 50)
+                result = await reflector.reflect_records(owner, records)
+                # A full batch may leave eligible evidence unseen. Advance only through
+                # supplied records; a short batch exhausted this snapshot (including
+                # records intentionally excluded by visibility).
+                processed = max(row["id"] for row in records) if len(records) == 50 else watermarks[owner]
+            except Exception as exc:  # noqa: BLE001 - one owner's failure must not stop the pass
+                info = {"error": f"{type(exc).__name__}: {str(exc)[:300]}", "model_trace": last_model_trace(model)}
+                schedule.record(owner, "failed", info, None, now)
+                log.warning("scheduled reflection failed for %s: %s", owner, info["error"])
+                summary = {"owner_id": owner, "status": "failed", **info}
+            else:
+                info = {"considered": result["considered"], "accepted": result["accepted"],
+                        "rejected": result["rejected"], "model_trace": last_model_trace(model)}
+                schedule.record(owner, "ok", info, processed, now)
+                summary = {"owner_id": owner, "status": "ok", **info}
+            if audit is not None:
+                audit.append("reflection-scheduler", "personal_model.reflect.scheduled", owner, summary["status"],
+                             {k: v for k, v in summary.items() if k != "owner_id"})
+            summaries.append(summary)
     return summaries
 
 

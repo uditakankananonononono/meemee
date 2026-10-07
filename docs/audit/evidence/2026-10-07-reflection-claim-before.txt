@@ -1,0 +1,37 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_____________ test_independent_pass_skips_owner_already_reflecting _____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-204/test_independent_pass_skips_ow0')
+
+    async def test_independent_pass_skips_owner_already_reflecting(tmp_path):
+        context = seed(tmp_path)
+        personal = PersonalModelStore(tmp_path / 'p.db')
+        schedules = [ReflectionSchedule(tmp_path / 's.db'), ReflectionSchedule(tmp_path / 's.db')]
+        entered, release = asyncio.Event(), asyncio.Event()
+        calls = []
+    
+        class Model:
+            async def chat(self, messages, **kwargs):
+                calls.append(messages)
+                entered.set()
+                await release.wait()
+                return '{"claims": []}'
+    
+        async def run(i):
+            return await reflect_due_once(context, personal, Model(), schedules[i], timedelta(0))
+    
+        first = asyncio.create_task(run(0))
+        await entered.wait()
+        second = asyncio.create_task(run(1))
+        await asyncio.sleep(0)
+        release.set()
+        await asyncio.gather(first, second)
+>       assert len(calls) == 1
+E       assert 2 == 1
+E        +  where 2 = len([[{'content': 'Infer only durable personal facts directly supported by the supplied records.\nAllowed kinds: goal, rel...t", "title": "Project", "content": "I am building Atlas 0", "occurred_at": "2026-09-22T10:00:00Z"}]', 'role': 'user'}]])
+
+tests/test_reflection_duplicate_canary.py:34: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_reflection_duplicate_canary.py::test_independent_pass_skips_owner_already_reflecting
+1 failed in 0.16s

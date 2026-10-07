@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -112,6 +113,23 @@ class MonitorStore:
 class ReflectionSchedule:
     def __init__(self, db: Database):
         self.db = db
+
+    @contextmanager
+    def owner_guard(self, owner_id: str):
+        # A dedicated session avoids consuming a pooled connection while model
+        # awaits and prevents nested store writes starving a one-connection pool.
+        import psycopg
+        from psycopg.rows import dict_row
+
+        key = f"reflection-pass:{owner_id}"
+        with psycopg.connect(self.db.pool.conninfo, autocommit=True, row_factory=dict_row) as c:
+            row = c.execute("SELECT pg_try_advisory_lock(hashtextextended(%s, 0)) AS claimed", (key,)).fetchone()
+            claimed = bool(row["claimed"])
+            try:
+                yield claimed
+            finally:
+                if claimed:
+                    c.execute("SELECT pg_advisory_unlock(hashtextextended(%s, 0))", (key,))
 
     def ping(self) -> bool:
         with self.db.transaction() as c:
