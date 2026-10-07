@@ -1,0 +1,25 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+______________ test_rotation_marker_race_preserves_existing_owner ______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-400/test_rotation_marker_race_pres0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f55ca697d30>
+
+    def test_rotation_marker_race_preserves_existing_owner(tmp_path, monkeypatch):
+        old, new = SecretVault.generate_key(), SecretVault.generate_key()
+        SecretVault(tmp_path / 'vault.sqlite3', old).put('dummy', 'fixture')
+        marker = tmp_path / '.key-rotation-in-progress'
+        backup = key_rotation._backup
+    
+        def competing_rotation(database, destination):
+            backup(database, destination)
+            marker.write_text('another rotation owns this marker')
+    
+        monkeypatch.setattr(key_rotation, '_backup', competing_rotation)
+>       with pytest.raises((FileExistsError, RuntimeError)):
+E       Failed: DID NOT RAISE any of (<class 'FileExistsError'>, <class 'RuntimeError'>)
+
+tests/test_rotation_marker_race.py:20: Failed
+=========================== short test summary info ============================
+FAILED tests/test_rotation_marker_race.py::test_rotation_marker_race_preserves_existing_owner
+1 failed in 0.08s
