@@ -47,6 +47,8 @@ class PersonalModelReflector:
         """Reflect precisely the caller-supplied batch, retaining citation checks."""
         if not records:
             return {"considered": 0, "accepted": 0, "rejected": 0, "items": []}
+        if not owner_id or any(row.get("owner_id") != owner_id for row in records):
+            raise ValueError("reflection records must belong to the requested owner")
         supplied = {(row["source_id"], row["external_id"]) for row in records}
         compact = [{"source_id": row["source_id"], "source_record_id": row["external_id"], "kind": row["kind"],
                     "title": row["title"], "content": row["content"], "occurred_at": row["occurred_at"]} for row in records]

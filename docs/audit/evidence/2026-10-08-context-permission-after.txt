@@ -1,0 +1,60 @@
+............................FF.....                                      [100%]
+=================================== FAILURES ===================================
+_______ test_context_sources_ingest_search_recent_assemble_purge[sqlite] _______
+
+stores = <function stores.<locals>.<lambda> at 0x7f0877bcab00>
+
+    def test_context_sources_ingest_search_recent_assemble_purge(stores):
+        _, context = stores()
+        with pytest.raises(ValueError):
+            context.ingest(_rec("1", "t", "c", "2026-01-01"))
+        src = context.register_source("o", "mail", "gmail", {"b": 2, "a": 1})
+        assert src["config"] == {"a": 1, "b": 2} and src["cursor"] is None
+        assert context.ingest(_rec("1", "Dentist", "appointment moved to Friday", "2026-01-02", cursor="c1"))
+        assert not context.ingest(_rec("1", "Dentist", "appointment moved to Friday", "2026-01-02"))  # same content dedupes
+        assert context.ingest(_rec("1", "Dentist", "appointment moved to Monday", "2026-01-03"))  # new content is a new record
+        assert context.ingest(_rec("2", "Lunch", "with Ravi", "2026-01-04", visibility="shared"))
+        assert context.cursor("o", "mail") == "c1"
+        hits = context.search("o", "appointment Friday")
+        assert [h["content"] for h in hits] == ["appointment moved to Friday"]
+        assert hits[0]["provenance"] == {"url": "x://1"} and hits[0]["metadata"] == {"n": "1"}
+>       assert context.search("o", "ravi") == [] and len(context.search("o", "ravi", allowed={"shared"})) == 1
+E       AssertionError: assert ([] == []
+E         
+E         Use -v to get more diff and 0 == 1)
+E        +  where 0 = len([])
+E        +    where [] = search('o', 'ravi', allowed={'shared'})
+E        +      where search = <meemee.context.ContextStore object at 0x7f0877b74370>.search
+
+tests/test_personal_context_backends.py:105: AssertionError
+_____ test_context_sources_ingest_search_recent_assemble_purge[postgresql] _____
+
+stores = <function stores.<locals>.<lambda> at 0x7f0877773be0>
+
+    def test_context_sources_ingest_search_recent_assemble_purge(stores):
+        _, context = stores()
+        with pytest.raises(ValueError):
+            context.ingest(_rec("1", "t", "c", "2026-01-01"))
+        src = context.register_source("o", "mail", "gmail", {"b": 2, "a": 1})
+        assert src["config"] == {"a": 1, "b": 2} and src["cursor"] is None
+        assert context.ingest(_rec("1", "Dentist", "appointment moved to Friday", "2026-01-02", cursor="c1"))
+        assert not context.ingest(_rec("1", "Dentist", "appointment moved to Friday", "2026-01-02"))  # same content dedupes
+        assert context.ingest(_rec("1", "Dentist", "appointment moved to Monday", "2026-01-03"))  # new content is a new record
+        assert context.ingest(_rec("2", "Lunch", "with Ravi", "2026-01-04", visibility="shared"))
+        assert context.cursor("o", "mail") == "c1"
+        hits = context.search("o", "appointment Friday")
+        assert [h["content"] for h in hits] == ["appointment moved to Friday"]
+        assert hits[0]["provenance"] == {"url": "x://1"} and hits[0]["metadata"] == {"n": "1"}
+>       assert context.search("o", "ravi") == [] and len(context.search("o", "ravi", allowed={"shared"})) == 1
+E       AssertionError: assert ([] == []
+E         
+E         Use -v to get more diff and 0 == 1)
+E        +  where 0 = len([])
+E        +    where [] = search('o', 'ravi', allowed={'shared'})
+E        +      where search = <meemee_persist_pg.personal.ContextStore object at 0x7f0877ba7bb0>.search
+
+tests/test_personal_context_backends.py:105: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_personal_context_backends.py::test_context_sources_ingest_search_recent_assemble_purge[sqlite]
+FAILED tests/test_personal_context_backends.py::test_context_sources_ingest_search_recent_assemble_purge[postgresql]
+2 failed, 33 passed in 5.58s

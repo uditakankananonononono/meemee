@@ -1,0 +1,34 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+______ test_reflection_refuses_another_owners_batch_before_model[sqlite] _______
+
+stores = <function stores.<locals>.<lambda> at 0x7f3580184ca0>
+
+    def test_reflection_refuses_another_owners_batch_before_model(stores):  # noqa: F811
+        personal, context = stores()
+        context.register_source('alice', 'source', 'test', {})
+        context.ingest(ContextRecord('alice', 'source', 'event', 'event', 'drink', 'likes tea', '2026-10-08', {}))
+        model = Model()
+        reflector = PersonalModelReflector(context, personal, model)
+>       with pytest.raises(ValueError, match='owner'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_reflection_owner_batch.py:29: Failed
+____ test_reflection_refuses_another_owners_batch_before_model[postgresql] _____
+
+stores = <function stores.<locals>.<lambda> at 0x7f35835e1bd0>
+
+    def test_reflection_refuses_another_owners_batch_before_model(stores):  # noqa: F811
+        personal, context = stores()
+        context.register_source('alice', 'source', 'test', {})
+        context.ingest(ContextRecord('alice', 'source', 'event', 'event', 'drink', 'likes tea', '2026-10-08', {}))
+        model = Model()
+        reflector = PersonalModelReflector(context, personal, model)
+>       with pytest.raises(ValueError, match='owner'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_reflection_owner_batch.py:29: Failed
+=========================== short test summary info ============================
+FAILED tests/test_reflection_owner_batch.py::test_reflection_refuses_another_owners_batch_before_model[sqlite]
+FAILED tests/test_reflection_owner_batch.py::test_reflection_refuses_another_owners_batch_before_model[postgresql]
+2 failed in 0.74s
