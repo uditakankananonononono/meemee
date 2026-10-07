@@ -30,9 +30,13 @@ async def run_api_loadcheck(app, token: str, requests: int = 200, concurrency: i
         await asyncio.gather(*(one(index) for index in range(requests)))
     unexpected_5xx = sum(count for status, count in statuses.items() if int(status) >= 500)
     completed = sum(statuses.values())
-    status = "pass" if completed == requests and not errors and not unexpected_5xx and not missing_request_ids else "fail"
+    # 429 remains a documented capacity response; auth/routing/redirect errors do not pass.
+    unexpected_statuses = {code: count for code, count in statuses.items()
+                           if code not in {"200", "429"}}
+    status = "pass" if completed == requests and not errors and not unexpected_statuses and not missing_request_ids else "fail"
     return {
         "status": status, "requests": requests, "concurrency": concurrency,
         "completed": completed, "statuses": statuses, "errors": errors,
-        "unexpected_5xx": unexpected_5xx, "missing_request_ids": missing_request_ids,
+        "unexpected_5xx": unexpected_5xx, "unexpected_statuses": unexpected_statuses,
+        "missing_request_ids": missing_request_ids,
     }

@@ -1,0 +1,92 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+________________ test_loadcheck_rejected_http_status_fails[401] ________________
+
+code = 401
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('code', [401, 403, 404, 302])
+    async def test_loadcheck_rejected_http_status_fails(code):
+        async def rejected(scope, receive, send):
+            status = 200 if scope['path'] == '/health' else code
+            await send({'type': 'http.response.start', 'status': status,
+                        'headers': [(b'x-request-id', b'fixture')]})
+            await send({'type': 'http.response.body', 'body': b'{}'})
+    
+        result = await run_api_loadcheck(rejected, 'dummy', requests=3, concurrency=1)
+>       assert result['status'] == 'fail'
+E       AssertionError: assert 'pass' == 'fail'
+E         
+E         - fail
+E         + pass
+
+tests/test_api_loadcheck_statuses.py:18: AssertionError
+________________ test_loadcheck_rejected_http_status_fails[403] ________________
+
+code = 403
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('code', [401, 403, 404, 302])
+    async def test_loadcheck_rejected_http_status_fails(code):
+        async def rejected(scope, receive, send):
+            status = 200 if scope['path'] == '/health' else code
+            await send({'type': 'http.response.start', 'status': status,
+                        'headers': [(b'x-request-id', b'fixture')]})
+            await send({'type': 'http.response.body', 'body': b'{}'})
+    
+        result = await run_api_loadcheck(rejected, 'dummy', requests=3, concurrency=1)
+>       assert result['status'] == 'fail'
+E       AssertionError: assert 'pass' == 'fail'
+E         
+E         - fail
+E         + pass
+
+tests/test_api_loadcheck_statuses.py:18: AssertionError
+________________ test_loadcheck_rejected_http_status_fails[404] ________________
+
+code = 404
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('code', [401, 403, 404, 302])
+    async def test_loadcheck_rejected_http_status_fails(code):
+        async def rejected(scope, receive, send):
+            status = 200 if scope['path'] == '/health' else code
+            await send({'type': 'http.response.start', 'status': status,
+                        'headers': [(b'x-request-id', b'fixture')]})
+            await send({'type': 'http.response.body', 'body': b'{}'})
+    
+        result = await run_api_loadcheck(rejected, 'dummy', requests=3, concurrency=1)
+>       assert result['status'] == 'fail'
+E       AssertionError: assert 'pass' == 'fail'
+E         
+E         - fail
+E         + pass
+
+tests/test_api_loadcheck_statuses.py:18: AssertionError
+________________ test_loadcheck_rejected_http_status_fails[302] ________________
+
+code = 302
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('code', [401, 403, 404, 302])
+    async def test_loadcheck_rejected_http_status_fails(code):
+        async def rejected(scope, receive, send):
+            status = 200 if scope['path'] == '/health' else code
+            await send({'type': 'http.response.start', 'status': status,
+                        'headers': [(b'x-request-id', b'fixture')]})
+            await send({'type': 'http.response.body', 'body': b'{}'})
+    
+        result = await run_api_loadcheck(rejected, 'dummy', requests=3, concurrency=1)
+>       assert result['status'] == 'fail'
+E       AssertionError: assert 'pass' == 'fail'
+E         
+E         - fail
+E         + pass
+
+tests/test_api_loadcheck_statuses.py:18: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_api_loadcheck_statuses.py::test_loadcheck_rejected_http_status_fails[401]
+FAILED tests/test_api_loadcheck_statuses.py::test_loadcheck_rejected_http_status_fails[403]
+FAILED tests/test_api_loadcheck_statuses.py::test_loadcheck_rejected_http_status_fails[404]
+FAILED tests/test_api_loadcheck_statuses.py::test_loadcheck_rejected_http_status_fails[302]
+4 failed in 0.07s
