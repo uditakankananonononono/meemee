@@ -9,6 +9,7 @@ takeovers that already ended are cancelled instead of sent.
 """
 from __future__ import annotations
 
+import asyncio
 import sqlite3
 import threading
 import uuid
@@ -138,7 +139,15 @@ async def deliver_notices(queue, sessions_store, companion_store, channels: dict
                 conversation = companion_store.latest_conversation(notice["user_id"], "local") or companion_store.start_conversation(notice["user_id"], "local")
                 address = conversation["id"]
             validate_delivery_address(companion_store, notice["user_id"], channel_name, address)
-            result = await adapter.send(address, notice["text"])
+            try:
+                result = await adapter.send(address, notice["text"])
+            except asyncio.CancelledError:
+                queue._finish(notice["id"], "failed", "delivery outcome unknown: send cancelled", channel_name)
+                raise
+            except ChannelError:
+                raise
+            except Exception as exc:  # Adapter may have accepted the message.
+                raise DeliveryOutcomeUnknown(f"delivery outcome unknown: {exc}") from exc
             if getattr(result, "delivered", None) is not True:
                 raise ChannelError(result.detail or "channel did not deliver takeover notice")
             queue._finish(notice["id"], "delivered", result.detail, channel_name)
