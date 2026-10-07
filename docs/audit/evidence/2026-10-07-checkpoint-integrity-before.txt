@@ -1,0 +1,64 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+_______________ test_corrupt_checkpoint_rejected_on_read[latest] _______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-271/test_corrupt_checkpoint_reject0')
+read = 'latest'
+
+    @pytest.mark.parametrize('read', ['latest', 'get', 'history', 'resume'])
+    def test_corrupt_checkpoint_rejected_on_read(tmp_path, read):
+        store = CheckpointStore(tmp_path / 'c.db')
+        store.save('owner', 'run', 'goal', 'planned', {'safe': True})
+        store.db.execute("UPDATE agency_checkpoints SET state=?", ('{"safe":false}',))
+>       with pytest.raises(ValueError, match='checksum'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_checkpoint_integrity_canary.py:12: Failed
+________________ test_corrupt_checkpoint_rejected_on_read[get] _________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-271/test_corrupt_checkpoint_reject1')
+read = 'get'
+
+    @pytest.mark.parametrize('read', ['latest', 'get', 'history', 'resume'])
+    def test_corrupt_checkpoint_rejected_on_read(tmp_path, read):
+        store = CheckpointStore(tmp_path / 'c.db')
+        store.save('owner', 'run', 'goal', 'planned', {'safe': True})
+        store.db.execute("UPDATE agency_checkpoints SET state=?", ('{"safe":false}',))
+>       with pytest.raises(ValueError, match='checksum'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_checkpoint_integrity_canary.py:12: Failed
+______________ test_corrupt_checkpoint_rejected_on_read[history] _______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-271/test_corrupt_checkpoint_reject2')
+read = 'history'
+
+    @pytest.mark.parametrize('read', ['latest', 'get', 'history', 'resume'])
+    def test_corrupt_checkpoint_rejected_on_read(tmp_path, read):
+        store = CheckpointStore(tmp_path / 'c.db')
+        store.save('owner', 'run', 'goal', 'planned', {'safe': True})
+        store.db.execute("UPDATE agency_checkpoints SET state=?", ('{"safe":false}',))
+>       with pytest.raises(ValueError, match='checksum'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_checkpoint_integrity_canary.py:12: Failed
+_______________ test_corrupt_checkpoint_rejected_on_read[resume] _______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-271/test_corrupt_checkpoint_reject3')
+read = 'resume'
+
+    @pytest.mark.parametrize('read', ['latest', 'get', 'history', 'resume'])
+    def test_corrupt_checkpoint_rejected_on_read(tmp_path, read):
+        store = CheckpointStore(tmp_path / 'c.db')
+        store.save('owner', 'run', 'goal', 'planned', {'safe': True})
+        store.db.execute("UPDATE agency_checkpoints SET state=?", ('{"safe":false}',))
+>       with pytest.raises(ValueError, match='checksum'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_checkpoint_integrity_canary.py:12: Failed
+=========================== short test summary info ============================
+FAILED tests/test_checkpoint_integrity_canary.py::test_corrupt_checkpoint_rejected_on_read[latest]
+FAILED tests/test_checkpoint_integrity_canary.py::test_corrupt_checkpoint_rejected_on_read[get]
+FAILED tests/test_checkpoint_integrity_canary.py::test_corrupt_checkpoint_rejected_on_read[history]
+FAILED tests/test_checkpoint_integrity_canary.py::test_corrupt_checkpoint_rejected_on_read[resume]
+4 failed in 0.07s

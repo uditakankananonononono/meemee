@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import sqlite3
 import threading
@@ -102,4 +103,9 @@ class CheckpointStore:
 
     @staticmethod
     def _row(row: sqlite3.Row) -> dict[str, Any]:
-        result = dict(row); result["state"] = json.loads(result["state"]); return result
+        result = dict(row)
+        digest = hashlib.sha256(result["state"].encode()).hexdigest()
+        if not hmac.compare_digest(digest, result["state_sha256"]):
+            raise ValueError("checkpoint state checksum mismatch")
+        result["state"] = json.loads(result["state"])
+        return result
