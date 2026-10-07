@@ -1,6 +1,6 @@
 # Meemee
 
-October 7 build-out: SQLite migration rollback, bounded shell output/executable identity, serialized audit-chain appends concurrent browser-store startup plan dependency/status checks worker lease renewal/fencing Docker runtime-package inputs and pre-effect browser input validation are improved. Fresh root suite: 609 passed, 130 skipped, 2 warnings. Eight implementation areas, not product completion. The historical audit is preserved below. Limits and retained failures: [build-out evidence](docs/audit/2026-10-07-buildout.md). No general real-world readiness claim.
+October 7 build-out: SQLite migration rollback, bounded shell output/executable identity, serialized audit-chain appends concurrent browser-store startup plan dependency/status checks worker lease renewal/fencing Docker runtime-package inputs pre-effect browser input validation, atomic file writes and concurrent run-store startup are improved. Fresh root suite: 613 passed, 130 skipped, 2 warnings. Ten implementation areas, not product completion. The historical audit is preserved below. Limits and retained failures: [build-out evidence](docs/audit/2026-10-07-buildout.md). No general real-world readiness claim.
 
 Monitor deadline guard (2026-09-27): explicit timezone and positive fire budgets are validated, and both stores normalize evaluation timestamps to UTC; 5 targeted SQLite monitor tests passed. PostgreSQL live behavior and the full suite were not rerun. See [monitor time guards](docs/MONITOR_TIME_GUARDS.md).
 

@@ -1,0 +1,61 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+________________ test_failed_write_preserves_destination[True] _________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-46/test_failed_write_preserves_de0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f06e0977e50>
+existing = True
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('existing', [True, False])
+    async def test_failed_write_preserves_destination(tmp_path, monkeypatch, existing):
+        target = tmp_path / 'note.txt'
+        if existing:
+            target.write_text('old complete contents')
+        original = Path.write_text
+        def partial_then_fail(path, data, *args, **kwargs):
+            original(path, data[:4], *args, **kwargs)
+            raise OSError('simulated full disk')
+        monkeypatch.setattr(Path, 'write_text', partial_then_fail)
+        with pytest.raises(OSError):
+            await WriteFile(tmp_path).run(WriteArgs(path='note.txt', content='new complete contents'))
+        if existing:
+>           assert target.read_text() == 'old complete contents'
+E           AssertionError: assert 'new ' == 'old complete contents'
+E             
+E             - old complete contents
+E             + new
+
+tests/test_file_publication_canaries.py:23: AssertionError
+________________ test_failed_write_preserves_destination[False] ________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-46/test_failed_write_preserves_de1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f06e09e6830>
+existing = False
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('existing', [True, False])
+    async def test_failed_write_preserves_destination(tmp_path, monkeypatch, existing):
+        target = tmp_path / 'note.txt'
+        if existing:
+            target.write_text('old complete contents')
+        original = Path.write_text
+        def partial_then_fail(path, data, *args, **kwargs):
+            original(path, data[:4], *args, **kwargs)
+            raise OSError('simulated full disk')
+        monkeypatch.setattr(Path, 'write_text', partial_then_fail)
+        with pytest.raises(OSError):
+            await WriteFile(tmp_path).run(WriteArgs(path='note.txt', content='new complete contents'))
+        if existing:
+            assert target.read_text() == 'old complete contents'
+        else:
+>           assert not target.exists()
+E           AssertionError: assert not True
+E            +  where True = exists()
+E            +    where exists = PosixPath('/tmp/pytest-of-sandbox/pytest-46/test_failed_write_preserves_de1/note.txt').exists
+
+tests/test_file_publication_canaries.py:25: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_file_publication_canaries.py::test_failed_write_preserves_destination[True]
+FAILED tests/test_file_publication_canaries.py::test_failed_write_preserves_destination[False]
+2 failed in 0.12s

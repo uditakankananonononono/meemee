@@ -1,0 +1,67 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+__________ test_independent_run_store_startups_serialize_schema_edit ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-49/test_independent_run_store_sta0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fa1f8f4a350>
+
+    def test_independent_run_store_startups_serialize_schema_edit(tmp_path, monkeypatch):
+        barrier = threading.Barrier(2)
+        original = sqlite3.connect
+        def connect(*args, **kwargs):
+            connection = original(*args, **kwargs)
+            def trace(sql):
+                if sql.startswith('ALTER TABLE runs ADD COLUMN approvals_required'):
+                    try:
+                        barrier.wait(timeout=0.2)
+                    except threading.BrokenBarrierError:
+                        pass
+            connection.set_trace_callback(trace)
+            return connection
+        monkeypatch.setattr(sqlite3, 'connect', connect)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+>           stores = list(pool.map(lambda _: RunStore(tmp_path / 'runs.db'), range(2)))
+
+tests/test_run_startup_race_canary.py:24: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.10/concurrent/futures/_base.py:621: in result_iterator
+    yield _result_or_cancel(fs.pop())
+/usr/lib/python3.10/concurrent/futures/_base.py:319: in _result_or_cancel
+    return fut.result(timeout)
+/usr/lib/python3.10/concurrent/futures/_base.py:458: in result
+    return self.__get_result()
+/usr/lib/python3.10/concurrent/futures/_base.py:403: in __get_result
+    raise self._exception
+/usr/lib/python3.10/concurrent/futures/thread.py:58: in run
+    result = self.fn(*self.args, **self.kwargs)
+tests/test_run_startup_race_canary.py:24: in <lambda>
+    stores = list(pool.map(lambda _: RunStore(tmp_path / 'runs.db'), range(2)))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <meemee.runs.RunStore object at 0x7fa1f8f49810>
+path = PosixPath('/tmp/pytest-of-sandbox/pytest-49/test_independent_run_store_sta0/runs.db')
+
+    def __init__(self, path: Path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self.db=sqlite3.connect(path,check_same_thread=False)
+        self.db.row_factory=sqlite3.Row
+        self.lock=threading.RLock()
+        self.db.executescript("""
+            PRAGMA journal_mode=WAL;
+            CREATE TABLE IF NOT EXISTS runs(
+                run_id TEXT PRIMARY KEY, principal TEXT NOT NULL, goal TEXT NOT NULL,
+                final TEXT NOT NULL, steps_used INTEGER NOT NULL, tool_results TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS runs_principal_created ON runs(principal,created_at DESC,run_id DESC);
+        """)
+        columns = {row["name"] for row in self.db.execute("PRAGMA table_info(runs)")}
+        if "approvals_required" not in columns:  # additive v2 column; older rows read as []
+            with self.db:
+>               self.db.execute("ALTER TABLE runs ADD COLUMN approvals_required TEXT NOT NULL DEFAULT '[]'")
+E               sqlite3.OperationalError: duplicate column name: approvals_required
+
+meemee/runs.py:34: OperationalError
+=========================== short test summary info ============================
+FAILED tests/test_run_startup_race_canary.py::test_independent_run_store_startups_serialize_schema_edit
+1 failed in 0.11s
