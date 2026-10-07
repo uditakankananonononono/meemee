@@ -1,0 +1,68 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+____ test_bad_context_timestamp_rejected_before_publish[sqlite-not-a-date] _____
+
+stores = <function stores.<locals>.<lambda> at 0x7fcceb17c3a0>
+stamp = 'not-a-date'
+
+    @pytest.mark.parametrize('stamp', ['not-a-date', '2026-02-30T00:00:00Z'])
+    def test_bad_context_timestamp_rejected_before_publish(stores, stamp):  # noqa: F811
+        _, store = stores()
+        store.register_source('owner', 'source', 'test', {})
+        store.ingest(ContextRecord('owner', 'source', 'valid', 'event', 'title', 'fixture',
+                                   '2026-10-08', {}, cursor='valid-cursor'))
+>       with pytest.raises(ValueError):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_context_timestamp_validation.py:15: Failed
+_ test_bad_context_timestamp_rejected_before_publish[sqlite-2026-02-30T00:00:00Z] _
+
+stores = <function stores.<locals>.<lambda> at 0x7fcceb1b0af0>
+stamp = '2026-02-30T00:00:00Z'
+
+    @pytest.mark.parametrize('stamp', ['not-a-date', '2026-02-30T00:00:00Z'])
+    def test_bad_context_timestamp_rejected_before_publish(stores, stamp):  # noqa: F811
+        _, store = stores()
+        store.register_source('owner', 'source', 'test', {})
+        store.ingest(ContextRecord('owner', 'source', 'valid', 'event', 'title', 'fixture',
+                                   '2026-10-08', {}, cursor='valid-cursor'))
+>       with pytest.raises(ValueError):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_context_timestamp_validation.py:15: Failed
+__ test_bad_context_timestamp_rejected_before_publish[postgresql-not-a-date] ___
+
+stores = <function stores.<locals>.<lambda> at 0x7fcceb1b1120>
+stamp = 'not-a-date'
+
+    @pytest.mark.parametrize('stamp', ['not-a-date', '2026-02-30T00:00:00Z'])
+    def test_bad_context_timestamp_rejected_before_publish(stores, stamp):  # noqa: F811
+        _, store = stores()
+        store.register_source('owner', 'source', 'test', {})
+        store.ingest(ContextRecord('owner', 'source', 'valid', 'event', 'title', 'fixture',
+                                   '2026-10-08', {}, cursor='valid-cursor'))
+>       with pytest.raises(ValueError):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_context_timestamp_validation.py:15: Failed
+_ test_bad_context_timestamp_rejected_before_publish[postgresql-2026-02-30T00:00:00Z] _
+
+stores = <function stores.<locals>.<lambda> at 0x7fcceb1b12d0>
+stamp = '2026-02-30T00:00:00Z'
+
+    @pytest.mark.parametrize('stamp', ['not-a-date', '2026-02-30T00:00:00Z'])
+    def test_bad_context_timestamp_rejected_before_publish(stores, stamp):  # noqa: F811
+        _, store = stores()
+        store.register_source('owner', 'source', 'test', {})
+        store.ingest(ContextRecord('owner', 'source', 'valid', 'event', 'title', 'fixture',
+                                   '2026-10-08', {}, cursor='valid-cursor'))
+>       with pytest.raises(ValueError):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_context_timestamp_validation.py:15: Failed
+=========================== short test summary info ============================
+FAILED tests/test_context_timestamp_validation.py::test_bad_context_timestamp_rejected_before_publish[sqlite-not-a-date]
+FAILED tests/test_context_timestamp_validation.py::test_bad_context_timestamp_rejected_before_publish[sqlite-2026-02-30T00:00:00Z]
+FAILED tests/test_context_timestamp_validation.py::test_bad_context_timestamp_rejected_before_publish[postgresql-not-a-date]
+FAILED tests/test_context_timestamp_validation.py::test_bad_context_timestamp_rejected_before_publish[postgresql-2026-02-30T00:00:00Z]
+4 failed in 1.07s
