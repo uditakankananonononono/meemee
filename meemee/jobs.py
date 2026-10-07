@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,8 +21,17 @@ class JobStore:
         self.db = sqlite3.connect(path, check_same_thread=False, isolation_level=None)
         self.db.row_factory = sqlite3.Row
         self.lock = threading.RLock()
+        # journal_mode can fail immediately under another initializer despite
+        # SQLite's busy timeout. Retry only that startup contention, bounded.
+        for attempt in range(50):
+            try:
+                self.db.execute("PRAGMA journal_mode=WAL")
+                break
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower() or attempt == 49:
+                    raise
+                time.sleep(0.1)
         self.db.executescript("""
-            PRAGMA journal_mode=WAL;
             CREATE TABLE IF NOT EXISTS jobs (
                 id TEXT PRIMARY KEY, goal TEXT NOT NULL, run_at TEXT NOT NULL,
                 status TEXT NOT NULL CHECK(status IN ('queued','running','done','failed','cancel_requested','cancelled')),

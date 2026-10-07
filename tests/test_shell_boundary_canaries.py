@@ -18,7 +18,7 @@ async def test_allowlist_cannot_run_workspace_impostor(tmp_path):
 
 @pytest.mark.asyncio
 async def test_output_capture_has_streaming_memory_bound(tmp_path):
-    tool = ShellCommand(tmp_path, {sys.executable.split('/')[-1]})
+    tool = ShellCommand(tmp_path, {sys.executable})
     tracemalloc.start()
     try:
         result = await tool.run(ShellArgs(argv=[sys.executable, '-c',
@@ -33,7 +33,7 @@ async def test_output_capture_has_streaming_memory_bound(tmp_path):
 
 @pytest.mark.asyncio
 async def test_both_pipes_drained_after_cap_without_deadlock(tmp_path):
-    result = await ShellCommand(tmp_path, {sys.executable.split('/')[-1]}).run(
+    result = await ShellCommand(tmp_path, {sys.executable}).run(
         ShellArgs(argv=[sys.executable, '-c', "import os; [ (os.write(1,b'x'*65536),os.write(2,b'y'*65536)) for _ in range(32)]"]))
     assert result['exit_code'] == 0 and result['truncated']
     assert len(result['stdout']) == len(result['stderr']) == 200_000
@@ -51,7 +51,7 @@ async def test_timeout_cleans_child_with_inherited_pipes(tmp_path):
     parent = f"import subprocess,sys,time; subprocess.Popen([sys.executable,'-c',{child!r}]); time.sleep(5)"
     began = time.monotonic()
     with pytest.raises(ValueError, match='timed out'):
-        await ShellCommand(tmp_path, {sys.executable.split('/')[-1]}).run(
+        await ShellCommand(tmp_path, {sys.executable}).run(
             ShellArgs(argv=[sys.executable, '-c', parent], timeout_seconds=0.2))
     assert time.monotonic() - began < 2
     await asyncio.sleep(0.6)

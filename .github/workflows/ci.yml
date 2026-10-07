@@ -18,7 +18,9 @@ jobs:
           python-version: "3.10"
           cache: pip
       - name: Install release dependencies
-        run: python -m pip install -e '.[dev,postgresql]' build && python -m pip install -e './sdk[dev]'
+        run: python -m pip install -e '.[dev,postgresql,browser]' build && python -m pip install -e './sdk[dev]'
+      - name: Install Chromium for real browser canaries
+        run: python -m playwright install --with-deps chromium
       - name: Lint
         run: ruff check meemee tests examples/webhook_receiver
       - name: Core and PostgreSQL contract tests
