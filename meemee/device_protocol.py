@@ -129,7 +129,9 @@ def verify_command(
         or not isinstance(envelope["arguments"], dict)
     ):
         raise ValueError("invalid command envelope")
-    supplied = str(envelope["signature"])
+    supplied = envelope["signature"]
+    if not isinstance(supplied, str) or not supplied.isascii():
+        raise ValueError("invalid command signature")
     if not hmac.compare_digest(sign(secret, envelope), supplied):
         raise ValueError("invalid command signature")
     clock = int(time.time()) if now is None else now

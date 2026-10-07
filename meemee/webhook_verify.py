@@ -14,7 +14,8 @@ def verify_signature(
     now: int | None = None,
 ) -> bool:
     """Verify a Meemee webhook signature and reject stale replay attempts."""
-    if tolerance_seconds < 0 or not signature.startswith("sha256="):
+    if (tolerance_seconds < 0 or not isinstance(signature, str)
+            or not signature.isascii() or not signature.startswith("sha256=")):
         return False
     try:
         observed = int(timestamp)
