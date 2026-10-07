@@ -61,7 +61,7 @@ class GitCommit(GitBase):
         return str(resolved.relative_to(self.root))
 
     async def run(self, arguments: GitCommitArgs) -> dict[str, object]:
-        paths = [self.safe_path(path) for path in arguments.paths]
+        paths = [":(literal)" + self.safe_path(path) for path in arguments.paths]
         await self.git("add", "--", *paths)
         result = await self.git("commit", "-m", arguments.message, "--", *paths)
         head = await self.git("rev-parse", "HEAD")

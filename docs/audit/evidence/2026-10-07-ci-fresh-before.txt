@@ -1,0 +1,409 @@
+.................................................s.s.s.s.s.s.s.s.s.s.s.. [  7%]
+..............................s.s..ss..F................................ [ 15%]
+.....s.s.s.s.s.s................................................s....... [ 23%]
+.................................................................s.sss.. [ 31%]
+...................................sss.....s.s.s.s.s.s.................. [ 39%]
+.......................................................ss.sssss......... [ 47%]
+.....sssssssssssss...............s.s.ss.s.............................ss [ 55%]
+.................s..........................sss.s.s.s.s................. [ 63%]
+..................sss.................s.s.s.s.s..s..........ss.......... [ 71%]
+...............................s.s.s.s.s.s..s.ss........................ [ 78%]
+.......s.s.s.s.s.s.s.ssss...................FFF............FFF.......... [ 86%]
+.........s.s.s.s.s.sss....sss..................sss............s.s.s.s.s. [ 94%]
+s.s.s..............................sss..........                         [100%]
+=================================== FAILURES ===================================
+_________ test_guarded_browser_keeps_normal_page_navigation_functional _________
+
+self = <meemee.tools.browser.BrowserNavigate object at 0x7ffb975fb430>
+arguments = BrowseArgs(url='http://127.0.0.1:45741/', actions=[], wait_ms=0, screenshot_path=None, profile=None, allowed_domains=[], download_dir=None)
+
+    async def run(self, arguments: BrowseArgs) -> dict[str, object]:
+        url = validate_public_url(arguments.url)
+        hostname = (urlparse(url).hostname or "").lower()
+        if arguments.allowed_domains and not any(hostname == domain.lower() or hostname.endswith("." + domain.lower()) for domain in arguments.allowed_domains):
+            raise ValueError("browser URL is outside the per-run domain policy")
+        try:
+>           from playwright.async_api import async_playwright
+E           ModuleNotFoundError: No module named 'playwright'
+
+meemee/tools/browser.py:80: ModuleNotFoundError
+
+The above exception was the direct cause of the following exception:
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-303/test_guarded_browser_keeps_nor0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ffb975d51b0>
+
+    @pytest.mark.asyncio
+    async def test_guarded_browser_keeps_normal_page_navigation_functional(tmp_path, monkeypatch):
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                body = b'<html><head><title>Normal fixture</title></head><body><p id="msg">hello</p></body></html>'
+                self.send_response(200)
+                self.send_header('Content-Type','text/html')
+                self.end_headers()
+                self.wfile.write(body)
+            def log_message(self, *args):
+                pass
+        server = ThreadingHTTPServer(('127.0.0.1',0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        monkeypatch.setattr('meemee.tools.browser.validate_public_url', lambda url:url)
+        try:
+>           result = await BrowserNavigate(tmp_path).run(BrowseArgs(url=f'http://127.0.0.1:{server.server_port}/',wait_ms=0))
+
+tests/test_browser_redirect_canaries.py:70: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <meemee.tools.browser.BrowserNavigate object at 0x7ffb975fb430>
+arguments = BrowseArgs(url='http://127.0.0.1:45741/', actions=[], wait_ms=0, screenshot_path=None, profile=None, allowed_domains=[], download_dir=None)
+
+    async def run(self, arguments: BrowseArgs) -> dict[str, object]:
+        url = validate_public_url(arguments.url)
+        hostname = (urlparse(url).hostname or "").lower()
+        if arguments.allowed_domains and not any(hostname == domain.lower() or hostname.endswith("." + domain.lower()) for domain in arguments.allowed_domains):
+            raise ValueError("browser URL is outside the per-run domain policy")
+        try:
+            from playwright.async_api import async_playwright
+        except ImportError as exc:
+>           raise ValueError("browser extra is not installed; run pip install 'meemee-agent[browser]' and playwright install chromium") from exc
+E           ValueError: browser extra is not installed; run pip install 'meemee-agent[browser]' and playwright install chromium
+
+meemee/tools/browser.py:82: ValueError
+_____ test_live_session_never_requests_forbidden_target[resource-domains0] _____
+
+self = <meemee.browser_sessions.BrowserSessionManager object at 0x7ffb96a1dae0>
+
+    async def _ensure_browser(self):
+        if self._playwright is None:
+            try:
+>               from playwright.async_api import async_playwright
+E               ModuleNotFoundError: No module named 'playwright'
+
+meemee/browser_sessions.py:378: ModuleNotFoundError
+
+The above exception was the direct cause of the following exception:
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-303/test_live_session_never_reques0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ffb975fb370>
+kind = 'resource', domains = []
+
+    @pytest.mark.parametrize('kind,domains', [('resource',[]),('resource',['127.0.0.1']),('redirect',['127.0.0.1'])])
+    def test_live_session_never_requests_forbidden_target(tmp_path, monkeypatch, kind, domains):
+        hits = []
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                if self.path == '/private':
+                    hits.append(self.path)
+                if self.path == '/redirect':
+                    self.send_response(302)
+                    self.send_header('Location',f'http://localhost:{self.server.server_port}/private')
+                    self.end_headers()
+                else:
+                    body = (f'<html><body>Public<img src="http://localhost:{self.server.server_port}/private"></body></html>'
+                        if self.path == '/resource' else '<html><body>Private</body></html>').encode()
+                    self.send_response(200); self.send_header('Content-Type','text/html'); self.end_headers(); self.wfile.write(body)
+            def log_message(self,*args):
+                pass
+        server = ThreadingHTTPServer(('127.0.0.1',0),Handler)
+        thread = threading.Thread(target=server.serve_forever,daemon=True); thread.start()
+        def fixture_policy(url,*args):
+            if urlparse(url).hostname == 'localhost':
+                raise BrowserSessionError('private fixture destination')
+            return url
+        monkeypatch.setattr('meemee.browser_sessions.check_url',fixture_policy)
+        manager = BrowserSessionManager(BrowserSessionStore(tmp_path/'sessions.db'),allow_private_hosts=True)
+        try:
+>           asyncio.run(manager.open(f'http://127.0.0.1:{server.server_port}/{kind}', allowed_domains=domains))
+
+tests/test_session_network_canaries.py:46: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.10/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+/usr/lib/python3.10/asyncio/base_events.py:649: in run_until_complete
+    return future.result()
+meemee/browser_sessions.py:421: in open
+    state = await self._call(self._open(url, owner_id, list(allowed_domains or []), profile, auto_takeover, notify_user_id))
+meemee/browser_sessions.py:369: in _call
+    return await asyncio.wrap_future(self._submit(coro))
+meemee/browser_sessions.py:451: in _open
+    browser = await self._ensure_browser()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <meemee.browser_sessions.BrowserSessionManager object at 0x7ffb96a1dae0>
+
+    async def _ensure_browser(self):
+        if self._playwright is None:
+            try:
+                from playwright.async_api import async_playwright
+            except ImportError as exc:
+>               raise BrowserSessionError("browser extra is not installed; run pip install 'meemee-agent[browser]' and playwright install chromium") from exc
+E               meemee.browser_sessions.BrowserSessionError: browser extra is not installed; run pip install 'meemee-agent[browser]' and playwright install chromium
+
+meemee/browser_sessions.py:380: BrowserSessionError
+_____ test_live_session_never_requests_forbidden_target[resource-domains1] _____
+
+self = <meemee.browser_sessions.BrowserSessionManager object at 0x7ffb98915600>
+
+    async def _ensure_browser(self):
+        if self._playwright is None:
+            try:
+>               from playwright.async_api import async_playwright
+E               ModuleNotFoundError: No module named 'playwright'
+
+meemee/browser_sessions.py:378: ModuleNotFoundError
+
+The above exception was the direct cause of the following exception:
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-303/test_live_session_never_reques1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ffb96c808e0>
+kind = 'resource', domains = ['127.0.0.1']
+
+    @pytest.mark.parametrize('kind,domains', [('resource',[]),('resource',['127.0.0.1']),('redirect',['127.0.0.1'])])
+    def test_live_session_never_requests_forbidden_target(tmp_path, monkeypatch, kind, domains):
+        hits = []
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                if self.path == '/private':
+                    hits.append(self.path)
+                if self.path == '/redirect':
+                    self.send_response(302)
+                    self.send_header('Location',f'http://localhost:{self.server.server_port}/private')
+                    self.end_headers()
+                else:
+                    body = (f'<html><body>Public<img src="http://localhost:{self.server.server_port}/private"></body></html>'
+                        if self.path == '/resource' else '<html><body>Private</body></html>').encode()
+                    self.send_response(200); self.send_header('Content-Type','text/html'); self.end_headers(); self.wfile.write(body)
+            def log_message(self,*args):
+                pass
+        server = ThreadingHTTPServer(('127.0.0.1',0),Handler)
+        thread = threading.Thread(target=server.serve_forever,daemon=True); thread.start()
+        def fixture_policy(url,*args):
+            if urlparse(url).hostname == 'localhost':
+                raise BrowserSessionError('private fixture destination')
+            return url
+        monkeypatch.setattr('meemee.browser_sessions.check_url',fixture_policy)
+        manager = BrowserSessionManager(BrowserSessionStore(tmp_path/'sessions.db'),allow_private_hosts=True)
+        try:
+>           asyncio.run(manager.open(f'http://127.0.0.1:{server.server_port}/{kind}', allowed_domains=domains))
+
+tests/test_session_network_canaries.py:46: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.10/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+/usr/lib/python3.10/asyncio/base_events.py:649: in run_until_complete
+    return future.result()
+meemee/browser_sessions.py:421: in open
+    state = await self._call(self._open(url, owner_id, list(allowed_domains or []), profile, auto_takeover, notify_user_id))
+meemee/browser_sessions.py:369: in _call
+    return await asyncio.wrap_future(self._submit(coro))
+meemee/browser_sessions.py:451: in _open
+    browser = await self._ensure_browser()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <meemee.browser_sessions.BrowserSessionManager object at 0x7ffb98915600>
+
+    async def _ensure_browser(self):
+        if self._playwright is None:
+            try:
+                from playwright.async_api import async_playwright
+            except ImportError as exc:
+>               raise BrowserSessionError("browser extra is not installed; run pip install 'meemee-agent[browser]' and playwright install chromium") from exc
+E               meemee.browser_sessions.BrowserSessionError: browser extra is not installed; run pip install 'meemee-agent[browser]' and playwright install chromium
+
+meemee/browser_sessions.py:380: BrowserSessionError
+_____ test_live_session_never_requests_forbidden_target[redirect-domains2] _____
+
+self = <meemee.browser_sessions.BrowserSessionManager object at 0x7ffb969b59f0>
+
+    async def _ensure_browser(self):
+        if self._playwright is None:
+            try:
+>               from playwright.async_api import async_playwright
+E               ModuleNotFoundError: No module named 'playwright'
+
+meemee/browser_sessions.py:378: ModuleNotFoundError
+
+The above exception was the direct cause of the following exception:
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-303/test_live_session_never_reques2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ffb96b47a90>
+kind = 'redirect', domains = ['127.0.0.1']
+
+    @pytest.mark.parametrize('kind,domains', [('resource',[]),('resource',['127.0.0.1']),('redirect',['127.0.0.1'])])
+    def test_live_session_never_requests_forbidden_target(tmp_path, monkeypatch, kind, domains):
+        hits = []
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                if self.path == '/private':
+                    hits.append(self.path)
+                if self.path == '/redirect':
+                    self.send_response(302)
+                    self.send_header('Location',f'http://localhost:{self.server.server_port}/private')
+                    self.end_headers()
+                else:
+                    body = (f'<html><body>Public<img src="http://localhost:{self.server.server_port}/private"></body></html>'
+                        if self.path == '/resource' else '<html><body>Private</body></html>').encode()
+                    self.send_response(200); self.send_header('Content-Type','text/html'); self.end_headers(); self.wfile.write(body)
+            def log_message(self,*args):
+                pass
+        server = ThreadingHTTPServer(('127.0.0.1',0),Handler)
+        thread = threading.Thread(target=server.serve_forever,daemon=True); thread.start()
+        def fixture_policy(url,*args):
+            if urlparse(url).hostname == 'localhost':
+                raise BrowserSessionError('private fixture destination')
+            return url
+        monkeypatch.setattr('meemee.browser_sessions.check_url',fixture_policy)
+        manager = BrowserSessionManager(BrowserSessionStore(tmp_path/'sessions.db'),allow_private_hosts=True)
+        try:
+>           asyncio.run(manager.open(f'http://127.0.0.1:{server.server_port}/{kind}', allowed_domains=domains))
+
+tests/test_session_network_canaries.py:46: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.10/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+/usr/lib/python3.10/asyncio/base_events.py:649: in run_until_complete
+    return future.result()
+meemee/browser_sessions.py:421: in open
+    state = await self._call(self._open(url, owner_id, list(allowed_domains or []), profile, auto_takeover, notify_user_id))
+meemee/browser_sessions.py:369: in _call
+    return await asyncio.wrap_future(self._submit(coro))
+meemee/browser_sessions.py:451: in _open
+    browser = await self._ensure_browser()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <meemee.browser_sessions.BrowserSessionManager object at 0x7ffb969b59f0>
+
+    async def _ensure_browser(self):
+        if self._playwright is None:
+            try:
+                from playwright.async_api import async_playwright
+            except ImportError as exc:
+>               raise BrowserSessionError("browser extra is not installed; run pip install 'meemee-agent[browser]' and playwright install chromium") from exc
+E               meemee.browser_sessions.BrowserSessionError: browser extra is not installed; run pip install 'meemee-agent[browser]' and playwright install chromium
+
+meemee/browser_sessions.py:380: BrowserSessionError
+________________ test_output_capture_has_streaming_memory_bound ________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-303/test_output_capture_has_stream0')
+
+    @pytest.mark.asyncio
+    async def test_output_capture_has_streaming_memory_bound(tmp_path):
+        tool = ShellCommand(tmp_path, {sys.executable.split('/')[-1]})
+        tracemalloc.start()
+        try:
+>           result = await tool.run(ShellArgs(argv=[sys.executable, '-c',
+                "import os; [os.write(1, b'x'*65536) for _ in range(256)]" ]))
+
+tests/test_shell_boundary_canaries.py:24: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <meemee.tools.shell.ShellCommand object at 0x7ffb97a8df30>
+arguments = ShellArgs(argv=['/tmp/meemee-ci-fresh/bin/python', '-c', "import os; [os.write(1, b'x'*65536) for _ in range(256)]"], timeout_seconds=30)
+
+    async def run(self, arguments: ShellArgs) -> dict[str, object]:
+        requested = arguments.argv[0]
+        name = Path(requested).name
+        expected = self.executables.get(requested) or self.executables.get(name)
+        candidate = shutil.which(requested)
+        if expected is None or candidate is None or Path(candidate).resolve() != expected:
+>           raise ValueError(f"executable not allowlisted: {requested}")
+E           ValueError: executable not allowlisted: /tmp/meemee-ci-fresh/bin/python
+
+meemee/tools/shell.py:45: ValueError
+______________ test_both_pipes_drained_after_cap_without_deadlock ______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-303/test_both_pipes_drained_after_0')
+
+    @pytest.mark.asyncio
+    async def test_both_pipes_drained_after_cap_without_deadlock(tmp_path):
+>       result = await ShellCommand(tmp_path, {sys.executable.split('/')[-1]}).run(
+            ShellArgs(argv=[sys.executable, '-c', "import os; [ (os.write(1,b'x'*65536),os.write(2,b'y'*65536)) for _ in range(32)]"]))
+
+tests/test_shell_boundary_canaries.py:36: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <meemee.tools.shell.ShellCommand object at 0x7ffb97afa170>
+arguments = ShellArgs(argv=['/tmp/meemee-ci-fresh/bin/python', '-c', "import os; [ (os.write(1,b'x'*65536),os.write(2,b'y'*65536)) for _ in range(32)]"], timeout_seconds=30)
+
+    async def run(self, arguments: ShellArgs) -> dict[str, object]:
+        requested = arguments.argv[0]
+        name = Path(requested).name
+        expected = self.executables.get(requested) or self.executables.get(name)
+        candidate = shutil.which(requested)
+        if expected is None or candidate is None or Path(candidate).resolve() != expected:
+>           raise ValueError(f"executable not allowlisted: {requested}")
+E           ValueError: executable not allowlisted: /tmp/meemee-ci-fresh/bin/python
+
+meemee/tools/shell.py:45: ValueError
+________________ test_timeout_cleans_child_with_inherited_pipes ________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-303/test_timeout_cleans_child_with0')
+
+    @pytest.mark.asyncio
+    async def test_timeout_cleans_child_with_inherited_pipes(tmp_path):
+        import asyncio
+        import os
+        import time
+        if os.name != 'posix':
+            pytest.skip('POSIX process-group cleanup')
+        marker = tmp_path / 'leaked'
+        child = f"import time,pathlib; time.sleep(0.5); pathlib.Path({str(marker)!r}).write_text('leaked'); time.sleep(5)"
+        parent = f"import subprocess,sys,time; subprocess.Popen([sys.executable,'-c',{child!r}]); time.sleep(5)"
+        began = time.monotonic()
+        with pytest.raises(ValueError, match='timed out'):
+>           await ShellCommand(tmp_path, {sys.executable.split('/')[-1]}).run(
+                ShellArgs(argv=[sys.executable, '-c', parent], timeout_seconds=0.2))
+
+tests/test_shell_boundary_canaries.py:54: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <meemee.tools.shell.ShellCommand object at 0x7ffb969d54e0>
+arguments = ShellArgs(argv=['/tmp/meemee-ci-fresh/bin/python', '-c', 'import subprocess,sys,time; subprocess.Popen([sys.executable...st_timeout_cleans_child_with0/leaked\').write_text(\'leaked\'); time.sleep(5)"]); time.sleep(5)'], timeout_seconds=0.2)
+
+    async def run(self, arguments: ShellArgs) -> dict[str, object]:
+        requested = arguments.argv[0]
+        name = Path(requested).name
+        expected = self.executables.get(requested) or self.executables.get(name)
+        candidate = shutil.which(requested)
+        if expected is None or candidate is None or Path(candidate).resolve() != expected:
+>           raise ValueError(f"executable not allowlisted: {requested}")
+E           ValueError: executable not allowlisted: /tmp/meemee-ci-fresh/bin/python
+
+meemee/tools/shell.py:45: ValueError
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-303/test_timeout_cleans_child_with0')
+
+    @pytest.mark.asyncio
+    async def test_timeout_cleans_child_with_inherited_pipes(tmp_path):
+        import asyncio
+        import os
+        import time
+        if os.name != 'posix':
+            pytest.skip('POSIX process-group cleanup')
+        marker = tmp_path / 'leaked'
+        child = f"import time,pathlib; time.sleep(0.5); pathlib.Path({str(marker)!r}).write_text('leaked'); time.sleep(5)"
+        parent = f"import subprocess,sys,time; subprocess.Popen([sys.executable,'-c',{child!r}]); time.sleep(5)"
+        began = time.monotonic()
+>       with pytest.raises(ValueError, match='timed out'):
+E       AssertionError: Regex pattern did not match.
+E        Regex: 'timed out'
+E        Input: 'executable not allowlisted: /tmp/meemee-ci-fresh/bin/python'
+
+tests/test_shell_boundary_canaries.py:53: AssertionError
+=============================== warnings summary ===============================
+../../../tmp/meemee-ci-fresh/lib/python3.10/site-packages/fastapi/testclient.py:1
+  /tmp/meemee-ci-fresh/lib/python3.10/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_browser_redirect_canaries.py::test_guarded_browser_keeps_normal_page_navigation_functional
+FAILED tests/test_session_network_canaries.py::test_live_session_never_requests_forbidden_target[resource-domains0]
+FAILED tests/test_session_network_canaries.py::test_live_session_never_requests_forbidden_target[resource-domains1]
+FAILED tests/test_session_network_canaries.py::test_live_session_never_requests_forbidden_target[redirect-domains2]
+FAILED tests/test_shell_boundary_canaries.py::test_output_capture_has_streaming_memory_bound
+FAILED tests/test_shell_boundary_canaries.py::test_both_pipes_drained_after_cap_without_deadlock
+FAILED tests/test_shell_boundary_canaries.py::test_timeout_cleans_child_with_inherited_pipes
+7 failed, 779 passed, 128 skipped, 1 warning in 74.69s (0:01:14)

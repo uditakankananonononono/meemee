@@ -1,0 +1,149 @@
+Skip to content
+uditakankananonononono
+meemee
+Type / to search
+Repository navigation
+Code
+Issues
+Pull requests
+5
+ (5)
+Agents
+Actions
+Projects
+Security and quality
+Insights
+Settings
+commercial-release-gate
+Repair full-tree CI release lint and validate local release gate #212
+Re-run jobs
+Summary
+All jobs
+verify
+Run details
+Usage
+Workflow file
+Annotations
+1 error, 1 warning, and 1 notice
+verify
+failed  in 1m 32s
+Explain error
+Set up job
+1s
+Run actions/checkout@v4
+3s
+Run actions/setup-python@v5
+4s
+Install release dependencies
+14s
+Lint
+0s
+Core and PostgreSQL contract tests
+1m 7s
+350
+            except ImportError as exc:
+
+351
+>               raise BrowserSessionError("browser extra is not installed; run pip install 'meemee-agent[browser]' and playwright install chromium") from exc
+
+352
+E               meemee.browser_sessions.BrowserSessionError: browser extra is not installed; run pip install 'meemee-agent[browser]' and playwright install chromium
+
+353
+
+
+354
+meemee/browser_sessions.py:380: BrowserSessionError
+
+355
+=============================== warnings summary ===============================
+
+356
+../../../../../opt/hostedtoolcache/Python/3.10.21/x64/lib/python3.10/site-packages/fastapi/testclient.py:1
+
+357
+  /opt/hostedtoolcache/Python/3.10.21/x64/lib/python3.10/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+
+358
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+359
+
+
+360
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+
+361
+=========================== short test summary info ============================
+
+362
+FAILED tests/test_browser_redirect_canaries.py::test_guarded_browser_keeps_normal_page_navigation_functional - ValueError: browser extra is not installed; run pip install 'meemee-agent[browser]' and playwright install chromium
+
+363
+FAILED tests/test_concurrent_sqlite_startup.py::test_six_processes_can_initialize_memory_and_job_schema_together - AssertionError: Traceback (most recent call last):
+
+364
+    File "<string>", line 9, in <module>
+
+365
+    File "/home/runner/work/meemee/meemee/meemee/jobs.py", line 23, in __init__
+
+366
+      self.db.executescript("""
+
+367
+  sqlite3.OperationalError: database is locked
+
+368
+  
+
+369
+assert 1 == 0
+
+370
+ +  where 1 = <Popen: returncode: 1 args: ['/opt/hostedtoolcache/Python/3.10.21/x64/bin/py...>.returncode
+
+371
+FAILED tests/test_git_pathspec_canary.py::test_explicit_star_filename_does_not_commit_unselected_files - AssertionError: assert '*\nprivate.txt' == '*'
+
+372
+  
+
+373
+  - *
+
+374
+  + *
+
+375
+  + private.txt
+
+376
+FAILED tests/test_session_network_canaries.py::test_live_session_never_requests_forbidden_target[resource-domains0] - meemee.browser_sessions.BrowserSessionError: browser extra is not installed; run pip install 'meemee-agent[browser]' and playwright install chromium
+
+377
+FAILED tests/test_session_network_canaries.py::test_live_session_never_requests_forbidden_target[resource-domains1] - meemee.browser_sessions.BrowserSessionError: browser extra is not installed; run pip install 'meemee-agent[browser]' and playwright install chromium
+
+378
+FAILED tests/test_session_network_canaries.py::test_live_session_never_requests_forbidden_target[redirect-domains2] - meemee.browser_sessions.BrowserSessionError: browser extra is not installed; run pip install 'meemee-agent[browser]' and playwright install chromium
+
+379
+6 failed, 780 passed, 128 skipped, 1 warning in 65.60s (0:01:05)
+
+380
+Error: Process completed with exit code 1.
+
+SDK tests
+0s
+Build distributions
+0s
+Audit release tree and wheel
+0s
+Run actions/upload-artifact@v4
+0s
+Post Run actions/setup-python@v5
+0s
+Post Run actions/checkout@v4
+0s
+Complete job
+0s
