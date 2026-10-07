@@ -1,0 +1,27 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___________ test_export_concurrent_destination_creation_is_preserved ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-290/test_export_concurrent_destina0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7efe31179f00>
+
+    def test_export_concurrent_destination_creation_is_preserved(tmp_path, monkeypatch):
+        destination = tmp_path / 'export.json'
+        real_exists = Path.exists
+        injected = [False]
+    
+        def raced_exists(path):
+            if path == destination and not injected[0]:
+                injected[0] = True
+                destination.write_text('competing owner file')
+                return False
+            return real_exists(path)
+    
+        monkeypatch.setattr(Path, 'exists', raced_exists)
+>       with pytest.raises(FileExistsError):
+E       Failed: DID NOT RAISE <class 'FileExistsError'>
+
+tests/test_account_export_overwrite_canary.py:22: Failed
+=========================== short test summary info ============================
+FAILED tests/test_account_export_overwrite_canary.py::test_export_concurrent_destination_creation_is_preserved
+1 failed in 0.05s
