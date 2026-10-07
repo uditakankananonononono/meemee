@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
 from collections.abc import Callable
@@ -82,7 +83,23 @@ class Agent:
                 final = "Cancelled before the next agent step."
                 self.memory.add(run_id, "cancelled", final, owner_id=owner_id)
                 return RunReport(run_id=run_id, goal=goal, final=final, steps_used=step_number - 1, tool_results=events, approvals_required=refusals)
-            decision = await self.model.decide(messages)
+            generation = asyncio.create_task(self.model.decide(messages))
+            try:
+                if cancel is not None:
+                    while not generation.done() and not cancel.is_set():
+                        await asyncio.sleep(0.05)
+                    if cancel.is_set() and not generation.done():
+                        generation.cancel()
+                        await asyncio.gather(generation, return_exceptions=True)
+                        final = "Cancelled during model generation."
+                        self.memory.add(run_id, "cancelled", final, owner_id=owner_id)
+                        return RunReport(run_id=run_id, goal=goal, final=final,
+                            steps_used=step_number - 1, tool_results=events, approvals_required=refusals)
+                decision = await generation
+            except asyncio.CancelledError:
+                generation.cancel()
+                await asyncio.gather(generation, return_exceptions=True)
+                raise
             if cancel is not None and cancel.is_set():
                 final = "Cancelled after model response, before action."
                 self.memory.add(run_id, "cancelled", final, owner_id=owner_id)

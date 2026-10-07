@@ -1,0 +1,236 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_________ test_cancel_stops_model_wait_without_waiting_for_generation __________
+
+self = <test_cancel_effect_canaries.test_cancel_stops_model_wait_without_waiting_for_generation.<locals>.SlowModel object at 0x7fad3a2bd8d0>
+messages = [{'content': "You are Meemee, an honest autonomous agent. Work toward the user's goal with the\navailable tools. Never...s": [], "relevant_memory": [], "unified_personal_context": [], "evidence_backed_personal_model": []}', 'role': 'user'}]
+
+    async def decide(self, messages):
+        began.set()
+        try:
+>           await asyncio.sleep(10)
+
+tests/test_cancel_effect_canaries.py:86: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+delay = 10, result = None
+
+    async def sleep(delay, result=None):
+        """Coroutine that completes after a given time (in seconds)."""
+        if delay <= 0:
+            await __sleep0()
+            return result
+    
+        loop = events.get_running_loop()
+        future = loop.create_future()
+        h = loop.call_later(delay,
+                            futures._set_result_unless_cancelled,
+                            future, result)
+        try:
+>           return await future
+E           asyncio.exceptions.CancelledError
+
+/usr/lib/python3.10/asyncio/tasks.py:605: CancelledError
+
+During handling of the above exception, another exception occurred:
+
+fut = <Task cancelled name='Task-2' coro=<Agent.run() done, defined at /home/sandbox/meemee/meemee/agent.py:58>>
+timeout = 0.5
+
+    async def wait_for(fut, timeout):
+        """Wait for the single Future or coroutine to complete, with timeout.
+    
+        Coroutine will be wrapped in Task.
+    
+        Returns result of the Future or coroutine.  When a timeout occurs,
+        it cancels the task and raises TimeoutError.  To avoid the task
+        cancellation, wrap it in shield().
+    
+        If the wait is cancelled, the task is also cancelled.
+    
+        This function is a coroutine.
+        """
+        loop = events.get_running_loop()
+    
+        if timeout is None:
+            return await fut
+    
+        if timeout <= 0:
+            fut = ensure_future(fut, loop=loop)
+    
+            if fut.done():
+                return fut.result()
+    
+            await _cancel_and_wait(fut, loop=loop)
+            try:
+                return fut.result()
+            except exceptions.CancelledError as exc:
+                raise exceptions.TimeoutError() from exc
+    
+        waiter = loop.create_future()
+        timeout_handle = loop.call_later(timeout, _release_waiter, waiter)
+        cb = functools.partial(_release_waiter, waiter)
+    
+        fut = ensure_future(fut, loop=loop)
+        fut.add_done_callback(cb)
+    
+        try:
+            # wait until the future completes or the timeout
+            try:
+                await waiter
+            except exceptions.CancelledError:
+                if fut.done():
+                    return fut.result()
+                else:
+                    fut.remove_done_callback(cb)
+                    # We must ensure that the task is not running
+                    # after wait_for() returns.
+                    # See https://bugs.python.org/issue32751
+                    await _cancel_and_wait(fut, loop=loop)
+                    raise
+    
+            if fut.done():
+                return fut.result()
+            else:
+                fut.remove_done_callback(cb)
+                # We must ensure that the task is not running
+                # after wait_for() returns.
+                # See https://bugs.python.org/issue32751
+                await _cancel_and_wait(fut, loop=loop)
+                # In case task cancellation failed with some
+                # exception, we should re-raise it
+                # See https://bugs.python.org/issue40607
+                try:
+>                   return fut.result()
+E                   asyncio.exceptions.CancelledError
+
+/usr/lib/python3.10/asyncio/tasks.py:456: CancelledError
+
+The above exception was the direct cause of the following exception:
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-84/test_cancel_stops_model_wait_w0')
+
+    @pytest.mark.asyncio
+    async def test_cancel_stops_model_wait_without_waiting_for_generation(tmp_path):
+        began, cleaned, cancel = asyncio.Event(), asyncio.Event(), Event()
+        class SlowModel:
+            async def decide(self, messages):
+                began.set()
+                try:
+                    await asyncio.sleep(10)
+                    return AgentDecision(final='late answer')
+                finally:
+                    cleaned.set()
+        agent = Agent(SlowModel(), ToolRegistry(), MemoryStore(tmp_path / 'memory.db'))
+        task = asyncio.create_task(agent.run('work', owner_id='owner', cancel=cancel))
+        await began.wait()
+        cancel.set()
+        try:
+>           report = await asyncio.wait_for(task, 0.5)
+
+tests/test_cancel_effect_canaries.py:95: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+fut = <Task cancelled name='Task-2' coro=<Agent.run() done, defined at /home/sandbox/meemee/meemee/agent.py:58>>
+timeout = 0.5
+
+    async def wait_for(fut, timeout):
+        """Wait for the single Future or coroutine to complete, with timeout.
+    
+        Coroutine will be wrapped in Task.
+    
+        Returns result of the Future or coroutine.  When a timeout occurs,
+        it cancels the task and raises TimeoutError.  To avoid the task
+        cancellation, wrap it in shield().
+    
+        If the wait is cancelled, the task is also cancelled.
+    
+        This function is a coroutine.
+        """
+        loop = events.get_running_loop()
+    
+        if timeout is None:
+            return await fut
+    
+        if timeout <= 0:
+            fut = ensure_future(fut, loop=loop)
+    
+            if fut.done():
+                return fut.result()
+    
+            await _cancel_and_wait(fut, loop=loop)
+            try:
+                return fut.result()
+            except exceptions.CancelledError as exc:
+                raise exceptions.TimeoutError() from exc
+    
+        waiter = loop.create_future()
+        timeout_handle = loop.call_later(timeout, _release_waiter, waiter)
+        cb = functools.partial(_release_waiter, waiter)
+    
+        fut = ensure_future(fut, loop=loop)
+        fut.add_done_callback(cb)
+    
+        try:
+            # wait until the future completes or the timeout
+            try:
+                await waiter
+            except exceptions.CancelledError:
+                if fut.done():
+                    return fut.result()
+                else:
+                    fut.remove_done_callback(cb)
+                    # We must ensure that the task is not running
+                    # after wait_for() returns.
+                    # See https://bugs.python.org/issue32751
+                    await _cancel_and_wait(fut, loop=loop)
+                    raise
+    
+            if fut.done():
+                return fut.result()
+            else:
+                fut.remove_done_callback(cb)
+                # We must ensure that the task is not running
+                # after wait_for() returns.
+                # See https://bugs.python.org/issue32751
+                await _cancel_and_wait(fut, loop=loop)
+                # In case task cancellation failed with some
+                # exception, we should re-raise it
+                # See https://bugs.python.org/issue40607
+                try:
+                    return fut.result()
+                except exceptions.CancelledError as exc:
+>                   raise exceptions.TimeoutError() from exc
+E                   asyncio.exceptions.TimeoutError
+
+/usr/lib/python3.10/asyncio/tasks.py:458: TimeoutError
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-84/test_cancel_stops_model_wait_w0')
+
+    @pytest.mark.asyncio
+    async def test_cancel_stops_model_wait_without_waiting_for_generation(tmp_path):
+        began, cleaned, cancel = asyncio.Event(), asyncio.Event(), Event()
+        class SlowModel:
+            async def decide(self, messages):
+                began.set()
+                try:
+                    await asyncio.sleep(10)
+                    return AgentDecision(final='late answer')
+                finally:
+                    cleaned.set()
+        agent = Agent(SlowModel(), ToolRegistry(), MemoryStore(tmp_path / 'memory.db'))
+        task = asyncio.create_task(agent.run('work', owner_id='owner', cancel=cancel))
+        await began.wait()
+        cancel.set()
+        try:
+            report = await asyncio.wait_for(task, 0.5)
+        except asyncio.TimeoutError:
+>           pytest.fail('cancellation waits for model generation timeout')
+E           Failed: cancellation waits for model generation timeout
+
+tests/test_cancel_effect_canaries.py:97: Failed
+=========================== short test summary info ============================
+FAILED tests/test_cancel_effect_canaries.py::test_cancel_stops_model_wait_without_waiting_for_generation
+1 failed in 0.65s
