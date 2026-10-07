@@ -30,3 +30,19 @@ def test_reflection_refuses_another_owners_batch_before_model(stores):  # noqa: 
         asyncio.run(reflector.reflect_records('bob', context.recent('alice')))
     assert model.calls == 0
     assert personal.list('bob') == []
+
+
+def test_reflection_refuses_shared_visibility_before_model(stores):  # noqa: F811
+    personal, context = stores()
+    context.register_source('alice', 'source', 'test', {})
+    context.ingest(ContextRecord('alice', 'source', 'event', 'event', 'drink', 'likes tea',
+                                 '2026-10-08', {}, visibility='shared'))
+    # The standard entry point excludes shared records; caller-supplied batches must too.
+    model = Model()
+    reflector = PersonalModelReflector(context, personal, model)
+    assert asyncio.run(reflector.reflect('alice'))['considered'] == 0
+    assert model.calls == 0
+    with pytest.raises(ValueError, match='visibility'):
+        asyncio.run(reflector.reflect_records('alice', context.recent('alice', allowed={'shared'})))
+    assert model.calls == 0
+    assert personal.list('alice') == []
