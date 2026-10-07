@@ -185,6 +185,12 @@ class CompanionStore:
     def add_message(self, conversation_id: str, role: str, content: str) -> dict[str, Any]:
         now = _now()
         with self.db.transaction() as c:
+            conversation = c.execute(
+                "SELECT id FROM meemee_companion_conversations WHERE id=%s FOR UPDATE",
+                (conversation_id,),
+            ).fetchone()
+            if conversation is None:
+                raise ValueError("Unknown conversation for message")
             row = c.execute("""INSERT INTO meemee_companion_messages(conversation_id,role,content,created_at)
                                VALUES (%s,%s,%s,%s) RETURNING *""", (conversation_id, role, scrub_text(content), now)).fetchone()
             c.execute("UPDATE meemee_companion_conversations SET last_message_at=%s WHERE id=%s", (now, conversation_id))

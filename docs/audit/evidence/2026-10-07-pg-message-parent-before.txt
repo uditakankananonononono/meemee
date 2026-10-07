@@ -1,0 +1,14 @@
+.F                                                                       [100%]
+=================================== FAILURES ===================================
+____________ test_message_rejects_unknown_conversation[postgresql] _____________
+
+store = <meemee_persist_pg.companion.CompanionStore object at 0x7fa319d56110>
+
+    def test_message_rejects_unknown_conversation(store):
+>       with pytest.raises(ValueError, match='conversation'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_companion_backends.py:176: Failed
+=========================== short test summary info ============================
+FAILED tests/test_companion_backends.py::test_message_rejects_unknown_conversation[postgresql]
+1 failed, 1 passed, 24 deselected in 0.78s
