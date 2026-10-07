@@ -1,0 +1,36 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______ test_internal_child_typeerror_retains_all_reports_without_replay _______
+
+    @pytest.mark.asyncio
+    async def test_internal_child_typeerror_retains_all_reports_without_replay():
+        calls = []
+        class Child:
+            async def run(self, goal, *, owner_id):
+                calls.append(goal)
+                if goal == 'bad':
+                    raise TypeError('internal failure after effect')
+                return SimpleNamespace(model_dump=lambda:{'final':'good'})
+>       reports = await AgentTeam(Child).delegate(['bad','good'], owner_id='owner')
+
+tests/test_team_failure_canary.py:18: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee/team.py:44: in delegate
+    return await asyncio.gather(*(one(index, goal) for index, goal in enumerate(goals)))
+meemee/team.py:39: in one
+    report = await child.run(goal, **options)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <test_team_failure_canary.test_internal_child_typeerror_retains_all_reports_without_replay.<locals>.Child object at 0x7fa45ad4a290>
+goal = 'bad'
+
+    async def run(self, goal, *, owner_id):
+        calls.append(goal)
+        if goal == 'bad':
+>           raise TypeError('internal failure after effect')
+E           TypeError: internal failure after effect
+
+tests/test_team_failure_canary.py:16: TypeError
+=========================== short test summary info ============================
+FAILED tests/test_team_failure_canary.py::test_internal_child_typeerror_retains_all_reports_without_replay
+1 failed in 0.04s
