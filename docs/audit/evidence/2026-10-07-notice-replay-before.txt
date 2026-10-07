@@ -1,0 +1,40 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+________ test_notice_enqueue_replay_returns_existing_durable_id[sqlite] ________
+
+make = <function make.<locals>.<lambda> at 0x7f3ac4f97f40>
+
+    def test_notice_enqueue_replay_returns_existing_durable_id(make):
+        _, notices = make('host-a')
+        takeover = {'takeover_id': 'stable', 'reason': 'captcha', 'url': 'https://example.test/t',
+                    'expires_at': (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()}
+        first = notices.enqueue(takeover, 'session', 'owner')
+        replay = notices.enqueue(takeover, 'session', 'owner')
+>       assert replay == first
+E       AssertionError: assert 'bn_909841f50...29fd2ee681cc0' == 'bn_da207d905...952e71ea19c1b'
+E         
+E         - bn_da207d905c9b4466ba8952e71ea19c1b
+E         + bn_909841f501534277acc29fd2ee681cc0
+
+tests/test_browser_records_backends.py:135: AssertionError
+______ test_notice_enqueue_replay_returns_existing_durable_id[postgresql] ______
+
+make = <function make.<locals>.<lambda> at 0x7f3ac396e320>
+
+    def test_notice_enqueue_replay_returns_existing_durable_id(make):
+        _, notices = make('host-a')
+        takeover = {'takeover_id': 'stable', 'reason': 'captcha', 'url': 'https://example.test/t',
+                    'expires_at': (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()}
+        first = notices.enqueue(takeover, 'session', 'owner')
+        replay = notices.enqueue(takeover, 'session', 'owner')
+>       assert replay == first
+E       AssertionError: assert 'bn_d6f51108b...77e8c002491f3' == 'bn_cd7ea16de...8427f0bc3e1c2'
+E         
+E         - bn_cd7ea16de85d4e52a2c8427f0bc3e1c2
+E         + bn_d6f51108be974d23b3f77e8c002491f3
+
+tests/test_browser_records_backends.py:135: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_browser_records_backends.py::test_notice_enqueue_replay_returns_existing_durable_id[sqlite]
+FAILED tests/test_browser_records_backends.py::test_notice_enqueue_replay_returns_existing_durable_id[postgresql]
+2 failed, 7 deselected in 0.72s

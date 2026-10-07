@@ -60,11 +60,15 @@ class TakeoverNoticeQueue:
         notice_id = "bn_" + uuid.uuid4().hex
         now = _now()
         with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
             self.db.execute(
                 "INSERT OR IGNORE INTO browser_takeover_notices(id, takeover_id, session_id, user_id, text, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
                 (notice_id, takeover["takeover_id"], session_id, user_id, text, "queued", now, now),
             )
-        return notice_id
+            row = self.db.execute(
+                "SELECT id FROM browser_takeover_notices WHERE takeover_id=?", (takeover["takeover_id"],)
+            ).fetchone()
+            return row["id"]
 
     def _finish(self, notice_id: str, status: str, detail: str, channel: str | None = None, keep_text: bool = False) -> None:
         with self.lock, self.db:

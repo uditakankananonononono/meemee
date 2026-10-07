@@ -124,3 +124,13 @@ def test_notice_delivery_rejects_foreign_local_address_on_both_backends(make, tm
     assert result[0]["status"] in {"queued", "failed"}
     assert "unknown local conversation" in result[0]["error"]
     assert companion.history(victim["id"]) == []
+
+
+def test_notice_enqueue_replay_returns_existing_durable_id(make):
+    _, notices = make('host-a')
+    takeover = {'takeover_id': 'stable', 'reason': 'captcha', 'url': 'https://example.test/t',
+                'expires_at': (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()}
+    first = notices.enqueue(takeover, 'session', 'owner')
+    replay = notices.enqueue(takeover, 'session', 'owner')
+    assert replay == first
+    assert [row['id'] for row in notices.list()] == [first]
