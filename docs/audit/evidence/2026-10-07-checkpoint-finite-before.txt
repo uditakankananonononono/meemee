@@ -1,0 +1,30 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+__________ test_nonfinite_checkpoint_refused_before_publication[nan] ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-333/test_nonfinite_checkpoint_refu0')
+value = nan
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf')])
+    def test_nonfinite_checkpoint_refused_before_publication(tmp_path, value):
+        store = CheckpointStore(tmp_path / 'c.db')
+>       with pytest.raises(ValueError):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_checkpoint_finite_state_canary.py:10: Failed
+__________ test_nonfinite_checkpoint_refused_before_publication[inf] ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-333/test_nonfinite_checkpoint_refu1')
+value = inf
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf')])
+    def test_nonfinite_checkpoint_refused_before_publication(tmp_path, value):
+        store = CheckpointStore(tmp_path / 'c.db')
+>       with pytest.raises(ValueError):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_checkpoint_finite_state_canary.py:10: Failed
+=========================== short test summary info ============================
+FAILED tests/test_checkpoint_finite_state_canary.py::test_nonfinite_checkpoint_refused_before_publication[nan]
+FAILED tests/test_checkpoint_finite_state_canary.py::test_nonfinite_checkpoint_refused_before_publication[inf]
+2 failed in 0.06s
