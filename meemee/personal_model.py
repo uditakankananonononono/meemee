@@ -119,40 +119,50 @@ class PersonalModelStore:
     def upsert(self, owner_id: str, item: PersonalItemInput, *, preserve_user: bool = False, expected_current_id: str | None = None) -> dict:
         if not owner_id:
             raise ValueError("owner is required")
-        now = datetime.now(timezone.utc).isoformat()
         with self.lock, self.db:
             self.db.execute("BEGIN IMMEDIATE")
-            current = self.db.execute(
-                "SELECT * FROM personal_items WHERE owner_id=? AND kind=? AND title=? AND status='active'",
-                (owner_id, item.kind, item.title.strip()),
+            return self._upsert_locked(owner_id, item, preserve_user, expected_current_id)
+
+    def upsert_batch(self, owner_id: str, items: list[PersonalItemInput], *, preserve_user: bool = False) -> list[dict]:
+        if not owner_id:
+            raise ValueError("owner is required")
+        with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            return [self._upsert_locked(owner_id, item, preserve_user, None) for item in items]
+
+    def _upsert_locked(self, owner_id, item, preserve_user, expected_current_id):
+        now = datetime.now(timezone.utc).isoformat()
+        current = self.db.execute(
+            "SELECT * FROM personal_items WHERE owner_id=? AND kind=? AND title=? AND status='active'",
+            (owner_id, item.kind, item.title.strip()),
+        ).fetchone()
+        if expected_current_id is not None and (current is None or current["id"] != expected_current_id):
+            return {}
+        if preserve_user and current:
+            confirmed = self.db.execute(
+                "SELECT 1 FROM personal_evidence WHERE item_id=? AND owner_id=? AND source_id='user' LIMIT 1",
+                (current["id"], owner_id),
             ).fetchone()
-            if expected_current_id is not None and (current is None or current["id"] != expected_current_id):
-                return {}
-            if preserve_user and current:
-                confirmed = self.db.execute(
-                    "SELECT 1 FROM personal_evidence WHERE item_id=? AND owner_id=? AND source_id='user' LIMIT 1",
-                    (current["id"], owner_id),
-                ).fetchone()
-                if confirmed:
-                    return {**dict(current), "reflection_preserved_user": True}
-            if current and current["value"] == item.value.strip():
-                ident = current["id"]
-                combined = max(float(current["confidence"]), item.confidence)
-                self.db.execute("UPDATE personal_items SET confidence=?,valid_from=?,valid_until=?,updated_at=? WHERE id=?", (combined, item.valid_from, item.valid_until, now, ident))
-            else:
-                ident = uuid.uuid4().hex
-                previous = current["id"] if current else None
-                if previous:
-                    self.db.execute("UPDATE personal_items SET status='superseded',updated_at=? WHERE id=?", (now, previous))
-                self.db.execute(
-                    "INSERT INTO personal_items VALUES(?,?,?,?,?,?,'active',?,?,?,?,?)",
-                    (ident, owner_id, item.kind, item.title.strip(), item.value.strip(), item.confidence,
-                     item.valid_from, item.valid_until, previous, now, now),
-                )
+            if confirmed:
+                return {**dict(current), "reflection_preserved_user": True}
+        if current and current["value"] == item.value.strip():
+            ident = current["id"]
+            combined = max(float(current["confidence"]), item.confidence)
+            self.db.execute("UPDATE personal_items SET confidence=?,valid_from=?,valid_until=?,updated_at=? WHERE id=?", (combined, item.valid_from, item.valid_until, now, ident))
+        else:
+            ident = uuid.uuid4().hex
+            previous = current["id"] if current else None
+            if previous:
+                self.db.execute("UPDATE personal_items SET status='superseded',updated_at=? WHERE id=?", (now, previous))
             self.db.execute(
-                "INSERT OR IGNORE INTO personal_evidence(item_id,owner_id,source_id,source_record_id,observed_value,confidence,observed_at) VALUES(?,?,?,?,?,?,?)",
-                (ident, owner_id, item.source_id, item.source_record_id, item.value.strip(), item.confidence, now),
+                "INSERT INTO personal_items VALUES(?,?,?,?,?,?,'active',?,?,?,?,?)",
+                (ident, owner_id, item.kind, item.title.strip(), item.value.strip(), item.confidence,
+                 item.valid_from, item.valid_until, previous, now, now),
             )
+        self.db.execute(
+            "INSERT OR IGNORE INTO personal_evidence(item_id,owner_id,source_id,source_record_id,observed_value,confidence,observed_at) VALUES(?,?,?,?,?,?,?)",
+            (ident, owner_id, item.source_id, item.source_record_id, item.value.strip(), item.confidence, now),
+        )
         return self.get(owner_id, ident) or {}
 
     def get(self, owner_id: str, ident: str) -> dict | None:
