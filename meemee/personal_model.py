@@ -167,11 +167,18 @@ class PersonalModelStore:
 
     def get(self, owner_id: str, ident: str) -> dict | None:
         with self.lock:
-            row = self.db.execute("SELECT * FROM personal_items WHERE owner_id=? AND id=?", (owner_id, ident)).fetchone()
-            evidence = self.db.execute(
-                "SELECT source_id,source_record_id,observed_value,confidence,observed_at FROM personal_evidence WHERE owner_id=? AND item_id=? ORDER BY observed_at DESC,id DESC",
-                (owner_id, ident),
-            ).fetchall()
+            if self.db.in_transaction:
+                return self._get_locked(owner_id, ident)
+            with self.db:
+                self.db.execute("BEGIN")
+                return self._get_locked(owner_id, ident)
+
+    def _get_locked(self, owner_id: str, ident: str) -> dict | None:
+        row = self.db.execute("SELECT * FROM personal_items WHERE owner_id=? AND id=?", (owner_id, ident)).fetchone()
+        evidence = self.db.execute(
+            "SELECT source_id,source_record_id,observed_value,confidence,observed_at FROM personal_evidence WHERE owner_id=? AND item_id=? ORDER BY observed_at DESC,id DESC",
+            (owner_id, ident),
+        ).fetchall()
         if not row:
             return None
         return {**dict(row), "evidence": [dict(item) for item in evidence]}

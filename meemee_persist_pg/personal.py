@@ -88,7 +88,7 @@ class PersonalModelStore:
         return self._get_on(c, owner_id, ident) or {}
 
     def get(self, owner_id: str, ident: str) -> dict | None:
-        with self.db.transaction() as c:
+        with self.db.transaction(isolation="REPEATABLE READ") as c:
             return self._get_on(c, owner_id, ident)
 
     @staticmethod

@@ -20,7 +20,7 @@ class ContractDB:
             'value':'Travel', 'confidence':0.5, 'status':'active',
             'valid_from':None, 'valid_until':'2020-01-01T00:00:00+00:00'}
     @contextmanager
-    def transaction(self):
+    def transaction(self, *, isolation=None):
         yield self
     def execute(self, sql, params=()):
         if sql.startswith('SELECT pg_advisory'):

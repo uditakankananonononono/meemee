@@ -1,0 +1,98 @@
+.............sssssssssssss.....................s.s..s................... [ 13%]
+..............ss.................s....................ss........sss.s.s. [ 26%]
+s.s...................................sss.................s.s.s.s.s..s.s [ 39%]
+F.........ss.............F....................................s.s.s.s.s. [ 52%]
+s..s.ss.......................s.s.s..s...................s.s.s.s.s.s.s.. [ 65%]
+.ssssss................................................................. [ 78%]
+....s.s.s.s.s.sss....sss..................sss............s.s.s.s.s.s.s.s [ 92%]
+..............................sss..........                              [100%]
+=================================== FAILURES ===================================
+______________ test_independent_personal_writers_merge_one_claim _______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-534/test_independent_personal_writ0')
+
+    def test_independent_personal_writers_merge_one_claim(tmp_path):
+        stores = [PersonalModelStore(tmp_path / 'p.db'), PersonalModelStore(tmp_path / 'p.db')]
+        for store in stores:
+            store.db = SlowConnection(store.db)
+        ready = threading.Barrier(2)
+    
+        def write(i):
+            ready.wait()
+            return stores[i].upsert('o', PersonalItemInput(kind='preference', title='drink', value='tea', source_id='fixture', source_record_id=str(i)))
+    
+        with ThreadPoolExecutor(2) as pool:
+>           rows = list(pool.map(write, range(2)))
+
+tests/test_personal_cross_connection_canary.py:38: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.10/concurrent/futures/_base.py:621: in result_iterator
+    yield _result_or_cancel(fs.pop())
+/usr/lib/python3.10/concurrent/futures/_base.py:319: in _result_or_cancel
+    return fut.result(timeout)
+/usr/lib/python3.10/concurrent/futures/_base.py:458: in result
+    return self.__get_result()
+/usr/lib/python3.10/concurrent/futures/_base.py:403: in __get_result
+    raise self._exception
+/usr/lib/python3.10/concurrent/futures/thread.py:58: in run
+    result = self.fn(*self.args, **self.kwargs)
+tests/test_personal_cross_connection_canary.py:35: in write
+    return stores[i].upsert('o', PersonalItemInput(kind='preference', title='drink', value='tea', source_id='fixture', source_record_id=str(i)))
+meemee/personal_model.py:124: in upsert
+    return self._upsert_locked(owner_id, item, preserve_user, expected_current_id)
+meemee/personal_model.py:166: in _upsert_locked
+    return self.get(owner_id, ident) or {}
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <meemee.personal_model.PersonalModelStore object at 0x7f95a1f73e20>
+owner_id = 'o', ident = '6e1896ad82a842229e5dcf0d38f85e80'
+
+    def get(self, owner_id: str, ident: str) -> dict | None:
+        with self.lock:
+>           if self.db.in_transaction:
+E           AttributeError: 'SlowConnection' object has no attribute 'in_transaction'
+
+meemee/personal_model.py:170: AttributeError
+____ test_pg_active_context_filters_expired_rows_without_claiming_live_sql _____
+
+    def test_pg_active_context_filters_expired_rows_without_claiming_live_sql():
+        db = ContractDB()
+        store = PersonalModelStore(db)
+>       assert store.list('owner') == []
+
+tests/test_pg_personal_time_contract_canary.py:55: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee_persist_pg/personal.py:113: in list
+    items = [self.get(owner_id, row["id"]) for row in rows]
+meemee_persist_pg/personal.py:113: in <listcomp>
+    items = [self.get(owner_id, row["id"]) for row in rows]
+meemee_persist_pg/personal.py:91: in get
+    with self.db.transaction(isolation="REPEATABLE READ") as c:
+/usr/lib/python3.10/contextlib.py:281: in helper
+    return _GeneratorContextManager(func, args, kwds)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._GeneratorContextManager object at 0x7f95a1ed3d90>
+func = <function ContractDB.transaction at 0x7f95a5f44d30>
+args = (<test_pg_personal_time_contract_canary.ContractDB object at 0x7f95a1ed28f0>,)
+kwds = {'isolation': 'REPEATABLE READ'}
+
+    def __init__(self, func, args, kwds):
+>       self.gen = func(*args, **kwds)
+E       TypeError: ContractDB.transaction() got an unexpected keyword argument 'isolation'
+
+/usr/lib/python3.10/contextlib.py:103: TypeError
+=============================== warnings summary ===============================
+.venv/lib/python3.10/site-packages/fastapi/testclient.py:1
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+.venv/lib/python3.10/site-packages/starlette/testclient.py:53
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_personal_cross_connection_canary.py::test_independent_personal_writers_merge_one_claim
+FAILED tests/test_pg_personal_time_contract_canary.py::test_pg_active_context_filters_expired_rows_without_claiming_live_sql
+2 failed, 454 passed, 91 skipped, 2 warnings in 54.97s

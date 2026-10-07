@@ -1,0 +1,28 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+______________________ test_sqlite_personal_get_snapshot _______________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-531/test_sqlite_personal_get_snaps0')
+
+    def test_sqlite_personal_get_snapshot(tmp_path):
+        path = tmp_path / 'personal.sqlite3'
+        reader, writer = PersonalModelStore(path), PersonalModelStore(path)
+        def value(confidence, source):
+            return PersonalItemInput(kind='preference', title='drink', value='tea', confidence=confidence,
+                                     source_id=source, source_record_id='record')
+        row = writer.upsert('owner', value(0.2, 'first'))
+        changed = []
+        def race(sql):
+            if 'SELECT source_id,source_record_id' in sql and not changed:
+                changed.append(True)
+                writer.upsert('owner', value(0.9, 'second'))
+        reader.db.set_trace_callback(race)
+        result = reader.get('owner', row['id'])
+>       assert result['confidence'] == max(e['confidence'] for e in result['evidence'])
+E       assert 0.2 == 0.9
+E        +  where 0.9 = max(<generator object test_sqlite_personal_get_snapshot.<locals>.<genexpr> at 0x7feca1f3eea0>)
+
+tests/test_personal_get_snapshot.py:20: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_personal_get_snapshot.py::test_sqlite_personal_get_snapshot
+1 failed in 0.14s

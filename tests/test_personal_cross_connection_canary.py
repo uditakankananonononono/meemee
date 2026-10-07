@@ -10,6 +10,10 @@ class SlowConnection:
     def __init__(self, db):
         self.db = db
 
+    @property
+    def in_transaction(self):
+        return self.db.in_transaction
+
     def __enter__(self):
         self.db.__enter__()
         return self
