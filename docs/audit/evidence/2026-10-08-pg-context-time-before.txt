@@ -1,0 +1,46 @@
+..FF....                                                                 [100%]
+=================================== FAILURES ===================================
+__________ test_context_offset_latest_before_limit[postgresql-recent] __________
+
+stores = <function stores.<locals>.<lambda> at 0x7f1ef8b80a60>
+reader = 'recent'
+
+    @pytest.mark.parametrize('reader', ['recent', 'search'])
+    def test_context_offset_latest_before_limit(stores, reader):
+        _, store = stores()
+        store.register_source('owner', 'source', 'test', {})
+        for ident, stamp in [('early', '2026-10-07T15:30:00+05:30'),
+                             ('later', '2026-10-07T11:00:00+00:00')]:
+            store.ingest(ContextRecord('owner', 'source', ident, 'event', 'same', 'fixture', stamp, {}))
+        records = store.recent('owner', limit=1) if reader == 'recent' else store.search('owner', 'fixture', limit=1)
+>       assert [r['external_id'] for r in records] == ['later']
+E       AssertionError: assert ['early'] == ['later']
+E         
+E         At index 0 diff: 'early' != 'later'
+E         Use -v to get more diff
+
+tests/test_context_time_backends.py:17: AssertionError
+__________ test_context_offset_latest_before_limit[postgresql-search] __________
+
+stores = <function stores.<locals>.<lambda> at 0x7f1ef8bf6050>
+reader = 'search'
+
+    @pytest.mark.parametrize('reader', ['recent', 'search'])
+    def test_context_offset_latest_before_limit(stores, reader):
+        _, store = stores()
+        store.register_source('owner', 'source', 'test', {})
+        for ident, stamp in [('early', '2026-10-07T15:30:00+05:30'),
+                             ('later', '2026-10-07T11:00:00+00:00')]:
+            store.ingest(ContextRecord('owner', 'source', ident, 'event', 'same', 'fixture', stamp, {}))
+        records = store.recent('owner', limit=1) if reader == 'recent' else store.search('owner', 'fixture', limit=1)
+>       assert [r['external_id'] for r in records] == ['later']
+E       AssertionError: assert ['early'] == ['later']
+E         
+E         At index 0 diff: 'early' != 'later'
+E         Use -v to get more diff
+
+tests/test_context_time_backends.py:17: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_context_time_backends.py::test_context_offset_latest_before_limit[postgresql-recent]
+FAILED tests/test_context_time_backends.py::test_context_offset_latest_before_limit[postgresql-search]
+2 failed, 6 passed in 1.50s

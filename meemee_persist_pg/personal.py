@@ -211,10 +211,12 @@ class ContextStore:
         if not query.split():
             return []
         with self.db.transaction() as c:
+            # Naive/date-only legacy timestamps mean UTC, independent of session defaults.
+            c.execute("SET LOCAL TIME ZONE 'UTC'")
             rows = c.execute("""WITH q AS (SELECT plainto_tsquery('simple', %s) AS query)
                 SELECT r.*, -ts_rank_cd(r.fts, q.query) AS score FROM meemee_context_records r, q
                 WHERE r.fts @@ q.query AND r.owner_id=%s AND r.visibility = ANY(%s)
-                ORDER BY score, r.occurred_at DESC LIMIT %s""",
+                ORDER BY score, r.occurred_at::timestamptz DESC, r.id DESC LIMIT %s""",
                              (query, owner_id, visibility, max(1, min(limit, 100)))).fetchall()
         return [self._record(row) for row in rows]
 
@@ -226,8 +228,9 @@ class ContextStore:
     def recent(self, owner_id: str, limit: int = 12, allowed: set[str] | None = None) -> list[dict]:
         visibility = sorted({"private", "agent"} if allowed is None else allowed)
         with self.db.transaction() as c:
+            c.execute("SET LOCAL TIME ZONE 'UTC'")
             rows = c.execute("""SELECT * FROM meemee_context_records WHERE owner_id=%s AND visibility = ANY(%s)
-                                ORDER BY occurred_at DESC,id DESC LIMIT %s""", (owner_id, visibility, max(1, min(limit, 100)))).fetchall()
+                                ORDER BY occurred_at::timestamptz DESC,id DESC LIMIT %s""", (owner_id, visibility, max(1, min(limit, 100)))).fetchall()
         return [self._record(row) for row in rows]
 
     def reflection_batch(self, owner_id: str, after: int, through: int, limit: int = 50) -> list[dict]:
