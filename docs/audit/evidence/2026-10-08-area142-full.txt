@@ -1,0 +1,26 @@
+.......................................................s.s.s.s.s.s.s.s.s [  6%]
+.s.s....................................s.s..s.s..sss................... [ 13%]
+...................................s.s.s.s.s.s..ss..ss..ss.s............ [ 20%]
+....................................................s................... [ 27%]
+............................................ss...ss..ss.....ss.......... [ 34%]
+.....s.sss.....................................sss.....s.s.s.s.s.s...... [ 40%]
+.....................................................................ss. [ 47%]
+sssss..............sssssssssssss.....................s.s.ss.s........... [ 54%]
+....................ss.................s....................ss........ss [ 61%]
+s.s.s.s.s...................................sss.................s.s.s.s. [ 68%]
+s..s.s..........ss..................................................s.s. [ 75%]
+s.s.s.s..s.ss.......................s.s.s....................s.s.s.s.s.s [ 81%]
+.s...ssssss............................................................. [ 88%]
+........s.s.s.s.s.sss....sss..................sss............s.s.s.s.s.s [ 95%]
+.s.s..............................sss..........                          [100%]
+=============================== warnings summary ===============================
+.venv/lib/python3.10/site-packages/fastapi/testclient.py:1
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+.venv/lib/python3.10/site-packages/starlette/testclient.py:53
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+903 passed, 152 skipped, 2 warnings in 105.57s (0:01:45)
