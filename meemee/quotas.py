@@ -13,6 +13,11 @@ def quota_day(now: datetime | None = None) -> date:
     return instant.astimezone(timezone.utc).date()
 
 
+def validate_quota_limit(value: int) -> None:
+    if type(value) is not int or value < 1:
+        raise ValueError("daily quota must be a positive integer")
+
+
 class QuotaExceeded(ValueError):
     pass
 
@@ -21,8 +26,7 @@ class QuotaStore:
     """Atomic per-principal daily quotas shared by all supported-host processes."""
 
     def __init__(self, path: Path, default_daily_jobs: int = 100):
-        if default_daily_jobs < 1:
-            raise ValueError("default quota must be positive")
+        validate_quota_limit(default_daily_jobs)
         path.parent.mkdir(parents=True, exist_ok=True)
         self.default = default_daily_jobs
         self.db = sqlite3.connect(path, check_same_thread=False, isolation_level=None, timeout=5)
@@ -45,8 +49,7 @@ class QuotaStore:
         return int(row[0]) if row else self.default
 
     def set_limit(self, principal: str, daily_jobs: int) -> None:
-        if daily_jobs < 1:
-            raise ValueError("daily quota must be positive")
+        validate_quota_limit(daily_jobs)
         with self.lock, self.db:
             self.db.execute("INSERT INTO quota_limits VALUES(?,?) ON CONFLICT(principal) DO UPDATE SET daily_jobs=excluded.daily_jobs", (principal, daily_jobs))
 
