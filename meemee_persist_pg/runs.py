@@ -34,13 +34,15 @@ class RunStore:
         self.db = db
 
     def add(self, principal: str, report: RunReport) -> None:
+        results = json.loads(json.dumps(report.tool_results, allow_nan=False))
+        approvals = json.loads(json.dumps([item.model_dump() for item in report.approvals_required], allow_nan=False))
         with self.db.transaction() as c:
             c.execute(
                 """INSERT INTO meemee_runs(run_id, principal, goal, final, steps_used, tool_results, created_at, approvals_required)
                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
                 (report.run_id, principal, report.goal, report.final, report.steps_used,
-                 Jsonb(json.loads(json.dumps(report.tool_results))), datetime.now(timezone.utc),
-                 Jsonb([item.model_dump() for item in report.approvals_required])),
+                 Jsonb(results), datetime.now(timezone.utc),
+                 Jsonb(approvals)),
             )
 
     @staticmethod

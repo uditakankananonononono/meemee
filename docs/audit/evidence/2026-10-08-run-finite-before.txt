@@ -1,0 +1,65 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+______ test_run_rejects_nonfinite_tool_result_before_publication[sqlite] _______
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7f181a5877f0>, jobs=<meemee.jobs.JobStore ...Store object at 0x7f181a107eb0>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7f181a107e50>)
+
+    def test_run_rejects_nonfinite_tool_result_before_publication(persistence):  # noqa: F811
+        report = RunReport(run_id='nonfinite', goal='check', final='done', steps_used=1, tool_results=[{'value': float('nan')}])
+>       with pytest.raises(ValueError, match='JSON'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_run_finite_results.py:11: Failed
+____ test_run_rejects_nonfinite_tool_result_before_publication[postgresql] _____
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f1818fdd150>, jobs=<meemee...re object at 0x7f1818fdded0>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f1818fddf00>)
+
+    def test_run_rejects_nonfinite_tool_result_before_publication(persistence):  # noqa: F811
+        report = RunReport(run_id='nonfinite', goal='check', final='done', steps_used=1, tool_results=[{'value': float('nan')}])
+        with pytest.raises(ValueError, match='JSON'):
+>           persistence.runs.add('owner', report)
+
+tests/test_run_finite_results.py:12: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee_persist_pg/runs.py:38: in add
+    c.execute(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <psycopg.Connection [IDLE] (host=127.0.0.1 port=55439 user=sandbox database=meemee_tok_ede77e155546) at 0x7f1818fdd3c0>
+query = 'INSERT INTO meemee_runs(run_id, principal, goal, final, steps_used, tool_results, created_at, approvals_required)\n                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)'
+params = ('nonfinite', 'owner', 'check', 'done', 1, Jsonb([{'value': nan}]), ...)
+
+    def execute(
+        self,
+        query: Query,
+        params: Params | None = None,
+        *,
+        prepare: bool | None = None,
+        binary: bool = False,
+    ) -> Cursor[Row]:
+        """Execute a query and return a cursor to read its results."""
+        try:
+            cur = self.cursor()
+            if binary:
+                cur.format = BINARY
+    
+            if isinstance(query, Template):
+                if params is not None:
+                    raise TypeError(
+                        "'execute()' with string template query doesn't support parameters"
+                    )
+                return cur.execute(query, prepare=prepare)
+            else:
+                return cur.execute(query, params, prepare=prepare)
+        except e._NO_TRACEBACK as ex:
+>           raise ex.with_traceback(None)
+E           psycopg.errors.InvalidTextRepresentation: invalid input syntax for type json
+E           DETAIL:  Token "NaN" is invalid.
+E           CONTEXT:  JSON data, line 1: [{"value": NaN...
+E           unnamed portal parameter $6 = '...'
+
+.venv/lib/python3.10/site-packages/psycopg/connection.py:304: InvalidTextRepresentation
+=========================== short test summary info ============================
+FAILED tests/test_run_finite_results.py::test_run_rejects_nonfinite_tool_result_before_publication[sqlite]
+FAILED tests/test_run_finite_results.py::test_run_rejects_nonfinite_tool_result_before_publication[postgresql]
+2 failed in 1.29s
