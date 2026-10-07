@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, timezone
 
 from ..config import Settings
-from .channels import ChannelError, DeliveryOutcomeUnknown, validate_delivery_address
+from .channels import ChannelError, DeliveryOutcomeUnknown, LocalChannel, validate_delivery_address
 from .checkins import CheckInScheduler, in_quiet_hours
 from .engine import CompanionEngine
 from .store import CompanionStore
@@ -61,6 +61,13 @@ async def deliver_due_once(
                 conversation = store.start_conversation(checkin["user_id"], "local")
             address = conversation["id"]
         validate_delivery_address(store, checkin["user_id"], channel_name, address)
+        # Only the exact built-in adapter on this SQLite store has no external side effect.
+        # Other stores/adapters retain the explicit accepted/unknown delivery boundary.
+        if (channel_name == "local" and type(adapter) is LocalChannel and adapter.store is store
+                and isinstance(store, CompanionStore)):
+            store.finish_local_checkin(checkin["id"], address, message)
+            return {"claimed": True, "checkin_id": checkin["id"], "user_id": checkin["user_id"],
+                    "delivered": True, "detail": "stored in local conversation"}
         try:
             result = await adapter.send(address, message)
         except asyncio.CancelledError:

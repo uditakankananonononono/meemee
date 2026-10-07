@@ -1,0 +1,54 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+______________ test_completion_abort_cannot_publish_local_message ______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-323/test_completion_abort_cannot_p0')
+
+    @pytest.mark.asyncio
+    async def test_completion_abort_cannot_publish_local_message(tmp_path):
+        store, engine, channels = setup(tmp_path)
+        queue_checkin(store)
+        store.db.execute("""CREATE TRIGGER reject_done BEFORE UPDATE OF status ON companion_checkins
+                          WHEN NEW.status='done' BEGIN SELECT RAISE(ABORT,'completion rejected'); END""")
+>       with pytest.raises(Exception, match='completion rejected'):
+E       Failed: DID NOT RAISE <class 'Exception'>
+
+tests/test_companion_local_atomic_canary.py:19: Failed
+__________ test_process_death_at_completion_rolls_back_local_message ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-323/test_process_death_at_completi0')
+
+    def test_process_death_at_completion_rolls_back_local_message(tmp_path):
+        script = '''
+    import asyncio, os, sys
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from meemee.companion.channels import LocalChannel
+    from meemee.companion.models import UserProfile, CheckInPreferences
+    from meemee.companion.store import CompanionStore
+    from meemee.companion.worker import deliver_due_once
+    store = CompanionStore(Path(sys.argv[1]))
+    store.upsert_user(UserProfile(user_id='owner',display_name='Owner',checkins=CheckInPreferences(enabled=True)))
+    store.schedule_checkin('owner',datetime.now(timezone.utc),'slot','local',None)
+    store.db.create_function('crash',0,lambda: os._exit(73))
+    store.db.execute("CREATE TRIGGER crash_done BEFORE UPDATE OF status ON companion_checkins WHEN NEW.status='done' BEGIN SELECT crash(); END")
+    class Engine:
+        async def checkin_message(self, user): return 'atomic local message'
+    asyncio.run(deliver_due_once(store,Engine(),{'local':LocalChannel(store)}))
+    '''
+        path = tmp_path / 'c.db'
+        proc = subprocess.run([sys.executable, '-c', script, str(path)], env=os.environ.copy(), check=False)
+        assert proc.returncode == 73
+        store = CompanionStore(path)
+        conv = store.latest_conversation('owner', 'local')
+>       assert store.history(conv['id']) == []
+E       AssertionError: assert [{'content': ...'id': 1, ...}] == []
+E         
+E         Left contains one more item: {'content': 'atomic local message', 'conversation_id': 'e918c09cb54f41eaa9b7c1f38cadc56a', 'created_at': '2026-10-07T14:47:47.525997+00:00', 'id': 1, ...}
+E         Use -v to get more diff
+
+tests/test_companion_local_atomic_canary.py:48: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_companion_local_atomic_canary.py::test_completion_abort_cannot_publish_local_message
+FAILED tests/test_companion_local_atomic_canary.py::test_process_death_at_completion_rolls_back_local_message
+2 failed in 0.36s

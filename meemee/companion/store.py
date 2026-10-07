@@ -376,6 +376,34 @@ class CompanionStore:
             self.db.execute("COMMIT")
         return dict(row) if changed else None
 
+    def finish_local_checkin(self, checkin_id: str, conversation_id: str, message: str) -> None:
+        """Commit local message and completion together; never cover external delivery."""
+        now = _now()
+        clean = scrub_text(message)
+        with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            row = self.db.execute(
+                "SELECT user_id FROM companion_checkins WHERE id=? AND status='running'",
+                (checkin_id,),
+            ).fetchone()
+            conversation = self.db.execute(
+                "SELECT user_id FROM companion_conversations WHERE id=?", (conversation_id,)
+            ).fetchone()
+            if row is None or conversation is None or row["user_id"] != conversation["user_id"]:
+                raise ValueError("check-in or local conversation is no longer eligible")
+            self.db.execute(
+                "INSERT INTO companion_messages(conversation_id,role,content,created_at) VALUES(?,'assistant',?,?)",
+                (conversation_id, clean, now),
+            )
+            self.db.execute(
+                "UPDATE companion_conversations SET last_message_at=? WHERE id=?",
+                (now, conversation_id),
+            )
+            self.db.execute(
+                "UPDATE companion_checkins SET status='done',message=?,last_error=NULL,updated_at=? WHERE id=?",
+                (clean, now, checkin_id),
+            )
+
     def finish_checkin(self, checkin_id: str, message: str) -> None:
         with self.lock, self.db:
             self.db.execute(
