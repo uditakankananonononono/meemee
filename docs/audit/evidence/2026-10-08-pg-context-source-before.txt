@@ -1,0 +1,40 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______ test_pg_ingest_does_not_publish_after_preflight_source_deletion ________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f339139fa90>
+
+    @pytest.mark.skipif(not PG_DSN, reason='requires real PostgreSQL')
+    def test_pg_ingest_does_not_publish_after_preflight_source_deletion(monkeypatch):
+        from meemee_persist_pg import ContextStore, Database, MigrationStore
+    
+        dsn, drop = _pg_dsn()
+        db = Database(dsn)
+        MigrationStore(db).apply()
+        try:
+            store = ContextStore(db)
+            store.register_source('owner', 'source', 'test', {})
+            original = store.source
+    
+            def removed_after_read(owner, source):
+                result = original(owner, source)
+                with db.transaction() as c:
+                    c.execute('DELETE FROM meemee_context_sources WHERE owner_id=%s AND source_id=%s', (owner, source))
+                return result
+    
+            monkeypatch.setattr(store, 'source', removed_after_read)
+            record = ContextRecord('owner', 'source', 'event', 'event', 'title', 'body', '2026-10-08', {})
+            try:
+                store.ingest(record)
+            except ValueError:
+                pass
+            with db.transaction() as c:
+                orphan = c.execute('''SELECT 1 FROM meemee_context_records r WHERE NOT EXISTS
+                    (SELECT 1 FROM meemee_context_sources s WHERE s.owner_id=r.owner_id AND s.source_id=r.source_id)''').fetchone()
+>           assert orphan is None
+E           AssertionError: assert {'?column?': 1} is None
+
+tests/test_context_pg_source_transaction.py:36: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_context_pg_source_transaction.py::test_pg_ingest_does_not_publish_after_preflight_source_deletion
+1 failed in 0.72s

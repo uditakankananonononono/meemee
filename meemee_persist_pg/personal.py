@@ -187,12 +187,14 @@ class ContextStore:
         row = self.source(owner_id, source_id); return row["cursor"] if row else None
 
     def ingest(self, record: ContextRecord) -> bool:
-        if self.source(record.owner_id, record.source_id) is None:
-            raise ValueError("source is not registered for owner")
         if record.visibility not in {"private", "agent", "shared"}:
             raise ValueError("invalid visibility")
         digest = context_record_hash(record); now = _now()
         with self.db.transaction() as c:
+            source = c.execute("SELECT 1 FROM meemee_context_sources WHERE owner_id=%s AND source_id=%s FOR UPDATE",
+                               (record.owner_id, record.source_id)).fetchone()
+            if source is None:
+                raise ValueError("source is not registered for owner")
             inserted = c.execute("""INSERT INTO meemee_context_records(owner_id,source_id,external_id,content_hash,kind,title,content,
                 occurred_at,provenance,visibility,cursor,metadata,ingested_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 ON CONFLICT (owner_id,source_id,external_id,content_hash) DO NOTHING""",
