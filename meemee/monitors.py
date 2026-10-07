@@ -60,8 +60,11 @@ class MonitorStore:
     def matches(predicate,event):
         value=event.get(predicate['field']);op=predicate['operator'];expected=predicate.get('expected')
         if op=='exists':return value is not None
-        if op=='eq':return value==expected
+        if op=='eq':
+            if isinstance(value,bool) or isinstance(expected,bool):return type(value) is type(expected) and value==expected
+            return value==expected
         if op=='contains':return str(expected).lower() in str(value or '').lower()
+        if isinstance(value,bool) or isinstance(expected,bool):return False
         try:
             return {'gt':value>expected,'gte':value>=expected,'lt':value<expected,'lte':value<=expected}[op]
         except (TypeError,KeyError):return False

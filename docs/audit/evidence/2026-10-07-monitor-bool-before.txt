@@ -1,0 +1,64 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+_______________ test_monitor_booleans_are_not_numbers[eq-1-True] _______________
+
+operator = 'eq', expected = 1, value = True
+
+    @pytest.mark.parametrize(('operator', 'expected', 'value'), [
+        ('eq', 1, True), ('eq', False, 0), ('gt', 0, True), ('gte', 1, True),
+    ])
+    def test_monitor_booleans_are_not_numbers(operator, expected, value):
+>       assert not MonitorStore.matches({'field': 'price', 'operator': operator, 'expected': expected}, {'price': value})
+E       AssertionError: assert not True
+E        +  where True = <function MonitorStore.matches at 0x7f613d75b010>({'expected': 1, 'field': 'price', 'operator': 'eq'}, {'price': True})
+E        +    where <function MonitorStore.matches at 0x7f613d75b010> = MonitorStore.matches
+
+tests/test_monitor_boolean_number_canary.py:11: AssertionError
+______________ test_monitor_booleans_are_not_numbers[eq-False-0] _______________
+
+operator = 'eq', expected = False, value = 0
+
+    @pytest.mark.parametrize(('operator', 'expected', 'value'), [
+        ('eq', 1, True), ('eq', False, 0), ('gt', 0, True), ('gte', 1, True),
+    ])
+    def test_monitor_booleans_are_not_numbers(operator, expected, value):
+>       assert not MonitorStore.matches({'field': 'price', 'operator': operator, 'expected': expected}, {'price': value})
+E       AssertionError: assert not True
+E        +  where True = <function MonitorStore.matches at 0x7f613d75b010>({'expected': False, 'field': 'price', 'operator': 'eq'}, {'price': 0})
+E        +    where <function MonitorStore.matches at 0x7f613d75b010> = MonitorStore.matches
+
+tests/test_monitor_boolean_number_canary.py:11: AssertionError
+_______________ test_monitor_booleans_are_not_numbers[gt-0-True] _______________
+
+operator = 'gt', expected = 0, value = True
+
+    @pytest.mark.parametrize(('operator', 'expected', 'value'), [
+        ('eq', 1, True), ('eq', False, 0), ('gt', 0, True), ('gte', 1, True),
+    ])
+    def test_monitor_booleans_are_not_numbers(operator, expected, value):
+>       assert not MonitorStore.matches({'field': 'price', 'operator': operator, 'expected': expected}, {'price': value})
+E       AssertionError: assert not True
+E        +  where True = <function MonitorStore.matches at 0x7f613d75b010>({'expected': 0, 'field': 'price', 'operator': 'gt'}, {'price': True})
+E        +    where <function MonitorStore.matches at 0x7f613d75b010> = MonitorStore.matches
+
+tests/test_monitor_boolean_number_canary.py:11: AssertionError
+______________ test_monitor_booleans_are_not_numbers[gte-1-True] _______________
+
+operator = 'gte', expected = 1, value = True
+
+    @pytest.mark.parametrize(('operator', 'expected', 'value'), [
+        ('eq', 1, True), ('eq', False, 0), ('gt', 0, True), ('gte', 1, True),
+    ])
+    def test_monitor_booleans_are_not_numbers(operator, expected, value):
+>       assert not MonitorStore.matches({'field': 'price', 'operator': operator, 'expected': expected}, {'price': value})
+E       AssertionError: assert not True
+E        +  where True = <function MonitorStore.matches at 0x7f613d75b010>({'expected': 1, 'field': 'price', 'operator': 'gte'}, {'price': True})
+E        +    where <function MonitorStore.matches at 0x7f613d75b010> = MonitorStore.matches
+
+tests/test_monitor_boolean_number_canary.py:11: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_monitor_boolean_number_canary.py::test_monitor_booleans_are_not_numbers[eq-1-True]
+FAILED tests/test_monitor_boolean_number_canary.py::test_monitor_booleans_are_not_numbers[eq-False-0]
+FAILED tests/test_monitor_boolean_number_canary.py::test_monitor_booleans_are_not_numbers[gt-0-True]
+FAILED tests/test_monitor_boolean_number_canary.py::test_monitor_booleans_are_not_numbers[gte-1-True]
+4 failed in 0.10s
