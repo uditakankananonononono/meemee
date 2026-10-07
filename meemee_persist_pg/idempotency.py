@@ -54,12 +54,13 @@ class IdempotencyStore:
         """
         if not key or len(key) > 200:
             raise ValueError("idempotency key must contain 1-200 characters")
+        digest = self.request_hash(payload)
         with self.db.transaction() as c:
             c.execute("DELETE FROM meemee_idempotency WHERE expires_at <= clock_timestamp()")
             inserted = c.execute("""INSERT INTO meemee_idempotency(principal, route, key, request_hash, response, status, created_at, expires_at)
                                     VALUES (%s, %s, %s, %s, 'null'::jsonb, %s, clock_timestamp(), clock_timestamp() + %s)
                                     ON CONFLICT (principal, route, key) DO NOTHING""",
-                                 (principal, route, key, self.request_hash(payload), PENDING, CLAIM_LEASE)).rowcount
+                                 (principal, route, key, digest, PENDING, CLAIM_LEASE)).rowcount
         return None if inserted else self.get(principal, route, key, payload)
 
     def release(self, principal: str, route: str, key: str) -> None:
