@@ -1,0 +1,2 @@
+Persisted naive attempt: 2026-10-08T09:00:00
+TypeError can't subtract offset-naive and offset-aware datetimes
