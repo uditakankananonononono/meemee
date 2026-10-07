@@ -1,0 +1,82 @@
+FFFFFF                                                                   [100%]
+=================================== FAILURES ===================================
+_________ test_monitor_rejects_nonfinite_event_before_fire[sqlite-nan] _________
+
+stores = <function stores.<locals>.<lambda> at 0x7f8725382560>, value = nan
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf'), float('-inf')])
+    def test_monitor_rejects_nonfinite_event_before_fire(stores, value):  # noqa: F811
+        monitors, _ = stores()
+        item = monitors.create('owner', MonitorInput(name='present', source_id='source', field='value', operator='exists'))
+>       with pytest.raises(ValueError, match='JSON'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_monitor_finite_event.py:13: Failed
+_________ test_monitor_rejects_nonfinite_event_before_fire[sqlite-inf] _________
+
+stores = <function stores.<locals>.<lambda> at 0x7f87253c6e60>, value = inf
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf'), float('-inf')])
+    def test_monitor_rejects_nonfinite_event_before_fire(stores, value):  # noqa: F811
+        monitors, _ = stores()
+        item = monitors.create('owner', MonitorInput(name='present', source_id='source', field='value', operator='exists'))
+>       with pytest.raises(ValueError, match='JSON'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_monitor_finite_event.py:13: Failed
+________ test_monitor_rejects_nonfinite_event_before_fire[sqlite--inf] _________
+
+stores = <function stores.<locals>.<lambda> at 0x7f87253c71c0>, value = -inf
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf'), float('-inf')])
+    def test_monitor_rejects_nonfinite_event_before_fire(stores, value):  # noqa: F811
+        monitors, _ = stores()
+        item = monitors.create('owner', MonitorInput(name='present', source_id='source', field='value', operator='exists'))
+>       with pytest.raises(ValueError, match='JSON'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_monitor_finite_event.py:13: Failed
+_______ test_monitor_rejects_nonfinite_event_before_fire[postgresql-nan] _______
+
+stores = <function stores.<locals>.<lambda> at 0x7f8725382050>, value = nan
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf'), float('-inf')])
+    def test_monitor_rejects_nonfinite_event_before_fire(stores, value):  # noqa: F811
+        monitors, _ = stores()
+        item = monitors.create('owner', MonitorInput(name='present', source_id='source', field='value', operator='exists'))
+>       with pytest.raises(ValueError, match='JSON'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_monitor_finite_event.py:13: Failed
+_______ test_monitor_rejects_nonfinite_event_before_fire[postgresql-inf] _______
+
+stores = <function stores.<locals>.<lambda> at 0x7f87253c7520>, value = inf
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf'), float('-inf')])
+    def test_monitor_rejects_nonfinite_event_before_fire(stores, value):  # noqa: F811
+        monitors, _ = stores()
+        item = monitors.create('owner', MonitorInput(name='present', source_id='source', field='value', operator='exists'))
+>       with pytest.raises(ValueError, match='JSON'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_monitor_finite_event.py:13: Failed
+______ test_monitor_rejects_nonfinite_event_before_fire[postgresql--inf] _______
+
+stores = <function stores.<locals>.<lambda> at 0x7f87253fc5e0>, value = -inf
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf'), float('-inf')])
+    def test_monitor_rejects_nonfinite_event_before_fire(stores, value):  # noqa: F811
+        monitors, _ = stores()
+        item = monitors.create('owner', MonitorInput(name='present', source_id='source', field='value', operator='exists'))
+>       with pytest.raises(ValueError, match='JSON'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_monitor_finite_event.py:13: Failed
+=========================== short test summary info ============================
+FAILED tests/test_monitor_finite_event.py::test_monitor_rejects_nonfinite_event_before_fire[sqlite-nan]
+FAILED tests/test_monitor_finite_event.py::test_monitor_rejects_nonfinite_event_before_fire[sqlite-inf]
+FAILED tests/test_monitor_finite_event.py::test_monitor_rejects_nonfinite_event_before_fire[sqlite--inf]
+FAILED tests/test_monitor_finite_event.py::test_monitor_rejects_nonfinite_event_before_fire[postgresql-nan]
+FAILED tests/test_monitor_finite_event.py::test_monitor_rejects_nonfinite_event_before_fire[postgresql-inf]
+FAILED tests/test_monitor_finite_event.py::test_monitor_rejects_nonfinite_event_before_fire[postgresql--inf]
+6 failed in 1.35s
