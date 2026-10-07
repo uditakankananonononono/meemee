@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import tempfile
+import uuid
 from pathlib import Path
 
 from .audit import AuditLog
@@ -26,7 +27,8 @@ def run_loadcheck(
     audit = AuditLog(root / "audit.sqlite3")
     jobs = JobStore(root / "jobs.sqlite3")
     entitlements = EntitlementStore(root / "entitlements.sqlite3")
-    _, raw = tokens.create("loadcheck", {"jobs:read", "jobs:write"})
+    principal_id = "loadcheck_" + uuid.uuid4().hex
+    _, raw = tokens.create(principal_id, {"jobs:read", "jobs:write"})
 
     def operation(index: int) -> str:
         lane = index % 4
@@ -38,9 +40,9 @@ def run_loadcheck(
             audit.append("loadcheck", "operation", str(index), "success")
             return "audit"
         if lane == 2:
-            jobs.enqueue(f"load operation {index}", principal="loadcheck")
+            jobs.enqueue(f"load operation {index}", principal=principal_id)
             return "job"
-        entitlements.get("loadcheck")
+        entitlements.get(principal_id)
         return "entitlement"
 
     errors: list[str] = []
@@ -54,7 +56,7 @@ def run_loadcheck(
     audit_valid, broken_at = audit.verify()
     stored_jobs, cursor = 0, None
     while True:
-        page, cursor = jobs.list_for_principal("loadcheck", limit=500, cursor=cursor)
+        page, cursor = jobs.list_for_principal(principal_id, limit=500, cursor=cursor)
         stored_jobs += len(page)
         if cursor is None:
             break
@@ -62,6 +64,7 @@ def run_loadcheck(
     status = "pass" if not errors and audit_valid and stored_jobs == expected_jobs else "fail"
     result = {
         "status": status, "operations": operations, "workers": workers,
+        "principal": principal_id,
         "counts": counts, "errors": errors, "audit_valid": audit_valid,
         "audit_broken_at": broken_at, "stored_jobs": stored_jobs,
     }
