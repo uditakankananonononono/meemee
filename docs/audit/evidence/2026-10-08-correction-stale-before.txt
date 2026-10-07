@@ -1,0 +1,66 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+__________ test_stale_correction_does_not_replace_new_current[sqlite] __________
+
+stores = <function stores.<locals>.<lambda> at 0x7f7704790310>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f77047596c0>
+
+    def test_stale_correction_does_not_replace_new_current(stores, monkeypatch):  # noqa: F811
+        personal, _ = stores()
+    
+        def value(text):
+            return PersonalItemInput(kind='preference', title='drink', value=text,
+                                     source_id='chat', source_record_id=text)
+    
+        old = personal.upsert('owner', value('tea'))
+        original = personal.get
+        replaced = []
+    
+        def raced_get(owner, ident):
+            row = original(owner, ident)
+            if ident == old['id'] and not replaced:
+                replaced.append(True)
+                personal.upsert('owner', value('coffee'))
+            return row
+    
+        monkeypatch.setattr(personal, 'get', raced_get)
+>       assert personal.correct('owner', old['id'], 'juice') is None
+E       AssertionError: assert {'confidence': 1.0, 'created_at': '2026-10-07T20:14:28.460489+00:00', 'evidence': [{'confidence': 1.0, 'observed_at': ...28.460489+00:00', 'observed_value': 'juice', 'source_id': 'user', ...}], 'id': '81fcb039c45645e9910a578fa285ee34', ...} is None
+E        +  where {'confidence': 1.0, 'created_at': '2026-10-07T20:14:28.460489+00:00', 'evidence': [{'confidence': 1.0, 'observed_at': ...28.460489+00:00', 'observed_value': 'juice', 'source_id': 'user', ...}], 'id': '81fcb039c45645e9910a578fa285ee34', ...} = correct('owner', 'f561cb55d2d74750b0de72988cf37973', 'juice')
+E        +    where correct = <meemee.personal_model.PersonalModelStore object at 0x7f7704759690>.correct
+
+tests/test_personal_correction_stale.py:27: AssertionError
+________ test_stale_correction_does_not_replace_new_current[postgresql] ________
+
+stores = <function stores.<locals>.<lambda> at 0x7f77047905e0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f770475a020>
+
+    def test_stale_correction_does_not_replace_new_current(stores, monkeypatch):  # noqa: F811
+        personal, _ = stores()
+    
+        def value(text):
+            return PersonalItemInput(kind='preference', title='drink', value=text,
+                                     source_id='chat', source_record_id=text)
+    
+        old = personal.upsert('owner', value('tea'))
+        original = personal.get
+        replaced = []
+    
+        def raced_get(owner, ident):
+            row = original(owner, ident)
+            if ident == old['id'] and not replaced:
+                replaced.append(True)
+                personal.upsert('owner', value('coffee'))
+            return row
+    
+        monkeypatch.setattr(personal, 'get', raced_get)
+>       assert personal.correct('owner', old['id'], 'juice') is None
+E       AssertionError: assert {'confidence': 1.0, 'created_at': '2026-10-07T20:14:28.745976+00:00', 'evidence': [{'confidence': 1.0, 'observed_at': ...28.745976+00:00', 'observed_value': 'juice', 'source_id': 'user', ...}], 'id': '0b335ca49e2f4977ade836bc680f8918', ...} is None
+E        +  where {'confidence': 1.0, 'created_at': '2026-10-07T20:14:28.745976+00:00', 'evidence': [{'confidence': 1.0, 'observed_at': ...28.745976+00:00', 'observed_value': 'juice', 'source_id': 'user', ...}], 'id': '0b335ca49e2f4977ade836bc680f8918', ...} = correct('owner', '2a5069ac2a0f41fdbd248bdb67539a0d', 'juice')
+E        +    where correct = <meemee_persist_pg.personal.PersonalModelStore object at 0x7f770475a380>.correct
+
+tests/test_personal_correction_stale.py:27: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_personal_correction_stale.py::test_stale_correction_does_not_replace_new_current[sqlite]
+FAILED tests/test_personal_correction_stale.py::test_stale_correction_does_not_replace_new_current[postgresql]
+2 failed in 0.73s

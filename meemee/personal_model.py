@@ -109,7 +109,7 @@ class PersonalModelStore:
         with self.lock:
             return self.db.execute("SELECT 1").fetchone() is not None
 
-    def upsert(self, owner_id: str, item: PersonalItemInput, *, preserve_user: bool = False) -> dict:
+    def upsert(self, owner_id: str, item: PersonalItemInput, *, preserve_user: bool = False, expected_current_id: str | None = None) -> dict:
         if not owner_id:
             raise ValueError("owner is required")
         now = datetime.now(timezone.utc).isoformat()
@@ -119,6 +119,8 @@ class PersonalModelStore:
                 "SELECT * FROM personal_items WHERE owner_id=? AND kind=? AND title=? AND status='active'",
                 (owner_id, item.kind, item.title.strip()),
             ).fetchone()
+            if expected_current_id is not None and (current is None or current["id"] != expected_current_id):
+                return {}
             if preserve_user and current:
                 confirmed = self.db.execute(
                     "SELECT 1 FROM personal_evidence WHERE item_id=? AND owner_id=? AND source_id='user' LIMIT 1",
@@ -181,7 +183,7 @@ class PersonalModelStore:
             kind=current["kind"], title=current["title"], value=value, confidence=1.0,
             source_id="user", source_record_id=f"correction:{uuid.uuid4().hex}",
             valid_from=current["valid_from"], valid_until=current["valid_until"],
-        ))
+        ), expected_current_id=ident) or None
 
     def decay(self, owner_id: str, before: str, factor: float = 0.9) -> int:
         if not 0 <= factor <= 1:
