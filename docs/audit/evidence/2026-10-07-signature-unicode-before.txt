@@ -1,0 +1,87 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+________________ test_webhook_nonascii_signature_returns_false _________________
+
+    def test_webhook_nonascii_signature_returns_false():
+>       assert verify_signature('fixture', '1000', b'{}', 'sha256=\u2603', now=1000) is False
+
+tests/test_signature_unicode_canary.py:9: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+secret = 'fixture', timestamp = '1000', body = b'{}', signature = 'sha256=☃'
+tolerance_seconds = 300, now = 1000
+
+    def verify_signature(
+        secret: str,
+        timestamp: str,
+        body: bytes,
+        signature: str,
+        tolerance_seconds: int = 300,
+        now: int | None = None,
+    ) -> bool:
+        """Verify a Meemee webhook signature and reject stale replay attempts."""
+        if tolerance_seconds < 0 or not signature.startswith("sha256="):
+            return False
+        try:
+            observed = int(timestamp)
+        except ValueError:
+            return False
+        current = int(time.time() if now is None else now)
+        if abs(current - observed) > tolerance_seconds:
+            return False
+        expected = "sha256=" + hmac.new(
+            secret.encode(), timestamp.encode() + b"." + body, hashlib.sha256
+        ).hexdigest()
+>       return hmac.compare_digest(expected, signature)
+E       TypeError: comparing strings with non-ASCII characters is not supported
+
+meemee/webhook_verify.py:29: TypeError
+______________ test_device_nonascii_signature_is_validation_error ______________
+
+    def test_device_nonascii_signature_is_validation_error():
+        envelope = make_command('d', 'echo', {}, b'fixture', issued_at=1000)
+        envelope['signature'] = '\u2603'
+        with pytest.raises(ValueError, match='signature'):
+>           verify_command(envelope, b'fixture', now=1000)
+
+tests/test_signature_unicode_canary.py:16: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+envelope = {'arguments': {}, 'capability': 'echo', 'command_id': '91b2c630b8bda18933154aebf954a5b0', 'device_id': 'd', ...}
+secret = b'fixture'
+
+    def verify_command(
+        envelope: dict[str, Any],
+        secret: bytes,
+        *,
+        expected_device_id: str | None = None,
+        allowed_capabilities: set[str] | None = None,
+        replay_guard: ReplayGuard | SQLiteReplayGuard | None = None,
+        now: int | None = None,
+        tolerance: int = 300,
+    ) -> VerifiedCommand:
+        required = {
+            "version",
+            "command_id",
+            "device_id",
+            "capability",
+            "arguments",
+            "issued_at",
+            "nonce",
+            "signature",
+        }
+        if (
+            set(envelope) != required
+            or envelope["version"] != 1
+            or not isinstance(envelope["arguments"], dict)
+        ):
+            raise ValueError("invalid command envelope")
+        supplied = str(envelope["signature"])
+>       if not hmac.compare_digest(sign(secret, envelope), supplied):
+E       TypeError: comparing strings with non-ASCII characters is not supported
+
+meemee/device_protocol.py:133: TypeError
+=========================== short test summary info ============================
+FAILED tests/test_signature_unicode_canary.py::test_webhook_nonascii_signature_returns_false
+FAILED tests/test_signature_unicode_canary.py::test_device_nonascii_signature_is_validation_error
+2 failed in 0.05s
