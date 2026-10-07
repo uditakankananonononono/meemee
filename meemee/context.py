@@ -38,6 +38,14 @@ def context_record_hash(record: ContextRecord) -> str:
                                      ensure_ascii=False).encode()).hexdigest()
 
 
+def context_utc(value: str) -> str:
+    """Comparable UTC instant; legacy date-only/naive input means UTC."""
+    moment = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(timezone.utc).isoformat(timespec="microseconds")
+
+
 class ContextStore:
     """Owner-scoped source/event ledger and unified context index."""
 
@@ -46,6 +54,7 @@ class ContextStore:
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.lock = threading.RLock()
+        self.db.create_function("context_utc", 1, context_utc, deterministic=True)
         with self.lock, self.db:
             self.db.executescript("""
                 PRAGMA journal_mode=WAL;
@@ -101,7 +110,7 @@ class ContextStore:
     def search(self, owner_id: str, query: str, limit: int = 12, allowed: set[str] | None = None) -> list[dict]:
         visibility=({"private","agent"} if allowed is None else allowed);placeholders=','.join('?' for _ in visibility)
         sql=f"""SELECT r.*,bm25(context_fts) score FROM context_fts JOIN context_records r ON r.id=context_fts.rowid
-        WHERE context_fts MATCH ? AND r.owner_id=? AND r.visibility IN ({placeholders}) ORDER BY score,r.occurred_at DESC LIMIT ?"""
+        WHERE context_fts MATCH ? AND r.owner_id=? AND r.visibility IN ({placeholders}) ORDER BY score,context_utc(r.occurred_at) DESC,r.id DESC LIMIT ?"""
         with self.lock: rows=self.db.execute(sql,(query,owner_id,*sorted(visibility),max(1,min(limit,100)))).fetchall()
         return [self._record(row) for row in rows]
 
@@ -113,7 +122,7 @@ class ContextStore:
 
     def recent(self, owner_id: str, limit: int = 12, allowed: set[str] | None = None) -> list[dict]:
         visibility=({"private","agent"} if allowed is None else allowed);placeholders=','.join('?' for _ in visibility)
-        with self.lock:rows=self.db.execute(f"SELECT * FROM context_records WHERE owner_id=? AND visibility IN ({placeholders}) ORDER BY occurred_at DESC,id DESC LIMIT ?",(owner_id,*sorted(visibility),max(1,min(limit,100)))).fetchall()
+        with self.lock:rows=self.db.execute(f"SELECT * FROM context_records WHERE owner_id=? AND visibility IN ({placeholders}) ORDER BY context_utc(occurred_at) DESC,id DESC LIMIT ?",(owner_id,*sorted(visibility),max(1,min(limit,100)))).fetchall()
         return [self._record(row) for row in rows]
 
     def reflection_batch(self, owner_id: str, after: int, through: int, limit: int = 50) -> list[dict]:
