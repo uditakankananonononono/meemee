@@ -17,6 +17,8 @@ class BrowserContract:
         return self
     def on(self, *args):
         pass
+    async def route(self, *args, **kwargs):
+        pass
     async def goto(self, *args, **kwargs):
         raise RuntimeError('navigation crashed')
     async def close(self):
