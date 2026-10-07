@@ -1,0 +1,21 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+________ test_stale_running_claim_recovers_to_unknown_failure_not_retry ________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-210/test_stale_running_claim_recov0')
+
+    def test_stale_running_claim_recovers_to_unknown_failure_not_retry(tmp_path):
+        store = CompanionStore(tmp_path / 'c.db')
+        store.upsert_user(UserProfile(user_id='o',display_name='Owner',checkins=CheckInPreferences(enabled=True,cadence_minutes=30)))
+        now = datetime.now(timezone.utc)
+        row, _ = store.schedule_checkin('o', now - timedelta(hours=2), 'old', 'local', None)
+        store.claim_checkin(now)
+        store.db.execute('UPDATE companion_checkins SET updated_at=? WHERE id=?', ((now-timedelta(hours=1)).isoformat(),row['id']))
+        planned = CheckInScheduler(store).plan_all(now)
+>       assert planned[0]['id'] != row['id']
+E       AssertionError: assert '85484da28ef1476eae152e49d5fc2378' != '85484da28ef1476eae152e49d5fc2378'
+
+tests/test_checkin_crash_recovery_canary.py:17: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_checkin_crash_recovery_canary.py::test_stale_running_claim_recovers_to_unknown_failure_not_retry
+1 failed in 0.17s
