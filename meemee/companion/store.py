@@ -427,6 +427,7 @@ class CompanionStore:
     def delete_user_data(self, user_id: str) -> dict[str, int]:
         """Delete customer companion content transactionally; audit lives elsewhere."""
         with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
             conversation_ids = [row[0] for row in self.db.execute("SELECT id FROM companion_conversations WHERE user_id=?", (user_id,))]
             messages = 0
             traces = 0

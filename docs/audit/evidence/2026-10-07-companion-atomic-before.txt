@@ -1,0 +1,25 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_________________ test_mid_delete_failure_rolls_back_messages __________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-126/test_mid_delete_failure_rolls_0')
+
+    def test_mid_delete_failure_rolls_back_messages(tmp_path):
+        store = CompanionStore(tmp_path / 'c.db')
+        store.upsert_user(UserProfile(user_id='o', display_name='Owner'))
+        conversation = store.start_conversation('o', 'local')
+        store.add_message(conversation['id'], 'user', 'fixture content')
+        store.add_fact('o', FactInput(text='fixture fact'), source='test')
+        store.db.execute("CREATE TRIGGER stop_fact_delete BEFORE DELETE ON companion_facts BEGIN SELECT RAISE(ABORT,'fixture failure'); END")
+        with pytest.raises(sqlite3.IntegrityError, match='fixture failure'):
+            store.delete_user_data('o')
+>       assert len(store.history(conversation['id'])) == 1
+E       AssertionError: assert 0 == 1
+E        +  where 0 = len([])
+E        +    where [] = history('f649e9f2b8904a2988ed56aa2aa4043d')
+E        +      where history = <meemee.companion.store.CompanionStore object at 0x7f1688c48670>.history
+
+tests/test_companion_deletion_atomic_canary.py:19: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_companion_deletion_atomic_canary.py::test_mid_delete_failure_rolls_back_messages
+1 failed in 0.15s
