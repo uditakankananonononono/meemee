@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import sqlite3
 import threading
 import uuid
@@ -19,6 +20,13 @@ class MonitorInput(BaseModel):
     expected:str|float|bool|None=None
     deadline:str|None=None
     max_fires:int=Field(default=1,ge=1,le=1000)
+
+    @field_validator('expected')
+    @classmethod
+    def finite_expected(cls, value: str | float | bool | None) -> str | float | bool | None:
+        if isinstance(value, float) and not math.isfinite(value):
+            raise ValueError('expected number must be finite')
+        return value
 
     @field_validator('deadline')
     @classmethod

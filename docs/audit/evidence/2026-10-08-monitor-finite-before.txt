@@ -1,0 +1,37 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+_________________ test_monitor_rejects_nonfinite_expected[nan] _________________
+
+value = nan
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf'), float('-inf')])
+    def test_monitor_rejects_nonfinite_expected(value):
+>       with pytest.raises(ValidationError, match='finite'):
+E       Failed: DID NOT RAISE <class 'pydantic_core._pydantic_core.ValidationError'>
+
+tests/test_monitor_finite_expected.py:11: Failed
+_________________ test_monitor_rejects_nonfinite_expected[inf] _________________
+
+value = inf
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf'), float('-inf')])
+    def test_monitor_rejects_nonfinite_expected(value):
+>       with pytest.raises(ValidationError, match='finite'):
+E       Failed: DID NOT RAISE <class 'pydantic_core._pydantic_core.ValidationError'>
+
+tests/test_monitor_finite_expected.py:11: Failed
+________________ test_monitor_rejects_nonfinite_expected[-inf] _________________
+
+value = -inf
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf'), float('-inf')])
+    def test_monitor_rejects_nonfinite_expected(value):
+>       with pytest.raises(ValidationError, match='finite'):
+E       Failed: DID NOT RAISE <class 'pydantic_core._pydantic_core.ValidationError'>
+
+tests/test_monitor_finite_expected.py:11: Failed
+=========================== short test summary info ============================
+FAILED tests/test_monitor_finite_expected.py::test_monitor_rejects_nonfinite_expected[nan]
+FAILED tests/test_monitor_finite_expected.py::test_monitor_rejects_nonfinite_expected[inf]
+FAILED tests/test_monitor_finite_expected.py::test_monitor_rejects_nonfinite_expected[-inf]
+3 failed in 0.12s
