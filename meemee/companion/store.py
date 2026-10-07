@@ -377,6 +377,13 @@ class CompanionStore:
             ).fetchone()
         return row["status"]
 
+    def cancel_claimed_checkin(self, checkin_id: str) -> bool:
+        with self.lock, self.db:
+            return bool(self.db.execute(
+                "UPDATE companion_checkins SET status='cancelled',updated_at=? WHERE id=? AND status='running'",
+                (_now(), checkin_id),
+            ).rowcount)
+
     def cancel_pending_checkins(self, user_id: str) -> int:
         with self.lock, self.db:
             return self.db.execute(

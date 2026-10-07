@@ -37,6 +37,13 @@ async def deliver_due_once(
             log.warning("check-in %s generation failed (%s)", checkin["id"], exc)
             return {"claimed": True, "checkin_id": checkin["id"], "user_id": checkin["user_id"],
                     "delivered": False, "status": state, "detail": str(exc)}
+        profile = store.profile(checkin["user_id"])
+        if (profile is None or not profile.checkins.enabled
+                or profile.checkins.channel != channel_name
+                or profile.checkins.address != checkin["address"]):
+            store.cancel_claimed_checkin(checkin["id"])
+            return {"claimed": True, "checkin_id": checkin["id"], "user_id": checkin["user_id"],
+                    "delivered": False, "status": "cancelled", "detail": "check-in preferences changed before delivery"}
         address = checkin["address"]
         if not address:
             if channel_name != "local":
