@@ -1,0 +1,18 @@
+.F                                                                       [100%]
+=================================== FAILURES ===================================
+_______ test_hour_cadence_crossing_dst_is_sixty_elapsed_minutes[after1] ________
+
+after = datetime.datetime(2026, 11, 1, 5, 30, tzinfo=datetime.timezone.utc)
+
+    @pytest.mark.parametrize('after', [datetime(2026,3,8,6,30,tzinfo=timezone.utc), datetime(2026,11,1,5,30,tzinfo=timezone.utc)])
+    def test_hour_cadence_crossing_dst_is_sixty_elapsed_minutes(after):
+        prefs = CheckInPreferences(enabled=True, cadence_minutes=60)
+        due = next_due(prefs, ZoneInfo('America/New_York'), after)
+>       assert due - after == timedelta(minutes=60)
+E       assert (datetime.datetime(2026, 11, 1, 7, 30, tzinfo=datetime.timezone.utc) - datetime.datetime(2026, 11, 1, 5, 30, tzinfo=datetime.timezone.utc)) == datetime.timedelta(seconds=3600)
+E        +  where datetime.timedelta(seconds=3600) = timedelta(minutes=60)
+
+tests/test_checkin_dst_canary.py:15: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_checkin_dst_canary.py::test_hour_cadence_crossing_dst_is_sixty_elapsed_minutes[after1]
+1 failed, 1 passed in 0.14s
