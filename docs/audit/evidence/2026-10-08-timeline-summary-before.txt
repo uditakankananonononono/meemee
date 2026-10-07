@@ -1,0 +1,21 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+__________ test_timeline_summary_uses_actual_first_and_last_instants ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-433/test_timeline_summary_uses_act0')
+
+    def test_timeline_summary_uses_actual_first_and_last_instants(tmp_path):
+        timeline = setup_timeline(tmp_path)
+        [summary] = timeline.source_summary('owner')
+>       assert summary['first_event_at'] == '2026-10-07T10:00:00.000000+00:00'
+E       AssertionError: assert '2026-10-07T11:00:00+00:00' == '2026-10-07T1....000000+00:00'
+E         
+E         - 2026-10-07T10:00:00.000000+00:00
+E         ?             ^    -------
+E         + 2026-10-07T11:00:00+00:00
+E         ?             ^
+
+tests/test_timeline_offset_bounds.py:33: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_timeline_offset_bounds.py::test_timeline_summary_uses_actual_first_and_last_instants
+1 failed, 2 deselected in 0.08s
