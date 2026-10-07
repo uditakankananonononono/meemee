@@ -1,0 +1,31 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______ test_terminal_retention_rolls_back_events_on_job_delete_failure ________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-349/test_terminal_retention_rolls_0')
+
+    def test_terminal_retention_rolls_back_events_on_job_delete_failure(tmp_path):
+        jobs = JobStore(tmp_path / 'jobs.sqlite3')
+        old = jobs.enqueue('old')
+        jobs.claim()
+        jobs.finish(old, {'done': True})
+        active = jobs.enqueue('active')
+        past = (datetime.now(timezone.utc) - timedelta(days=100)).isoformat()
+        jobs.db.execute('UPDATE jobs SET updated_at=? WHERE id=?', (past, old))
+        jobs.db.executescript("""
+            CREATE TRIGGER refuse_terminal_delete BEFORE DELETE ON jobs
+            BEGIN SELECT RAISE(ABORT, 'injected job deletion failure'); END;
+        """)
+        before = jobs.events(old)
+        with pytest.raises(sqlite3.IntegrityError, match='injected'):
+            RetentionManager(tmp_path).run()
+>       assert jobs.events(old) == before
+E       AssertionError: assert [] == [{'created_at... True}}, ...}]
+E         
+E         Right contains 3 more items, first extra item: {'created_at': '2026-10-07T16:02:39.633148+00:00', 'job_id': '7d34ad08fd1f4252bd15f7e1e930c17a', 'kind': 'queued', 'payload': {'run_at': '2026-10-07T16:02:39.633156+00:00'}, ...}
+E         Use -v to get more diff
+
+tests/test_retention_job_atomicity.py:27: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_retention_job_atomicity.py::test_terminal_retention_rolls_back_events_on_job_delete_failure
+1 failed in 0.07s

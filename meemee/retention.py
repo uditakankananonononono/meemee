@@ -36,6 +36,27 @@ class RetentionManager:
         finally:
             db.close()
 
+    def _delete_jobs(self, path: Path, cutoff: str) -> tuple[int, int]:
+        """Remove terminal jobs and their events in one SQLite transaction."""
+        if not path.exists():
+            return 0, 0
+        db = sqlite3.connect(path, timeout=5)
+        try:
+            with db:
+                db.execute("BEGIN IMMEDIATE")
+                events = db.execute(
+                    "DELETE FROM job_events WHERE job_id IN (SELECT id FROM jobs "
+                    "WHERE status IN ('done','failed','cancelled') AND updated_at<?)",
+                    (cutoff,),
+                ).rowcount
+                jobs = db.execute(
+                    "DELETE FROM jobs WHERE status IN ('done','failed','cancelled') AND updated_at<?",
+                    (cutoff,),
+                ).rowcount
+                return events, jobs
+        finally:
+            db.close()
+
     def _delete_memories(self, path: Path, cutoff: str) -> int:
         """Delete expired memories without orphaning their embedding vectors.
 
@@ -81,15 +102,8 @@ class RetentionManager:
         memory_cutoff = (now - timedelta(days=memory_days)).isoformat()
         runs_cutoff = (now - timedelta(days=runs_days)).isoformat()
         _audit_cutoff = (now - timedelta(days=audit_days)).isoformat()
-        job_events = self.delete(
-            self.data_dir / "jobs.sqlite3",
-            "DELETE FROM job_events WHERE job_id IN (SELECT id FROM jobs WHERE status IN ('done','failed','cancelled') AND updated_at<?)",
-            (jobs_cutoff,),
-        )
-        terminal_jobs = self.delete(
-            self.data_dir / "jobs.sqlite3",
-            "DELETE FROM jobs WHERE status IN ('done','failed','cancelled') AND updated_at<?",
-            (jobs_cutoff,),
+        job_events, terminal_jobs = self._delete_jobs(
+            self.data_dir / "jobs.sqlite3", jobs_cutoff
         )
         memories = self._delete_memories(self.data_dir / "meemee.sqlite3", memory_cutoff)
         runs = self.delete(self.data_dir / "runs.sqlite3", "DELETE FROM runs WHERE created_at<?", (runs_cutoff,))
