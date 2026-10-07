@@ -261,7 +261,12 @@ class CompanionStore:
                    ON CONFLICT(id) DO NOTHING""",
                 (ident, user_id, channel, now, now),
             )
-        return self.get_conversation(ident)  # type: ignore[return-value]
+            row = self.db.execute(
+                "SELECT * FROM companion_conversations WHERE id=?", (ident,)
+            ).fetchone()
+            if row["user_id"] != user_id or row["channel"] != channel:
+                raise ValueError("conversation ID already belongs to another owner or channel")
+            return dict(row)
 
     def get_conversation(self, conversation_id: str) -> dict[str, Any] | None:
         with self.lock:
