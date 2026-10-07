@@ -44,6 +44,7 @@ class EmailVerificationStore:
         now = datetime.now(timezone.utc).isoformat()
         digest = hashlib.sha256(raw.encode()).digest()
         with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
             row = self.db.execute("SELECT * FROM email_verifications WHERE account_id=?", (account_id,)).fetchone()
             if row is None or row["verified_at"] or row["expires_at"] <= now or not secrets.compare_digest(row["token_digest"], digest):
                 return False
@@ -73,6 +74,7 @@ class EmailVerificationStore:
         now = datetime.now(timezone.utc).isoformat()
         digest = hashlib.sha256(raw.encode()).digest()
         with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
             row = self.db.execute("SELECT * FROM password_resets WHERE account_id=?", (account_id,)).fetchone()
             if row is None or row["used_at"] or row["expires_at"] <= now or not secrets.compare_digest(row["token_digest"], digest):
                 return False
