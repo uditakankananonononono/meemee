@@ -8,9 +8,26 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 PersonalKind = Literal["goal", "relationship", "project", "preference", "routine", "constraint"]
+
+
+def validity_instant(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError("personal validity timestamp requires timezone")
+    return parsed.astimezone(timezone.utc)
+
+
+def currently_valid(row: dict, clock: datetime) -> bool:
+    try:
+        start = validity_instant(row["valid_from"]) if row.get("valid_from") else None
+        end = validity_instant(row["valid_until"]) if row.get("valid_until") else None
+        return (start is None or start <= clock) and (end is None or clock < end)
+    except (ValueError, TypeError):
+        # Legacy malformed validity never becomes trusted active context.
+        return False
 
 
 class PersonalItemInput(BaseModel):
@@ -22,6 +39,17 @@ class PersonalItemInput(BaseModel):
     source_record_id: str = Field(min_length=1, max_length=240)
     valid_from: str | None = None
     valid_until: str | None = None
+
+    @field_validator("valid_from", "valid_until")
+    @classmethod
+    def normalized_time(cls, value):
+        return validity_instant(value).isoformat() if value is not None else None
+
+    @model_validator(mode="after")
+    def ordered_time(self):
+        if self.valid_from and self.valid_until and self.valid_from >= self.valid_until:
+            raise ValueError("valid_from must precede valid_until")
+        return self
 
 
 class PersonalModelStore:
@@ -93,7 +121,7 @@ class PersonalModelStore:
             if current and current["value"] == item.value.strip():
                 ident = current["id"]
                 combined = max(float(current["confidence"]), item.confidence)
-                self.db.execute("UPDATE personal_items SET confidence=?,updated_at=? WHERE id=?", (combined, now, ident))
+                self.db.execute("UPDATE personal_items SET confidence=?,valid_from=?,valid_until=?,updated_at=? WHERE id=?", (combined, item.valid_from, item.valid_until, now, ident))
             else:
                 ident = uuid.uuid4().hex
                 previous = current["id"] if current else None
@@ -131,7 +159,11 @@ class PersonalModelStore:
             rows = self.db.execute(
                 f"SELECT id FROM personal_items WHERE {' AND '.join(clauses)} ORDER BY updated_at DESC,id DESC", values
             ).fetchall()
-        return [self.get(owner_id, row["id"]) for row in rows]
+        items = [self.get(owner_id, row["id"]) for row in rows]
+        if include_history:
+            return items
+        clock = datetime.now(timezone.utc)
+        return [row for row in items if row and currently_valid(row, clock)]
 
     def correct(self, owner_id: str, ident: str, value: str) -> dict | None:
         current = self.get(owner_id, ident)
@@ -167,12 +199,22 @@ class PersonalModelStore:
         return json.dumps([{key: row[key] for key in ("kind", "title", "value", "confidence", "valid_from", "valid_until")} for row in rows])
 
     def expire(self, owner_id: str, at: str | None = None) -> int:
-        clock = at or datetime.now(timezone.utc).isoformat()
+        clock = validity_instant(at) if at is not None else datetime.now(timezone.utc)
         with self.lock, self.db:
-            return self.db.execute(
-                "UPDATE personal_items SET status='superseded',updated_at=? WHERE owner_id=? AND status='active' AND valid_until IS NOT NULL AND valid_until<=?",
-                (clock, owner_id, clock),
-            ).rowcount
+            rows = self.db.execute(
+                "SELECT id,valid_until FROM personal_items WHERE owner_id=? AND status='active' AND valid_until IS NOT NULL",
+                (owner_id,)).fetchall()
+            expired = []
+            for row in rows:
+                try:
+                    if validity_instant(row["valid_until"]) <= clock:
+                        expired.append(row["id"])
+                except (ValueError, TypeError):
+                    expired.append(row["id"])
+            self.db.executemany(
+                "UPDATE personal_items SET status='superseded',updated_at=? WHERE id=? AND owner_id=? AND status='active'",
+                [(clock.isoformat(), ident, owner_id) for ident in expired])
+            return len(expired)
 
     def purge_owner(self, owner_id: str) -> dict[str, int]:
         """Hard-delete the owner's whole personal model, including soft-deleted items and evidence.
