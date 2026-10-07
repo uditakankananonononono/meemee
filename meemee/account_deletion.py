@@ -151,9 +151,9 @@ class AccountPurger:
 
         def memory_step() -> dict[str, int]:
             run_ids = list(t.runs.run_ids(principal)) + list(t.jobs.run_ids_for_principal(principal))
-            return {"memories": int(t.memory.delete_runs(run_ids, owner_id=principal)), "runs_scanned": len(set(run_ids))}
+            return {"memories": int(t.memory.purge_owner(principal)), "runs_scanned": len(set(run_ids))}
 
-        # memory must run before jobs/runs: it reads their run IDs.
+        # Keep run-count diagnostics, but ownership drives deletion even when reports are missing.
         steps.append(("memory", memory_step))
         steps.append(("jobs", lambda: _as_counts(t.jobs.purge_principal(principal), "jobs_deleted")))
         steps.append(("runs", lambda: _as_counts(t.runs.delete_principal(principal), "runs")))
