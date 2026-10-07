@@ -1,0 +1,58 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_______________ test_database_probe_failure_is_not_ready[false] ________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-373/test_database_probe_failure_is0')
+failure = 'false'
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('failure', ['false', 'sqlite'])
+    async def test_database_probe_failure_is_not_ready(tmp_path, failure):
+        def probe():
+            if failure == 'sqlite':
+                raise sqlite3.OperationalError('private connection detail')
+            return False
+    
+        checker = ReadinessChecker(tmp_path, {'db': probe}, 'https://model.test', min_free_bytes=1)
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(200))) as client:
+            result = await checker.check(client)
+>       assert result['status'] == 'not_ready'
+E       AssertionError: assert 'ready' == 'not_ready'
+E         
+E         - not_ready
+E         + ready
+
+tests/test_readiness_database_failure.py:22: AssertionError
+_______________ test_database_probe_failure_is_not_ready[sqlite] _______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-373/test_database_probe_failure_is1')
+failure = 'sqlite'
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('failure', ['false', 'sqlite'])
+    async def test_database_probe_failure_is_not_ready(tmp_path, failure):
+        def probe():
+            if failure == 'sqlite':
+                raise sqlite3.OperationalError('private connection detail')
+            return False
+    
+        checker = ReadinessChecker(tmp_path, {'db': probe}, 'https://model.test', min_free_bytes=1)
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(200))) as client:
+>           result = await checker.check(client)
+
+tests/test_readiness_database_failure.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee/health.py:39: in check
+    check()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def probe():
+        if failure == 'sqlite':
+>           raise sqlite3.OperationalError('private connection detail')
+E           sqlite3.OperationalError: private connection detail
+
+tests/test_readiness_database_failure.py:16: OperationalError
+=========================== short test summary info ============================
+FAILED tests/test_readiness_database_failure.py::test_database_probe_failure_is_not_ready[false]
+FAILED tests/test_readiness_database_failure.py::test_database_probe_failure_is_not_ready[sqlite]
+2 failed in 0.06s
