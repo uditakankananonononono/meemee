@@ -1,0 +1,19 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___________ test_recreated_peer_rejects_previously_executed_command ____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-260/test_recreated_peer_rejects_pr0')
+
+    def test_recreated_peer_rejects_previously_executed_command(tmp_path):
+        calls = []
+        envelope = make_command('d', 'echo', {}, b'\x11' * 32)
+        first = DeviceSimulator('d', '11' * 32, {'echo': lambda: calls.append('effect')})
+        first.execute(envelope)
+        second = DeviceSimulator('d', '11' * 32, {'echo': lambda: calls.append('effect')})
+>       with pytest.raises(ValueError, match='replayed'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_device_durable_replay_canary.py:14: Failed
+=========================== short test summary info ============================
+FAILED tests/test_device_durable_replay_canary.py::test_recreated_peer_rejects_previously_executed_command
+1 failed in 0.05s

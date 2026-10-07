@@ -4,6 +4,7 @@ import copy
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from .devices import DeviceSimulator
@@ -26,12 +27,13 @@ class StatefulDeviceSimulator(DeviceSimulator):
         secret_hex: str,
         capabilities: dict[str, Callable[..., Any]],
         initial_state: dict[str, Any] | None = None,
+        *, replay_path: Path | None = None,
     ):
         self.state = copy.deepcopy(initial_state or {})
         self.history: list[SimulationResult] = []
         self._state_lock = threading.RLock()
         wrapped = {name: self._wrap(handler) for name, handler in capabilities.items()}
-        super().__init__(device_id, secret_hex, wrapped)
+        super().__init__(device_id, secret_hex, wrapped, replay_path=replay_path)
 
     def _wrap(self, handler: Callable[..., Any]) -> Callable[..., Any]:
         def execute(**arguments: Any) -> Any:

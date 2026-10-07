@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from .device_protocol import ReplayGuard, make_command, verify_command
+from .device_protocol import ReplayGuard, SQLiteReplayGuard, make_command, verify_command
 
 
 class DeviceRegistry:
@@ -185,11 +185,13 @@ class DeviceRegistry:
 class DeviceSimulator:
     """In-process protocol peer for deterministic device integration tests."""
 
-    def __init__(self, device_id: str, secret_hex: str, handlers: dict[str, Callable[..., Any]]):
+    def __init__(self, device_id: str, secret_hex: str, handlers: dict[str, Callable[..., Any]],
+                 *, replay_path: Path | None = None):
         self.device_id = device_id
         self.secret = bytes.fromhex(secret_hex)
         self.handlers = handlers
-        self.replay = ReplayGuard()
+        namespace = hashlib.sha256(device_id.encode() + b"\x00" + self.secret).hexdigest()
+        self.replay = (SQLiteReplayGuard(replay_path, namespace) if replay_path is not None else ReplayGuard())
 
     def execute(self, envelope: dict[str, Any], *, now: int | None = None) -> Any:
         command = verify_command(
