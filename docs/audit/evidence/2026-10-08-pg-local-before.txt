@@ -1,0 +1,36 @@
+.F                                                                       [100%]
+=================================== FAILURES ===================================
+______ test_local_completion_failure_does_not_publish_message[postgresql] ______
+
+store = <meemee_persist_pg.companion.CompanionStore object at 0x7faa78159f90>
+
+    @pytest.mark.asyncio
+    async def test_local_completion_failure_does_not_publish_message(store):  # noqa: F811
+        store.upsert_user(UserProfile(user_id='owner', display_name='Owner', checkins=CheckInPreferences(enabled=True)))
+        row, _ = store.schedule_checkin('owner', datetime.now(timezone.utc), 'slot', 'local', None)
+        if hasattr(store, 'lock'):
+            store.db.execute("""CREATE TRIGGER reject_done BEFORE UPDATE OF status ON companion_checkins
+                WHEN NEW.status='done' BEGIN SELECT RAISE(ABORT,'completion rejected'); END""")
+        else:
+            with store.db.transaction() as c:
+                c.execute("ALTER TABLE meemee_companion_checkins ADD CONSTRAINT reject_done CHECK(status <> 'done')")
+    
+        class Engine:
+            async def checkin_message(self, user):
+                return 'atomic message'
+    
+        try:
+            await deliver_due_once(store, Engine(), {'local': LocalChannel(store)})
+        except Exception as exc:  # noqa: BLE001 - intentional backend failure may propagate
+            assert 'completion rejected' in str(exc) or 'reject_done' in str(exc)
+        conversation = store.latest_conversation('owner', 'local')
+>       assert store.history(conversation['id']) == []
+E       AssertionError: assert [{'content': ...'id': 1, ...}] == []
+E         
+E         Left contains one more item: {'content': 'atomic message', 'conversation_id': '4a267b9b352b45aebe82e3c322ca50ae', 'created_at': '2026-10-07T20:55:20.229798+00:00', 'id': 1, ...}
+E         Use -v to get more diff
+
+tests/test_companion_pg_local_atomic.py:33: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_companion_pg_local_atomic.py::test_local_completion_failure_does_not_publish_message[postgresql]
+1 failed, 1 passed in 0.69s

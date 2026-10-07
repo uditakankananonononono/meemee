@@ -61,10 +61,16 @@ async def deliver_due_once(
                 conversation = store.start_conversation(checkin["user_id"], "local")
             address = conversation["id"]
         validate_delivery_address(store, checkin["user_id"], channel_name, address)
-        # Only the exact built-in adapter on this SQLite store has no external side effect.
-        # Other stores/adapters retain the explicit accepted/unknown delivery boundary.
+        # Only the exact built-in adapter on supported stores has no external side effect.
+        # Other adapters retain the explicit accepted/unknown delivery boundary.
+        supported_local = type(store) is CompanionStore
         if (channel_name == "local" and type(adapter) is LocalChannel and adapter.store is store
-                and isinstance(store, CompanionStore)):
+                and not supported_local):
+            from meemee_persist_pg.companion import CompanionStore as PGCompanionStore
+
+            supported_local = type(store) is PGCompanionStore
+        if (channel_name == "local" and type(adapter) is LocalChannel and adapter.store is store
+                and supported_local):
             if not store.finish_local_checkin(checkin["id"], address, message):
                 return {"claimed": True, "checkin_id": checkin["id"], "user_id": checkin["user_id"],
                         "delivered": False, "status": "cancelled", "detail": "delivery preferences changed at commit"}
