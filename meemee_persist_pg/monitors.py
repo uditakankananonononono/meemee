@@ -141,7 +141,7 @@ class ReflectionSchedule:
         with self.db.transaction() as c:
             c.execute("""INSERT INTO meemee_reflection_runs(owner_id,watermark,last_attempt_at,last_success_at,last_status,last_result)
                 VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT (owner_id) DO UPDATE SET
-                watermark=COALESCE(%s, meemee_reflection_runs.watermark), last_attempt_at=EXCLUDED.last_attempt_at,
+                watermark=GREATEST(meemee_reflection_runs.watermark, COALESCE(%s, meemee_reflection_runs.watermark)), last_attempt_at=EXCLUDED.last_attempt_at,
                 last_success_at=COALESCE(EXCLUDED.last_success_at, meemee_reflection_runs.last_success_at),
                 last_status=EXCLUDED.last_status, last_result=EXCLUDED.last_result""",
                       (owner_id, watermark or 0, at, at if status == "ok" else None, status,
