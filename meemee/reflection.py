@@ -74,9 +74,9 @@ class PersonalModelReflector:
                 valid_from=claim.valid_from, valid_until=claim.valid_until,
             )
             prepared.append((claim, value))
-        for claim, value in prepared:
+        published = self.personal.upsert_batch(owner_id, [value for _, value in prepared], preserve_user=True)
+        for (claim, _), item in zip(prepared, published, strict=True):
             evidence_hash = hashlib.sha256(f"{claim.source_id}\0{claim.source_record_id}".encode()).hexdigest()
-            item = self.personal.upsert(owner_id, value, preserve_user=True)
             if item.pop("reflection_preserved_user", False):
                 rejected += 1
                 continue

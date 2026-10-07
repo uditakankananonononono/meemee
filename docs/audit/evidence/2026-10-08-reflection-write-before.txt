@@ -1,0 +1,66 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_________ test_later_reflection_write_failure_rolls_back_batch[sqlite] _________
+
+stores = <function stores.<locals>.<lambda> at 0x7f93a4d756c0>
+
+    def test_later_reflection_write_failure_rolls_back_batch(stores):  # noqa: F811
+        personal, context = stores()
+        context.register_source('owner', 'source', 'test', {})
+        context.ingest(ContextRecord('owner', 'source', 'event', 'event', 'preferences', 'likes tea and swim', '2026-10-08', {}))
+        if hasattr(personal, 'lock'):
+            personal.db.execute("""CREATE TRIGGER reject_exercise BEFORE INSERT ON personal_items
+                WHEN new.title='exercise' BEGIN SELECT RAISE(ABORT, 'injected store failure'); END""")
+        else:
+            with personal.db.transaction() as c:
+                c.execute("ALTER TABLE meemee_personal_items ADD CONSTRAINT reject_exercise CHECK (title <> 'exercise')")
+        claim = {'kind': 'preference', 'title': 'drink', 'value': 'tea', 'confidence': 0.8,
+                 'source_id': 'source', 'source_record_id': 'event'}
+    
+        class Model:
+            async def chat(self, *args, **kwargs):
+                return json.dumps({'claims': [claim, {**claim, 'title': 'exercise', 'value': 'swim'}]})
+    
+        with pytest.raises(Exception, match='injected store failure|reject_exercise'):
+            asyncio.run(PersonalModelReflector(context, personal, Model()).reflect('owner'))
+>       assert personal.list('owner', include_history=True) == []
+E       AssertionError: assert [{'confidence...a1fe2d', ...}] == []
+E         
+E         Left contains one more item: {'confidence': 0.8, 'created_at': '2026-10-07T20:41:28.112701+00:00', 'evidence': [{'confidence': 0.8, 'observed_at': ...28.112701+00:00', 'observed_value': 'tea', 'source_id': 'source', ...}], 'id': 'bc9228db447c41babfaf9335e0a1fe2d', ...}
+E         Use -v to get more diff
+
+tests/test_reflection_write_rollback.py:32: AssertionError
+_______ test_later_reflection_write_failure_rolls_back_batch[postgresql] _______
+
+stores = <function stores.<locals>.<lambda> at 0x7f93a4d74c10>
+
+    def test_later_reflection_write_failure_rolls_back_batch(stores):  # noqa: F811
+        personal, context = stores()
+        context.register_source('owner', 'source', 'test', {})
+        context.ingest(ContextRecord('owner', 'source', 'event', 'event', 'preferences', 'likes tea and swim', '2026-10-08', {}))
+        if hasattr(personal, 'lock'):
+            personal.db.execute("""CREATE TRIGGER reject_exercise BEFORE INSERT ON personal_items
+                WHEN new.title='exercise' BEGIN SELECT RAISE(ABORT, 'injected store failure'); END""")
+        else:
+            with personal.db.transaction() as c:
+                c.execute("ALTER TABLE meemee_personal_items ADD CONSTRAINT reject_exercise CHECK (title <> 'exercise')")
+        claim = {'kind': 'preference', 'title': 'drink', 'value': 'tea', 'confidence': 0.8,
+                 'source_id': 'source', 'source_record_id': 'event'}
+    
+        class Model:
+            async def chat(self, *args, **kwargs):
+                return json.dumps({'claims': [claim, {**claim, 'title': 'exercise', 'value': 'swim'}]})
+    
+        with pytest.raises(Exception, match='injected store failure|reject_exercise'):
+            asyncio.run(PersonalModelReflector(context, personal, Model()).reflect('owner'))
+>       assert personal.list('owner', include_history=True) == []
+E       AssertionError: assert [{'confidence...988054', ...}] == []
+E         
+E         Left contains one more item: {'confidence': 0.8, 'created_at': '2026-10-07T20:41:28.386701+00:00', 'evidence': [{'confidence': 0.8, 'observed_at': ...28.386701+00:00', 'observed_value': 'tea', 'source_id': 'source', ...}], 'id': 'ed68ca1aa7e04b98ab1b3dbd6a988054', ...}
+E         Use -v to get more diff
+
+tests/test_reflection_write_rollback.py:32: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_reflection_write_rollback.py::test_later_reflection_write_failure_rolls_back_batch[sqlite]
+FAILED tests/test_reflection_write_rollback.py::test_later_reflection_write_failure_rolls_back_batch[postgresql]
+2 failed in 0.71s

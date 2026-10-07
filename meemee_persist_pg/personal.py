@@ -42,45 +42,61 @@ class PersonalModelStore:
     def upsert(self, owner_id: str, item: PersonalItemInput, *, preserve_user: bool = False, expected_current_id: str | None = None) -> dict:
         if not owner_id:
             raise ValueError("owner is required")
-        now, title, value = _now(), item.title.strip(), item.value.strip()
         with self.db.transaction() as c:
-            # Serialize writers of one claim across hosts so two hosts cannot both insert an active row.
-            c.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (f"personal:{owner_id}:{item.kind}:{title}",))
-            current = c.execute(
-                "SELECT * FROM meemee_personal_items WHERE owner_id=%s AND kind=%s AND title=%s AND status='active'",
-                (owner_id, item.kind, title)).fetchone()
-            if expected_current_id is not None and (current is None or current["id"] != expected_current_id):
-                return {}
-            if preserve_user and current:
-                confirmed = c.execute(
-                    "SELECT 1 FROM meemee_personal_evidence WHERE item_id=%s AND owner_id=%s AND source_id='user' LIMIT 1",
-                    (current["id"], owner_id),
-                ).fetchone()
-                if confirmed:
-                    return {**dict(current), "reflection_preserved_user": True}
-            if current and current["value"] == value:
-                ident = current["id"]
-                c.execute("UPDATE meemee_personal_items SET confidence=%s,valid_from=%s,valid_until=%s,updated_at=%s WHERE id=%s",
-                          (max(float(current["confidence"]), item.confidence), item.valid_from, item.valid_until, now, ident))
-            else:
-                ident = uuid.uuid4().hex
-                previous = current["id"] if current else None
-                if previous:
-                    c.execute("UPDATE meemee_personal_items SET status='superseded',updated_at=%s WHERE id=%s", (now, previous))
-                c.execute("""INSERT INTO meemee_personal_items(id,owner_id,kind,title,value,confidence,status,valid_from,valid_until,
-                               supersedes_id,created_at,updated_at) VALUES (%s,%s,%s,%s,%s,%s,'active',%s,%s,%s,%s,%s)""",
-                          (ident, owner_id, item.kind, title, value, item.confidence, item.valid_from, item.valid_until, previous, now, now))
-            c.execute("""INSERT INTO meemee_personal_evidence(item_id,owner_id,source_id,source_record_id,observed_value,confidence,observed_at)
-                         VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING""",
-                      (ident, owner_id, item.source_id, item.source_record_id, value, item.confidence, now))
-        return self.get(owner_id, ident) or {}
+            return self._upsert_on(c, owner_id, item, preserve_user, expected_current_id)
+
+    def upsert_batch(self, owner_id: str, items: list[PersonalItemInput], *, preserve_user: bool = False) -> list[dict]:
+        if not owner_id:
+            raise ValueError("owner is required")
+        with self.db.transaction() as c:
+            # Acquire batch claim locks in stable order to avoid inverse-order deadlocks.
+            for kind, title in sorted({(item.kind, item.title.strip()) for item in items}):
+                c.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (f"personal:{owner_id}:{kind}:{title}",))
+            return [self._upsert_on(c, owner_id, item, preserve_user, None) for item in items]
+
+    def _upsert_on(self, c, owner_id, item, preserve_user, expected_current_id):
+        now, title, value = _now(), item.title.strip(), item.value.strip()
+        # Serialize writers of one claim across hosts so two hosts cannot both insert an active row.
+        c.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (f"personal:{owner_id}:{item.kind}:{title}",))
+        current = c.execute(
+            "SELECT * FROM meemee_personal_items WHERE owner_id=%s AND kind=%s AND title=%s AND status='active'",
+            (owner_id, item.kind, title)).fetchone()
+        if expected_current_id is not None and (current is None or current["id"] != expected_current_id):
+            return {}
+        if preserve_user and current:
+            confirmed = c.execute(
+                "SELECT 1 FROM meemee_personal_evidence WHERE item_id=%s AND owner_id=%s AND source_id='user' LIMIT 1",
+                (current["id"], owner_id),
+            ).fetchone()
+            if confirmed:
+                return {**dict(current), "reflection_preserved_user": True}
+        if current and current["value"] == value:
+            ident = current["id"]
+            c.execute("UPDATE meemee_personal_items SET confidence=%s,valid_from=%s,valid_until=%s,updated_at=%s WHERE id=%s",
+                      (max(float(current["confidence"]), item.confidence), item.valid_from, item.valid_until, now, ident))
+        else:
+            ident = uuid.uuid4().hex
+            previous = current["id"] if current else None
+            if previous:
+                c.execute("UPDATE meemee_personal_items SET status='superseded',updated_at=%s WHERE id=%s", (now, previous))
+            c.execute("""INSERT INTO meemee_personal_items(id,owner_id,kind,title,value,confidence,status,valid_from,valid_until,
+                           supersedes_id,created_at,updated_at) VALUES (%s,%s,%s,%s,%s,%s,'active',%s,%s,%s,%s,%s)""",
+                      (ident, owner_id, item.kind, title, value, item.confidence, item.valid_from, item.valid_until, previous, now, now))
+        c.execute("""INSERT INTO meemee_personal_evidence(item_id,owner_id,source_id,source_record_id,observed_value,confidence,observed_at)
+                     VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING""",
+                  (ident, owner_id, item.source_id, item.source_record_id, value, item.confidence, now))
+        return self._get_on(c, owner_id, ident) or {}
 
     def get(self, owner_id: str, ident: str) -> dict | None:
         with self.db.transaction() as c:
-            row = c.execute("SELECT * FROM meemee_personal_items WHERE owner_id=%s AND id=%s", (owner_id, ident)).fetchone()
-            evidence = c.execute(
-                """SELECT source_id,source_record_id,observed_value,confidence,observed_at FROM meemee_personal_evidence
-                   WHERE owner_id=%s AND item_id=%s ORDER BY observed_at DESC,id DESC""", (owner_id, ident)).fetchall()
+            return self._get_on(c, owner_id, ident)
+
+    @staticmethod
+    def _get_on(c, owner_id, ident):
+        row = c.execute("SELECT * FROM meemee_personal_items WHERE owner_id=%s AND id=%s", (owner_id, ident)).fetchone()
+        evidence = c.execute(
+            "SELECT source_id,source_record_id,observed_value,confidence,observed_at FROM meemee_personal_evidence WHERE owner_id=%s AND item_id=%s ORDER BY observed_at DESC,id DESC",
+            (owner_id, ident)).fetchall()
         if not row:
             return None
         return {**dict(row), "evidence": [dict(e) for e in evidence]}
