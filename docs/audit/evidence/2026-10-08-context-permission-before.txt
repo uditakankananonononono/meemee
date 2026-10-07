@@ -1,0 +1,182 @@
+FFFFFFFF                                                                 [100%]
+=================================== FAILURES ===================================
+________ test_source_audience_restricts_record_retrieval[sqlite-recent] ________
+
+stores = <function stores.<locals>.<lambda> at 0x7efcecf88550>
+reader = 'recent'
+
+    @pytest.mark.parametrize('reader', ['recent', 'search', 'reflection'])
+    def test_source_audience_restricts_record_retrieval(stores, reader):  # noqa: F811
+        _, store = stores()
+        store.register_source('owner', 'source', 'test', {}, permission='shared')
+        store.ingest(ContextRecord('owner', 'source', 'record', 'event', 'title', 'fixture', '2026-10-08', {}))
+        if reader == 'recent':
+            records = store.recent('owner')
+        elif reader == 'search':
+            records = store.search('owner', 'fixture')
+        else:
+            records = store.reflection_batch('owner', 0, store.owner_watermarks()['owner'])
+>       assert records == []
+E       AssertionError: assert [{'content': ...record', ...}] == []
+E         
+E         Left contains one more item: {'content': 'fixture', 'content_hash': '8cc4d8e807193fc637860ef27f7d83e7888306927e3eb12de37eeb35b33c8d54', 'cursor': None, 'external_id': 'record', ...}
+E         Use -v to get more diff
+
+tests/test_context_source_permission.py:20: AssertionError
+________ test_source_audience_restricts_record_retrieval[sqlite-search] ________
+
+stores = <function stores.<locals>.<lambda> at 0x7efcecfc8f70>
+reader = 'search'
+
+    @pytest.mark.parametrize('reader', ['recent', 'search', 'reflection'])
+    def test_source_audience_restricts_record_retrieval(stores, reader):  # noqa: F811
+        _, store = stores()
+        store.register_source('owner', 'source', 'test', {}, permission='shared')
+        store.ingest(ContextRecord('owner', 'source', 'record', 'event', 'title', 'fixture', '2026-10-08', {}))
+        if reader == 'recent':
+            records = store.recent('owner')
+        elif reader == 'search':
+            records = store.search('owner', 'fixture')
+        else:
+            records = store.reflection_batch('owner', 0, store.owner_watermarks()['owner'])
+>       assert records == []
+E       AssertionError: assert [{'content': ...record', ...}] == []
+E         
+E         Left contains one more item: {'content': 'fixture', 'content_hash': '8cc4d8e807193fc637860ef27f7d83e7888306927e3eb12de37eeb35b33c8d54', 'cursor': None, 'external_id': 'record', ...}
+E         Use -v to get more diff
+
+tests/test_context_source_permission.py:20: AssertionError
+______ test_source_audience_restricts_record_retrieval[sqlite-reflection] ______
+
+stores = <function stores.<locals>.<lambda> at 0x7efcecfc8e50>
+reader = 'reflection'
+
+    @pytest.mark.parametrize('reader', ['recent', 'search', 'reflection'])
+    def test_source_audience_restricts_record_retrieval(stores, reader):  # noqa: F811
+        _, store = stores()
+        store.register_source('owner', 'source', 'test', {}, permission='shared')
+        store.ingest(ContextRecord('owner', 'source', 'record', 'event', 'title', 'fixture', '2026-10-08', {}))
+        if reader == 'recent':
+            records = store.recent('owner')
+        elif reader == 'search':
+            records = store.search('owner', 'fixture')
+        else:
+            records = store.reflection_batch('owner', 0, store.owner_watermarks()['owner'])
+>       assert records == []
+E       AssertionError: assert [{'content': ...record', ...}] == []
+E         
+E         Left contains one more item: {'content': 'fixture', 'content_hash': '8cc4d8e807193fc637860ef27f7d83e7888306927e3eb12de37eeb35b33c8d54', 'cursor': None, 'external_id': 'record', ...}
+E         Use -v to get more diff
+
+tests/test_context_source_permission.py:20: AssertionError
+______ test_source_audience_restricts_record_retrieval[postgresql-recent] ______
+
+stores = <function stores.<locals>.<lambda> at 0x7efcecf54a60>
+reader = 'recent'
+
+    @pytest.mark.parametrize('reader', ['recent', 'search', 'reflection'])
+    def test_source_audience_restricts_record_retrieval(stores, reader):  # noqa: F811
+        _, store = stores()
+        store.register_source('owner', 'source', 'test', {}, permission='shared')
+        store.ingest(ContextRecord('owner', 'source', 'record', 'event', 'title', 'fixture', '2026-10-08', {}))
+        if reader == 'recent':
+            records = store.recent('owner')
+        elif reader == 'search':
+            records = store.search('owner', 'fixture')
+        else:
+            records = store.reflection_batch('owner', 0, store.owner_watermarks()['owner'])
+>       assert records == []
+E       AssertionError: assert [{'content': ...record', ...}] == []
+E         
+E         Left contains one more item: {'content': 'fixture', 'content_hash': '8cc4d8e807193fc637860ef27f7d83e7888306927e3eb12de37eeb35b33c8d54', 'cursor': None, 'external_id': 'record', ...}
+E         Use -v to get more diff
+
+tests/test_context_source_permission.py:20: AssertionError
+______ test_source_audience_restricts_record_retrieval[postgresql-search] ______
+
+stores = <function stores.<locals>.<lambda> at 0x7efcecfc9fc0>
+reader = 'search'
+
+    @pytest.mark.parametrize('reader', ['recent', 'search', 'reflection'])
+    def test_source_audience_restricts_record_retrieval(stores, reader):  # noqa: F811
+        _, store = stores()
+        store.register_source('owner', 'source', 'test', {}, permission='shared')
+        store.ingest(ContextRecord('owner', 'source', 'record', 'event', 'title', 'fixture', '2026-10-08', {}))
+        if reader == 'recent':
+            records = store.recent('owner')
+        elif reader == 'search':
+            records = store.search('owner', 'fixture')
+        else:
+            records = store.reflection_batch('owner', 0, store.owner_watermarks()['owner'])
+>       assert records == []
+E       AssertionError: assert [{'content': ...record', ...}] == []
+E         
+E         Left contains one more item: {'content': 'fixture', 'content_hash': '8cc4d8e807193fc637860ef27f7d83e7888306927e3eb12de37eeb35b33c8d54', 'cursor': None, 'external_id': 'record', ...}
+E         Use -v to get more diff
+
+tests/test_context_source_permission.py:20: AssertionError
+____ test_source_audience_restricts_record_retrieval[postgresql-reflection] ____
+
+stores = <function stores.<locals>.<lambda> at 0x7efcecfc9f30>
+reader = 'reflection'
+
+    @pytest.mark.parametrize('reader', ['recent', 'search', 'reflection'])
+    def test_source_audience_restricts_record_retrieval(stores, reader):  # noqa: F811
+        _, store = stores()
+        store.register_source('owner', 'source', 'test', {}, permission='shared')
+        store.ingest(ContextRecord('owner', 'source', 'record', 'event', 'title', 'fixture', '2026-10-08', {}))
+        if reader == 'recent':
+            records = store.recent('owner')
+        elif reader == 'search':
+            records = store.search('owner', 'fixture')
+        else:
+            records = store.reflection_batch('owner', 0, store.owner_watermarks()['owner'])
+>       assert records == []
+E       AssertionError: assert [{'content': ...record', ...}] == []
+E         
+E         Left contains one more item: {'content': 'fixture', 'content_hash': '8cc4d8e807193fc637860ef27f7d83e7888306927e3eb12de37eeb35b33c8d54', 'cursor': None, 'external_id': 'record', ...}
+E         Use -v to get more diff
+
+tests/test_context_source_permission.py:20: AssertionError
+___________ test_private_source_not_exposed_by_shared_record[sqlite] ___________
+
+stores = <function stores.<locals>.<lambda> at 0x7efcee42c3a0>
+
+    def test_private_source_not_exposed_by_shared_record(stores):  # noqa: F811
+        _, store = stores()
+        store.register_source('owner', 'source', 'test', {}, permission='private')
+        store.ingest(ContextRecord('owner', 'source', 'record', 'event', 'title', 'fixture',
+                                   '2026-10-08', {}, visibility='shared'))
+>       assert store.recent('owner', allowed={'shared'}) == []
+E       AssertionError: assert [{'content': ...record', ...}] == []
+E         
+E         Left contains one more item: {'content': 'fixture', 'content_hash': '66c13dff5e319200639bd7013c8c3afc04b82a6968998cbbd4a301dcefd90269', 'cursor': None, 'external_id': 'record', ...}
+E         Use -v to get more diff
+
+tests/test_context_source_permission.py:33: AssertionError
+_________ test_private_source_not_exposed_by_shared_record[postgresql] _________
+
+stores = <function stores.<locals>.<lambda> at 0x7efcecfca830>
+
+    def test_private_source_not_exposed_by_shared_record(stores):  # noqa: F811
+        _, store = stores()
+        store.register_source('owner', 'source', 'test', {}, permission='private')
+        store.ingest(ContextRecord('owner', 'source', 'record', 'event', 'title', 'fixture',
+                                   '2026-10-08', {}, visibility='shared'))
+>       assert store.recent('owner', allowed={'shared'}) == []
+E       AssertionError: assert [{'content': ...record', ...}] == []
+E         
+E         Left contains one more item: {'content': 'fixture', 'content_hash': '66c13dff5e319200639bd7013c8c3afc04b82a6968998cbbd4a301dcefd90269', 'cursor': None, 'external_id': 'record', ...}
+E         Use -v to get more diff
+
+tests/test_context_source_permission.py:33: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_context_source_permission.py::test_source_audience_restricts_record_retrieval[sqlite-recent]
+FAILED tests/test_context_source_permission.py::test_source_audience_restricts_record_retrieval[sqlite-search]
+FAILED tests/test_context_source_permission.py::test_source_audience_restricts_record_retrieval[sqlite-reflection]
+FAILED tests/test_context_source_permission.py::test_source_audience_restricts_record_retrieval[postgresql-recent]
+FAILED tests/test_context_source_permission.py::test_source_audience_restricts_record_retrieval[postgresql-search]
+FAILED tests/test_context_source_permission.py::test_source_audience_restricts_record_retrieval[postgresql-reflection]
+FAILED tests/test_context_source_permission.py::test_private_source_not_exposed_by_shared_record[sqlite]
+FAILED tests/test_context_source_permission.py::test_private_source_not_exposed_by_shared_record[postgresql]
+8 failed in 1.67s
