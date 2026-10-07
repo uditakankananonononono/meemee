@@ -1,0 +1,28 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_____________ test_status_uses_single_snapshot_across_limit_usage ______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-526/test_status_uses_single_snapsh0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fcb9c8119f0>
+
+    def test_status_uses_single_snapshot_across_limit_usage(tmp_path, monkeypatch):
+        path = tmp_path / 'quota.sqlite3'
+        reader, writer = QuotaStore(path), QuotaStore(path)
+        writer.set_limit('owner', 10)
+        original = reader.limit
+    
+        def changed_after_limit(owner):
+            result = original(owner)
+            writer.set_limit(owner, 20)
+            writer.consume_job(owner)
+            return result
+    
+        monkeypatch.setattr(reader, 'limit', changed_after_limit)
+        status = reader.status('owner')
+>       assert (status['limit'], status['used']) in {(10, 0), (20, 1)}
+E       assert (10, 1) in {(10, 0), (20, 1)}
+
+tests/test_quota_status_snapshot.py:20: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_quota_status_snapshot.py::test_status_uses_single_snapshot_across_limit_usage
+1 failed in 0.07s
