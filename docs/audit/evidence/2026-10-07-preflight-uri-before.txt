@@ -1,0 +1,46 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_ test_corrupt_special_filename_cannot_pass_integrity[corrupt?mode=rw.sqlite3] _
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-394/test_corrupt_special_filename_0')
+name = 'corrupt?mode=rw.sqlite3'
+
+    @pytest.mark.parametrize('name', ['corrupt?mode=rw.sqlite3', 'corrupt#section.sqlite3'])
+    def test_corrupt_special_filename_cannot_pass_integrity(tmp_path, name):
+        # Valid decoy at the URI-truncated path must not be mistaken for this corrupt file.
+        decoy = tmp_path / 'corrupt'
+        with sqlite3.connect(decoy) as db:
+            db.execute('CREATE TABLE decoy(id INTEGER)')
+        (tmp_path / name).write_bytes(b'not a SQLite database')
+        [result] = _check_databases(tmp_path)
+        assert result['name'] == 'database_integrity:' + name
+        assert result['ok'] is False
+>       assert result['error'] == 'DatabaseError'
+E       AssertionError: assert 'OperationalError' == 'DatabaseError'
+E         
+E         - DatabaseError
+E         + OperationalError
+
+tests/test_preflight_filename_uri.py:20: AssertionError
+_ test_corrupt_special_filename_cannot_pass_integrity[corrupt#section.sqlite3] _
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-394/test_corrupt_special_filename_1')
+name = 'corrupt#section.sqlite3'
+
+    @pytest.mark.parametrize('name', ['corrupt?mode=rw.sqlite3', 'corrupt#section.sqlite3'])
+    def test_corrupt_special_filename_cannot_pass_integrity(tmp_path, name):
+        # Valid decoy at the URI-truncated path must not be mistaken for this corrupt file.
+        decoy = tmp_path / 'corrupt'
+        with sqlite3.connect(decoy) as db:
+            db.execute('CREATE TABLE decoy(id INTEGER)')
+        (tmp_path / name).write_bytes(b'not a SQLite database')
+        [result] = _check_databases(tmp_path)
+        assert result['name'] == 'database_integrity:' + name
+>       assert result['ok'] is False
+E       assert True is False
+
+tests/test_preflight_filename_uri.py:19: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_preflight_filename_uri.py::test_corrupt_special_filename_cannot_pass_integrity[corrupt?mode=rw.sqlite3]
+FAILED tests/test_preflight_filename_uri.py::test_corrupt_special_filename_cannot_pass_integrity[corrupt#section.sqlite3]
+2 failed in 0.16s
