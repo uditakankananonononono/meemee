@@ -1,0 +1,139 @@
+FFFFFFFF                                                                 [100%]
+=================================== FAILURES ===================================
+_____________ test_checkin_rejects_invalid_retry_budget[sqlite-0] ______________
+
+store = <meemee.companion.store.CompanionStore object at 0x7f03f7b4e590>
+budget = 0
+
+    @pytest.mark.parametrize('budget', [0, -1, True, 1.5])
+    def test_checkin_rejects_invalid_retry_budget(store, budget):  # noqa: F811
+>       with pytest.raises(ValueError, match='max_attempts'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_checkin_retry_budget.py:11: Failed
+_____________ test_checkin_rejects_invalid_retry_budget[sqlite--1] _____________
+
+store = <meemee.companion.store.CompanionStore object at 0x7f03f7b4f190>
+budget = -1
+
+    @pytest.mark.parametrize('budget', [0, -1, True, 1.5])
+    def test_checkin_rejects_invalid_retry_budget(store, budget):  # noqa: F811
+>       with pytest.raises(ValueError, match='max_attempts'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_checkin_retry_budget.py:11: Failed
+____________ test_checkin_rejects_invalid_retry_budget[sqlite-True] ____________
+
+store = <meemee.companion.store.CompanionStore object at 0x7f03f7be1240>
+budget = True
+
+    @pytest.mark.parametrize('budget', [0, -1, True, 1.5])
+    def test_checkin_rejects_invalid_retry_budget(store, budget):  # noqa: F811
+>       with pytest.raises(ValueError, match='max_attempts'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_checkin_retry_budget.py:11: Failed
+____________ test_checkin_rejects_invalid_retry_budget[sqlite-1.5] _____________
+
+store = <meemee.companion.store.CompanionStore object at 0x7f03f7b4f160>
+budget = 1.5
+
+    @pytest.mark.parametrize('budget', [0, -1, True, 1.5])
+    def test_checkin_rejects_invalid_retry_budget(store, budget):  # noqa: F811
+>       with pytest.raises(ValueError, match='max_attempts'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_checkin_retry_budget.py:11: Failed
+___________ test_checkin_rejects_invalid_retry_budget[postgresql-0] ____________
+
+store = <meemee_persist_pg.companion.CompanionStore object at 0x7f03f7b4e470>
+budget = 0
+
+    @pytest.mark.parametrize('budget', [0, -1, True, 1.5])
+    def test_checkin_rejects_invalid_retry_budget(store, budget):  # noqa: F811
+>       with pytest.raises(ValueError, match='max_attempts'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_checkin_retry_budget.py:11: Failed
+___________ test_checkin_rejects_invalid_retry_budget[postgresql--1] ___________
+
+store = <meemee_persist_pg.companion.CompanionStore object at 0x7f03f7be2b00>
+budget = -1
+
+    @pytest.mark.parametrize('budget', [0, -1, True, 1.5])
+    def test_checkin_rejects_invalid_retry_budget(store, budget):  # noqa: F811
+>       with pytest.raises(ValueError, match='max_attempts'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_checkin_retry_budget.py:11: Failed
+__________ test_checkin_rejects_invalid_retry_budget[postgresql-True] __________
+
+store = <meemee_persist_pg.companion.CompanionStore object at 0x7f03f7be01f0>
+budget = True
+
+    @pytest.mark.parametrize('budget', [0, -1, True, 1.5])
+    def test_checkin_rejects_invalid_retry_budget(store, budget):  # noqa: F811
+        with pytest.raises(ValueError, match='max_attempts'):
+>           store.schedule_checkin('owner', datetime.now(timezone.utc), 'slot', 'local', None, max_attempts=budget)
+
+tests/test_checkin_retry_budget.py:12: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee_persist_pg/companion.py:221: in schedule_checkin
+    created = c.execute("""INSERT INTO meemee_companion_checkins(id,user_id,slot,due_at,status,max_attempts,channel,address,created_at,updated_at)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <psycopg.Connection [IDLE] (host=127.0.0.1 port=55439 user=sandbox database=meemee_tok_cac0f97f2c3b) at 0x7f03f771d2a0>
+query = "INSERT INTO meemee_companion_checkins(id,user_id,slot,due_at,status,max_attempts,channel,address,created_at,updated_a...                                   VALUES (%s,%s,%s,%s,'queued',%s,%s,%s,%s,%s) ON CONFLICT (user_id, slot) DO NOTHING"
+params = ('b6bd954322724d5fa4796a2a6f206b78', 'owner', 'slot', datetime.datetime(2026, 10, 7, 20, 48, 31, 977063, tzinfo=datetime.timezone.utc), True, 'local', ...)
+
+    def execute(
+        self,
+        query: Query,
+        params: Params | None = None,
+        *,
+        prepare: bool | None = None,
+        binary: bool = False,
+    ) -> Cursor[Row]:
+        """Execute a query and return a cursor to read its results."""
+        try:
+            cur = self.cursor()
+            if binary:
+                cur.format = BINARY
+    
+            if isinstance(query, Template):
+                if params is not None:
+                    raise TypeError(
+                        "'execute()' with string template query doesn't support parameters"
+                    )
+                return cur.execute(query, prepare=prepare)
+            else:
+                return cur.execute(query, params, prepare=prepare)
+        except e._NO_TRACEBACK as ex:
+>           raise ex.with_traceback(None)
+E           psycopg.errors.DatatypeMismatch: column "max_attempts" is of type integer but expression is of type boolean
+E           LINE 2: ...                     VALUES ($1,$2,$3,$4,'queued',$5,$6,$7,$...
+E                                                                        ^
+E           HINT:  You will need to rewrite or cast the expression.
+
+.venv/lib/python3.10/site-packages/psycopg/connection.py:304: DatatypeMismatch
+__________ test_checkin_rejects_invalid_retry_budget[postgresql-1.5] ___________
+
+store = <meemee_persist_pg.companion.CompanionStore object at 0x7f03f7be2020>
+budget = 1.5
+
+    @pytest.mark.parametrize('budget', [0, -1, True, 1.5])
+    def test_checkin_rejects_invalid_retry_budget(store, budget):  # noqa: F811
+>       with pytest.raises(ValueError, match='max_attempts'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_checkin_retry_budget.py:11: Failed
+=========================== short test summary info ============================
+FAILED tests/test_checkin_retry_budget.py::test_checkin_rejects_invalid_retry_budget[sqlite-0]
+FAILED tests/test_checkin_retry_budget.py::test_checkin_rejects_invalid_retry_budget[sqlite--1]
+FAILED tests/test_checkin_retry_budget.py::test_checkin_rejects_invalid_retry_budget[sqlite-True]
+FAILED tests/test_checkin_retry_budget.py::test_checkin_rejects_invalid_retry_budget[sqlite-1.5]
+FAILED tests/test_checkin_retry_budget.py::test_checkin_rejects_invalid_retry_budget[postgresql-0]
+FAILED tests/test_checkin_retry_budget.py::test_checkin_rejects_invalid_retry_budget[postgresql--1]
+FAILED tests/test_checkin_retry_budget.py::test_checkin_rejects_invalid_retry_budget[postgresql-True]
+FAILED tests/test_checkin_retry_budget.py::test_checkin_rejects_invalid_retry_budget[postgresql-1.5]
+8 failed in 1.45s

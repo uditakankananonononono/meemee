@@ -350,6 +350,8 @@ class CompanionStore:
         max_attempts: int = 3,
         *, reuse_pending: bool = False,
     ) -> tuple[dict[str, Any], bool]:
+        if type(max_attempts) is not int or max_attempts < 1:
+            raise ValueError("max_attempts must be a positive integer")
         if due_at.tzinfo is None or due_at.utcoffset() is None:
             raise ValueError("check-in due_at requires a timezone")
         ident = uuid.uuid4().hex
