@@ -30,6 +30,13 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def reflection_clock(now: datetime | None = None) -> datetime:
+    instant = now if now is not None else _now()
+    if instant.tzinfo is None or instant.utcoffset() is None:
+        raise ValueError("reflection clock must include a timezone")
+    return instant
+
+
 class ReflectionSchedule:
     def __init__(self, path: Path):
         self.guard_dir = path.parent / (path.name + ".owner-locks")
@@ -79,7 +86,7 @@ class ReflectionSchedule:
         return dict(row) if row else None
 
     def due(self, watermarks: dict[str, int], interval: timedelta, now: datetime | None = None) -> list[str]:
-        now = now or _now()
+        now = reflection_clock(now)
         out = []
         for owner, top in sorted(watermarks.items()):
             st = self.state(owner)
@@ -94,7 +101,7 @@ class ReflectionSchedule:
         return out
 
     def record(self, owner_id: str, status: str, result: dict[str, Any], watermark: int | None, now: datetime | None = None) -> None:
-        at = (now or _now()).isoformat()
+        at = reflection_clock(now).isoformat()
         with self.lock, self.db:
             self.db.execute(
                 "INSERT INTO reflection_runs(owner_id,watermark,last_attempt_at,last_success_at,last_status,last_result)"

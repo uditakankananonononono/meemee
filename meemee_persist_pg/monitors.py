@@ -18,6 +18,8 @@ from typing import Any
 from meemee.monitors import MonitorInput
 from meemee.monitors import MonitorStore as _SQLiteMonitors
 
+from meemee.reflection_schedule import reflection_clock
+
 from ._db import Database
 
 
@@ -142,7 +144,7 @@ class ReflectionSchedule:
         return dict(row) if row else None
 
     def due(self, watermarks: dict[str, int], interval: timedelta, now: datetime | None = None) -> list[str]:
-        now, out = now or _now(), []
+        now, out = reflection_clock(now), []
         for owner, top in sorted(watermarks.items()):
             st = self.state(owner)
             if st is None:
@@ -155,7 +157,7 @@ class ReflectionSchedule:
         return out
 
     def record(self, owner_id: str, status: str, result: dict[str, Any], watermark: int | None, now: datetime | None = None) -> None:
-        at = (now or _now()).isoformat()
+        at = reflection_clock(now).isoformat()
         with self.db.transaction() as c:
             c.execute("""INSERT INTO meemee_reflection_runs(owner_id,watermark,last_attempt_at,last_success_at,last_status,last_result)
                 VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT (owner_id) DO UPDATE SET

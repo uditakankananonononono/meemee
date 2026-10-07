@@ -1,0 +1,60 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+____ test_reflection_rejects_naive_clock_before_state_change[sqlite-record] ____
+
+stores = <function stores.<locals>.<lambda> at 0x7f086b575ea0>
+operation = 'record'
+
+    @pytest.mark.parametrize('operation', ['record', 'due'])
+    def test_reflection_rejects_naive_clock_before_state_change(stores, operation):  # noqa: F811
+        _, schedule = stores()
+        naive = datetime(2026, 10, 8, 9)  # noqa: DTZ001
+>       with pytest.raises(ValueError, match='timezone'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_reflection_naive_time.py:13: Failed
+_____ test_reflection_rejects_naive_clock_before_state_change[sqlite-due] ______
+
+stores = <function stores.<locals>.<lambda> at 0x7f086b5c2560>
+operation = 'due'
+
+    @pytest.mark.parametrize('operation', ['record', 'due'])
+    def test_reflection_rejects_naive_clock_before_state_change(stores, operation):  # noqa: F811
+        _, schedule = stores()
+        naive = datetime(2026, 10, 8, 9)  # noqa: DTZ001
+>       with pytest.raises(ValueError, match='timezone'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_reflection_naive_time.py:13: Failed
+__ test_reflection_rejects_naive_clock_before_state_change[postgresql-record] __
+
+stores = <function stores.<locals>.<lambda> at 0x7f086b5c2710>
+operation = 'record'
+
+    @pytest.mark.parametrize('operation', ['record', 'due'])
+    def test_reflection_rejects_naive_clock_before_state_change(stores, operation):  # noqa: F811
+        _, schedule = stores()
+        naive = datetime(2026, 10, 8, 9)  # noqa: DTZ001
+>       with pytest.raises(ValueError, match='timezone'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_reflection_naive_time.py:13: Failed
+___ test_reflection_rejects_naive_clock_before_state_change[postgresql-due] ____
+
+stores = <function stores.<locals>.<lambda> at 0x7f086b5c3640>
+operation = 'due'
+
+    @pytest.mark.parametrize('operation', ['record', 'due'])
+    def test_reflection_rejects_naive_clock_before_state_change(stores, operation):  # noqa: F811
+        _, schedule = stores()
+        naive = datetime(2026, 10, 8, 9)  # noqa: DTZ001
+>       with pytest.raises(ValueError, match='timezone'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_reflection_naive_time.py:13: Failed
+=========================== short test summary info ============================
+FAILED tests/test_reflection_naive_time.py::test_reflection_rejects_naive_clock_before_state_change[sqlite-record]
+FAILED tests/test_reflection_naive_time.py::test_reflection_rejects_naive_clock_before_state_change[sqlite-due]
+FAILED tests/test_reflection_naive_time.py::test_reflection_rejects_naive_clock_before_state_change[postgresql-record]
+FAILED tests/test_reflection_naive_time.py::test_reflection_rejects_naive_clock_before_state_change[postgresql-due]
+4 failed in 0.99s
