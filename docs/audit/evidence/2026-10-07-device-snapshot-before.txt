@@ -1,0 +1,39 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+________________ test_execution_snapshot_and_history_are_atomic ________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-242/test_execution_snapshot_and_hi0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f9e160e1060>
+
+    def test_execution_snapshot_and_history_are_atomic(tmp_path, monkeypatch):
+        def increment(state):
+            state['n'] += 1
+            return state['n']
+    
+        simulator = StatefulDeviceSimulator('d', '11' * 32, {'increment': increment}, {'n': 0})
+        commands = [make_command('d', 'increment', {}, b'\x11' * 32) for _ in range(2)]
+        first_snapshot = threading.Event()
+        original = simulator.snapshot
+        count = [0]
+    
+        def delayed_snapshot():
+            count[0] += 1
+            if count[0] == 1:
+                first_snapshot.set()
+                time.sleep(0.15)
+            return original()
+    
+        monkeypatch.setattr(simulator, 'snapshot', delayed_snapshot)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            first = pool.submit(simulator.execute, commands[0])
+            assert first_snapshot.wait(2)
+            second = pool.submit(simulator.execute, commands[1])
+            results = [first.result(timeout=3), second.result(timeout=3)]
+>       assert results[0].result == 1 and results[0].state['n'] == 1
+E       AssertionError: assert (1 == 1 and 2 == 1)
+E        +  where 1 = SimulationResult(command_id='c5620cf6f45d1f6310d66bc4d26f03a9', capability='increment', result=1, state={'n': 2}).result
+
+tests/test_device_snapshot_race_canary.py:34: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_device_snapshot_race_canary.py::test_execution_snapshot_and_history_are_atomic
+1 failed in 0.21s

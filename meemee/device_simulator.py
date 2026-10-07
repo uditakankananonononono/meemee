@@ -41,13 +41,13 @@ class StatefulDeviceSimulator(DeviceSimulator):
         return execute
 
     def execute(self, envelope: dict[str, Any], *, now: int | None = None) -> SimulationResult:
-        result = super().execute(envelope, now=now)
-        record = SimulationResult(
-            str(envelope["command_id"]), str(envelope["capability"]), result, self.snapshot()
-        )
         with self._state_lock:
+            result = super().execute(envelope, now=now)
+            record = SimulationResult(
+                str(envelope["command_id"]), str(envelope["capability"]), result, self.snapshot()
+            )
             self.history.append(record)
-        return record
+            return record
 
     def snapshot(self) -> dict[str, Any]:
         with self._state_lock:
