@@ -1,0 +1,37 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_____________ test_ingest_rechecks_source_inside_write_transaction _____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-436/test_ingest_rechecks_source_in0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fef3ea9e830>
+
+    def test_ingest_rechecks_source_inside_write_transaction(tmp_path, monkeypatch):
+        store = ContextStore(tmp_path / 'context.sqlite3')
+        other = ContextStore(tmp_path / 'context.sqlite3')
+        store.register_source('owner', 'source', 'test', {})
+        original = store.source
+    
+        def removed_after_read(owner, source):
+            result = original(owner, source)
+            if not store.db.in_transaction:
+                with other.db:
+                    other.db.execute('DELETE FROM context_sources WHERE owner_id=? AND source_id=?', (owner, source))
+            return result
+    
+        monkeypatch.setattr(store, 'source', removed_after_read)
+        record = ContextRecord('owner', 'source', 'event', 'event', 'title', 'body', '2026-10-08', {})
+        # Either source validation prevents deletion or ingestion rejects its disappearance.
+        try:
+            store.ingest(record)
+        except ValueError:
+            pass
+        rows = store.db.execute('SELECT count(*) FROM context_records').fetchone()[0]
+>       assert rows == 0 or store.source('owner', 'source') is not None
+E       AssertionError: assert (1 == 0 or None is not None)
+E        +  where None = <function test_ingest_rechecks_source_inside_write_transaction.<locals>.removed_after_read at 0x7fef3e9e5360>('owner', 'source')
+E        +    where <function test_ingest_rechecks_source_inside_write_transaction.<locals>.removed_after_read at 0x7fef3e9e5360> = <meemee.context.ContextStore object at 0x7fef3ea9dd50>.source
+
+tests/test_context_source_transaction.py:29: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_context_source_transaction.py::test_ingest_rechecks_source_inside_write_transaction
+1 failed in 0.09s
