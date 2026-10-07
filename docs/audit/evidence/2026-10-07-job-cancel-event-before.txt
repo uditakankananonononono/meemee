@@ -1,0 +1,54 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_______________ test_cancel_event_abort_rolls_back_state[cancel] _______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-287/test_cancel_event_abort_rolls_0')
+action = 'cancel'
+
+    @pytest.mark.parametrize('action', ['cancel', 'cancel_running'])
+    def test_cancel_event_abort_rolls_back_state(tmp_path, action):
+        store = JobStore(tmp_path / 'j.db')
+        ident = store.enqueue('fixture', principal='owner')
+        expected = 'queued'
+        if action == 'cancel_running':
+            store.claim()
+            store.request_cancel(ident)
+            expected = 'cancel_requested'
+        store.db.execute("CREATE TRIGGER reject_event BEFORE INSERT ON job_events BEGIN SELECT RAISE(ABORT,'fixture event unavailable'); END")
+        with pytest.raises(sqlite3.IntegrityError, match='event unavailable'):
+            getattr(store, action)(ident)
+>       assert store.get(ident)['status'] == expected
+E       AssertionError: assert 'cancelled' == 'queued'
+E         
+E         - queued
+E         + cancelled
+
+tests/test_job_cancel_event_atomic_canary.py:21: AssertionError
+___________ test_cancel_event_abort_rolls_back_state[cancel_running] ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-287/test_cancel_event_abort_rolls_1')
+action = 'cancel_running'
+
+    @pytest.mark.parametrize('action', ['cancel', 'cancel_running'])
+    def test_cancel_event_abort_rolls_back_state(tmp_path, action):
+        store = JobStore(tmp_path / 'j.db')
+        ident = store.enqueue('fixture', principal='owner')
+        expected = 'queued'
+        if action == 'cancel_running':
+            store.claim()
+            store.request_cancel(ident)
+            expected = 'cancel_requested'
+        store.db.execute("CREATE TRIGGER reject_event BEFORE INSERT ON job_events BEGIN SELECT RAISE(ABORT,'fixture event unavailable'); END")
+        with pytest.raises(sqlite3.IntegrityError, match='event unavailable'):
+            getattr(store, action)(ident)
+>       assert store.get(ident)['status'] == expected
+E       AssertionError: assert 'cancelled' == 'cancel_requested'
+E         
+E         - cancel_requested
+E         + cancelled
+
+tests/test_job_cancel_event_atomic_canary.py:21: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_job_cancel_event_atomic_canary.py::test_cancel_event_abort_rolls_back_state[cancel]
+FAILED tests/test_job_cancel_event_atomic_canary.py::test_cancel_event_abort_rolls_back_state[cancel_running]
+2 failed in 0.06s
