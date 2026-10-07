@@ -86,6 +86,18 @@ class CompanionStore:
                              (min(max(limit, 1), 500),)).fetchall()
         return [self._profile(row) for row in rows]
 
+    def iter_user_ids(self, batch_size: int = 200):
+        after = ""
+        while True:
+            with self.db.transaction() as c:
+                rows = c.execute("SELECT user_id FROM meemee_companion_users WHERE user_id>%s ORDER BY user_id LIMIT %s",
+                                 (after, max(1, min(batch_size, 500)))).fetchall()
+            if not rows:
+                return
+            for row in rows:
+                yield row["user_id"]
+            after = rows[-1]["user_id"]
+
     # facts ------------------------------------------------------------
     def add_fact(self, user_id: str, fact: FactInput, source: str) -> dict[str, Any]:
         now = _now()

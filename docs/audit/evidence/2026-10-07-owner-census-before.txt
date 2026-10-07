@@ -1,0 +1,22 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______________ test_planning_includes_owner_beyond_five_hundred _______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-196/test_planning_includes_owner_b0')
+
+    def test_planning_includes_owner_beyond_five_hundred(tmp_path):
+        store = CompanionStore(tmp_path / 'c.db')
+        store.upsert_user(UserProfile(user_id='old',display_name='Old',checkins=CheckInPreferences(enabled=True)))
+        for i in range(500):
+            store.upsert_user(UserProfile(user_id=f'user{i}',display_name='Off'))
+        planned = CheckInScheduler(store).plan_all(datetime(2026,1,1,tzinfo=timezone.utc))
+>       assert [row['user_id'] for row in planned] == ['old']
+E       AssertionError: assert [] == ['old']
+E         
+E         Right contains one more item: 'old'
+E         Use -v to get more diff
+
+tests/test_checkin_owner_census_canary.py:15: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_checkin_owner_census_canary.py::test_planning_includes_owner_beyond_five_hundred
+1 failed in 0.41s

@@ -71,8 +71,8 @@ class CheckInScheduler:
 
     def plan_all(self, after: datetime | None = None) -> list[dict[str, Any]]:
         planned = []
-        for record in self.store.list_users(limit=500):
-            row = self.plan_user(record["user_id"], after)
+        for user_id in self.store.iter_user_ids():
+            row = self.plan_user(user_id, after)
             if row is not None:
                 planned.append(row)
         return planned
