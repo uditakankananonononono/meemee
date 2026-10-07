@@ -1,0 +1,253 @@
+.F...F.F.F.F......FF                                                     [100%]
+=================================== FAILURES ===================================
+_______________ test_profiles_round_trip_and_upsert[postgresql] ________________
+
+store = <meemee_persist_pg.companion.CompanionStore object at 0x7f8f4cdf6ec0>
+
+    def test_profiles_round_trip_and_upsert(store):
+        assert isinstance(store, CompanionStoreInterface) and store.ping()
+        created = store.upsert_user(_profile())
+>       assert created["display_name"] == "Ana" and isinstance(created["persona"], dict)
+E       AssertionError: assert (b'Ana' == 'Ana')
+
+tests/test_companion_backends.py:45: AssertionError
+______________ test_conversations_messages_and_traces[postgresql] ______________
+
+store = <meemee_persist_pg.companion.CompanionStore object at 0x7f8f4c9ff580>
+
+    def test_conversations_messages_and_traces(store):
+        first = store.start_conversation("u1", "local", "c1")
+        assert store.start_conversation("u1", "local", "c1") == first
+        store.start_conversation("u1", "sms")
+        messages = [store.add_message("c1", role, f"m{i}") for i, role in enumerate(["user", "assistant", "user"])]
+>       assert [m["content"] for m in store.history("c1")] == ["m0", "m1", "m2"]
+E       AssertionError: assert [b'm0', b'm1', b'm2'] == ['m0', 'm1', 'm2']
+E         
+E         At index 0 diff: b'm0' != 'm0'
+E         Use -v to get more diff
+
+tests/test_companion_backends.py:77: AssertionError
+_________ test_checkins_schedule_claim_retry_finish_cancel[postgresql] _________
+
+store = <meemee_persist_pg.companion.CompanionStore object at 0x7f8f4cdf43a0>
+
+    def test_checkins_schedule_claim_retry_finish_cancel(store):
+        now = datetime.now(timezone.utc)
+        row, created = store.schedule_checkin("u1", now - timedelta(minutes=1), "2026-09-24:morning", "local", None, max_attempts=2)
+        again, created_again = store.schedule_checkin("u1", now, "2026-09-24:morning", "local", None)
+        assert created and not created_again and again["id"] == row["id"]
+        store.schedule_checkin("u1", now + timedelta(hours=1), "2026-09-24:evening", "local", None)
+>       claimed = store.claim_checkin(now)
+
+tests/test_companion_backends.py:96: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee_persist_pg/companion.py:222: in claim_checkin
+    c.execute("UPDATE meemee_companion_checkins SET status='running', attempts=attempts+1, updated_at=%s WHERE id=%s",
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <psycopg.Connection [IDLE] (host=127.0.0.1 port=55439 user=sandbox database=meemee_tok_2fa41b937726) at 0x7f8f4cde14b0>
+query = "UPDATE meemee_companion_checkins SET status='running', attempts=attempts+1, updated_at=%s WHERE id=%s"
+params = (datetime.datetime(2026, 10, 7, 16, 6, 6, 501843, tzinfo=datetime.timezone.utc), b'd5ead9e51b844daea2c4839d4159e7b1')
+
+    def execute(
+        self,
+        query: Query,
+        params: Params | None = None,
+        *,
+        prepare: bool | None = None,
+        binary: bool = False,
+    ) -> Cursor[Row]:
+        """Execute a query and return a cursor to read its results."""
+        try:
+            cur = self.cursor()
+            if binary:
+                cur.format = BINARY
+    
+            if isinstance(query, Template):
+                if params is not None:
+                    raise TypeError(
+                        "'execute()' with string template query doesn't support parameters"
+                    )
+                return cur.execute(query, prepare=prepare)
+            else:
+                return cur.execute(query, params, prepare=prepare)
+        except e._NO_TRACEBACK as ex:
+>           raise ex.with_traceback(None)
+E           psycopg.errors.UndefinedFunction: operator does not exist: text = bytea
+E           LINE 1: ...us='running', attempts=attempts+1, updated_at=$1 WHERE id=$2
+E                                                                               ^
+E           HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
+
+.venv/lib/python3.10/site-packages/psycopg/connection.py:304: UndefinedFunction
+_______ test_concurrent_checkin_claims_have_one_winner_each[postgresql] ________
+
+backend = <function backend.<locals>.<lambda> at 0x7f8f4c9eb130>
+
+    def test_concurrent_checkin_claims_have_one_winner_each(backend):
+        stores = [backend() for _ in range(4)]
+        now = datetime.now(timezone.utc)
+        for i in range(20):
+            stores[0].schedule_checkin(f"u{i}", now - timedelta(seconds=1), "slot", "local", None)
+    
+        def drain(store):
+            got = []
+            while (c := store.claim_checkin(now)) is not None:
+                got.append(c["id"])
+            return got
+        with ThreadPoolExecutor(8) as pool:
+>           claimed = [ident for batch in pool.map(drain, stores * 2) for ident in batch]
+
+tests/test_companion_backends.py:123: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_companion_backends.py:123: in <listcomp>
+    claimed = [ident for batch in pool.map(drain, stores * 2) for ident in batch]
+/usr/lib/python3.10/concurrent/futures/_base.py:621: in result_iterator
+    yield _result_or_cancel(fs.pop())
+/usr/lib/python3.10/concurrent/futures/_base.py:319: in _result_or_cancel
+    return fut.result(timeout)
+/usr/lib/python3.10/concurrent/futures/_base.py:451: in result
+    return self.__get_result()
+/usr/lib/python3.10/concurrent/futures/_base.py:403: in __get_result
+    raise self._exception
+/usr/lib/python3.10/concurrent/futures/thread.py:58: in run
+    result = self.fn(*self.args, **self.kwargs)
+tests/test_companion_backends.py:119: in drain
+    while (c := store.claim_checkin(now)) is not None:
+meemee_persist_pg/companion.py:222: in claim_checkin
+    c.execute("UPDATE meemee_companion_checkins SET status='running', attempts=attempts+1, updated_at=%s WHERE id=%s",
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <psycopg.Connection [IDLE] (host=127.0.0.1 port=55439 user=sandbox database=meemee_tok_4976a0a1c9c5) at 0x7f8f4cdf7f70>
+query = "UPDATE meemee_companion_checkins SET status='running', attempts=attempts+1, updated_at=%s WHERE id=%s"
+params = (datetime.datetime(2026, 10, 7, 16, 6, 6, 823290, tzinfo=datetime.timezone.utc), b'0f0d7e4580b445ddad349f1bf72d1fa9')
+
+    def execute(
+        self,
+        query: Query,
+        params: Params | None = None,
+        *,
+        prepare: bool | None = None,
+        binary: bool = False,
+    ) -> Cursor[Row]:
+        """Execute a query and return a cursor to read its results."""
+        try:
+            cur = self.cursor()
+            if binary:
+                cur.format = BINARY
+    
+            if isinstance(query, Template):
+                if params is not None:
+                    raise TypeError(
+                        "'execute()' with string template query doesn't support parameters"
+                    )
+                return cur.execute(query, prepare=prepare)
+            else:
+                return cur.execute(query, params, prepare=prepare)
+        except e._NO_TRACEBACK as ex:
+>           raise ex.with_traceback(None)
+E           psycopg.errors.UndefinedFunction: operator does not exist: text = bytea
+E           LINE 1: ...us='running', attempts=attempts+1, updated_at=$1 WHERE id=$2
+E                                                                               ^
+E           HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
+
+.venv/lib/python3.10/site-packages/psycopg/connection.py:304: UndefinedFunction
+______________ test_export_and_delete_are_user_scoped[postgresql] ______________
+
+store = <meemee_persist_pg.companion.CompanionStore object at 0x7f8f4cdf7a00>
+
+    def test_export_and_delete_are_user_scoped(store):
+        store.upsert_user(_profile()); store.upsert_user(_profile("u2", "Bo"))
+        store.add_fact("u1", FactInput(category="x", text="fact one", confidence=0.5), "chat")
+        store.start_conversation("u1", "local", "c1"); msg = store.add_message("c1", "user", "hi")
+>       store.record_model_trace(msg["id"], "c1", {"attempts": []})
+
+tests/test_companion_backends.py:131: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <meemee_persist_pg.companion.CompanionStore object at 0x7f8f4cdf7a00>
+message_id = 1, conversation_id = 'c1', trace = {'attempts': []}
+
+    def record_model_trace(self, message_id: int, conversation_id: str, trace: dict[str, Any]) -> None:
+        with self.db.transaction() as c:
+            message = c.execute(
+                "SELECT conversation_id FROM meemee_companion_messages WHERE id=%s FOR SHARE",
+                (message_id,),
+            ).fetchone()
+            if message is None:
+                raise ValueError("Unknown message for model trace")
+            if message["conversation_id"] != conversation_id:
+>               raise ValueError("Model trace conversation does not match message")
+E               ValueError: Model trace conversation does not match message
+
+meemee_persist_pg/companion.py:277: ValueError
+_________________ test_model_trace_binding[postgresql-missing] _________________
+
+store = <meemee_persist_pg.companion.CompanionStore object at 0x7f8f4c5d0400>
+target_kind = 'missing'
+
+    @pytest.mark.parametrize('target_kind', ['missing', 'other_conversation'])
+    def test_model_trace_binding(store, target_kind):
+        store.start_conversation('u1', 'local', 'c1')
+        store.start_conversation('u2', 'local', 'c2')
+        message = store.add_message('c1', 'assistant', 'reply')
+>       store.record_model_trace(message['id'], 'c1', {'model': 'original'})
+
+tests/test_companion_backends.py:158: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <meemee_persist_pg.companion.CompanionStore object at 0x7f8f4c5d0400>
+message_id = 1, conversation_id = 'c1', trace = {'model': 'original'}
+
+    def record_model_trace(self, message_id: int, conversation_id: str, trace: dict[str, Any]) -> None:
+        with self.db.transaction() as c:
+            message = c.execute(
+                "SELECT conversation_id FROM meemee_companion_messages WHERE id=%s FOR SHARE",
+                (message_id,),
+            ).fetchone()
+            if message is None:
+                raise ValueError("Unknown message for model trace")
+            if message["conversation_id"] != conversation_id:
+>               raise ValueError("Model trace conversation does not match message")
+E               ValueError: Model trace conversation does not match message
+
+meemee_persist_pg/companion.py:277: ValueError
+___________ test_model_trace_binding[postgresql-other_conversation] ____________
+
+store = <meemee_persist_pg.companion.CompanionStore object at 0x7f8f4c12dab0>
+target_kind = 'other_conversation'
+
+    @pytest.mark.parametrize('target_kind', ['missing', 'other_conversation'])
+    def test_model_trace_binding(store, target_kind):
+        store.start_conversation('u1', 'local', 'c1')
+        store.start_conversation('u2', 'local', 'c2')
+        message = store.add_message('c1', 'assistant', 'reply')
+>       store.record_model_trace(message['id'], 'c1', {'model': 'original'})
+
+tests/test_companion_backends.py:158: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <meemee_persist_pg.companion.CompanionStore object at 0x7f8f4c12dab0>
+message_id = 1, conversation_id = 'c1', trace = {'model': 'original'}
+
+    def record_model_trace(self, message_id: int, conversation_id: str, trace: dict[str, Any]) -> None:
+        with self.db.transaction() as c:
+            message = c.execute(
+                "SELECT conversation_id FROM meemee_companion_messages WHERE id=%s FOR SHARE",
+                (message_id,),
+            ).fetchone()
+            if message is None:
+                raise ValueError("Unknown message for model trace")
+            if message["conversation_id"] != conversation_id:
+>               raise ValueError("Model trace conversation does not match message")
+E               ValueError: Model trace conversation does not match message
+
+meemee_persist_pg/companion.py:277: ValueError
+=========================== short test summary info ============================
+FAILED tests/test_companion_backends.py::test_profiles_round_trip_and_upsert[postgresql]
+FAILED tests/test_companion_backends.py::test_conversations_messages_and_traces[postgresql]
+FAILED tests/test_companion_backends.py::test_checkins_schedule_claim_retry_finish_cancel[postgresql]
+FAILED tests/test_companion_backends.py::test_concurrent_checkin_claims_have_one_winner_each[postgresql]
+FAILED tests/test_companion_backends.py::test_export_and_delete_are_user_scoped[postgresql]
+FAILED tests/test_companion_backends.py::test_model_trace_binding[postgresql-missing]
+FAILED tests/test_companion_backends.py::test_model_trace_binding[postgresql-other_conversation]
+7 failed, 13 passed in 3.30s

@@ -137,3 +137,27 @@ def test_export_and_delete_are_user_scoped(store):
     assert exported["model_traces"][0]["attempts"] == "[]"
     assert store.delete_user_data("u1") == {"messages": 1, "model_traces": 1, "conversations": 1, "facts": 1, "checkins": 1, "profiles": 1}
     assert store.export_user_data("u1")["profile"] is None and store.history("c2")[0]["content"] == "other"
+
+
+@pytest.mark.parametrize('target_kind', ['missing', 'other_owner'])
+def test_fact_replacement_binding(store, target_kind):
+    original = store.add_fact('u1', FactInput(text='tea'), 'test')
+    target = original['id'] + 100 if target_kind == 'missing' else store.add_fact(
+        'u2', FactInput(text='coffee'), 'test'
+    )['id']
+    with pytest.raises(ValueError, match='replacement'):
+        store.supersede_fact(original['id'], target)
+    assert store.get_fact(original['id'])['superseded_by'] is None
+
+
+@pytest.mark.parametrize('target_kind', ['missing', 'other_conversation'])
+def test_model_trace_binding(store, target_kind):
+    store.start_conversation('u1', 'local', 'c1')
+    store.start_conversation('u2', 'local', 'c2')
+    message = store.add_message('c1', 'assistant', 'reply')
+    store.record_model_trace(message['id'], 'c1', {'model': 'original'})
+    ident = message['id'] + 100 if target_kind == 'missing' else message['id']
+    with pytest.raises(ValueError, match='message|conversation'):
+        store.record_model_trace(ident, 'c2', {'model': 'wrong'})
+    assert store.model_traces('c1')[0]['model'] == 'original'
+    assert store.model_traces('c2') == []

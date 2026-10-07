@@ -1,0 +1,70 @@
+..FF..FF                                                                 [100%]
+=================================== FAILURES ===================================
+______________ test_fact_replacement_binding[postgresql-missing] _______________
+
+store = <meemee_persist_pg.companion.CompanionStore object at 0x7f748f5516f0>
+target_kind = 'missing'
+
+    @pytest.mark.parametrize('target_kind', ['missing', 'other_owner'])
+    def test_fact_replacement_binding(store, target_kind):
+        original = store.add_fact('u1', FactInput(text='tea'), 'test')
+        target = original['id'] + 100 if target_kind == 'missing' else store.add_fact(
+            'u2', FactInput(text='coffee'), 'test'
+        )['id']
+>       with pytest.raises(ValueError, match='replacement'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_companion_backends.py:148: Failed
+____________ test_fact_replacement_binding[postgresql-other_owner] _____________
+
+store = <meemee_persist_pg.companion.CompanionStore object at 0x7f748f5526b0>
+target_kind = 'other_owner'
+
+    @pytest.mark.parametrize('target_kind', ['missing', 'other_owner'])
+    def test_fact_replacement_binding(store, target_kind):
+        original = store.add_fact('u1', FactInput(text='tea'), 'test')
+        target = original['id'] + 100 if target_kind == 'missing' else store.add_fact(
+            'u2', FactInput(text='coffee'), 'test'
+        )['id']
+>       with pytest.raises(ValueError, match='replacement'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_companion_backends.py:148: Failed
+_________________ test_model_trace_binding[postgresql-missing] _________________
+
+store = <meemee_persist_pg.companion.CompanionStore object at 0x7f748f552b60>
+target_kind = 'missing'
+
+    @pytest.mark.parametrize('target_kind', ['missing', 'other_conversation'])
+    def test_model_trace_binding(store, target_kind):
+        store.start_conversation('u1', 'local', 'c1')
+        store.start_conversation('u2', 'local', 'c2')
+        message = store.add_message('c1', 'assistant', 'reply')
+        store.record_model_trace(message['id'], 'c1', {'model': 'original'})
+        ident = message['id'] + 100 if target_kind == 'missing' else message['id']
+>       with pytest.raises(ValueError, match='message|conversation'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_companion_backends.py:160: Failed
+___________ test_model_trace_binding[postgresql-other_conversation] ____________
+
+store = <meemee_persist_pg.companion.CompanionStore object at 0x7f748f5e5b70>
+target_kind = 'other_conversation'
+
+    @pytest.mark.parametrize('target_kind', ['missing', 'other_conversation'])
+    def test_model_trace_binding(store, target_kind):
+        store.start_conversation('u1', 'local', 'c1')
+        store.start_conversation('u2', 'local', 'c2')
+        message = store.add_message('c1', 'assistant', 'reply')
+        store.record_model_trace(message['id'], 'c1', {'model': 'original'})
+        ident = message['id'] + 100 if target_kind == 'missing' else message['id']
+>       with pytest.raises(ValueError, match='message|conversation'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_companion_backends.py:160: Failed
+=========================== short test summary info ============================
+FAILED tests/test_companion_backends.py::test_fact_replacement_binding[postgresql-missing]
+FAILED tests/test_companion_backends.py::test_fact_replacement_binding[postgresql-other_owner]
+FAILED tests/test_companion_backends.py::test_model_trace_binding[postgresql-missing]
+FAILED tests/test_companion_backends.py::test_model_trace_binding[postgresql-other_conversation]
+4 failed, 4 passed, 12 deselected in 1.61s
