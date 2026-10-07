@@ -438,18 +438,18 @@ class BrowserSessionManager:
         if profile:
             if self.profiles_dir is None:
                 raise BrowserSessionError("persistent profiles are not configured")
-            if not all(ch.isalnum() or ch in "_.-" for ch in profile) or len(profile) > 64:
+            if profile in {".", ".."} or not all(ch.isalnum() or ch in "_.-" for ch in profile) or len(profile) > 64:
                 raise BrowserSessionError("invalid profile name")
             if any(l.context and getattr(l, "profile", None) == profile for l in self._live.values()):
                 raise BrowserSessionError("profile is already in use by an open session")
             await self._ensure_browser()
             context = await self._playwright.chromium.launch_persistent_context(
                 str(self.profiles_dir / profile), headless=self.headless,
-                viewport={"width": self.viewport[0], "height": self.viewport[1]},
+                viewport={"width": self.viewport[0], "height": self.viewport[1]}, service_workers="block",
             )
         else:
             browser = await self._ensure_browser()
-            context = await browser.new_context(viewport={"width": self.viewport[0], "height": self.viewport[1]})
+            context = await browser.new_context(viewport={"width": self.viewport[0], "height": self.viewport[1]}, service_workers="block")
         page = context.pages[0] if context.pages else await context.new_page()
         session_id = "bs_" + uuid.uuid4().hex
         live = _Live(session_id, owner_id, allowed_domains, context, page, browser, asyncio.Lock(), time.monotonic())
@@ -459,15 +459,16 @@ class BrowserSessionManager:
         async def guard(route):
             try:
                 check_url(route.request.url, allowed_domains, self.allow_private_hosts)
-            except BrowserSessionError:
-                if route.request.is_navigation_request():
-                    self.store.event(session_id, "system", "navigation_blocked", {"url": route.request.url[:500]})
-                    await route.abort("blockedbyclient")
-                    return
-            await route.continue_()
+                response = await route.fetch(max_redirects=0)
+                if response.status in {301, 302, 303, 307, 308} and "location" in response.headers:
+                    await response.dispose()
+                    raise BrowserSessionError("automatic redirects are blocked; use verified final URL")
+                await route.fulfill(response=response)
+            except (BrowserSessionError, OSError):
+                self.store.event(session_id, "system", "request_blocked", {"url": route.request.url[:500]})
+                await route.abort("blockedbyclient")
 
-        if allowed_domains:
-            await context.route("**/*", guard)
+        await context.route("**/*", guard)
         self.store.create_session(session_id, owner_id, profile, allowed_domains)
         self._live[session_id] = live
         self.store.event(session_id, owner_id, "opened", {"url": url[:500], "profile": profile})

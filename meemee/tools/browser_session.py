@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from ..browser_sessions import BrowserSessionManager
 from ..types import Risk
@@ -22,6 +22,13 @@ class OpenArgs(BaseModel):
     allowed_domains: list[str] = Field(default_factory=list, max_length=100)
     profile: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_.-]{1,64}$")
     auto_takeover: bool = True
+
+    @field_validator("profile")
+    @classmethod
+    def named_profile(cls, value):
+        if value in {".", ".."}:
+            raise ValueError("profile must be a named child directory")
+        return value
 
 
 class ActArgs(BaseModel):
