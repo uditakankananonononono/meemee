@@ -1,0 +1,17 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+________________ test_unbalanced_leave_preserves_gate_and_drain ________________
+
+    @pytest.mark.asyncio
+    async def test_unbalanced_leave_preserves_gate_and_drain():
+        gate = RunGate()
+        with pytest.raises(RuntimeError, match='underflow'):
+            await gate.leave()
+>       assert gate.active == 0
+E       assert -1 == 0
+E        +  where -1 = <meemee.shutdown.RunGate object at 0x7f2c82d56d70>.active
+
+tests/test_shutdown_underflow.py:13: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_shutdown_underflow.py::test_unbalanced_leave_preserves_gate_and_drain
+1 failed in 0.05s
