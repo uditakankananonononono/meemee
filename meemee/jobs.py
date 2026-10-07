@@ -152,6 +152,7 @@ class JobStore:
     def request_cancel(self, ident: str) -> str | None:
         now = datetime.now(timezone.utc).isoformat()
         with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
             row = self.db.execute("SELECT status FROM jobs WHERE id=?", (ident,)).fetchone()
             if row is None:
                 return None
@@ -162,7 +163,10 @@ class JobStore:
             else:
                 return row["status"]
             self.db.execute("UPDATE jobs SET status=?, error='cancelled', updated_at=? WHERE id=?", (target, now, ident))
-        self.event(ident, target, {})
+            self.db.execute(
+                "INSERT INTO job_events(job_id,kind,payload,created_at) VALUES(?,?,?,?)",
+                (ident, target, "{}", now),
+            )
         return target
 
     def cancel_running(self, ident: str) -> bool:
