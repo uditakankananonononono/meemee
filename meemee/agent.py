@@ -83,6 +83,11 @@ class Agent:
                 self.memory.add(run_id, "cancelled", final, owner_id=owner_id)
                 return RunReport(run_id=run_id, goal=goal, final=final, steps_used=step_number - 1, tool_results=events, approvals_required=refusals)
             decision = await self.model.decide(messages)
+            if cancel is not None and cancel.is_set():
+                final = "Cancelled after model response, before action."
+                self.memory.add(run_id, "cancelled", final, owner_id=owner_id)
+                return RunReport(run_id=run_id, goal=goal, final=final,
+                    steps_used=step_number - 1, tool_results=events, approvals_required=refusals)
             messages.append({"role": "assistant", "content": decision.model_dump_json()})
             if decision.final is not None:
                 self.memory.add(run_id, "final", decision.final, owner_id=owner_id)

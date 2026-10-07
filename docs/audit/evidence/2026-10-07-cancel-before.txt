@@ -1,0 +1,39 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+___________ test_already_cancelled_registry_never_invokes_sync_tool ____________
+
+    @pytest.mark.asyncio
+    async def test_already_cancelled_registry_never_invokes_sync_tool():
+        tool, registry, cancel = Effect(), ToolRegistry(), Event()
+        registry.register(tool)
+        cancel.set()
+        result = await registry.execute('effect', {}, cancel=cancel, owner_id='owner')
+>       assert tool.calls == 0
+E       assert 1 == 0
+E        +  where 1 = <test_cancel_effect_canaries.Effect object at 0x7f58510a5d50>.calls
+
+tests/test_cancel_effect_canaries.py:34: AssertionError
+___________ test_cancel_arriving_during_model_decision_prevents_tool ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-52/test_cancel_arriving_during_mo0')
+
+    @pytest.mark.asyncio
+    async def test_cancel_arriving_during_model_decision_prevents_tool(tmp_path):
+        tool, registry, cancel = Effect(), ToolRegistry(), Event()
+        registry.register(tool)
+        class Model:
+            async def decide(self, messages):
+                cancel.set()
+                await asyncio.sleep(0)
+                return AgentDecision(tool_call=ToolCall(name='effect'))
+        report = await Agent(Model(), registry, MemoryStore(tmp_path / 'memory.db')).run(
+            'do work', owner_id='owner', cancel=cancel)
+>       assert tool.calls == 0
+E       assert 1 == 0
+E        +  where 1 = <test_cancel_effect_canaries.Effect object at 0x7f5850f439a0>.calls
+
+tests/test_cancel_effect_canaries.py:49: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_cancel_effect_canaries.py::test_already_cancelled_registry_never_invokes_sync_tool
+FAILED tests/test_cancel_effect_canaries.py::test_cancel_arriving_during_model_decision_prevents_tool
+2 failed in 0.12s
