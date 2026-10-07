@@ -12,9 +12,10 @@ import time
 import urllib.parse
 import urllib.request
 import urllib.robotparser
+from collections.abc import Callable
 from dataclasses import dataclass
 from html.parser import HTMLParser
-from typing import Callable, Protocol
+from typing import ClassVar, Protocol
 
 BASE = "https://www.theailibrary.co"
 UA = "instinct-models-catalog/0.1 (read-only)"
@@ -61,7 +62,7 @@ def _get(url: str, timeout: float = 20) -> str:
 
 class AILibraryCatalog:
     name = "theailibrary.co"
-    SECTIONS = {"": "/", "prompts": "/prompts", "ai": "/categories/ai"}
+    SECTIONS: ClassVar[dict[str, str]] = {"": "/", "prompts": "/prompts", "ai": "/categories/ai"}
 
     def __init__(self, fetch: Callable[[str], str] = _get, min_interval_s: float = 2.0, ttl_s: float = 3600,
                  clock: Callable[[], float] = time.monotonic, sleep: Callable[[float], None] = time.sleep):

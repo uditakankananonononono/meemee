@@ -5,9 +5,9 @@ import httpx
 import pytest
 from fastapi import HTTPException
 from starlette.requests import Request
+from test_oidc import token, validator
 
 from meemee.web_login import WebLogin, WebLoginConfig
-from test_oidc import token, validator
 
 
 @pytest.mark.asyncio

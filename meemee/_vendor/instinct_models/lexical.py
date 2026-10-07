@@ -17,6 +17,7 @@ import json
 import math
 import re
 from collections import Counter, defaultdict
+from itertools import pairwise
 from pathlib import Path
 
 from .providers import LOCAL, ChatResult, Provider, ProviderUnavailable
@@ -36,7 +37,7 @@ def _words(text: str) -> list[str]:
 
 def _feats(text: str) -> list[str]:
     w = [x for x in _words(text) if x not in _STOP]
-    return w + [f"{a}_{b}" for a, b in zip(w, w[1:])]
+    return w + [f"{a}_{b}" for a, b in pairwise(w)]
 
 
 class LexicalToolModel:
@@ -50,7 +51,7 @@ class LexicalToolModel:
         self.trained_rows = 0
 
     # ---- training -------------------------------------------------------
-    def fit(self, rows: list[dict]) -> "LexicalToolModel":
+    def fit(self, rows: list[dict]) -> LexicalToolModel:
         """rows: Needle-format records {query, tools, answers}."""
         for r in rows:
             q = r["query"]
@@ -70,7 +71,7 @@ class LexicalToolModel:
         return self
 
     @classmethod
-    def from_jsonl(cls, path: str | Path, **kw) -> "LexicalToolModel":
+    def from_jsonl(cls, path: str | Path, **kw) -> LexicalToolModel:
         rows = [json.loads(l) for l in Path(path).read_text().splitlines() if l.strip()]
         return cls(**kw).fit(rows)
 
