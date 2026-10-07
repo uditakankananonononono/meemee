@@ -1,0 +1,44 @@
+Traceback (most recent call last):
+  File "/usr/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/usr/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/uvicorn/__main__.py", line 4, in <module>
+    uvicorn.main()
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/click/core.py", line 1631, in __call__
+    return self.main(*args, **kwargs)
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/click/core.py", line 1552, in main
+    rv = self.invoke(ctx)
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/click/core.py", line 1415, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/click/core.py", line 910, in invoke
+    return callback(*args, **kwargs)
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/uvicorn/main.py", line 448, in main
+    run(
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/uvicorn/main.py", line 620, in run
+    config.load_app()
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/uvicorn/config.py", line 434, in load_app
+    return import_from_string(self.app)
+  File "/home/sandbox/meemee/.venv/lib/python3.10/site-packages/uvicorn/importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+  File "/usr/lib/python3.10/importlib/__init__.py", line 126, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+  File "<frozen importlib._bootstrap>", line 1050, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1027, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1006, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 688, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 883, in exec_module
+  File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+  File "/home/sandbox/meemee/meemee/api.py", line 128, in <module>
+    webhooks = persistence.webhooks or WebhookStore(settings.data_dir / "webhooks.sqlite3", settings.webhook_max_payload_bytes, settings.vault_key)  # PostgreSQL mode: shared outbox
+  File "/home/sandbox/meemee/meemee/webhooks.py", line 76, in __init__
+    raise ValueError("webhook secret encryption requires MEEMEE_VAULT_KEY")
+ValueError: webhook secret encryption requires MEEMEE_VAULT_KEY
+Traceback (most recent call last):
+  File "/home/sandbox/meemee/examples/monitor_event_walkthrough.py", line 95, in <module>
+    main()
+  File "/home/sandbox/meemee/examples/monitor_event_walkthrough.py", line 60, in main
+    process, base = start(Path(directory), free_port(), token)
+  File "/home/sandbox/meemee/examples/monitor_event_walkthrough.py", line 35, in start
+    raise RuntimeError('fixture API exited during startup')
+RuntimeError: fixture API exited during startup

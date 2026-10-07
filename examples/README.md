@@ -24,3 +24,7 @@ Run one:
 export MEEMEE_API_TOKEN=mee_...
 python examples/quickstart.py "Find three actively maintained Python agent frameworks"
 ```
+
+## Monitor source-event walkthrough (no model)
+
+`uv run --locked python examples/monitor_event_walkthrough.py` boots a real loopback API against temporary SQLite files, creates a price monitor, submits nonmatching/matching/repeated caller events, restarts the API and checks the retained trigger/count. No external source is contacted, model called, notification sent or existing account touched. The script uses an explicitly synthetic encryption key for disposable state only. The event feed is authenticated with `runs:write`; POST `/v1/monitors/evaluate` takes `source_id` and a finite JSON `event`, bounded to 100 fields and 32KiB. Submitted facts are not independently verified external truth. This shows one supplied-event monitoring path, not autonomous polling or alert delivery.
