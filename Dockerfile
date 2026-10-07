@@ -5,6 +5,8 @@ COPY pyproject.toml README.md LICENSE ./
 COPY meemee ./meemee
 COPY meemee_persist_pg ./meemee_persist_pg
 COPY console ./console
+COPY webapp ./webapp
+COPY product_site ./product_site
 RUN pip install --no-cache-dir . \
     && useradd --create-home --uid 10001 meemee \
     && mkdir -p /home/meemee/.meemee \
