@@ -1,0 +1,34 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_______________ test_redirect_response_is_not_delivery[webhook] ________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f7d1502b2b0>
+channel = 'webhook'
+
+    @pytest.mark.parametrize('channel', ['webhook', 'provider'])
+    async def test_redirect_response_is_not_delivery(monkeypatch, channel):
+        monkeypatch.setattr('meemee.companion.channels.validate_webhook_url', lambda url: url)
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda request: httpx.Response(302, headers={'Location':'https://other.invalid'}))) as client:
+            adapter = WebhookChannel(client=client) if channel == 'webhook' else ProviderChannel('fixture','https://fixture.invalid','fixture-token',client=client)
+>           with pytest.raises(ChannelError, match='HTTP 302'):
+E           Failed: DID NOT RAISE <class 'meemee.companion.channels.ChannelError'>
+
+tests/test_companion_http_redirect_canary.py:13: Failed
+_______________ test_redirect_response_is_not_delivery[provider] _______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f7d14f23d30>
+channel = 'provider'
+
+    @pytest.mark.parametrize('channel', ['webhook', 'provider'])
+    async def test_redirect_response_is_not_delivery(monkeypatch, channel):
+        monkeypatch.setattr('meemee.companion.channels.validate_webhook_url', lambda url: url)
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda request: httpx.Response(302, headers={'Location':'https://other.invalid'}))) as client:
+            adapter = WebhookChannel(client=client) if channel == 'webhook' else ProviderChannel('fixture','https://fixture.invalid','fixture-token',client=client)
+>           with pytest.raises(ChannelError, match='HTTP 302'):
+E           Failed: DID NOT RAISE <class 'meemee.companion.channels.ChannelError'>
+
+tests/test_companion_http_redirect_canary.py:13: Failed
+=========================== short test summary info ============================
+FAILED tests/test_companion_http_redirect_canary.py::test_redirect_response_is_not_delivery[webhook]
+FAILED tests/test_companion_http_redirect_canary.py::test_redirect_response_is_not_delivery[provider]
+2 failed in 0.14s
