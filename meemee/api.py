@@ -465,7 +465,7 @@ async def models_status(probe: bool = False, principal=jobs_read_dependency):
         results = await asyncio.gather(*(probe_profile(p, timeout=3.0) for p in usable))
         body["probes"] = {r["name"]: r for r in results}
         for chain_role, chain in catalog.routes.items():
-            first = next((n for n in chain if body["probes"].get(n, {}).get("reachable")), None)
+            first = next((n for n in chain if body["probes"].get(n, {}).get("reachable") and body["probes"].get(n, {}).get("model_listed")), None)
             body.setdefault("serving", {})[chain_role] = first
     return body
 
