@@ -65,10 +65,17 @@ class WebLogin:
             raise HTTPException(401, "OIDC state mismatch")
         response = await self.client.post(self.config.token_endpoint, data={"grant_type":"authorization_code","code":code,"redirect_uri":self.config.redirect_uri,"client_id":self.config.client_id,"client_secret":self.config.client_secret,"code_verifier":stored["verifier"]})
         response.raise_for_status()
-        access = response.json().get("access_token")
+        payload = response.json()
+        access = payload.get("access_token")
+        identity = payload.get("id_token")
+        validate_identity = getattr(self.validator, "validate_id_token", None)
+        subject = validate_identity(identity, self.config.client_id, stored["nonce"], access) if (
+            identity and access and callable(validate_identity)) else None
+        if subject is None:
+            raise HTTPException(401, "identity provider returned invalid login ID token")
         principal = self.validator.authenticate(access) if access else None
-        if principal is None:
-            raise HTTPException(401, "identity provider returned invalid access token")
+        if principal is None or principal.id != f"oidc:{subject}":
+            raise HTTPException(401, "identity provider returned invalid or mismatched access token")
         session = self.encode({"aud":"session","sub":principal.id,"name":principal.name,"scopes":sorted(principal.scopes)}, timedelta(hours=8))
         result = RedirectResponse("/", 302)
         result.delete_cookie("meemee_login", path="/auth")
