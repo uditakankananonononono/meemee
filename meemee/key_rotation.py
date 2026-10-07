@@ -22,7 +22,7 @@ def _material(key: str) -> bytes:
 
 
 def _backup(database: Path, destination: Path) -> None:
-    source = sqlite3.connect(f"file:{database}?mode=ro", uri=True)
+    source = sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True)
     target = sqlite3.connect(destination)
     try:
         source.backup(target)
@@ -34,7 +34,7 @@ def _backup(database: Path, destination: Path) -> None:
 
 
 def _restore(backup: Path, database: Path) -> None:
-    source = sqlite3.connect(f"file:{backup}?mode=ro", uri=True)
+    source = sqlite3.connect(backup.resolve().as_uri() + "?mode=ro", uri=True)
     target = sqlite3.connect(database)
     try:
         source.backup(target)
