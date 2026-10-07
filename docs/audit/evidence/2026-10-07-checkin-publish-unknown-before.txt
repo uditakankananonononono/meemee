@@ -1,0 +1,74 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+__________ test_sent_then_finish_error_terminal_unknown[RuntimeError] __________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-228/test_sent_then_finish_error_te0')
+error = <class 'RuntimeError'>
+
+    @pytest.mark.parametrize('error', [RuntimeError, OSError])
+    async def test_sent_then_finish_error_terminal_unknown(tmp_path, error):
+        store, engine, channels = setup(tmp_path)
+        queue_checkin(store)
+        sent = []
+    
+        class Accepted:
+            async def send(self, address, message):
+                sent.append(message)
+                return DeliveryResult('local', address, True, 'accepted')
+    
+        def failed_publication(checkin_id, message):
+            raise error('completion publication unavailable')
+    
+        store.finish_checkin = failed_publication
+        channels['local'] = Accepted()
+        try:
+            summary = await deliver_due_once(store, engine, channels)
+        except OSError:
+            summary = None
+        row = store.list_checkins('udita')[0]
+>       assert row['status'] == 'failed'
+E       AssertionError: assert 'queued' == 'failed'
+E         
+E         - failed
+E         + queued
+
+tests/test_companion_publish_unknown_canary.py:30: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  meemee.companion.worker:worker.py:91 check-in 659dc2f28940486c8f75ec730c63c61c delivery failed (completion publication unavailable)
+____________ test_sent_then_finish_error_terminal_unknown[OSError] _____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-228/test_sent_then_finish_error_te1')
+error = <class 'OSError'>
+
+    @pytest.mark.parametrize('error', [RuntimeError, OSError])
+    async def test_sent_then_finish_error_terminal_unknown(tmp_path, error):
+        store, engine, channels = setup(tmp_path)
+        queue_checkin(store)
+        sent = []
+    
+        class Accepted:
+            async def send(self, address, message):
+                sent.append(message)
+                return DeliveryResult('local', address, True, 'accepted')
+    
+        def failed_publication(checkin_id, message):
+            raise error('completion publication unavailable')
+    
+        store.finish_checkin = failed_publication
+        channels['local'] = Accepted()
+        try:
+            summary = await deliver_due_once(store, engine, channels)
+        except OSError:
+            summary = None
+        row = store.list_checkins('udita')[0]
+>       assert row['status'] == 'failed'
+E       AssertionError: assert 'running' == 'failed'
+E         
+E         - failed
+E         + running
+
+tests/test_companion_publish_unknown_canary.py:30: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_companion_publish_unknown_canary.py::test_sent_then_finish_error_terminal_unknown[RuntimeError]
+FAILED tests/test_companion_publish_unknown_canary.py::test_sent_then_finish_error_terminal_unknown[OSError]
+2 failed in 0.17s
