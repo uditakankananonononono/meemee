@@ -1,0 +1,26 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______________ test_idle_worker_cancellation_closes_persistence _______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f82779f5f30>
+
+    async def test_idle_worker_cancellation_closes_persistence(monkeypatch):
+        closed = []
+        stores = SimpleNamespace(jobs=SimpleNamespace(claim=lambda: None), webhooks=object(), approvals=object(),
+                                 close=lambda: closed.append('persistence'))
+        monkeypatch.setattr(worker, 'persistence_from_settings', lambda settings: stores)
+        async def cancelled_sleep(delay):
+            raise asyncio.CancelledError
+        monkeypatch.setattr(worker.asyncio, 'sleep', cancelled_sleep)
+        with pytest.raises(asyncio.CancelledError):
+            await worker.work_forever(SimpleNamespace(worker_poll_seconds=1))
+>       assert closed == ['persistence']
+E       AssertionError: assert [] == ['persistence']
+E         
+E         Right contains one more item: 'persistence'
+E         Use -v to get more diff
+
+tests/test_worker_cleanup.py:21: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_worker_cleanup.py::test_idle_worker_cancellation_closes_persistence
+1 failed in 0.44s

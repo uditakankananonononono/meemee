@@ -1,0 +1,302 @@
+..FF.....                                                                [100%]
+=================================== FAILURES ===================================
+_________ test_worker_renews_lease_and_never_settles_lost_work[False] __________
+
+self = <test_worker_lease_canaries.test_worker_renews_lease_and_never_settles_lost_work.<locals>.Jobs object at 0x7fd9841cbfd0>
+
+    def claim(self):
+        if self.claimed:
+>           raise EndLoop()
+E           test_worker_lease_canaries.EndLoop
+
+tests/test_worker_lease_canaries.py:31: EndLoop
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-644/test_worker_renews_lease_and_n0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fd9841c8c10>
+lost = False
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('lost', [False, True])
+    async def test_worker_renews_lease_and_never_settles_lost_work(tmp_path, monkeypatch, lost):
+        from meemee import worker
+        from meemee_persist_pg.jobs import LeaseLostError
+        class Jobs:
+            lease_seconds = 0.15
+            claimed = False
+            deadline = 0
+            beats = 0
+            def __init__(self):
+                self.terminals = []
+            def claim(self):
+                if self.claimed:
+                    raise EndLoop()
+                self.claimed = True
+                self.deadline = time.monotonic() + self.lease_seconds
+                return {'id':'j', 'goal':'work', 'principal':'owner', 'lease_token':'original'}
+            def get(self, ident):
+                return {'status':'running', 'lease_token':'original'}
+            def heartbeat(self, ident, token):
+                self.beats += 1
+                if lost or token != 'original' or time.monotonic() >= self.deadline:
+                    return False
+                self.deadline = time.monotonic() + self.lease_seconds
+                return True
+            def finish(self, ident, result, lease_token=None):
+                self.terminals.append(('finish', lease_token))
+                if lost or time.monotonic() >= self.deadline:
+                    raise LeaseLostError('expired')
+                return False
+            def fail(self, ident, error, lease_token=None):
+                self.terminals.append(('fail', lease_token))
+                raise LeaseLostError('expired')
+            def cancel_running(self, ident, lease_token=None):
+                self.terminals.append(('cancel', lease_token))
+                return False
+        jobs = Jobs()
+        events = []
+        class Agent:
+            async def run(self, goal, **kwargs):
+                await asyncio.sleep(0.35)
+                return RunReport(run_id='r', goal=goal, final='done', steps_used=1, tool_results=[])
+        persistence = SimpleNamespace(jobs=jobs, webhooks=SimpleNamespace(enqueue=lambda *a, **kw: events.append(a)),
+            memory=SimpleNamespace(delete_runs=lambda *a, **kw: None), approvals=SimpleNamespace(allows=lambda *a, **kw: False))
+        monkeypatch.setattr(worker, 'persistence_from_settings', lambda settings: persistence)
+        monkeypatch.setattr(worker, 'build_agent', lambda *a, **kw: Agent())
+        with pytest.raises(EndLoop):
+>           await work_forever(Settings(data_dir=tmp_path))
+
+tests/test_worker_lease_canaries.py:65: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+settings = Settings(model_base_url='http://127.0.0.1:11434/v1', model_name='qwen2.5-coder:14b', model_api_key='local', embedding_...='admin=admin;operator=runs:write,jobs:read,jobs:write,companion:read,companion:write;viewer=jobs:read,companion:read')
+
+    async def work_forever(settings: Settings | None = None) -> None:
+        settings = settings or Settings()
+        persistence = persistence_from_settings(settings)
+        try:
+            jobs = persistence.jobs
+            webhooks = persistence.webhooks or WebhookStore(
+                settings.data_dir / "webhooks.sqlite3",
+                settings.webhook_max_payload_bytes,
+                settings.vault_key,
+            )  # PostgreSQL mode: the shared outbox
+            # Same persistent, argument-scoped grants the API applies to POST /v1/runs. Queued jobs have no
+            # per-request approval fields, so a grant is the only way a job may use an approval-gated tool.
+            # PostgreSQL mode reads them from the shared database, so a grant made on the API host applies here.
+            approvals = persistence.approvals
+            while True:
+                job = jobs.claim()
+                if job is None:
+                    await asyncio.sleep(settings.worker_poll_seconds)
+                    continue
+                cancel, stop, lease_lost = threading.Event(), threading.Event(), threading.Event()
+                lease_token = job.get("lease_token")
+                terminal_kwargs = {"lease_token": lease_token} if lease_token else {}
+                watcher = threading.Thread(target=cancellation_watcher,
+                    args=(jobs, job["id"], cancel, stop, lease_token, lease_lost), daemon=True)
+                watcher.start()
+                run_id = uuid.uuid4().hex
+                try:
+                    owner = job.get("principal")
+                    if not owner:
+                        # Fail closed: every creation path sets a principal, so a
+                        # principal-less job is legacy or corrupt. Running it under the
+                        # shared "default" bucket would leak its memory across owners.
+                        jobs.fail(job["id"], "job has no principal owner; refusing to run unowned work", **terminal_kwargs)
+                        continue
+                    report = await build_agent(settings, memory=persistence.memory, persistence=persistence).run(
+                        job["goal"], approve=job_approval(approvals, owner), cancel=cancel, owner_id=owner, run_id=run_id)
+                    if lease_lost.is_set():
+                        # A different claimant may own the row. Never fail, finish,
+                        # cancel or announce work through the old claim.
+                        continue
+                    if cancel.is_set():
+                        settled = jobs.cancel_running(job["id"], **terminal_kwargs)
+                        if lease_token and not settled:
+                            continue
+                        if not purge_if_deleted(jobs, persistence.memory, job["id"], run_id, owner):
+                            webhooks.enqueue(f"job:{job['id']}:cancelled", "job.cancelled", {"job_id": job["id"], "status": "cancelled"}, principal=owner)
+                    else:
+                        jobs.finish(job["id"], report.model_dump(), **terminal_kwargs)
+                        if not purge_if_deleted(jobs, persistence.memory, job["id"], run_id, owner):
+                            webhooks.enqueue(f"job:{job['id']}:done", "job.done", {"job_id": job["id"], "status": "done", "blocked": report.blocked, "result": report.model_dump()}, principal=owner)
+                except LeaseLostError:
+                    # Fencing refusal is not a task failure under this stale lease.
+                    continue
+                except (OSError, ValueError, RuntimeError) as exc:
+                    if lease_lost.is_set():
+                        continue
+                    try:
+                        jobs.fail(job["id"], str(exc), **terminal_kwargs)
+                    except LeaseLostError:
+                        continue
+                    if not purge_if_deleted(jobs, persistence.memory, job["id"], run_id, owner):
+                        state = jobs.get(job["id"])["status"]
+                        if state == "failed":
+                            webhooks.enqueue(f"job:{job['id']}:failed", "job.failed", {"job_id": job["id"], "status": "failed", "error": str(exc)}, principal=owner)
+                finally:
+                    stop.set(); watcher.join(timeout=1)
+        finally:
+>           persistence.close()
+E           AttributeError: 'types.SimpleNamespace' object has no attribute 'close'
+
+meemee/worker.py:121: AttributeError
+__________ test_worker_renews_lease_and_never_settles_lost_work[True] __________
+
+self = <test_worker_lease_canaries.test_worker_renews_lease_and_never_settles_lost_work.<locals>.Jobs object at 0x7fd982b43040>
+
+    def claim(self):
+        if self.claimed:
+>           raise EndLoop()
+E           test_worker_lease_canaries.EndLoop
+
+tests/test_worker_lease_canaries.py:31: EndLoop
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-644/test_worker_renews_lease_and_n1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fd982b43490>
+lost = True
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('lost', [False, True])
+    async def test_worker_renews_lease_and_never_settles_lost_work(tmp_path, monkeypatch, lost):
+        from meemee import worker
+        from meemee_persist_pg.jobs import LeaseLostError
+        class Jobs:
+            lease_seconds = 0.15
+            claimed = False
+            deadline = 0
+            beats = 0
+            def __init__(self):
+                self.terminals = []
+            def claim(self):
+                if self.claimed:
+                    raise EndLoop()
+                self.claimed = True
+                self.deadline = time.monotonic() + self.lease_seconds
+                return {'id':'j', 'goal':'work', 'principal':'owner', 'lease_token':'original'}
+            def get(self, ident):
+                return {'status':'running', 'lease_token':'original'}
+            def heartbeat(self, ident, token):
+                self.beats += 1
+                if lost or token != 'original' or time.monotonic() >= self.deadline:
+                    return False
+                self.deadline = time.monotonic() + self.lease_seconds
+                return True
+            def finish(self, ident, result, lease_token=None):
+                self.terminals.append(('finish', lease_token))
+                if lost or time.monotonic() >= self.deadline:
+                    raise LeaseLostError('expired')
+                return False
+            def fail(self, ident, error, lease_token=None):
+                self.terminals.append(('fail', lease_token))
+                raise LeaseLostError('expired')
+            def cancel_running(self, ident, lease_token=None):
+                self.terminals.append(('cancel', lease_token))
+                return False
+        jobs = Jobs()
+        events = []
+        class Agent:
+            async def run(self, goal, **kwargs):
+                await asyncio.sleep(0.35)
+                return RunReport(run_id='r', goal=goal, final='done', steps_used=1, tool_results=[])
+        persistence = SimpleNamespace(jobs=jobs, webhooks=SimpleNamespace(enqueue=lambda *a, **kw: events.append(a)),
+            memory=SimpleNamespace(delete_runs=lambda *a, **kw: None), approvals=SimpleNamespace(allows=lambda *a, **kw: False))
+        monkeypatch.setattr(worker, 'persistence_from_settings', lambda settings: persistence)
+        monkeypatch.setattr(worker, 'build_agent', lambda *a, **kw: Agent())
+        with pytest.raises(EndLoop):
+>           await work_forever(Settings(data_dir=tmp_path))
+
+tests/test_worker_lease_canaries.py:65: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+settings = Settings(model_base_url='http://127.0.0.1:11434/v1', model_name='qwen2.5-coder:14b', model_api_key='local', embedding_...='admin=admin;operator=runs:write,jobs:read,jobs:write,companion:read,companion:write;viewer=jobs:read,companion:read')
+
+    async def work_forever(settings: Settings | None = None) -> None:
+        settings = settings or Settings()
+        persistence = persistence_from_settings(settings)
+        try:
+            jobs = persistence.jobs
+            webhooks = persistence.webhooks or WebhookStore(
+                settings.data_dir / "webhooks.sqlite3",
+                settings.webhook_max_payload_bytes,
+                settings.vault_key,
+            )  # PostgreSQL mode: the shared outbox
+            # Same persistent, argument-scoped grants the API applies to POST /v1/runs. Queued jobs have no
+            # per-request approval fields, so a grant is the only way a job may use an approval-gated tool.
+            # PostgreSQL mode reads them from the shared database, so a grant made on the API host applies here.
+            approvals = persistence.approvals
+            while True:
+                job = jobs.claim()
+                if job is None:
+                    await asyncio.sleep(settings.worker_poll_seconds)
+                    continue
+                cancel, stop, lease_lost = threading.Event(), threading.Event(), threading.Event()
+                lease_token = job.get("lease_token")
+                terminal_kwargs = {"lease_token": lease_token} if lease_token else {}
+                watcher = threading.Thread(target=cancellation_watcher,
+                    args=(jobs, job["id"], cancel, stop, lease_token, lease_lost), daemon=True)
+                watcher.start()
+                run_id = uuid.uuid4().hex
+                try:
+                    owner = job.get("principal")
+                    if not owner:
+                        # Fail closed: every creation path sets a principal, so a
+                        # principal-less job is legacy or corrupt. Running it under the
+                        # shared "default" bucket would leak its memory across owners.
+                        jobs.fail(job["id"], "job has no principal owner; refusing to run unowned work", **terminal_kwargs)
+                        continue
+                    report = await build_agent(settings, memory=persistence.memory, persistence=persistence).run(
+                        job["goal"], approve=job_approval(approvals, owner), cancel=cancel, owner_id=owner, run_id=run_id)
+                    if lease_lost.is_set():
+                        # A different claimant may own the row. Never fail, finish,
+                        # cancel or announce work through the old claim.
+                        continue
+                    if cancel.is_set():
+                        settled = jobs.cancel_running(job["id"], **terminal_kwargs)
+                        if lease_token and not settled:
+                            continue
+                        if not purge_if_deleted(jobs, persistence.memory, job["id"], run_id, owner):
+                            webhooks.enqueue(f"job:{job['id']}:cancelled", "job.cancelled", {"job_id": job["id"], "status": "cancelled"}, principal=owner)
+                    else:
+                        jobs.finish(job["id"], report.model_dump(), **terminal_kwargs)
+                        if not purge_if_deleted(jobs, persistence.memory, job["id"], run_id, owner):
+                            webhooks.enqueue(f"job:{job['id']}:done", "job.done", {"job_id": job["id"], "status": "done", "blocked": report.blocked, "result": report.model_dump()}, principal=owner)
+                except LeaseLostError:
+                    # Fencing refusal is not a task failure under this stale lease.
+                    continue
+                except (OSError, ValueError, RuntimeError) as exc:
+                    if lease_lost.is_set():
+                        continue
+                    try:
+                        jobs.fail(job["id"], str(exc), **terminal_kwargs)
+                    except LeaseLostError:
+                        continue
+                    if not purge_if_deleted(jobs, persistence.memory, job["id"], run_id, owner):
+                        state = jobs.get(job["id"])["status"]
+                        if state == "failed":
+                            webhooks.enqueue(f"job:{job['id']}:failed", "job.failed", {"job_id": job["id"], "status": "failed", "error": str(exc)}, principal=owner)
+                finally:
+                    stop.set(); watcher.join(timeout=1)
+        finally:
+>           persistence.close()
+E           AttributeError: 'types.SimpleNamespace' object has no attribute 'close'
+
+meemee/worker.py:121: AttributeError
+=============================== warnings summary ===============================
+tests/test_job_ownership.py::test_api_job_reads_are_owner_scoped
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/test_job_ownership.py::test_api_job_reads_are_owner_scoped
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_worker_lease_canaries.py::test_worker_renews_lease_and_never_settles_lost_work[False]
+FAILED tests/test_worker_lease_canaries.py::test_worker_renews_lease_and_never_settles_lost_work[True]
+2 failed, 7 passed, 2 warnings in 2.25s
