@@ -95,7 +95,7 @@ class WebhookStore:
     def enqueue(self, event_id: str, event_type: str, payload: dict, *, principal: str) -> int:
         """Queue one delivery per matching active subscription owned by ``principal`` (the event's owner)."""
         envelope = {"schema": "meemee.webhook.v1", "event_id": event_id, "event_type": event_type, "data": payload}
-        encoded, now = json.dumps(envelope, sort_keys=True, separators=(",", ":")), time.time()
+        encoded, now = json.dumps(envelope, sort_keys=True, separators=(",", ":"), allow_nan=False), time.time()
         if len(encoded.encode()) > self.max_payload_bytes:
             raise ValueError(f"webhook payload exceeds {self.max_payload_bytes} bytes")
         created = 0
@@ -109,7 +109,7 @@ class WebhookStore:
                 body = encoded
                 if subscription["fields"]:
                     selected = {key: payload[key] for key in subscription["fields"].split() if key in payload}
-                    body = json.dumps({**envelope, "data": selected}, sort_keys=True, separators=(",", ":"))
+                    body = json.dumps({**envelope, "data": selected}, sort_keys=True, separators=(",", ":"), allow_nan=False)
                 created += c.execute(
                     """INSERT INTO meemee_webhook_deliveries(id,subscription_id,event_id,event_type,payload,payload_sha256,status,next_attempt_at,created_at)
                        VALUES (%s,%s,%s,%s,%s,%s,'queued',%s,%s) ON CONFLICT (subscription_id,event_id) DO NOTHING""",
@@ -233,7 +233,7 @@ class WebhookStore:
 
     def enqueue_test(self, ident: str, principal: str) -> str | None:
         event_id = f"test:{uuid.uuid4().hex}"
-        payload = json.dumps({"webhook_id": ident, "test": True}, sort_keys=True, separators=(",", ":"))
+        payload = json.dumps({"webhook_id": ident, "test": True}, sort_keys=True, separators=(",", ":"), allow_nan=False)
         with self.db.transaction() as c:
             if c.execute("SELECT 1 FROM meemee_webhook_subscriptions WHERE id=%s AND principal=%s AND active", (ident, principal)).fetchone() is None:
                 return None

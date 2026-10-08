@@ -1,0 +1,79 @@
+FFFFFF                                                                   [100%]
+=================================== FAILURES ===================================
+____ test_webhook_nonfinite_payload_rejected_without_outbox_row[sqlite-nan] ____
+
+store = <meemee.webhooks.WebhookStore object at 0x7efe7a1a87f0>, value = nan
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf'), float('-inf')])
+    def test_webhook_nonfinite_payload_rejected_without_outbox_row(store, value):  # noqa: F811
+        store.subscribe('owner', 'https://hooks.example/a', {'*'})
+>       with pytest.raises(ValueError):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_webhook_finite_payload.py:10: Failed
+____ test_webhook_nonfinite_payload_rejected_without_outbox_row[sqlite-inf] ____
+
+store = <meemee.webhooks.WebhookStore object at 0x7efe7a1aadd0>, value = inf
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf'), float('-inf')])
+    def test_webhook_nonfinite_payload_rejected_without_outbox_row(store, value):  # noqa: F811
+        store.subscribe('owner', 'https://hooks.example/a', {'*'})
+>       with pytest.raises(ValueError):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_webhook_finite_payload.py:10: Failed
+___ test_webhook_nonfinite_payload_rejected_without_outbox_row[sqlite--inf] ____
+
+store = <meemee.webhooks.WebhookStore object at 0x7efe7a1a9900>, value = -inf
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf'), float('-inf')])
+    def test_webhook_nonfinite_payload_rejected_without_outbox_row(store, value):  # noqa: F811
+        store.subscribe('owner', 'https://hooks.example/a', {'*'})
+>       with pytest.raises(ValueError):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_webhook_finite_payload.py:10: Failed
+__ test_webhook_nonfinite_payload_rejected_without_outbox_row[postgresql-nan] __
+
+store = <meemee_persist_pg.webhooks.WebhookStore object at 0x7efe7a1aaad0>
+value = nan
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf'), float('-inf')])
+    def test_webhook_nonfinite_payload_rejected_without_outbox_row(store, value):  # noqa: F811
+        store.subscribe('owner', 'https://hooks.example/a', {'*'})
+>       with pytest.raises(ValueError):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_webhook_finite_payload.py:10: Failed
+__ test_webhook_nonfinite_payload_rejected_without_outbox_row[postgresql-inf] __
+
+store = <meemee_persist_pg.webhooks.WebhookStore object at 0x7efe7d684d60>
+value = inf
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf'), float('-inf')])
+    def test_webhook_nonfinite_payload_rejected_without_outbox_row(store, value):  # noqa: F811
+        store.subscribe('owner', 'https://hooks.example/a', {'*'})
+>       with pytest.raises(ValueError):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_webhook_finite_payload.py:10: Failed
+_ test_webhook_nonfinite_payload_rejected_without_outbox_row[postgresql--inf] __
+
+store = <meemee_persist_pg.webhooks.WebhookStore object at 0x7efe7d632bc0>
+value = -inf
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf'), float('-inf')])
+    def test_webhook_nonfinite_payload_rejected_without_outbox_row(store, value):  # noqa: F811
+        store.subscribe('owner', 'https://hooks.example/a', {'*'})
+>       with pytest.raises(ValueError):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_webhook_finite_payload.py:10: Failed
+=========================== short test summary info ============================
+FAILED tests/test_webhook_finite_payload.py::test_webhook_nonfinite_payload_rejected_without_outbox_row[sqlite-nan]
+FAILED tests/test_webhook_finite_payload.py::test_webhook_nonfinite_payload_rejected_without_outbox_row[sqlite-inf]
+FAILED tests/test_webhook_finite_payload.py::test_webhook_nonfinite_payload_rejected_without_outbox_row[sqlite--inf]
+FAILED tests/test_webhook_finite_payload.py::test_webhook_nonfinite_payload_rejected_without_outbox_row[postgresql-nan]
+FAILED tests/test_webhook_finite_payload.py::test_webhook_nonfinite_payload_rejected_without_outbox_row[postgresql-inf]
+FAILED tests/test_webhook_finite_payload.py::test_webhook_nonfinite_payload_rejected_without_outbox_row[postgresql--inf]
+6 failed in 1.29s
