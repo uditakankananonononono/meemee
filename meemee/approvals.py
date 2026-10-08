@@ -67,7 +67,7 @@ def constraints_match(constraints: dict | None, arguments: dict | None) -> bool:
         validate_constraints(constraints)
     except ValueError:
         return False
-    supplied = arguments or {}
+    supplied = {} if arguments is None else arguments
     if not isinstance(supplied, dict):
         return False
 
