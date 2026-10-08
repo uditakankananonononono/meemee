@@ -63,6 +63,16 @@ def vendor_pin() -> dict[str, str]:
     return out
 
 
+_CLASS_NAMES = ("URLError", "TimeoutError", "ConnectionError", "HTTPException", "IncompleteRead",
+                "RemoteDisconnected", "SSLError", "JSONDecodeError", "UnicodeDecodeError", "RecursionError")
+
+
+def _cls(exc: BaseException, fallback: str) -> str:
+    """Class name from a fixed allowlist, else the fallback category (subclass names are not trusted)."""
+    n = type(exc).__name__
+    return n if n in _CLASS_NAMES else fallback
+
+
 def _contained(chat: Any, name: str) -> Any:
     """Convert transport/decoder failures from one provider's chat() into ProviderError.
 
@@ -78,9 +88,9 @@ def _contained(chat: Any, name: str) -> Any:
         except (ProviderError, ProviderUnavailable):
             raise
         except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException, ssl.SSLError) as exc:
-            raise ProviderUnavailable(f"{name}: transport failure ({type(exc).__name__})") from None
+            raise ProviderUnavailable(f"{name}: transport failure ({_cls(exc, 'HTTPException')})") from None
         except (json.JSONDecodeError, UnicodeDecodeError, RecursionError) as exc:
-            raise ProviderError(f"{name}: undecodable response ({type(exc).__name__})") from None
+            raise ProviderError(f"{name}: undecodable response ({_cls(exc, 'JSONDecodeError')})") from None
 
     guarded._meemee_contained = True  # type: ignore[attr-defined]
     return guarded
@@ -94,18 +104,36 @@ def contain_chain(chain: list[Provider]) -> list[Provider]:
     return chain
 
 
-_HTTP_STATUS = re.compile(r"^(?:HTTP|OpenClaw HTTP) (\d{3})\b")
+_HTTP_STATUS = re.compile(r"HTTP ([1-5][0-9]{2}) from [^\n]*|(?:OpenClaw )?HTTP ([1-5][0-9]{2})")
+_GUARD_FORM = re.compile(
+    r"(?:ornith-local|inkling-local|hermes-local|inkling-hf-router|needle-local): (?P<kind>transport failure|undecodable response) "
+    r"\((?P<cls>URLError|TimeoutError|ConnectionError|HTTPException|IncompleteRead|RemoteDisconnected|"
+    r"SSLError|JSONDecodeError|UnicodeDecodeError|RecursionError|[A-Za-z]{1,40}Error)\)")
+
+
+_KNOWN_NAMES = frozenset({"ornith-local", "inkling-local", "hermes-local", "inkling-hf-router", "needle-local"})
+
+
+def _safe_name(name: str) -> str:
+    """Only fixed standard provider names pass through; custom names are not trusted."""
+    return name if name in _KNOWN_NAMES else "provider"
 
 
 def _safe_detail(outcome: str, detail: str) -> str:
-    """Attempt detail that is safe for model-visible text: fixed router strings, or class/status only."""
+    """Attempt detail that is safe for model-visible text.
+
+    Fixed router strings pass through for non-error outcomes. For errors only canonical forms are
+    re-emitted, rebuilt from the parsed fields; anything else fails closed to "provider error".
+    """
     if outcome != "error":
         return detail
-    m = _HTTP_STATUS.match(detail or "")
+    d = detail or ""
+    m = _HTTP_STATUS.fullmatch(d)
     if m:
-        return f"HTTP {m.group(1)}"
-    if detail.startswith(("transport failure", "undecodable response")) or ": transport failure" in detail or ": undecodable response" in detail:
-        return detail
+        return f"HTTP {m.group(1) or m.group(2)}"
+    m = _GUARD_FORM.fullmatch(d)
+    if m:
+        return f"{m.group('kind')} ({m.group('cls')})"
     return "provider error"
 
 
@@ -180,9 +208,9 @@ class SharedLayerModel:
                     max_tokens=max_tokens or 1024)
         assert self.router is not None
         routed = await asyncio.to_thread(self.router.run, task)
-        self.last_attempts = [{"profile": a.provider, "outcome": a.outcome, "detail": _safe_detail(a.outcome, a.detail)} for a in routed.attempts]
+        self.last_attempts = [{"profile": _safe_name(a.provider), "outcome": a.outcome, "detail": _safe_detail(a.outcome, a.detail)} for a in routed.attempts]
         if not routed.ok or routed.result is None:
-            summary = "; ".join(f"{a.provider}: {a.outcome}" + (f" ({d})" if d else "") for a in routed.attempts for d in [_safe_detail(a.outcome, a.detail)])
+            summary = "; ".join(f"{_safe_name(a.provider)}: {a.outcome}" + (f" ({d})" if d else "") for a in routed.attempts for d in [_safe_detail(a.outcome, a.detail)])
             raise ModelError(f"shared model layer produced no answer: {summary}")
         self.last_provider = routed.result.provider
         text = (routed.result.text or "").strip()
