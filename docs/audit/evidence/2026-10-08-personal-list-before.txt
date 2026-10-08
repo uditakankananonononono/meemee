@@ -1,0 +1,44 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_____________ test_personal_history_list_remains_coherent[sqlite] ______________
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7fe9af583f10>, jobs=<meemee.jobs.JobStore ...Store object at 0x7fe9af406230>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7fe9af406290>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fe9af4040a0>
+
+    def test_personal_history_list_remains_coherent(persistence, monkeypatch):  # noqa: F811
+        store = persistence.personal_model
+        row = store.upsert('owner', PersonalItemInput(kind='preference', title='drink', value='tea', source_id='user', source_record_id='1'))
+        original = store.get
+        def purged_before_read(owner, ident):
+            store.purge_owner(owner)
+            return original(owner, ident)
+        monkeypatch.setattr(store, 'get', purged_before_read)
+        result = store.list('owner', include_history=True)
+>       assert all(isinstance(item, dict) for item in result)
+E       assert False
+E        +  where False = all(<generator object test_personal_history_list_remains_coherent.<locals>.<genexpr> at 0x7fe9af5b4a50>)
+
+tests/test_personal_list_snapshot.py:17: AssertionError
+___________ test_personal_history_list_remains_coherent[postgresql] ____________
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7fe9adfaf790>, jobs=<meemee...re object at 0x7fe9adb00550>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7fe9adb00580>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fe9adb006a0>
+
+    def test_personal_history_list_remains_coherent(persistence, monkeypatch):  # noqa: F811
+        store = persistence.personal_model
+        row = store.upsert('owner', PersonalItemInput(kind='preference', title='drink', value='tea', source_id='user', source_record_id='1'))
+        original = store.get
+        def purged_before_read(owner, ident):
+            store.purge_owner(owner)
+            return original(owner, ident)
+        monkeypatch.setattr(store, 'get', purged_before_read)
+        result = store.list('owner', include_history=True)
+>       assert all(isinstance(item, dict) for item in result)
+E       assert False
+E        +  where False = all(<generator object test_personal_history_list_remains_coherent.<locals>.<genexpr> at 0x7fe9af5b6ab0>)
+
+tests/test_personal_list_snapshot.py:17: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_personal_list_snapshot.py::test_personal_history_list_remains_coherent[sqlite]
+FAILED tests/test_personal_list_snapshot.py::test_personal_history_list_remains_coherent[postgresql]
+2 failed in 1.09s

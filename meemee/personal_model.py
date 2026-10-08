@@ -189,11 +189,13 @@ class PersonalModelStore:
             clauses.append("kind=?"); values.append(kind)
         if not include_history:
             clauses.append("status='active'")
-        with self.lock:
+        with self.lock, self.db:
+            if not self.db.in_transaction:
+                self.db.execute("BEGIN")
             rows = self.db.execute(
                 f"SELECT id FROM personal_items WHERE {' AND '.join(clauses)} ORDER BY updated_at DESC,id DESC", values
             ).fetchall()
-        items = [self.get(owner_id, row["id"]) for row in rows]
+            items = [self._get_locked(owner_id, row["id"]) for row in rows]
         if include_history:
             return items
         clock = datetime.now(timezone.utc)
