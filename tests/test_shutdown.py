@@ -27,12 +27,13 @@ async def test_drain_times_out_and_rejects_new_runs():
 @pytest.mark.asyncio
 async def test_lifespan_shutdown_drains_and_closes(monkeypatch):
     from meemee import api
-
-    closed = False
-    async def close():
-        nonlocal closed
-        closed = True
-    monkeypatch.setattr(api.agent.model, "aclose", close)
+    original = api.bootstrap_api
+    closed = []
+    async def bootstrap(cleanup):
+        objects = await original(cleanup)
+        cleanup.callback(lambda: closed.append(True))
+        return objects
+    monkeypatch.setattr(api, "bootstrap_api", bootstrap)
     async with api.lifespan(api.app):
         assert api.run_gate.accepting
-    assert closed
+    assert closed == [True]

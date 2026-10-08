@@ -1,0 +1,63 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+__________________ test_resources_require_successful_startup ___________________
+
+    async def test_resources_require_successful_startup():
+>       with pytest.raises(APINotStartedError):
+E       Failed: DID NOT RAISE <class 'meemee.api_state.APINotStartedError'>
+
+tests/test_api_bootstrap_lifecycle.py:10: Failed
+____________ test_import_in_running_loop_does_not_acquire_resources ____________
+
+    async def test_import_in_running_loop_does_not_acquire_resources():
+        import asyncio
+        import os
+        import sys
+        import tempfile
+        code = '''
+    import asyncio
+    async def main():
+     from meemee import persistence, runtime
+     def forbidden(*a, **kw):raise AssertionError('acquired during import')
+     persistence.persistence_from_settings=forbidden
+     runtime.build_agent=forbidden
+     runtime.build_agent_async=forbidden
+     from meemee import api
+     assert not api._resources
+    asyncio.run(main())
+    '''
+        process = await asyncio.create_subprocess_exec(sys.executable, '-c', code,
+            env={**os.environ, 'MEEMEE_DATA_DIR': tempfile.mkdtemp()},
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        out, err = await process.communicate()
+>       assert process.returncode == 0, (out + err).decode()
+E       AssertionError: Traceback (most recent call last):
+E           File "<string>", line 11, in <module>
+E           File "/usr/lib/python3.10/asyncio/runners.py", line 44, in run
+E             return loop.run_until_complete(main)
+E           File "/usr/lib/python3.10/asyncio/base_events.py", line 649, in run_until_complete
+E             return future.result()
+E           File "<string>", line 9, in main
+E           File "/home/sandbox/meemee/meemee/api.py", line 105, in <module>
+E             persistence = persistence_from_settings(settings)
+E           File "<string>", line 5, in forbidden
+E         AssertionError: acquired during import
+E         
+E       assert 1 == 0
+E        +  where 1 = <Process 517390>.returncode
+
+tests/test_api_bootstrap_lifecycle.py:39: AssertionError
+=============================== warnings summary ===============================
+.venv/lib/python3.10/site-packages/fastapi/testclient.py:1
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+.venv/lib/python3.10/site-packages/starlette/testclient.py:53
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_api_bootstrap_lifecycle.py::test_resources_require_successful_startup
+FAILED tests/test_api_bootstrap_lifecycle.py::test_import_in_running_loop_does_not_acquire_resources
+2 failed, 3 deselected, 2 warnings in 1.39s

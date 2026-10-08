@@ -21,11 +21,12 @@ from webapp.mount import mount_webapp
 
 from . import __version__
 from .account_deletion import AccountPurger, PurgeTargets
+from .api_state import _UNSET, APIAuth, APIResource
 from .auth import Authenticator, Principal
 from .browser_api import build_browser_router
 from .browser_sessions import BrowserSessionManager
 from .companion.api import build_companion_router
-from .companion.runtime import build_companion
+from .companion.runtime import build_companion_async
 from .config import Settings
 from .email_verification import ResendMailer
 from .entitlements import public_catalog
@@ -50,7 +51,7 @@ from .personal_model import PersonalItemInput
 from .quotas import QuotaExceeded
 from .rate_limit import RateLimitMiddleware, SQLiteRateLimiter
 from .reflection import PersonalModelReflector
-from .runtime import build_agent
+from .runtime import build_agent_async
 from .shutdown import RunGate
 from .streaming import job_event_stream
 from .web_login import WebLogin, WebLoginConfig
@@ -69,29 +70,35 @@ if (settings.data_dir / ".key-rotation-in-progress").exists():
     raise RuntimeError("incomplete encryption-key rotation; restore the pre-rotation backup")
 configure_logging(settings.log_level, settings.log_json)
 log = logging.getLogger("meemee.api")
+check_private_hosts_override("api")  # fail closed on invalid production configuration before startup
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    async with AsyncExitStack() as cleanup:
-        # LIFO order: owned HTTP clients, then browser and persistence. All
-        # callbacks are attempted even when an earlier closer raises.
-        cleanup.callback(persistence.close)
-        cleanup.callback(browser_sessions.shutdown)
-        seen = {id(agent.model)}
-        for model in (reflection_model, companion.model):
-            if id(model) not in seen:
-                seen.add(id(model))
-                close = getattr(model, "aclose", None)
-                if close is not None:
-                    cleanup.push_async_callback(close)
-        cleanup.push_async_callback(agent.aclose)
-        try:
-            yield
-        finally:
-            drained = await run_gate.drain(settings.shutdown_grace_seconds)
-            if not drained:
-                log.warning("shutdown grace period elapsed", extra={"active_runs": run_gate.active})
+    global _lifecycle_active
+    if _lifecycle_active:
+        raise RuntimeError("API lifespan is already starting or started")
+    # Claim starting state before the first await; hold through cleanup completion.
+    _lifecycle_active = True
+    try:
+        async with AsyncExitStack() as cleanup:
+            resources = await bootstrap_api(cleanup)
+            browser = resources["browser_sessions"]
+            browser.notice_delivery = lambda: browser.notices.deliver_pending(browser.store, resources["companion"].store, resources["companion"].channels)
+            _resources.update(resources)
+            try:
+                yield
+            finally:
+                try:
+                    gate = resources["run_gate"]
+                    drained = await gate.drain(settings.shutdown_grace_seconds)
+                    if not drained:
+                        log.warning("shutdown grace period elapsed", extra={"active_runs": gate.active})
+                finally:
+                    _resources.clear()
+    finally:
+        _resources.clear()
+        _lifecycle_active = False
 
 app = FastAPI(title="Meemee", version=__version__, lifespan=lifespan)
 trusted_hosts = [host.strip() for host in settings.trusted_hosts.split(",") if host.strip()]
@@ -102,75 +109,121 @@ mount_console(app)
 mount_webapp(app)
 mount_site(app)
 app.add_middleware(MetricsMiddleware)
-persistence = persistence_from_settings(settings)
-browser_sessions = BrowserSessionManager(
-    persistence.browser_sessions,  # PostgreSQL mode: shared records; the live browser stays on this host
-    headless=settings.browser_headless,
-    profiles_dir=settings.data_dir / "browser-profiles",
-    public_url=settings.public_url,
-    allow_private_hosts=settings.browser_allow_private_hosts,
-    max_sessions=settings.browser_max_sessions,
-    idle_timeout_seconds=settings.browser_idle_timeout_seconds,
-    takeover_ttl_seconds=settings.browser_takeover_ttl_seconds,
-    notices=persistence.browser_notices,  # PostgreSQL mode: one queue for every host
-)
-agent = build_agent(settings, memory=persistence.memory, browser_sessions=browser_sessions, persistence=persistence)
-reflection_model = agent.model if not uses_routing(settings) else build_role_model(settings, "reflection")
-run_gate = RunGate()
-jobs = persistence.jobs
-if persistence.backend == "postgresql":
-    from meemee_persist_pg.rate_limit import PostgreSQLRateLimiter
-    rate_limiter = PostgreSQLRateLimiter(persistence.database, settings.rate_limit_requests, settings.rate_limit_window_seconds)
-else:
-    rate_limiter = SQLiteRateLimiter(settings.data_dir / "rate-limits.sqlite3", settings.rate_limit_requests, settings.rate_limit_window_seconds)
+_resources = {}
+_lifecycle_active = False
+
+
+async def bootstrap_api(cleanup):
+    persistence = persistence_from_settings(settings)
+    cleanup.callback(persistence.close)
+    browser_sessions = BrowserSessionManager(
+        persistence.browser_sessions,  # PostgreSQL mode: shared records; the live browser stays on this host
+        headless=settings.browser_headless,
+        profiles_dir=settings.data_dir / "browser-profiles",
+        public_url=settings.public_url,
+        allow_private_hosts=settings.browser_allow_private_hosts,
+        max_sessions=settings.browser_max_sessions,
+        idle_timeout_seconds=settings.browser_idle_timeout_seconds,
+        takeover_ttl_seconds=settings.browser_takeover_ttl_seconds,
+        notices=persistence.browser_notices,  # PostgreSQL mode: one queue for every host
+    )
+    cleanup.callback(browser_sessions.shutdown)
+    agent = await build_agent_async(settings, memory=persistence.memory, browser_sessions=browser_sessions, persistence=persistence)
+    cleanup.push_async_callback(agent.aclose)
+    reflection_model = agent.model if not uses_routing(settings) else build_role_model(settings, "reflection")
+    model_ids = {id(agent.model)}
+    if id(reflection_model) not in model_ids:
+        model_ids.add(id(reflection_model))
+        cleanup.push_async_callback(reflection_model.aclose)
+    run_gate = RunGate()
+    jobs = persistence.jobs
+    if persistence.backend == "postgresql":
+        from meemee_persist_pg.rate_limit import PostgreSQLRateLimiter
+        rate_limiter = PostgreSQLRateLimiter(persistence.database, settings.rate_limit_requests, settings.rate_limit_window_seconds)
+    else:
+        rate_limiter = SQLiteRateLimiter(settings.data_dir / "rate-limits.sqlite3", settings.rate_limit_requests, settings.rate_limit_window_seconds)
+    runs = persistence.runs  # PostgreSQL mode: run history and idempotency keys shared by every host
+    idempotency = persistence.idempotency
+    quotas = persistence.quotas  # PostgreSQL mode: one daily counter per principal across hosts
+    entitlements = persistence.entitlements
+    tokens = persistence.tokens  # PostgreSQL mode: shared by every API host
+    email_verifications = persistence.email_verifications  # PostgreSQL mode: links work on every host
+    mailer = ResendMailer(settings.resend_api_key, settings.email_from_address, settings.public_url, settings.resend_api_url)
+    personal_model = persistence.personal_model  # PostgreSQL mode: shared personal model
+    monitors = persistence.monitors  # PostgreSQL mode: shared by every host
+    audit = persistence.audit  # PostgreSQL mode: one global chain for every host
+    approvals = persistence.approvals  # PostgreSQL mode: shared with every worker, not local disk
+    webhooks = persistence.webhooks or WebhookStore(settings.data_dir / "webhooks.sqlite3", settings.webhook_max_payload_bytes, settings.vault_key)  # PostgreSQL mode: shared outbox
+    companion = await build_companion_async(settings, store=persistence.companion, persistence=persistence)  # PostgreSQL mode: shared companion tables
+    if id(companion.model) not in model_ids:
+        model_ids.add(id(companion.model))
+        cleanup.push_async_callback(companion.model.aclose)
+    for channel in companion.channels.values():
+        close = getattr(channel, "aclose", None)
+        if close is not None:
+            cleanup.push_async_callback(close)
+    deletion_ledger = persistence.deletion_ledger  # PostgreSQL mode: shared, any host resumes a deletion
+    account_purger = AccountPurger(PurgeTargets(
+        jobs=jobs, runs=runs, memory=persistence.memory, idempotency=idempotency, quotas=quotas,
+        entitlements=entitlements, approvals=approvals, monitors=monitors, personal_model=personal_model,
+        context=persistence.context, webhooks=webhooks, companion=companion.store,
+        browser_sessions=browser_sessions.store, browser_notices=browser_sessions.notices,
+        reflection_schedule=persistence.reflection_schedule,
+    ), deletion_ledger)
+    for _resumed in account_purger.resume_incomplete():
+        log.warning("resumed interrupted account deletion", extra={"deletion_id": _resumed["deletion_id"]})
+    oidc = None
+    if any((settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url)):
+        if not all((settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url)):
+            raise RuntimeError("OIDC requires issuer, audience and JWKS URL together")
+        oidc = OIDCValidator(OIDCConfig(
+            settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url,
+            settings.oidc_role_claim, settings.oidc_role_scopes,
+        ))
+    web_login = None
+    web_values = (settings.oidc_client_id, settings.oidc_client_secret, settings.oidc_authorization_endpoint, settings.oidc_token_endpoint, settings.oidc_redirect_uri, settings.session_key)
+    if any(web_values):
+        if oidc is None or not all(web_values):
+            raise RuntimeError("interactive login requires complete OIDC and web-login configuration")
+        web_login = WebLogin(WebLoginConfig(*web_values), oidc)
+    auth = Authenticator(tokens, settings.api_token, oidc, web_login.authenticate_session if web_login else None)
+    readiness = ReadinessChecker(settings.data_dir, {"memory": persistence.check_memory, "jobs": persistence.check_jobs, "runs": runs.ping, "tokens": tokens.ping, "entitlements": entitlements.ping, "webhooks": webhooks.ping, "companion": companion.store.ping, "personal_model": personal_model.ping, "context": persistence.context.ping, "monitors": monitors.ping, "reflection_schedule": persistence.reflection_schedule.ping, "account_deletions": deletion_ledger.ping, "browser_sessions": browser_sessions.store.ping, "browser_notices": browser_sessions.notices.ping}, settings.model_base_url, settings.readiness_min_free_bytes, require_model=settings.readiness_require_model)
+    return {name: value for name, value in locals().items() if name in _resource_names}
+
+_resource_names = ['persistence', 'browser_sessions', 'agent', 'reflection_model', 'run_gate', 'jobs', 'rate_limiter', 'runs', 'idempotency', 'quotas', 'entitlements', 'tokens', 'email_verifications', 'mailer', 'personal_model', 'monitors', 'audit', 'approvals', 'webhooks', 'companion', 'deletion_ledger', 'account_purger', 'oidc', 'web_login', 'auth', 'readiness']
+persistence = APIResource(lambda: _resources.get("persistence", _UNSET), "persistence")
+browser_sessions = APIResource(lambda: _resources.get("browser_sessions", _UNSET), "browser_sessions")
+agent = APIResource(lambda: _resources.get("agent", _UNSET), "agent")
+reflection_model = APIResource(lambda: _resources.get("reflection_model", _UNSET), "reflection_model")
+run_gate = APIResource(lambda: _resources.get("run_gate", _UNSET), "run_gate")
+jobs = APIResource(lambda: _resources.get("jobs", _UNSET), "jobs")
+rate_limiter = APIResource(lambda: _resources.get("rate_limiter", _UNSET), "rate_limiter")
+runs = APIResource(lambda: _resources.get("runs", _UNSET), "runs")
+idempotency = APIResource(lambda: _resources.get("idempotency", _UNSET), "idempotency")
+quotas = APIResource(lambda: _resources.get("quotas", _UNSET), "quotas")
+entitlements = APIResource(lambda: _resources.get("entitlements", _UNSET), "entitlements")
+tokens = APIResource(lambda: _resources.get("tokens", _UNSET), "tokens")
+email_verifications = APIResource(lambda: _resources.get("email_verifications", _UNSET), "email_verifications")
+mailer = APIResource(lambda: _resources.get("mailer", _UNSET), "mailer")
+personal_model = APIResource(lambda: _resources.get("personal_model", _UNSET), "personal_model")
+monitors = APIResource(lambda: _resources.get("monitors", _UNSET), "monitors")
+audit = APIResource(lambda: _resources.get("audit", _UNSET), "audit")
+approvals = APIResource(lambda: _resources.get("approvals", _UNSET), "approvals")
+webhooks = APIResource(lambda: _resources.get("webhooks", _UNSET), "webhooks")
+companion = APIResource(lambda: _resources.get("companion", _UNSET), "companion")
+deletion_ledger = APIResource(lambda: _resources.get("deletion_ledger", _UNSET), "deletion_ledger")
+account_purger = APIResource(lambda: _resources.get("account_purger", _UNSET), "account_purger")
+oidc = APIResource(lambda: _resources.get("oidc", _UNSET), "oidc")
+web_login = APIResource(lambda: _resources.get("web_login", _UNSET), "web_login")
+auth = APIAuth(lambda: _resources.get("auth", _UNSET), "auth")
+readiness = APIResource(lambda: _resources.get("readiness", _UNSET), "readiness")
 app.add_middleware(RateLimitMiddleware, limiter=rate_limiter)
-runs = persistence.runs  # PostgreSQL mode: run history and idempotency keys shared by every host
-idempotency = persistence.idempotency
-quotas = persistence.quotas  # PostgreSQL mode: one daily counter per principal across hosts
-entitlements = persistence.entitlements
-tokens = persistence.tokens  # PostgreSQL mode: shared by every API host
-email_verifications = persistence.email_verifications  # PostgreSQL mode: links work on every host
-mailer = ResendMailer(settings.resend_api_key, settings.email_from_address, settings.public_url, settings.resend_api_url)
-personal_model = persistence.personal_model  # PostgreSQL mode: shared personal model
-monitors = persistence.monitors  # PostgreSQL mode: shared by every host
-audit = persistence.audit  # PostgreSQL mode: one global chain for every host
-approvals = persistence.approvals  # PostgreSQL mode: shared with every worker, not local disk
-check_private_hosts_override("api")  # raises when MEEMEE_ENV=production
-webhooks = persistence.webhooks or WebhookStore(settings.data_dir / "webhooks.sqlite3", settings.webhook_max_payload_bytes, settings.vault_key)  # PostgreSQL mode: shared outbox
-companion = build_companion(settings, store=persistence.companion, persistence=persistence)  # PostgreSQL mode: shared companion tables
-deletion_ledger = persistence.deletion_ledger  # PostgreSQL mode: shared, any host resumes a deletion
-account_purger = AccountPurger(PurgeTargets(
-    jobs=jobs, runs=runs, memory=persistence.memory, idempotency=idempotency, quotas=quotas,
-    entitlements=entitlements, approvals=approvals, monitors=monitors, personal_model=personal_model,
-    context=persistence.context, webhooks=webhooks, companion=companion.store,
-    browser_sessions=browser_sessions.store, browser_notices=browser_sessions.notices,
-    reflection_schedule=persistence.reflection_schedule,
-), deletion_ledger)
-for _resumed in account_purger.resume_incomplete():
-    log.warning("resumed interrupted account deletion", extra={"deletion_id": _resumed["deletion_id"]})
-oidc = None
-if any((settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url)):
-    if not all((settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url)):
-        raise RuntimeError("OIDC requires issuer, audience and JWKS URL together")
-    oidc = OIDCValidator(OIDCConfig(
-        settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url,
-        settings.oidc_role_claim, settings.oidc_role_scopes,
-    ))
-web_login = None
-web_values = (settings.oidc_client_id, settings.oidc_client_secret, settings.oidc_authorization_endpoint, settings.oidc_token_endpoint, settings.oidc_redirect_uri, settings.session_key)
-if any(web_values):
-    if oidc is None or not all(web_values):
-        raise RuntimeError("interactive login requires complete OIDC and web-login configuration")
-    web_login = WebLogin(WebLoginConfig(*web_values), oidc)
-auth = Authenticator(tokens, settings.api_token, oidc, web_login.authenticate_session if web_login else None)
-readiness = ReadinessChecker(settings.data_dir, {"memory": persistence.check_memory, "jobs": persistence.check_jobs, "runs": runs.ping, "tokens": tokens.ping, "entitlements": entitlements.ping, "webhooks": webhooks.ping, "companion": companion.store.ping, "personal_model": personal_model.ping, "context": persistence.context.ping, "monitors": monitors.ping, "reflection_schedule": persistence.reflection_schedule.ping, "account_deletions": deletion_ledger.ping, "browser_sessions": browser_sessions.store.ping, "browser_notices": browser_sessions.notices.ping}, settings.model_base_url, settings.readiness_min_free_bytes, require_model=settings.readiness_require_model)
 jobs_write_auth = auth.dependency("jobs:write")
 jobs_write_dependency = Depends(jobs_write_auth)
 runs_write_dependency = Depends(auth.dependency("runs:write"))
 jobs_read_dependency = Depends(auth.dependency("jobs:read"))
-app.include_router(build_companion_router(companion.store, companion.engine, companion.channels, auth, audit))
+app.include_router(build_companion_router(companion.child("store"), companion.child("engine"), companion.child("channels"), auth, audit))
 app.include_router(build_browser_router(browser_sessions, auth, audit))
-browser_sessions.notice_delivery = lambda: browser_sessions.notices.deliver_pending(browser_sessions.store, companion.store, companion.channels)
 
 
 @app.middleware("http")
@@ -777,7 +830,7 @@ def introspect_token(request: TokenIntrospectionRequest):
                   "expires_at": None, "revoked_at": None}
     elif (record := tokens.introspect(supplied)) is not None:
         result = {**base, **record}
-    elif oidc is not None and (claims := oidc.authenticate(supplied)) is not None:
+    elif bool(oidc) and (claims := oidc.authenticate(supplied)) is not None:
         result = {**base, "active": True, "state": "active", "credential": "oidc",
                   "principal": claims.id, "name": claims.name, "scopes": sorted(claims.scopes),
                   "expires_at": None, "revoked_at": None}
@@ -824,14 +877,14 @@ def web_home(request: Request):
 
 @app.get("/auth/login", include_in_schema=False)
 def web_login_start():
-    if web_login is None:
+    if not web_login:
         raise HTTPException(404, "interactive login is not configured")
     return web_login.start()
 
 
 @app.get("/auth/callback", include_in_schema=False)
 async def web_login_callback(request: Request, code: str, state: str):
-    if web_login is None:
+    if not web_login:
         raise HTTPException(404, "interactive login is not configured")
     return await web_login.callback(request, code, state)
 
@@ -877,9 +930,9 @@ async def websocket_job_events(websocket: WebSocket, job_id: str):
             principal = Principal("bootstrap", "bootstrap", frozenset({"admin", "jobs:read"}))
         else:
             principal = tokens.authenticate(supplied)
-            if principal is None and oidc is not None:
+            if principal is None and bool(oidc):
                 principal = oidc.authenticate(supplied)
-    if principal is None and web_login is not None:
+    if principal is None and bool(web_login):
         principal = web_login.authenticate_session(websocket.cookies.get("meemee_session", ""))
     if principal is None:
         await websocket.close(code=4401, reason="authentication required"); return

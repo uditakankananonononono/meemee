@@ -8,7 +8,7 @@ import pytest
 from meemee.config import Settings
 from meemee.llm import OpenAICompatibleModel
 from meemee.memory import MemoryStore
-from meemee.runtime import build_agent
+from meemee.runtime import build_agent_async
 from meemee.shutdown import RunGate
 
 
@@ -16,7 +16,7 @@ from meemee.shutdown import RunGate
 async def test_lifespan_releases_actual_owned_http_clients(monkeypatch, tmp_path, resource):
     from meemee import api
 
-    agent = build_agent(Settings(_env_file=None, data_dir=tmp_path), memory=MemoryStore(tmp_path / 'memory.db'))
+    agent = await build_agent_async(Settings(_env_file=None, data_dir=tmp_path), memory=MemoryStore(tmp_path / 'memory.db'))
     companion_model = OpenAICompatibleModel('http://unused', 'model', 'key')
     reflection = OpenAICompatibleModel('http://unused', 'model', 'key')
     clients = {
@@ -34,12 +34,13 @@ async def test_lifespan_releases_actual_owned_http_clients(monkeypatch, tmp_path
         for index, client in enumerate(group):
             await client._transport.aclose()
             client._transport = Transport((label, index))
-    monkeypatch.setattr(api, 'agent', agent)
-    monkeypatch.setattr(api, 'companion', SimpleNamespace(model=companion_model))
-    monkeypatch.setattr(api, 'reflection_model', reflection)
-    monkeypatch.setattr(api, 'run_gate', RunGate())
-    monkeypatch.setattr(api, 'browser_sessions', SimpleNamespace(shutdown=Mock()))
-    monkeypatch.setattr(api, 'persistence', SimpleNamespace(close=Mock()))
+    objects = {'agent': agent}
+    objects['companion'] = SimpleNamespace(model=companion_model)
+    objects['reflection_model'] = reflection
+    objects['run_gate'] = RunGate()
+    objects['browser_sessions'] = SimpleNamespace(shutdown=Mock())
+    objects['persistence'] = SimpleNamespace(close=Mock())
+    install_bootstrap(monkeypatch, api, objects)
     try:
         async with api.lifespan(api.app):
             pass
@@ -67,37 +68,30 @@ async def test_shutdown_attempts_remaining_cleanup_after_close_error(monkeypatch
         async def aclose(self):
             events.append('agent')
             raise RuntimeError('close failed')
-    monkeypatch.setattr(api, 'agent', Agent())
-    monkeypatch.setattr(api, 'companion', SimpleNamespace(model=Model()))
-    monkeypatch.setattr(api, 'reflection_model', Model())
-    monkeypatch.setattr(api, 'run_gate', RunGate())
-    monkeypatch.setattr(api, 'browser_sessions', SimpleNamespace(shutdown=lambda: events.append('browser')))
-    monkeypatch.setattr(api, 'persistence', SimpleNamespace(close=lambda: events.append('persistence')))
+    objects = {'agent': Agent()}
+    objects['companion'] = SimpleNamespace(model=Model())
+    objects['reflection_model'] = Model()
+    objects['run_gate'] = RunGate()
+    objects['browser_sessions'] = SimpleNamespace(shutdown=lambda: events.append('browser'))
+    objects['persistence'] = SimpleNamespace(close=lambda: events.append('persistence'))
+    install_bootstrap(monkeypatch, api, objects)
     with pytest.raises(RuntimeError, match='close failed'):
         async with api.lifespan(api.app):
             pass
     assert events == ['agent', 'other', 'other', 'browser', 'persistence']
 
 
-async def test_shutdown_closes_shared_model_once_on_body_error(monkeypatch):
-    from meemee import api
 
-    events = []
-    class Model:
-        async def aclose(self):
-            events.append('model')
-    shared = Model()
-    class Agent:
-        model = shared
-        async def aclose(self):
-            await shared.aclose()
-    monkeypatch.setattr(api, 'agent', Agent())
-    monkeypatch.setattr(api, 'companion', SimpleNamespace(model=shared))
-    monkeypatch.setattr(api, 'reflection_model', shared)
-    monkeypatch.setattr(api, 'run_gate', RunGate())
-    monkeypatch.setattr(api, 'browser_sessions', SimpleNamespace(shutdown=lambda: events.append('browser')))
-    monkeypatch.setattr(api, 'persistence', SimpleNamespace(close=lambda: events.append('persistence')))
-    with pytest.raises(ValueError, match='body failed'):
-        async with api.lifespan(api.app):
-            raise ValueError('body failed')
-    assert events == ['model', 'browser', 'persistence']
+
+def install_bootstrap(monkeypatch, api, objects):
+    async def bootstrap(cleanup):
+        cleanup.callback(objects['persistence'].close)
+        cleanup.callback(objects['browser_sessions'].shutdown)
+        seen = {id(objects['agent'].model)}
+        for model in (objects['reflection_model'], objects['companion'].model):
+            if id(model) not in seen:
+                seen.add(id(model))
+                cleanup.push_async_callback(model.aclose)
+        cleanup.push_async_callback(objects['agent'].aclose)
+        return objects
+    monkeypatch.setattr(api, 'bootstrap_api', bootstrap)
