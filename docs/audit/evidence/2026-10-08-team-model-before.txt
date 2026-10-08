@@ -1,0 +1,124 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+_____________ test_team_child_actual_model_client_closes[success] ______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fd2cba54310>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-767/test_team_child_actual_model_c0')
+outcome = 'success'
+
+    @pytest.mark.parametrize('outcome', ['success', 'typeerror', 'cancelled'])
+    async def test_team_child_actual_model_client_closes(monkeypatch, tmp_path, outcome):
+        stores = build_persistence('sqlite', tmp_path)
+        children = []
+    
+        def factory():
+            child = build_agent(Settings(_env_file=None, data_dir=tmp_path), False, persistence=stores)
+            children.append(child)
+    
+            async def run(goal, *, owner_id, cancel=None):
+                if outcome == 'typeerror':
+                    raise TypeError('effect happened')
+                if outcome == 'cancelled':
+                    raise asyncio.CancelledError
+                return RunReport(run_id='run', goal=goal, final='done', steps_used=0, tool_results=[])
+    
+            child.run = run
+            return child
+    
+        try:
+            if outcome == 'success':
+                assert (await AgentTeam(factory).delegate(['work'], owner_id='owner'))[0]['ok']
+            else:
+                with pytest.raises(TypeError if outcome == 'typeerror' else asyncio.CancelledError):
+                    await AgentTeam(factory).delegate(['work'], owner_id='owner')
+            assert len(children) == 1
+>           assert children[0].model.client.is_closed
+E           assert False
+E            +  where False = <httpx.AsyncClient object at 0x7fd2cbaad960>.is_closed
+E            +    where <httpx.AsyncClient object at 0x7fd2cbaad960> = <meemee.llm.OpenAICompatibleModel object at 0x7fd2cbaad810>.client
+E            +      where <meemee.llm.OpenAICompatibleModel object at 0x7fd2cbaad810> = <meemee.agent.Agent object at 0x7fd2cbaad9c0>.model
+
+tests/test_team_model_http_cleanup.py:40: AssertionError
+____________ test_team_child_actual_model_client_closes[typeerror] _____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fd2cbaae620>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-767/test_team_child_actual_model_c1')
+outcome = 'typeerror'
+
+    @pytest.mark.parametrize('outcome', ['success', 'typeerror', 'cancelled'])
+    async def test_team_child_actual_model_client_closes(monkeypatch, tmp_path, outcome):
+        stores = build_persistence('sqlite', tmp_path)
+        children = []
+    
+        def factory():
+            child = build_agent(Settings(_env_file=None, data_dir=tmp_path), False, persistence=stores)
+            children.append(child)
+    
+            async def run(goal, *, owner_id, cancel=None):
+                if outcome == 'typeerror':
+                    raise TypeError('effect happened')
+                if outcome == 'cancelled':
+                    raise asyncio.CancelledError
+                return RunReport(run_id='run', goal=goal, final='done', steps_used=0, tool_results=[])
+    
+            child.run = run
+            return child
+    
+        try:
+            if outcome == 'success':
+                assert (await AgentTeam(factory).delegate(['work'], owner_id='owner'))[0]['ok']
+            else:
+                with pytest.raises(TypeError if outcome == 'typeerror' else asyncio.CancelledError):
+                    await AgentTeam(factory).delegate(['work'], owner_id='owner')
+            assert len(children) == 1
+>           assert children[0].model.client.is_closed
+E           assert False
+E            +  where False = <httpx.AsyncClient object at 0x7fd2cb90bfd0>.is_closed
+E            +    where <httpx.AsyncClient object at 0x7fd2cb90bfd0> = <meemee.llm.OpenAICompatibleModel object at 0x7fd2cba56ce0>.client
+E            +      where <meemee.llm.OpenAICompatibleModel object at 0x7fd2cba56ce0> = <meemee.agent.Agent object at 0x7fd2cb90bf70>.model
+
+tests/test_team_model_http_cleanup.py:40: AssertionError
+____________ test_team_child_actual_model_client_closes[cancelled] _____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fd2cb90ae00>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-767/test_team_child_actual_model_c2')
+outcome = 'cancelled'
+
+    @pytest.mark.parametrize('outcome', ['success', 'typeerror', 'cancelled'])
+    async def test_team_child_actual_model_client_closes(monkeypatch, tmp_path, outcome):
+        stores = build_persistence('sqlite', tmp_path)
+        children = []
+    
+        def factory():
+            child = build_agent(Settings(_env_file=None, data_dir=tmp_path), False, persistence=stores)
+            children.append(child)
+    
+            async def run(goal, *, owner_id, cancel=None):
+                if outcome == 'typeerror':
+                    raise TypeError('effect happened')
+                if outcome == 'cancelled':
+                    raise asyncio.CancelledError
+                return RunReport(run_id='run', goal=goal, final='done', steps_used=0, tool_results=[])
+    
+            child.run = run
+            return child
+    
+        try:
+            if outcome == 'success':
+                assert (await AgentTeam(factory).delegate(['work'], owner_id='owner'))[0]['ok']
+            else:
+                with pytest.raises(TypeError if outcome == 'typeerror' else asyncio.CancelledError):
+                    await AgentTeam(factory).delegate(['work'], owner_id='owner')
+            assert len(children) == 1
+>           assert children[0].model.client.is_closed
+E           assert False
+E            +  where False = <httpx.AsyncClient object at 0x7fd2cb9090c0>.is_closed
+E            +    where <httpx.AsyncClient object at 0x7fd2cb9090c0> = <meemee.llm.OpenAICompatibleModel object at 0x7fd2cb909270>.client
+E            +      where <meemee.llm.OpenAICompatibleModel object at 0x7fd2cb909270> = <meemee.agent.Agent object at 0x7fd2cb909060>.model
+
+tests/test_team_model_http_cleanup.py:40: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_team_model_http_cleanup.py::test_team_child_actual_model_client_closes[success]
+FAILED tests/test_team_model_http_cleanup.py::test_team_child_actual_model_client_closes[typeerror]
+FAILED tests/test_team_model_http_cleanup.py::test_team_child_actual_model_client_closes[cancelled]
+3 failed in 1.27s
