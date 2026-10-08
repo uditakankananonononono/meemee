@@ -108,7 +108,7 @@ _HTTP_STATUS = re.compile(r"HTTP ([1-5][0-9]{2}) from [^\n]*|(?:OpenClaw )?HTTP 
 _GUARD_FORM = re.compile(
     r"(?:ornith-local|inkling-local|hermes-local|inkling-hf-router|needle-local): (?P<kind>transport failure|undecodable response) "
     r"\((?P<cls>URLError|TimeoutError|ConnectionError|HTTPException|IncompleteRead|RemoteDisconnected|"
-    r"SSLError|JSONDecodeError|UnicodeDecodeError|RecursionError|[A-Za-z]{1,40}Error)\)")
+    r"SSLError|JSONDecodeError|UnicodeDecodeError|RecursionError)\)")
 
 
 _KNOWN_NAMES = frozenset({"ornith-local", "inkling-local", "hermes-local", "inkling-hf-router", "needle-local"})
