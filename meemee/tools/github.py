@@ -121,9 +121,12 @@ class GitHubMutation(Tool):
     async def request(self, method: str, url: str, **kwargs: Any) -> dict[str, Any]:
         response=await self.client.request(method,url,headers=self.headers(),**kwargs)
         if response.status_code in {401,403}: raise ValueError("GitHub refused the credential or permission")
-        if response.status_code == 422: raise ValueError(f"GitHub rejected mutation: {response.json().get('message','validation failed')}")
+        if response.status_code == 422: raise ValueError("GitHub rejected mutation; outcome unknown, verify before retrying")
         response.raise_for_status()
-        return response.json()
+        data=response.json()
+        if not isinstance(data,dict):
+            raise ValueError("GitHub response shape invalid; outcome unknown, verify before retrying")
+        return data
 
 
 class GitHubPushBranch(GitHubMutation):
