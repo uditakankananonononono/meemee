@@ -3,8 +3,7 @@ from __future__ import annotations
 
 import httpx
 import pytest
-
-from meemee_client import AuthenticationError, MeemeeError, OIDCClientCredentialsAuth, TokenAuth
+from meemee_client import AuthenticationError, OIDCClientCredentialsAuth, TokenAuth
 
 
 def test_token_auth_header() -> None:

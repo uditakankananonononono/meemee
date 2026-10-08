@@ -5,15 +5,14 @@ import json
 
 import pytest
 from conftest import NOW, job_payload
-
 from meemee_client import (
+    KNOWN_SCOPES,
     AuditEntry,
     AuditPage,
     CreatedToken,
     Job,
     JobEvent,
     JobStatus,
-    KNOWN_SCOPES,
     RateLimitInfo,
     RunReport,
 )

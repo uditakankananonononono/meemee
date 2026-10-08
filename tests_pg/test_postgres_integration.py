@@ -1,17 +1,18 @@
 """Run with MEEMEE_TEST_POSTGRES_DSN pointed at an expendable empty database."""
 import os
+
 import pytest
 
 DSN=os.getenv("MEEMEE_TEST_POSTGRES_DSN") or os.getenv("MEEMEE_TEST_DATABASE_URL")
 pytestmark=pytest.mark.skipif(not DSN,reason="requires real PostgreSQL")
 
 def db():
-    from meemee_persist_pg import Database,MigrationStore
+    from meemee_persist_pg import Database, MigrationStore
     value=Database(DSN,min_size=1,max_size=4)
     MigrationStore(value).apply(); return value
 
 def test_memory_tokens_audit_and_migration_idempotency():
-    from meemee_persist_pg import MemoryStore,TokenStore,AuditLog,MigrationStore
+    from meemee_persist_pg import AuditLog, MemoryStore, MigrationStore, TokenStore
     value=db()
     try:
         memory=MemoryStore(value); ident=memory.add("run-i","fact","alpha beta",{"safe":True}, owner_id="test-owner")
@@ -23,7 +24,7 @@ def test_memory_tokens_audit_and_migration_idempotency():
     finally:value.close()
 
 def test_skip_locked_claim_and_fencing():
-    from meemee_persist_pg import JobStore,LeaseLostError
+    from meemee_persist_pg import JobStore, LeaseLostError
     value=db()
     try:
         first,second=JobStore(value,worker_id="one"),JobStore(value,worker_id="two")

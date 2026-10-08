@@ -6,9 +6,9 @@ from test_token_audit_backends import persistence  # noqa: F401
 from meemee.idempotency import IdempotencyInProgress
 
 
-def expire_claim(persistence):
-    store = persistence.idempotency
-    if persistence.backend == 'sqlite':
+def expire_claim(backend):
+    store = backend.idempotency
+    if backend.backend == 'sqlite':
         with store.db:
             store.db.execute("UPDATE idempotency SET expires_at='2000-01-01T00:00:00+00:00'")
     else:
