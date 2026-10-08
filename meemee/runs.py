@@ -12,6 +12,12 @@ from .schema_registry import register_schema
 from .types import RunReport
 
 
+def _cutoff(value: str) -> str:
+    instant = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    instant = instant if instant.tzinfo else instant.replace(tzinfo=timezone.utc)
+    return instant.astimezone(timezone.utc).isoformat()
+
+
 class RunStore:
     """Principal-owned completed run reports for durable account history."""
 
@@ -68,11 +74,10 @@ class RunStore:
     ) -> tuple[list[dict], str | None]:
         query = "SELECT * FROM runs WHERE principal=?"; params: list = [principal]
         if before is not None:
-            instant = datetime.fromisoformat(before.replace("Z", "+00:00"))
-            instant = instant if instant.tzinfo else instant.replace(tzinfo=timezone.utc)
-            query += " AND created_at<?"; params.append(instant.astimezone(timezone.utc).isoformat())
+            query += " AND created_at<?"; params.append(_cutoff(before))
         if cursor is not None:
             cursor_time, cursor_id = decode_cursor(cursor)
+            cursor_time = _cutoff(cursor_time)
             query += " AND (created_at<? OR (created_at=? AND run_id<?))"
             params.extend((cursor_time, cursor_time, cursor_id))
         page_size = min(max(limit, 1), 500)
