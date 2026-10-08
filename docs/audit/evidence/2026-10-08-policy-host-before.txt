@@ -1,0 +1,70 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_______ test_denied_dns_host_rejects_absolute_spelling[blocked.example.] _______
+
+host = 'blocked.example.'
+
+    @pytest.mark.parametrize('host', ['blocked.example.', 'BLOCKED.EXAMPLE.'])
+    def test_denied_dns_host_rejects_absolute_spelling(host):
+        policy = PolicyEngine({'deny_hosts': ['blocked.example']})
+>       result = policy.evaluate('browser.navigate', {'url': 'https://' + host + '/private'}, Risk.read)
+
+tests/test_policy_host_canonical.py:12: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+cls = <enum 'Risk'>, name = 'read'
+
+    def __getattr__(cls, name):
+        """
+        Return the enum member matching `name`
+    
+        We use __getattr__ instead of descriptors or inserting into the enum
+        class' __dict__ in order to support `name` and `value` being both
+        properties for enum members (which live in the class' __dict__) and
+        enum members themselves.
+        """
+        if _is_dunder(name):
+            raise AttributeError(name)
+        try:
+            return cls._member_map_[name]
+        except KeyError:
+>           raise AttributeError(name) from None
+E           AttributeError: read
+
+/usr/lib/python3.10/enum.py:437: AttributeError
+_______ test_denied_dns_host_rejects_absolute_spelling[BLOCKED.EXAMPLE.] _______
+
+host = 'BLOCKED.EXAMPLE.'
+
+    @pytest.mark.parametrize('host', ['blocked.example.', 'BLOCKED.EXAMPLE.'])
+    def test_denied_dns_host_rejects_absolute_spelling(host):
+        policy = PolicyEngine({'deny_hosts': ['blocked.example']})
+>       result = policy.evaluate('browser.navigate', {'url': 'https://' + host + '/private'}, Risk.read)
+
+tests/test_policy_host_canonical.py:12: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+cls = <enum 'Risk'>, name = 'read'
+
+    def __getattr__(cls, name):
+        """
+        Return the enum member matching `name`
+    
+        We use __getattr__ instead of descriptors or inserting into the enum
+        class' __dict__ in order to support `name` and `value` being both
+        properties for enum members (which live in the class' __dict__) and
+        enum members themselves.
+        """
+        if _is_dunder(name):
+            raise AttributeError(name)
+        try:
+            return cls._member_map_[name]
+        except KeyError:
+>           raise AttributeError(name) from None
+E           AttributeError: read
+
+/usr/lib/python3.10/enum.py:437: AttributeError
+=========================== short test summary info ============================
+FAILED tests/test_policy_host_canonical.py::test_denied_dns_host_rejects_absolute_spelling[blocked.example.]
+FAILED tests/test_policy_host_canonical.py::test_denied_dns_host_rejects_absolute_spelling[BLOCKED.EXAMPLE.]
+2 failed in 0.24s
