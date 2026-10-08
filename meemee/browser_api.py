@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
@@ -28,6 +29,39 @@ class ReleaseRequest(BaseModel):
     token: str = Field(min_length=20, max_length=200)
     note: str | None = Field(default=None, max_length=1000)
     outcome: str = "completed"
+
+
+LOGGER = logging.getLogger(__name__)
+RELEASE_OUTCOMES = frozenset({"completed", "declined"})
+
+
+class _BadFrame(ValueError):
+    """A client frame that is not a JSON object; safe to report back to the client."""
+
+
+async def _receive_object(websocket: WebSocket, timeout: float | None = None) -> dict:
+    """Read one text frame and require a JSON object, else raise _BadFrame."""
+    receive = websocket.receive_text()
+    try:
+        raw = await (asyncio.wait_for(receive, timeout) if timeout else receive)
+    except (KeyError, TypeError):
+        raise _BadFrame("text frames only") from None
+    try:
+        value = json.loads(raw)
+    except (ValueError, TypeError):
+        raise _BadFrame("message must be valid JSON") from None
+    if not isinstance(value, dict):
+        raise _BadFrame("message must be a JSON object")
+    return value
+
+
+def _release_arguments(message: dict) -> tuple[str | None, str]:
+    note, outcome = message.get("note"), message.get("outcome", "completed")
+    if note is not None and not isinstance(note, str):
+        raise BrowserSessionError("note must be a string")
+    if not isinstance(outcome, str) or outcome not in RELEASE_OUTCOMES:
+        raise BrowserSessionError("outcome must be completed or declined")
+    return note, outcome
 
 
 VIEWER_HTML = """<!doctype html>
@@ -176,7 +210,7 @@ def build_browser_router(manager: BrowserSessionManager, auth, audit=None, frame
     async def takeover_socket(websocket: WebSocket):
         await websocket.accept()
         try:
-            hello = json.loads(await asyncio.wait_for(websocket.receive_text(), 15))
+            hello = await _receive_object(websocket, 15)
             takeover_id, token = str(hello.get("takeover_id", "")), str(hello.get("token", ""))
             claimed = await manager.claim(takeover_id, token)
         except (BrowserSessionError, ValueError, asyncio.TimeoutError) as exc:
@@ -200,6 +234,13 @@ def build_browser_router(manager: BrowserSessionManager, auth, audit=None, frame
                 except (*PAGE_ERRORS, WebSocketDisconnect, RuntimeError):
                     stop.set()
                     return
+                except Exception:
+                    LOGGER.exception("takeover frame stream failed: %s", takeover_id)
+                    stop.set()
+                    with contextlib.suppress(Exception):
+                        await websocket.send_json({"type": "error", "error": "frame stream failed"})
+                        await websocket.close()
+                    return
                 try:
                     await asyncio.wait_for(stop.wait(), frame_interval)
                 except asyncio.TimeoutError:
@@ -208,9 +249,18 @@ def build_browser_router(manager: BrowserSessionManager, auth, audit=None, frame
         streamer = asyncio.create_task(stream())
         try:
             while not stop.is_set():
-                message = json.loads(await websocket.receive_text())
+                try:
+                    message = await _receive_object(websocket)
+                except _BadFrame as exc:
+                    await websocket.send_json({"type": "error", "error": str(exc)})
+                    continue
                 if message.get("type") == "release":
-                    result = await manager.release(takeover_id, token, message.get("note"), message.get("outcome", "completed"))
+                    try:
+                        note, outcome = _release_arguments(message)
+                        result = await manager.release(takeover_id, token, note, outcome)
+                    except BrowserSessionError as exc:
+                        await websocket.send_json({"type": "error", "error": str(exc)})
+                        continue
                     audit_event("human", "browser.takeover_released", result["session_id"], {"takeover_id": takeover_id, "outcome": result["outcome"]})
                     stop.set()
                     await streamer
@@ -232,5 +282,7 @@ def build_browser_router(manager: BrowserSessionManager, auth, audit=None, frame
                 streamer.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await streamer
+            elif not streamer.cancelled():
+                streamer.exception()  # mark retrieved; stream() already logged failures
 
     return router
