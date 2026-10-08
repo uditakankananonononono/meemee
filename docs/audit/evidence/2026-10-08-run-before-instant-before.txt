@@ -1,0 +1,32 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+____________ test_run_before_cutoff_normalizes_aware_offset[sqlite] ____________
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7f1fab9b0d60>, jobs=<meemee.jobs.JobStore ...Store object at 0x7f1fab9f6740>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7f1fab9f6b60>)
+
+    def test_run_before_cutoff_normalizes_aware_offset(persistence):  # noqa: F811
+        runs = persistence.runs
+>       runs.add('owner', RunReport(run_id='r1', goal='work', final='done', steps_used=1))
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for RunReport
+E       tool_results
+E         Field required [type=missing, input_value={'run_id': 'r1', 'goal': ...'done', 'steps_used': 1}, input_type=dict]
+E           For further information visit https://errors.pydantic.dev/2.13/v/missing
+
+tests/test_run_before_instant.py:11: ValidationError
+__________ test_run_before_cutoff_normalizes_aware_offset[postgresql] __________
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f1faa39fc40>, jobs=<meemee...re object at 0x7f1faa3e4a00>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f1faa3e4a30>)
+
+    def test_run_before_cutoff_normalizes_aware_offset(persistence):  # noqa: F811
+        runs = persistence.runs
+>       runs.add('owner', RunReport(run_id='r1', goal='work', final='done', steps_used=1))
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for RunReport
+E       tool_results
+E         Field required [type=missing, input_value={'run_id': 'r1', 'goal': ...'done', 'steps_used': 1}, input_type=dict]
+E           For further information visit https://errors.pydantic.dev/2.13/v/missing
+
+tests/test_run_before_instant.py:11: ValidationError
+=========================== short test summary info ============================
+FAILED tests/test_run_before_instant.py::test_run_before_cutoff_normalizes_aware_offset[sqlite]
+FAILED tests/test_run_before_instant.py::test_run_before_cutoff_normalizes_aware_offset[postgresql]
+2 failed in 0.81s

@@ -67,7 +67,10 @@ class RunStore:
         cursor: str | None = None,
     ) -> tuple[list[dict], str | None]:
         query = "SELECT * FROM runs WHERE principal=?"; params: list = [principal]
-        if before is not None: query += " AND created_at<?"; params.append(before)
+        if before is not None:
+            instant = datetime.fromisoformat(before.replace("Z", "+00:00"))
+            instant = instant if instant.tzinfo else instant.replace(tzinfo=timezone.utc)
+            query += " AND created_at<?"; params.append(instant.astimezone(timezone.utc).isoformat())
         if cursor is not None:
             cursor_time, cursor_id = decode_cursor(cursor)
             query += " AND (created_at<? OR (created_at=? AND run_id<?))"

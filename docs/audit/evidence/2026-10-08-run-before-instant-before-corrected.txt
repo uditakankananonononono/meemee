@@ -1,0 +1,27 @@
+F.                                                                       [100%]
+=================================== FAILURES ===================================
+____________ test_run_before_cutoff_normalizes_aware_offset[sqlite] ____________
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7efebf3811e0>, jobs=<meemee.jobs.JobStore ...Store object at 0x7efebf3c7eb0>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7efebf3c7e50>)
+
+    def test_run_before_cutoff_normalizes_aware_offset(persistence):  # noqa: F811
+        runs = persistence.runs
+        runs.add('owner', RunReport(run_id='r1', goal='work', final='done', steps_used=1, tool_results=[]))
+        stamp = '2026-10-08T04:00:00+00:00'
+        if persistence.backend == 'sqlite':
+            with runs.db:
+                runs.db.execute('UPDATE runs SET created_at=? WHERE run_id=?', (stamp, 'r1'))
+        else:
+            with runs.db.transaction() as c:
+                c.execute('UPDATE meemee_runs SET created_at=%s WHERE run_id=%s', (stamp, 'r1'))
+        # 08:00IST is02:30UTC, earlier than this run, so it must be excluded.
+>       assert runs.list('owner', before='2026-10-08T08:00:00+05:30')[0] == []
+E       AssertionError: assert [{'approvals_... 'done', ...}] == []
+E         
+E         Left contains one more item: {'approvals_required': [], 'blocked': False, 'created_at': '2026-10-08T04:00:00+00:00', 'final': 'done', ...}
+E         Use -v to get more diff
+
+tests/test_run_before_instant.py:19: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_run_before_instant.py::test_run_before_cutoff_normalizes_aware_offset[sqlite]
+1 failed, 1 passed in 0.82s
