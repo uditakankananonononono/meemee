@@ -1,0 +1,32 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_______ test_denied_dns_host_rejects_absolute_spelling[blocked.example.] _______
+
+host = 'blocked.example.'
+
+    @pytest.mark.parametrize('host', ['blocked.example.', 'BLOCKED.EXAMPLE.'])
+    def test_denied_dns_host_rejects_absolute_spelling(host):
+        policy = PolicyEngine({'deny_hosts': ['blocked.example']})
+        result = policy.evaluate('browser.navigate', {'url': 'https://' + host + '/private'}, Risk.READ)
+>       assert result.allowed is False
+E       AssertionError: assert True is False
+E        +  where True = PolicyDecision(allowed=True, reason='allowed', require_approval=False).allowed
+
+tests/test_policy_host_canonical.py:13: AssertionError
+_______ test_denied_dns_host_rejects_absolute_spelling[BLOCKED.EXAMPLE.] _______
+
+host = 'BLOCKED.EXAMPLE.'
+
+    @pytest.mark.parametrize('host', ['blocked.example.', 'BLOCKED.EXAMPLE.'])
+    def test_denied_dns_host_rejects_absolute_spelling(host):
+        policy = PolicyEngine({'deny_hosts': ['blocked.example']})
+        result = policy.evaluate('browser.navigate', {'url': 'https://' + host + '/private'}, Risk.READ)
+>       assert result.allowed is False
+E       AssertionError: assert True is False
+E        +  where True = PolicyDecision(allowed=True, reason='allowed', require_approval=False).allowed
+
+tests/test_policy_host_canonical.py:13: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_policy_host_canonical.py::test_denied_dns_host_rejects_absolute_spelling[blocked.example.]
+FAILED tests/test_policy_host_canonical.py::test_denied_dns_host_rejects_absolute_spelling[BLOCKED.EXAMPLE.]
+2 failed in 0.18s
