@@ -108,6 +108,13 @@ def detect_challenge(text: str, frame_urls: list[str] | None = None) -> dict[str
     return {"detected": detected, "requires_human": detected, "markers": markers, "frames": frames[:5]}
 
 
+def _is_playwright_error(exc: BaseException) -> bool:
+    """Playwright error classes matched by module/name string, not isinstance; test env has no
+    playwright package; not verified against the real classes."""
+    return any(c.__module__.split(".")[0] == "playwright" and c.__name__ in ("Error", "TimeoutError")
+               for c in type(exc).__mro__)
+
+
 def check_url(url: str, allowed_domains: list[str], allow_private_hosts: bool) -> str:
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
@@ -118,7 +125,7 @@ def check_url(url: str, allowed_domains: list[str], allow_private_hosts: bool) -
     if not allow_private_hosts:
         try:
             addresses = socket.getaddrinfo(hostname, parsed.port or (443 if parsed.scheme == "https" else 80))
-        except socket.gaierror as exc:
+        except (socket.gaierror, ValueError) as exc:  # UnicodeError (idna) and a bad port are ValueErrors
             raise BrowserSessionError(f"cannot resolve {hostname}") from exc
         for address in addresses:
             if not ipaddress.ip_address(address[4][0]).is_global:
@@ -445,7 +452,7 @@ class BrowserSessionManager:
 
     async def _open(self, url: str, owner_id: str, allowed_domains: list[str], profile: str | None, auto_takeover: bool,
                     notify_user_id: str | None = None) -> dict[str, Any]:
-        check_url(url, allowed_domains, self.allow_private_hosts)
+        await asyncio.to_thread(check_url, url, allowed_domains, self.allow_private_hosts)
         await self._reap()
         if len(self._live) >= self.max_sessions:
             raise BrowserSessionError(f"browser session limit reached ({self.max_sessions}); close one first")
@@ -473,13 +480,15 @@ class BrowserSessionManager:
 
         async def guard(route):
             try:
-                check_url(route.request.url, allowed_domains, self.allow_private_hosts)
+                await asyncio.to_thread(check_url, route.request.url, allowed_domains, self.allow_private_hosts)
                 response = await route.fetch(max_redirects=0)
                 if response.status in {301, 302, 303, 307, 308} and "location" in response.headers:
                     await response.dispose()
                     raise BrowserSessionError("automatic redirects are blocked; use verified final URL")
                 await route.fulfill(response=response)
-            except (BrowserSessionError, OSError):
+            except Exception as exc:
+                if not isinstance(exc, (BrowserSessionError, OSError)) and not _is_playwright_error(exc):
+                    raise
                 self.store.event(session_id, "system", "request_blocked", {"url": route.request.url[:500]})
                 await route.abort("blockedbyclient")
 
@@ -516,7 +525,7 @@ class BrowserSessionManager:
                 selector = action.get("selector")
                 value = action.get("value")
                 if kind == "goto":
-                    check_url(value or "", live.allowed_domains, self.allow_private_hosts)
+                    await asyncio.to_thread(check_url, value or "", live.allowed_domains, self.allow_private_hosts)
                     await page.goto(value, wait_until="domcontentloaded", timeout=30_000)
                 elif kind == "wait":
                     await page.wait_for_timeout(min(int(action.get("milliseconds") or 0), 10_000))
@@ -740,7 +749,7 @@ class BrowserSessionManager:
                 detail = {"dy": round(dy)}
             elif kind == "goto":
                 url = str(event.get("url", ""))
-                check_url(url, live.allowed_domains, self.allow_private_hosts)
+                await asyncio.to_thread(check_url, url, live.allowed_domains, self.allow_private_hosts)
                 await page.goto(url, wait_until="domcontentloaded", timeout=30_000)
                 detail = {"url": url[:500]}
             else:

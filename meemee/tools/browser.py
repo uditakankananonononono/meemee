@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import ipaddress
 import socket
 from pathlib import Path
@@ -42,11 +43,21 @@ class BrowseArgs(BaseModel):
         return value
 
 
+def _is_playwright_error(exc: BaseException) -> bool:
+    """Playwright error classes matched by module/name string, not isinstance; test env has no
+    playwright package; not verified against the real classes."""
+    return any(c.__module__.split(".")[0] == "playwright" and c.__name__ in ("Error", "TimeoutError")
+               for c in type(exc).__mro__)
+
+
 def validate_public_url(url: str) -> str:
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
         raise ValueError("browser URL must use http or https")
-    addresses = socket.getaddrinfo(parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80))
+    try:
+        addresses = socket.getaddrinfo(parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80))
+    except (socket.gaierror, UnicodeError):
+        raise ValueError("browser URL could not be resolved") from None
     for address in addresses:
         ip = ipaddress.ip_address(address[4][0])
         if not ip.is_global:
@@ -109,7 +120,8 @@ class BrowserNavigate(Tool):
                 async def guarded_request(route):
                     current = route.request.url
                     try:
-                        allowed_request(current)
+                        # getaddrinfo blocks: keep it off the event loop
+                        await asyncio.to_thread(allowed_request, current)
                         # Chromium routing does not re-intercept every redirect
                         # hop. Fail closed rather than automatically follow a hop
                         # that could bypass this policy or forward credentials.
@@ -118,7 +130,9 @@ class BrowserNavigate(Tool):
                             await response.dispose()
                             raise ValueError("automatic redirects are blocked; use verified final URL")
                         await route.fulfill(response=response)
-                    except (ValueError, OSError):
+                    except Exception as exc:
+                        if not isinstance(exc, (ValueError, OSError)) and not _is_playwright_error(exc):
+                            raise
                         blocked_requests.append(current)
                         await route.abort("blockedbyclient")
 
