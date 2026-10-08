@@ -135,3 +135,74 @@ def test_contain_chain_is_idempotent_and_build_chain_is_contained():
     sm.contain_chain(chain)
     p = chain[1]
     assert getattr(p.chat.__wrapped__, "_meemee_contained", False) is False
+
+
+BYPASS_SHAPES = [
+    "transport failure: http://secret.test?token=PRIVATE",
+    "ornith: undecodable response SECRET_BODY",
+    "ornith-local: transport failure (URLError) http://secret.test?token=PRIVATE",
+    "x ornith-local: transport failure (SECRET_BODYError)",
+    "ornith-local: undecodable response (SECRET_BODY)",
+    "HTTP 500 from http://secret.test?token=PRIVATE: SECRET_BODY",
+    "HTTP 500 SECRET_BODY",
+    "OpenClaw HTTP 502 SECRET_BODY",
+    "prefix\nornith-local: transport failure (URLError)",
+    "ornith-local: undecodable response (RecursionError)\nSECRET_BODY",
+]
+
+
+@pytest.mark.parametrize("detail", BYPASS_SHAPES)
+async def test_provider_raised_error_text_never_reaches_model_text(detail):
+    from meemee._vendor.instinct_models.providers import ProviderError
+
+    def t(*a):
+        raise ProviderError(detail)
+    model = _model(t)
+    with pytest.raises(ModelError) as ei:
+        await model.chat([{"role": "user", "content": "x"}])
+    observed = str(ei.value) + json.dumps(model.last_attempts)
+    for marker in ("PRIVATE", "SECRET_BODY", "secret.test", "token"):
+        assert marker not in observed
+
+
+def test_safe_detail_canonical_forms_only():
+    assert sm._safe_detail("error", "HTTP 503 from http://x: y") == "HTTP 503"
+    assert sm._safe_detail("error", "ornith-local: transport failure (URLError)") == "transport failure (URLError)"
+    assert sm._safe_detail("error", "anything else") == "provider error"
+    assert sm._safe_detail("skipped", "not a tool-calling task") == "not a tool-calling task"
+
+
+async def test_unknown_httpexception_subclass_name_is_not_echoed():
+    class SECRET_BODYException(http.client.HTTPException):
+        pass
+    model = _model(_raises(SECRET_BODYException("x")))
+    with pytest.raises(ModelError) as ei:
+        await model.chat([{"role": "user", "content": "x"}])
+    assert "SECRET_BODY" not in str(ei.value) + json.dumps(model.last_attempts)
+
+
+async def test_custom_provider_name_is_not_echoed():
+    from meemee._vendor.instinct_models.providers import ProviderError
+
+    class Custom(OrnithOpenAICompat):
+        name = "SECRET_BODY-name"
+    def t(*a):
+        raise ProviderError("x")
+    chain = [Custom("http://o/v1", "o", transport=t)]
+    sm.contain_chain(chain)
+    model = sm.SharedLayerModel(Settings(), router=Router(chain))
+    with pytest.raises(ModelError) as ei:
+        await model.chat([{"role": "user", "content": "x"}])
+    assert "SECRET_BODY" not in str(ei.value) + json.dumps(model.last_attempts)
+
+
+async def test_rethrown_provider_error_subclass_with_canonical_prefix_and_secret():
+    from meemee._vendor.instinct_models.providers import ProviderUnavailable
+
+    def t(*a):
+        raise ProviderUnavailable("ornith-local: transport failure (URLError) http://secret.test?token=PRIVATE")
+    model = _model(t)
+    with pytest.raises(ModelError) as ei:
+        await model.chat([{"role": "user", "content": "x"}])
+    observed = str(ei.value) + json.dumps(model.last_attempts)
+    assert "PRIVATE" not in observed and "secret.test" not in observed
