@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from contextlib import AsyncExitStack
 from typing import Annotated
 
 import typer
@@ -146,12 +147,20 @@ def chat(user_id: str, channel: str = typer.Option("local", "--channel")) -> Non
     """Interactive companion chat on the local channel. Empty line exits."""
     async def loop() -> None:
         companion = await build_companion_async(Settings())
-        while True:
-            text = typer.prompt("you", default="", show_default=False)
-            if not text.strip():
-                return
-            reply = await companion.engine.reply(user_id, text, channel)
-            typer.echo(f"{reply.persona}: {reply.reply}")
+        async with AsyncExitStack() as cleanup:
+            if companion.owned_persistence is not None:
+                cleanup.callback(companion.owned_persistence.close)
+            cleanup.push_async_callback(companion.model.aclose)
+            for adapter in companion.channels.values():
+                close = getattr(adapter, "aclose", None)
+                if close is not None:
+                    cleanup.push_async_callback(close)
+            while True:
+                text = typer.prompt("you", default="", show_default=False)
+                if not text.strip():
+                    return
+                reply = await companion.engine.reply(user_id, text, channel)
+                typer.echo(f"{reply.persona}: {reply.reply}")
 
     asyncio.run(loop())
 
