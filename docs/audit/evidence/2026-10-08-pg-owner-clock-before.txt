@@ -1,0 +1,89 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+____________ test_pg_owned_expiry_ignores_client_clock_skew[-86400] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fbb7594ea10>
+client_offset = -86400
+
+    @pytest.mark.skipif(not PG_DSN, reason='requires real PostgreSQL')
+    @pytest.mark.parametrize('client_offset', [-86400, 86400])
+    def test_pg_owned_expiry_ignores_client_clock_skew(monkeypatch, client_offset):
+        dsn, drop = _pg_dsn()
+        db = Database(dsn)
+        try:
+            MigrationStore(db).apply()
+            store = IdempotencyStore(db)
+            store.claim('owner', '/jobs', 'key', {}, claim_token='fresh')
+    
+            class Clock(datetime):
+                @classmethod
+                def now(cls, tz=None):
+                    return datetime.now(timezone.utc) + timedelta(seconds=client_offset)
+    
+            monkeypatch.setattr(adapter, 'datetime', Clock)
+            if client_offset < 0:
+                with db.transaction() as c:
+                    c.execute("UPDATE meemee_idempotency SET expires_at=clock_timestamp()-interval '1 second'")
+>               with pytest.raises(IdempotencyConflict):
+E               Failed: DID NOT RAISE <class 'meemee.idempotency.IdempotencyConflict'>
+
+tests/test_idempotency_pg_owner_clock.py:32: Failed
+____________ test_pg_owned_expiry_ignores_client_clock_skew[86400] _____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fbb759fbbb0>
+client_offset = 86400
+
+    @pytest.mark.skipif(not PG_DSN, reason='requires real PostgreSQL')
+    @pytest.mark.parametrize('client_offset', [-86400, 86400])
+    def test_pg_owned_expiry_ignores_client_clock_skew(monkeypatch, client_offset):
+        dsn, drop = _pg_dsn()
+        db = Database(dsn)
+        try:
+            MigrationStore(db).apply()
+            store = IdempotencyStore(db)
+            store.claim('owner', '/jobs', 'key', {}, claim_token='fresh')
+    
+            class Clock(datetime):
+                @classmethod
+                def now(cls, tz=None):
+                    return datetime.now(timezone.utc) + timedelta(seconds=client_offset)
+    
+            monkeypatch.setattr(adapter, 'datetime', Clock)
+            if client_offset < 0:
+                with db.transaction() as c:
+                    c.execute("UPDATE meemee_idempotency SET expires_at=clock_timestamp()-interval '1 second'")
+                with pytest.raises(IdempotencyConflict):
+                    store.put('owner', '/jobs', 'key', {}, 200, {'id': 'expired'}, claim_token='fresh')
+            else:
+>               store.put('owner', '/jobs', 'key', {}, 200, {'id': 'live'}, claim_token='fresh')
+
+tests/test_idempotency_pg_owner_clock.py:35: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <meemee_persist_pg.idempotency.IdempotencyStore object at 0x7fbb759fb280>
+principal = 'owner', route = '/jobs', key = 'key', payload = {}, status = 200
+response = {'id': 'live'}
+
+    def put(self, principal: str, route: str, key: str, payload: Any, status: int, response: Any, *, claim_token: str | None = None) -> None:
+        if type(status) is not int or not 100 <= status <= 599:
+            raise ValueError("response status must be an HTTP status integer (100-599)")
+        if not key or len(key) > 200:
+            raise ValueError("idempotency key must contain 1-200 characters")
+        encoded_response = json.dumps(response, default=str, allow_nan=False)
+        now = datetime.now(timezone.utc)
+        digest = self.request_hash(payload)
+        with self.db.transaction() as c:
+            # Serialize owner verification with replacement/release/publication.
+            reserved = c.execute("SELECT request_hash, status, claim_token, expires_at FROM meemee_idempotency WHERE principal=%s AND route=%s AND key=%s FOR UPDATE",
+                                 (principal, route, key)).fetchone()
+            protected = claim_token is not None or (reserved is not None and reserved["claim_token"] is not None)
+            if protected and (reserved is None or reserved["claim_token"] != claim_token
+                              or reserved["status"] != PENDING or reserved["expires_at"] <= datetime.now(timezone.utc)):
+>               raise IdempotencyConflict("idempotency claim ownership was lost")
+E               meemee.idempotency.IdempotencyConflict: idempotency claim ownership was lost
+
+meemee_persist_pg/idempotency.py:86: IdempotencyConflict
+=========================== short test summary info ============================
+FAILED tests/test_idempotency_pg_owner_clock.py::test_pg_owned_expiry_ignores_client_clock_skew[-86400]
+FAILED tests/test_idempotency_pg_owner_clock.py::test_pg_owned_expiry_ignores_client_clock_skew[86400]
+2 failed in 1.14s

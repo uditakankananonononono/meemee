@@ -80,9 +80,10 @@ class IdempotencyStore:
             # Serialize owner verification with replacement/release/publication.
             reserved = c.execute("SELECT request_hash, status, claim_token, expires_at FROM meemee_idempotency WHERE principal=%s AND route=%s AND key=%s FOR UPDATE",
                                  (principal, route, key)).fetchone()
+            server_now = c.execute("SELECT clock_timestamp() AS now").fetchone()["now"]
             protected = claim_token is not None or (reserved is not None and reserved["claim_token"] is not None)
             if protected and (reserved is None or reserved["claim_token"] != claim_token
-                              or reserved["status"] != PENDING or reserved["expires_at"] <= datetime.now(timezone.utc)):
+                              or reserved["status"] != PENDING or reserved["expires_at"] <= server_now):
                 raise IdempotencyConflict("idempotency claim ownership was lost")
             # ON CONFLICT locks the existing row even when its WHERE rejects the update.
             # Check the digest while that lock is held, including completed-key replays.
