@@ -21,7 +21,7 @@ def test_actual_git_child_timeout_cleanup(tmp_path):
  subprocess.run(['git','config','alias.slow','!sleep 10'],cwd=tmp_path,check=True)
  start=time.monotonic()
  with pytest.raises(ValueError,match='timed out'):
-  asyncio.run(GitBase(tmp_path).git('slow',timeout=.1))
+  asyncio.run(GitInspect(tmp_path).git('slow',timeout=.1))
  assert time.monotonic()-start<3
 
 def test_git_budget_controls_are_strict():
