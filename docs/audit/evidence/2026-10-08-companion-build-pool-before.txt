@@ -1,0 +1,36 @@
+...F                                                                     [100%]
+=================================== FAILURES ===================================
+______ test_companion_builder_model_failure_releases_owned_actual_pg_pool ______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f0737dda5c0>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-746/test_companion_builder_model_f0')
+
+    @pytest.mark.skipif(not PG_DSN, reason='requires real PostgreSQL')
+    def test_companion_builder_model_failure_releases_owned_actual_pg_pool(monkeypatch, tmp_path):
+        dsn, drop = _pg_dsn()
+        created = []
+        original = persistence.persistence_from_settings
+    
+        def capture(settings):
+            value = original(settings)
+            created.append(value)
+            return value
+    
+        def broken_model(*args):
+            raise RuntimeError('model configuration rejected')
+    
+        monkeypatch.setattr(persistence, 'persistence_from_settings', capture)
+        monkeypatch.setattr(runtime, 'build_role_model', broken_model)
+        try:
+            with pytest.raises(RuntimeError, match='model configuration rejected'):
+                runtime.build_companion(Settings(_env_file=None, data_dir=tmp_path, persistence_backend='postgresql', postgres_dsn=dsn))
+>           assert created[0].database.pool.closed
+E           AssertionError: assert False
+E            +  where False = <psycopg_pool.pool.ConnectionPool 'pool-3' at 0x7f0737dd81c0>.closed
+E            +    where <psycopg_pool.pool.ConnectionPool 'pool-3' at 0x7f0737dd81c0> = <meemee_persist_pg._db.Database object at 0x7f0737dd8700>.pool
+E            +      where <meemee_persist_pg._db.Database object at 0x7f0737dd8700> = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f0739c58d60>, jobs=<meemee...re object at 0x7f0739c59bd0>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f0739c593f0>).database
+
+tests/test_companion_owned_persistence.py:96: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_companion_owned_persistence.py::test_companion_builder_model_failure_releases_owned_actual_pg_pool
+1 failed, 3 passed in 1.86s
