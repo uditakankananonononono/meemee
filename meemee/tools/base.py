@@ -28,6 +28,10 @@ def _network_error_text(exc: BaseException, tool: Any) -> str:
     return text
 
 
+class PreDispatchRefusal(ValueError):
+    """Tool-owned refusal before any effect, preserving known no-action status."""
+
+
 class Tool(ABC):
     name: str
     description: str
@@ -76,6 +80,7 @@ class ToolRegistry:
         return [tool.schema() for tool in self._tools.values()]
 
     async def execute(self, name: str, arguments: dict[str, Any], cancel=None, *, owner_id: str) -> ToolResult:
+        dispatched = False
         started = time.perf_counter()
         if cancel is not None and cancel.is_set():
             return ToolResult(ok=False, error="tool cancelled", elapsed_ms=0)
@@ -98,6 +103,7 @@ class ToolRegistry:
                 options["owner_id"] = owner_id
             if cancel is not None and cancel.is_set():
                 return ToolResult(ok=False, error="tool cancelled", elapsed_ms=round((time.perf_counter()-started)*1000))
+            dispatched = True
             value = tool.run(parsed, **options)
             if inspect.isawaitable(value):
                 task = asyncio.create_task(value)
@@ -125,7 +131,8 @@ class ToolRegistry:
         except (KeyError, TypeError, ValidationError, ValueError, OSError) as exc:
             return ToolResult(
                 ok=False,
-                error=str(exc),
+                error=str(exc) + ("; outcome unknown, verify before retrying"
+                    if dispatched and tool.risk != Risk.READ and not isinstance(exc,PreDispatchRefusal) else ""),
                 elapsed_ms=round((time.perf_counter() - started) * 1000),
             )
         except (httpx.HTTPError, RecursionError) as exc:

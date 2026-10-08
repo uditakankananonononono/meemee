@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from ..browser_sessions import BrowserSessionManager
 from ..types import Risk
-from .base import Tool
+from .base import PreDispatchRefusal, Tool
 
 
 class SessionAction(BaseModel):
@@ -67,7 +67,7 @@ class _SessionTool(Tool):
         # Session ids are identifiers, not authorization capabilities.
         record = self.manager.store.get_session(session_id)
         if not owner_id or record is None or record["owner_id"] != owner_id:
-            raise ValueError("unknown browser session")
+            raise PreDispatchRefusal("unknown browser session")
 
 
 class BrowserSessionOpen(_SessionTool):
