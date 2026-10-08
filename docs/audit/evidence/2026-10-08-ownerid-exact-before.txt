@@ -1,0 +1,26 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+______ test_user_id_rejects_newline_and_overlong_control_suffix[owner\n] _______
+
+user_id = 'owner\n'
+
+    @pytest.mark.parametrize('user_id', ['owner\n', 'a' * 80 + '\n'])
+    def test_user_id_rejects_newline_and_overlong_control_suffix(user_id):
+>       with pytest.raises(ValidationError, match='user_id'):
+E       Failed: DID NOT RAISE <class 'pydantic_core._pydantic_core.ValidationError'>
+
+tests/test_companion_user_id_exact.py:11: Failed
+_ test_user_id_rejects_newline_and_overlong_control_suffix[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n] _
+
+user_id = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n'
+
+    @pytest.mark.parametrize('user_id', ['owner\n', 'a' * 80 + '\n'])
+    def test_user_id_rejects_newline_and_overlong_control_suffix(user_id):
+>       with pytest.raises(ValidationError, match='user_id'):
+E       Failed: DID NOT RAISE <class 'pydantic_core._pydantic_core.ValidationError'>
+
+tests/test_companion_user_id_exact.py:11: Failed
+=========================== short test summary info ============================
+FAILED tests/test_companion_user_id_exact.py::test_user_id_rejects_newline_and_overlong_control_suffix[owner\n]
+FAILED tests/test_companion_user_id_exact.py::test_user_id_rejects_newline_and_overlong_control_suffix[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n]
+2 failed in 0.19s
