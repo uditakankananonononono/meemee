@@ -107,10 +107,10 @@ class PersonalModelStore:
             clauses.append("kind=%s"); values.append(kind)
         if not include_history:
             clauses.append("status='active'")
-        with self.db.transaction() as c:
+        with self.db.transaction(isolation="REPEATABLE READ") as c:
             rows = c.execute(f"SELECT id FROM meemee_personal_items WHERE {' AND '.join(clauses)} ORDER BY updated_at DESC,id DESC",
                              values).fetchall()
-        items = [self.get(owner_id, row["id"]) for row in rows]
+            items = [self._get_on(c, owner_id, row["id"]) for row in rows]
         if include_history:
             return items
         clock = datetime.now(timezone.utc)
