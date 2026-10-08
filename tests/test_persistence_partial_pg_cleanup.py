@@ -32,3 +32,22 @@ def test_pg_composition_failure_closes_actual_pool(monkeypatch, tmp_path, failur
         for pool in pools:
             pool.close()
         drop()
+
+
+def test_actual_pool_initialization_timeout_already_releases_workers(monkeypatch):
+    from psycopg_pool import PoolTimeout
+
+    from meemee_persist_pg import _db
+
+    pools = []
+    original = _db.ConnectionPool
+
+    def capture(*args, **kwargs):
+        pool = original(*args, **kwargs)
+        pools.append(pool)
+        return pool
+
+    monkeypatch.setattr(_db, 'ConnectionPool', capture)
+    with pytest.raises(PoolTimeout):
+        _db.Database('host=127.0.0.1 port=1 user=sandbox dbname=postgres connect_timeout=1', timeout=.1)
+    assert pools[0].closed
