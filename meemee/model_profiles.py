@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+from contextlib import AsyncExitStack
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -360,8 +361,9 @@ class RoutedModel:
         if self.client is not None:
             await self.client.aclose()
             return
-        for model in self._clients.values():
-            await model.aclose()
+        async with AsyncExitStack() as cleanup:
+            for model in self._clients.values():
+                cleanup.push_async_callback(model.aclose)
 
 
 async def probe_profile(profile: ModelProfile, timeout: float = 5.0, client: httpx.AsyncClient | None = None) -> dict[str, Any]:
