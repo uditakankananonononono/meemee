@@ -1,5 +1,8 @@
-import asyncio,subprocess
-from meemee.tools.git import GitInspect,GitReadArgs
+import asyncio
+import subprocess
+
+from meemee.tools.git import GitInspect, GitReadArgs
+
 
 def test_actual_git_diff_budget(tmp_path):
  def git(*args):return subprocess.run(['git',*args],cwd=tmp_path,check=True,capture_output=True)
@@ -15,8 +18,10 @@ def test_log_remains_runnable(tmp_path):
  assert r['exit_code']==0 and not r['truncated']
 
 def test_actual_git_child_timeout_cleanup(tmp_path):
- import pytest,time
- from meemee.tools.git import GitBase
+ import time
+
+ import pytest
+
  subprocess.run(['git','init'],cwd=tmp_path,check=True,capture_output=True)
  subprocess.run(['git','config','alias.slow','!sleep 10'],cwd=tmp_path,check=True)
  start=time.monotonic()

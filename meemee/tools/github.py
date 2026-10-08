@@ -125,7 +125,8 @@ class GitHubMutation(Tool):
         response.raise_for_status()
         data=response.json()
         if not isinstance(data,dict):
-            raise ValueError("GitHub response shape invalid; outcome unknown, verify before retrying")
+            # ValueError is this class's error contract (callers and tests match it); TypeError would change behavior.
+            raise ValueError("GitHub response shape invalid; outcome unknown, verify before retrying")  # noqa: TRY004
         return data
 
 
