@@ -9,10 +9,13 @@ from pathlib import Path
 
 import httpx
 
+from ._sqlite_guard import close_db_on_init_failure
+
 
 class EmailVerificationStore:
     """One-time, expiring email verification challenges stored as digests."""
 
+    @close_db_on_init_failure
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False)

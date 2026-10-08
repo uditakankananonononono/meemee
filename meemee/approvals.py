@@ -7,6 +7,8 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
+from ._sqlite_guard import close_db_on_init_failure
+
 
 def normalize_expiry(value: str | None) -> str | None:
     """Canonical UTC ISO 8601 form of a grant expiry, shared by the SQLite and PostgreSQL stores.
@@ -90,6 +92,7 @@ def constraints_match(constraints: dict | None, arguments: dict | None) -> bool:
 class ApprovalStore:
     """Persistent, revocable, expiring per-principal grants for exact tool names."""
 
+    @close_db_on_init_failure
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False)

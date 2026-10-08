@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ._sqlite_guard import close_db_on_init_failure
+
 
 def canonical_json(value: Any) -> bytes:
     from .approvals import validate_constraints
@@ -76,6 +78,7 @@ class ReplayGuard:
 class SQLiteReplayGuard:
     """Optional persistent pre-execution nonce claim ledger for one peer identity."""
 
+    @close_db_on_init_failure
     def __init__(self, path: Path, namespace: str, ttl_seconds: int = 300,
                  clock: Callable[[], float] = time.time):
         if ttl_seconds < 1 or not namespace:
