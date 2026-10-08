@@ -26,6 +26,7 @@ from .tools import (
 
 async def build_agent_async(settings: Settings | None = None, include_delegation: bool = True, memory=None, browser_sessions=None, persistence=None) -> Agent:
     settings = settings or Settings()
+    owned_persistence = None
     registry = ToolRegistry()
     async with AsyncExitStack() as cleanup:
         def register(tool):
@@ -52,12 +53,13 @@ async def build_agent_async(settings: Settings | None = None, include_delegation
         cleanup.push_async_callback(model.aclose)
         if persistence is None and (memory is None or settings.persistence_backend.strip().lower() == "postgresql"):
             persistence = persistence_from_settings(settings)
+            owned_persistence = persistence
             cleanup.callback(persistence.close)
         selected_memory = memory or persistence.memory
         # PostgreSQL mode: the shared personal model and context index, not per-host files.
         context = persistence.context if persistence is not None else ContextStore(settings.data_dir / "context.sqlite3")
         personal_model = persistence.personal_model if persistence is not None else PersonalModelStore(settings.data_dir / "personal-model.sqlite3")
-        agent = Agent(model, registry, selected_memory, settings.max_steps, PolicyEngine.from_file(settings.policy_file), context, personal_model, owns_model=True, owns_tools=True)
+        agent = Agent(model, registry, selected_memory, settings.max_steps, PolicyEngine.from_file(settings.policy_file), context, personal_model, owns_model=True, owns_tools=True, owned_persistence=owned_persistence)
         cleanup.pop_all()
         return agent
 
