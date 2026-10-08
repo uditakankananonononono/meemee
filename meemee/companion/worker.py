@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from contextlib import AsyncExitStack
 from datetime import datetime, timezone
 
 from ..config import Settings
@@ -131,9 +132,15 @@ async def checkin_forever(settings: Settings | None = None) -> None:
     from .runtime import build_companion
 
     companion = build_companion(settings)
-    scheduler = CheckInScheduler(companion.store)
-    while True:
-        scheduler.plan_all()
-        summary = await deliver_due_once(companion.store, companion.engine, companion.channels)
-        if not summary["claimed"]:
-            await asyncio.sleep(settings.companion_checkin_poll_seconds)
+    async with AsyncExitStack() as cleanup:
+        cleanup.push_async_callback(companion.model.aclose)
+        for channel in companion.channels.values():
+            close = getattr(channel, "aclose", None)
+            if close is not None:
+                cleanup.push_async_callback(close)
+        scheduler = CheckInScheduler(companion.store)
+        while True:
+            scheduler.plan_all()
+            summary = await deliver_due_once(companion.store, companion.engine, companion.channels)
+            if not summary["claimed"]:
+                await asyncio.sleep(settings.companion_checkin_poll_seconds)

@@ -1,0 +1,134 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+______ test_companion_loop_closes_model_and_all_channels_on_cancel[False] ______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f9fd176a4a0>
+channel_close_fails = False
+
+    @pytest.mark.parametrize('channel_close_fails', [False, True])
+    def test_companion_loop_closes_model_and_all_channels_on_cancel(monkeypatch, channel_close_fails):
+        closed = []
+    
+        class Client:
+            def __init__(self, name):
+                self.name = name
+    
+            async def aclose(self):
+                closed.append(self.name)
+                if self.name == 'failing' and channel_close_fails:
+                    raise RuntimeError('close failure')
+    
+        companion = SimpleNamespace(store=object(), engine=object(), model=Client('model'),
+                                    channels={'plain': object(), 'good': Client('good'), 'failing': Client('failing')})
+        monkeypatch.setattr(runtime, 'build_companion', lambda settings: companion)
+        monkeypatch.setattr(worker, 'CheckInScheduler', lambda store: SimpleNamespace(plan_all=lambda: None))
+    
+        async def cancel(*args):
+            raise asyncio.CancelledError
+    
+        monkeypatch.setattr(worker, 'deliver_due_once', cancel)
+        with pytest.raises(RuntimeError if channel_close_fails else asyncio.CancelledError):
+            asyncio.run(worker.checkin_forever(SimpleNamespace(companion_checkin_poll_seconds=1)))
+>       assert set(closed) == {'model', 'good', 'failing'}
+E       AssertionError: assert set() == {'failing', 'good', 'model'}
+E         
+E         Extra items in the right set:
+E         'failing'
+E         'model'
+E         'good'
+E         Use -v to get more diff
+
+tests/test_companion_worker_http_cleanup.py:35: AssertionError
+______ test_companion_loop_closes_model_and_all_channels_on_cancel[True] _______
+
+args = (<object object at 0x7f9fd498b410>, <object object at 0x7f9fd498b470>, {'failing': <test_companion_worker_http_cleanup...odel_and_all_channels_on_cancel.<locals>.Client object at 0x7f9fd176b8e0>, 'plain': <object object at 0x7f9fd498b480>})
+
+    async def cancel(*args):
+>       raise asyncio.CancelledError
+E       asyncio.exceptions.CancelledError
+
+tests/test_companion_worker_http_cleanup.py:30: CancelledError
+
+During handling of the above exception, another exception occurred:
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f9fd176b970>
+channel_close_fails = True
+
+    @pytest.mark.parametrize('channel_close_fails', [False, True])
+    def test_companion_loop_closes_model_and_all_channels_on_cancel(monkeypatch, channel_close_fails):
+        closed = []
+    
+        class Client:
+            def __init__(self, name):
+                self.name = name
+    
+            async def aclose(self):
+                closed.append(self.name)
+                if self.name == 'failing' and channel_close_fails:
+                    raise RuntimeError('close failure')
+    
+        companion = SimpleNamespace(store=object(), engine=object(), model=Client('model'),
+                                    channels={'plain': object(), 'good': Client('good'), 'failing': Client('failing')})
+        monkeypatch.setattr(runtime, 'build_companion', lambda settings: companion)
+        monkeypatch.setattr(worker, 'CheckInScheduler', lambda store: SimpleNamespace(plan_all=lambda: None))
+    
+        async def cancel(*args):
+            raise asyncio.CancelledError
+    
+        monkeypatch.setattr(worker, 'deliver_due_once', cancel)
+        with pytest.raises(RuntimeError if channel_close_fails else asyncio.CancelledError):
+>           asyncio.run(worker.checkin_forever(SimpleNamespace(companion_checkin_poll_seconds=1)))
+
+tests/test_companion_worker_http_cleanup.py:34: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.10/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <_UnixSelectorEventLoop running=False closed=True debug=False>
+future = <Task cancelled name='Task-4' coro=<checkin_forever() done, defined at /home/sandbox/meemee/meemee/companion/worker.py:128>>
+
+    def run_until_complete(self, future):
+        """Run until the Future is done.
+    
+        If the argument is a coroutine, it is wrapped in a Task.
+    
+        WARNING: It would be disastrous to call run_until_complete()
+        with the same coroutine twice -- it would wrap it in two
+        different Tasks and that can't be good.
+    
+        Return the Future's result, or raise its exception.
+        """
+        self._check_closed()
+        self._check_running()
+    
+        new_task = not futures.isfuture(future)
+        future = tasks.ensure_future(future, loop=self)
+        if new_task:
+            # An exception is raised if the future didn't complete, so there
+            # is no need to log the "destroy pending task" message
+            future._log_destroy_pending = False
+    
+        future.add_done_callback(_run_until_complete_cb)
+        try:
+            self.run_forever()
+        except:
+            if new_task and future.done() and not future.cancelled():
+                # The coroutine raised a BaseException. Consume the exception
+                # to not log a warning, the caller doesn't have access to the
+                # local task.
+                future.exception()
+            raise
+        finally:
+            future.remove_done_callback(_run_until_complete_cb)
+        if not future.done():
+            raise RuntimeError('Event loop stopped before Future completed.')
+    
+>       return future.result()
+E       asyncio.exceptions.CancelledError
+
+/usr/lib/python3.10/asyncio/base_events.py:649: CancelledError
+=========================== short test summary info ============================
+FAILED tests/test_companion_worker_http_cleanup.py::test_companion_loop_closes_model_and_all_channels_on_cancel[False]
+FAILED tests/test_companion_worker_http_cleanup.py::test_companion_loop_closes_model_and_all_channels_on_cancel[True]
+2 failed in 0.20s
