@@ -133,6 +133,9 @@ async def checkin_forever(settings: Settings | None = None) -> None:
 
     companion = build_companion(settings)
     async with AsyncExitStack() as cleanup:
+        owned_persistence = getattr(companion, "owned_persistence", None)
+        if owned_persistence is not None:
+            cleanup.callback(owned_persistence.close)
         cleanup.push_async_callback(companion.model.aclose)
         for channel in companion.channels.values():
             close = getattr(channel, "aclose", None)
