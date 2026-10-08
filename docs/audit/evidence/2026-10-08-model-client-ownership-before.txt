@@ -1,0 +1,64 @@
+FF.                                                                      [100%]
+=================================== FAILURES ===================================
+________ test_model_close_preserves_injected_actual_http_client[False] _________
+
+routed = False
+
+    @pytest.mark.parametrize('routed', [False, True])
+    async def test_model_close_preserves_injected_actual_http_client(routed):
+        released = []
+        class Transport(httpx.AsyncBaseTransport):
+            async def handle_async_request(self, request):
+                return httpx.Response(200, text='usable')
+            async def aclose(self):
+                released.append(True)
+        client = httpx.AsyncClient(transport=Transport())
+        model = (RoutedModel(ModelCatalog.from_settings(Settings(_env_file=None)), client=client) if routed else
+                 OpenAICompatibleModel('http://unused', 'model', 'key', client=client))
+        if routed:
+            model._model_for(model.catalog.profiles['local'])
+        try:
+            await model.aclose()
+>           assert not client.is_closed and released == []
+E           assert (not True)
+E            +  where True = <httpx.AsyncClient object at 0x7f51d0c79f00>.is_closed
+
+tests/test_model_http_client_ownership.py:25: AssertionError
+_________ test_model_close_preserves_injected_actual_http_client[True] _________
+
+routed = True
+
+    @pytest.mark.parametrize('routed', [False, True])
+    async def test_model_close_preserves_injected_actual_http_client(routed):
+        released = []
+        class Transport(httpx.AsyncBaseTransport):
+            async def handle_async_request(self, request):
+                return httpx.Response(200, text='usable')
+            async def aclose(self):
+                released.append(True)
+        client = httpx.AsyncClient(transport=Transport())
+        model = (RoutedModel(ModelCatalog.from_settings(Settings(_env_file=None)), client=client) if routed else
+                 OpenAICompatibleModel('http://unused', 'model', 'key', client=client))
+        if routed:
+            model._model_for(model.catalog.profiles['local'])
+        try:
+            await model.aclose()
+>           assert not client.is_closed and released == []
+E           assert (not True)
+E            +  where True = <httpx.AsyncClient object at 0x7f51d0c7bc70>.is_closed
+
+tests/test_model_http_client_ownership.py:25: AssertionError
+=============================== warnings summary ===============================
+.venv/lib/python3.10/site-packages/fastapi/testclient.py:1
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+.venv/lib/python3.10/site-packages/starlette/testclient.py:53
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_model_http_client_ownership.py::test_model_close_preserves_injected_actual_http_client[False]
+FAILED tests/test_model_http_client_ownership.py::test_model_close_preserves_injected_actual_http_client[True]
+2 failed, 1 passed, 2 warnings in 0.21s
