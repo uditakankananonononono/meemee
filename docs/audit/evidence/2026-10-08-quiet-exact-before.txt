@@ -1,0 +1,30 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_______________ test_quiet_hours_rejects_trailing_newline[start] _______________
+
+field = 'start'
+
+    @pytest.mark.parametrize('field', ['start', 'end'])
+    def test_quiet_hours_rejects_trailing_newline(field):
+        values = {'start': '22:00', 'end': '07:00'}
+        values[field] += '\n'
+>       with pytest.raises(ValidationError, match='HH:MM'):
+E       Failed: DID NOT RAISE <class 'pydantic_core._pydantic_core.ValidationError'>
+
+tests/test_quiet_hours_exact.py:13: Failed
+________________ test_quiet_hours_rejects_trailing_newline[end] ________________
+
+field = 'end'
+
+    @pytest.mark.parametrize('field', ['start', 'end'])
+    def test_quiet_hours_rejects_trailing_newline(field):
+        values = {'start': '22:00', 'end': '07:00'}
+        values[field] += '\n'
+>       with pytest.raises(ValidationError, match='HH:MM'):
+E       Failed: DID NOT RAISE <class 'pydantic_core._pydantic_core.ValidationError'>
+
+tests/test_quiet_hours_exact.py:13: Failed
+=========================== short test summary info ============================
+FAILED tests/test_quiet_hours_exact.py::test_quiet_hours_rejects_trailing_newline[start]
+FAILED tests/test_quiet_hours_exact.py::test_quiet_hours_rejects_trailing_newline[end]
+2 failed in 0.18s

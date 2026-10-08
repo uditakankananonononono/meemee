@@ -39,7 +39,7 @@ class QuietHours(BaseModel):
     @field_validator("start", "end")
     @classmethod
     def hhmm(cls, value: str) -> str:
-        if not HHMM.match(value):
+        if not HHMM.fullmatch(value):
             raise ValueError("quiet hours use HH:MM 24-hour local time")
         return value
 
