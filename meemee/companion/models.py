@@ -62,7 +62,7 @@ class UserProfile(BaseModel):
     @field_validator("user_id")
     @classmethod
     def safe_id(cls, value: str) -> str:
-        if not USER_ID.match(value):
+        if not USER_ID.fullmatch(value):
             raise ValueError("user_id must be 1-80 characters of letters, digits, dot, dash or underscore")
         return value
 
