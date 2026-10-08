@@ -1,0 +1,146 @@
+FFFFFFFFFF                                                               [100%]
+=================================== FAILURES ===================================
+_ test_replacement_owned_claim_rejects_stale_or_unfenced_writer[sqlite-old-release] _
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7f5e1679ff70>, jobs=<meemee.jobs.JobStore ...Store object at 0x7f5e167c48b0>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7f5e167c49a0>)
+action = 'release', old_token = 'old'
+
+    @pytest.mark.parametrize('action', ['release', 'put'])
+    @pytest.mark.parametrize('old_token', ['old', None])
+    def test_replacement_owned_claim_rejects_stale_or_unfenced_writer(persistence, action, old_token):  # noqa: F811
+        store = persistence.idempotency
+        payload = {'goal': 'same'}
+>       store.claim('owner', '/jobs', 'key', payload, claim_token='old')
+E       TypeError: IdempotencyStore.claim() got an unexpected keyword argument 'claim_token'
+
+tests/test_idempotency_owned_claims.py:23: TypeError
+_ test_replacement_owned_claim_rejects_stale_or_unfenced_writer[sqlite-old-put] _
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7f5e167c42b0>, jobs=<meemee.jobs.JobStore ...Store object at 0x7f5e16651090>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7f5e16650f70>)
+action = 'put', old_token = 'old'
+
+    @pytest.mark.parametrize('action', ['release', 'put'])
+    @pytest.mark.parametrize('old_token', ['old', None])
+    def test_replacement_owned_claim_rejects_stale_or_unfenced_writer(persistence, action, old_token):  # noqa: F811
+        store = persistence.idempotency
+        payload = {'goal': 'same'}
+>       store.claim('owner', '/jobs', 'key', payload, claim_token='old')
+E       TypeError: IdempotencyStore.claim() got an unexpected keyword argument 'claim_token'
+
+tests/test_idempotency_owned_claims.py:23: TypeError
+_ test_replacement_owned_claim_rejects_stale_or_unfenced_writer[sqlite-None-release] _
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7f5e166779a0>, jobs=<meemee.jobs.JobStore ...Store object at 0x7f5e16676cb0>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7f5e16676890>)
+action = 'release', old_token = None
+
+    @pytest.mark.parametrize('action', ['release', 'put'])
+    @pytest.mark.parametrize('old_token', ['old', None])
+    def test_replacement_owned_claim_rejects_stale_or_unfenced_writer(persistence, action, old_token):  # noqa: F811
+        store = persistence.idempotency
+        payload = {'goal': 'same'}
+>       store.claim('owner', '/jobs', 'key', payload, claim_token='old')
+E       TypeError: IdempotencyStore.claim() got an unexpected keyword argument 'claim_token'
+
+tests/test_idempotency_owned_claims.py:23: TypeError
+_ test_replacement_owned_claim_rejects_stale_or_unfenced_writer[sqlite-None-put] _
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7f5e16651cf0>, jobs=<meemee.jobs.JobStore ...Store object at 0x7f5e166525c0>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7f5e16651600>)
+action = 'put', old_token = None
+
+    @pytest.mark.parametrize('action', ['release', 'put'])
+    @pytest.mark.parametrize('old_token', ['old', None])
+    def test_replacement_owned_claim_rejects_stale_or_unfenced_writer(persistence, action, old_token):  # noqa: F811
+        store = persistence.idempotency
+        payload = {'goal': 'same'}
+>       store.claim('owner', '/jobs', 'key', payload, claim_token='old')
+E       TypeError: IdempotencyStore.claim() got an unexpected keyword argument 'claim_token'
+
+tests/test_idempotency_owned_claims.py:23: TypeError
+_ test_replacement_owned_claim_rejects_stale_or_unfenced_writer[postgresql-old-release] _
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f5e18663a90>, jobs=<meemee...re object at 0x7f5e18661270>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f5e18661240>)
+action = 'release', old_token = 'old'
+
+    @pytest.mark.parametrize('action', ['release', 'put'])
+    @pytest.mark.parametrize('old_token', ['old', None])
+    def test_replacement_owned_claim_rejects_stale_or_unfenced_writer(persistence, action, old_token):  # noqa: F811
+        store = persistence.idempotency
+        payload = {'goal': 'same'}
+>       store.claim('owner', '/jobs', 'key', payload, claim_token='old')
+E       TypeError: IdempotencyStore.claim() got an unexpected keyword argument 'claim_token'
+
+tests/test_idempotency_owned_claims.py:23: TypeError
+_ test_replacement_owned_claim_rejects_stale_or_unfenced_writer[postgresql-old-put] _
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f5e1517f250>, jobs=<meemee...re object at 0x7f5e1517fcd0>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f5e1517fb80>)
+action = 'put', old_token = 'old'
+
+    @pytest.mark.parametrize('action', ['release', 'put'])
+    @pytest.mark.parametrize('old_token', ['old', None])
+    def test_replacement_owned_claim_rejects_stale_or_unfenced_writer(persistence, action, old_token):  # noqa: F811
+        store = persistence.idempotency
+        payload = {'goal': 'same'}
+>       store.claim('owner', '/jobs', 'key', payload, claim_token='old')
+E       TypeError: IdempotencyStore.claim() got an unexpected keyword argument 'claim_token'
+
+tests/test_idempotency_owned_claims.py:23: TypeError
+_ test_replacement_owned_claim_rejects_stale_or_unfenced_writer[postgresql-None-release] _
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f5e18646200>, jobs=<meemee...re object at 0x7f5e186444c0>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f5e18644760>)
+action = 'release', old_token = None
+
+    @pytest.mark.parametrize('action', ['release', 'put'])
+    @pytest.mark.parametrize('old_token', ['old', None])
+    def test_replacement_owned_claim_rejects_stale_or_unfenced_writer(persistence, action, old_token):  # noqa: F811
+        store = persistence.idempotency
+        payload = {'goal': 'same'}
+>       store.claim('owner', '/jobs', 'key', payload, claim_token='old')
+E       TypeError: IdempotencyStore.claim() got an unexpected keyword argument 'claim_token'
+
+tests/test_idempotency_owned_claims.py:23: TypeError
+_ test_replacement_owned_claim_rejects_stale_or_unfenced_writer[postgresql-None-put] _
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f5e186138e0>, jobs=<meemee...re object at 0x7f5e18610af0>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f5e18610a00>)
+action = 'put', old_token = None
+
+    @pytest.mark.parametrize('action', ['release', 'put'])
+    @pytest.mark.parametrize('old_token', ['old', None])
+    def test_replacement_owned_claim_rejects_stale_or_unfenced_writer(persistence, action, old_token):  # noqa: F811
+        store = persistence.idempotency
+        payload = {'goal': 'same'}
+>       store.claim('owner', '/jobs', 'key', payload, claim_token='old')
+E       TypeError: IdempotencyStore.claim() got an unexpected keyword argument 'claim_token'
+
+tests/test_idempotency_owned_claims.py:23: TypeError
+_____ test_expired_owned_claim_cannot_publish_without_replacement[sqlite] ______
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7f5e18647190>, jobs=<meemee.jobs.JobStore ...Store object at 0x7f5e14d132b0>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7f5e14d13310>)
+
+    def test_expired_owned_claim_cannot_publish_without_replacement(persistence):  # noqa: F811
+        store = persistence.idempotency
+>       store.claim('owner', '/jobs', 'key', {}, claim_token='old')
+E       TypeError: IdempotencyStore.claim() got an unexpected keyword argument 'claim_token'
+
+tests/test_idempotency_owned_claims.py:39: TypeError
+___ test_expired_owned_claim_cannot_publish_without_replacement[postgresql] ____
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f5e151b4760>, jobs=<meemee...re object at 0x7f5e151b4190>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f5e151b4af0>)
+
+    def test_expired_owned_claim_cannot_publish_without_replacement(persistence):  # noqa: F811
+        store = persistence.idempotency
+>       store.claim('owner', '/jobs', 'key', {}, claim_token='old')
+E       TypeError: IdempotencyStore.claim() got an unexpected keyword argument 'claim_token'
+
+tests/test_idempotency_owned_claims.py:39: TypeError
+=========================== short test summary info ============================
+FAILED tests/test_idempotency_owned_claims.py::test_replacement_owned_claim_rejects_stale_or_unfenced_writer[sqlite-old-release]
+FAILED tests/test_idempotency_owned_claims.py::test_replacement_owned_claim_rejects_stale_or_unfenced_writer[sqlite-old-put]
+FAILED tests/test_idempotency_owned_claims.py::test_replacement_owned_claim_rejects_stale_or_unfenced_writer[sqlite-None-release]
+FAILED tests/test_idempotency_owned_claims.py::test_replacement_owned_claim_rejects_stale_or_unfenced_writer[sqlite-None-put]
+FAILED tests/test_idempotency_owned_claims.py::test_replacement_owned_claim_rejects_stale_or_unfenced_writer[postgresql-old-release]
+FAILED tests/test_idempotency_owned_claims.py::test_replacement_owned_claim_rejects_stale_or_unfenced_writer[postgresql-old-put]
+FAILED tests/test_idempotency_owned_claims.py::test_replacement_owned_claim_rejects_stale_or_unfenced_writer[postgresql-None-release]
+FAILED tests/test_idempotency_owned_claims.py::test_replacement_owned_claim_rejects_stale_or_unfenced_writer[postgresql-None-put]
+FAILED tests/test_idempotency_owned_claims.py::test_expired_owned_claim_cannot_publish_without_replacement[sqlite]
+FAILED tests/test_idempotency_owned_claims.py::test_expired_owned_claim_cannot_publish_without_replacement[postgresql]
+10 failed in 2.26s

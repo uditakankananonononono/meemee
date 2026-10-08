@@ -35,9 +35,14 @@ class IdempotencyStore:
             self.db.execute("""CREATE TABLE IF NOT EXISTS idempotency (
                 principal TEXT NOT NULL, route TEXT NOT NULL, key TEXT NOT NULL,
                 request_hash TEXT NOT NULL, response TEXT NOT NULL, status INTEGER NOT NULL,
-                created_at TEXT NOT NULL, expires_at TEXT NOT NULL,
+                created_at TEXT NOT NULL, expires_at TEXT NOT NULL, claim_token TEXT,
                 PRIMARY KEY(principal, route, key)
             )""")
+
+        with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            if "claim_token" not in {row[1] for row in self.db.execute("PRAGMA table_info(idempotency)")}:
+                self.db.execute("ALTER TABLE idempotency ADD COLUMN claim_token TEXT")
 
     @staticmethod
     def request_hash(payload: Any) -> str:
@@ -60,7 +65,7 @@ class IdempotencyStore:
             raise IdempotencyInProgress(IN_PROGRESS)
         return row["status"], json.loads(row["response"])
 
-    def claim(self, principal: str, route: str, key: str, payload: Any) -> tuple[int, Any] | None:
+    def claim(self, principal: str, route: str, key: str, payload: Any, *, claim_token: str | None = None) -> tuple[int, Any] | None:
         """Atomically reserve ``key``: None means this caller owns it and must ``put`` or ``release``.
 
         Otherwise returns the stored ``(status, response)``, or raises IdempotencyConflict for a
@@ -73,19 +78,19 @@ class IdempotencyStore:
         with self.lock, self.db:
             self.db.execute("DELETE FROM idempotency WHERE expires_at<=?", (now.isoformat(),))
             inserted = self.db.execute(
-                "INSERT OR IGNORE INTO idempotency VALUES(?,?,?,?,?,?,?,?)",
+                "INSERT OR IGNORE INTO idempotency VALUES(?,?,?,?,?,?,?,?,?)",
                 (principal, route, key, digest, "null", PENDING,
-                 now.isoformat(), (now + CLAIM_LEASE).isoformat()),
+                 now.isoformat(), (now + CLAIM_LEASE).isoformat(), claim_token),
             ).rowcount
         return None if inserted else self.get(principal, route, key, payload)
 
-    def release(self, principal: str, route: str, key: str) -> None:
+    def release(self, principal: str, route: str, key: str, *, claim_token: str | None = None) -> None:
         """Drop an unfinished claim so a retry can run (the request failed before storing a response)."""
         with self.lock, self.db:
-            self.db.execute("DELETE FROM idempotency WHERE principal=? AND route=? AND key=? AND status=?",
-                            (principal, route, key, PENDING))
+            self.db.execute("DELETE FROM idempotency WHERE principal=? AND route=? AND key=? AND status=? AND claim_token IS ?",
+                            (principal, route, key, PENDING, claim_token))
 
-    def put(self, principal: str, route: str, key: str, payload: Any, status: int, response: Any) -> None:
+    def put(self, principal: str, route: str, key: str, payload: Any, status: int, response: Any, *, claim_token: str | None = None) -> None:
         if type(status) is not int or not 100 <= status <= 599:
             raise ValueError("response status must be an HTTP status integer (100-599)")
         if not key or len(key) > 200:
@@ -96,18 +101,22 @@ class IdempotencyStore:
         with self.lock, self.db:
             self.db.execute("BEGIN IMMEDIATE")
             reserved = self.db.execute(
-                "SELECT request_hash FROM idempotency WHERE principal=? AND route=? AND key=?",
+                "SELECT request_hash, status, expires_at, claim_token FROM idempotency WHERE principal=? AND route=? AND key=?",
                 (principal, route, key),
             ).fetchone()
             if reserved is not None and reserved["request_hash"] != digest:
                 raise IdempotencyConflict("idempotency key was already used with a different request")
+            protected = claim_token is not None or (reserved is not None and reserved["claim_token"] is not None)
+            if protected and (reserved is None or reserved["claim_token"] != claim_token
+                              or reserved["status"] != PENDING or reserved["expires_at"] <= datetime.now(timezone.utc).isoformat()):
+                raise IdempotencyConflict("idempotency claim ownership was lost")
             self.db.execute(
-                """INSERT INTO idempotency VALUES(?,?,?,?,?,?,?,?)
+                """INSERT INTO idempotency VALUES(?,?,?,?,?,?,?,?,?)
                    ON CONFLICT(principal, route, key) DO UPDATE SET request_hash=excluded.request_hash,
                    response=excluded.response, status=excluded.status, created_at=excluded.created_at,
                    expires_at=excluded.expires_at WHERE idempotency.status=0""",
                 (principal, route, key, self.request_hash(payload), encoded_response, status,
-                 now.isoformat(), (now + self.ttl).isoformat()),
+                 now.isoformat(), (now + self.ttl).isoformat(), claim_token),
             )
 
     def ping(self) -> bool:

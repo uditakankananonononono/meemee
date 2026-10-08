@@ -36,7 +36,7 @@ SPECS={
            TableSpec("quota_usage","meemee_quota_usage",("principal","day","jobs"),("principal","day"))),
  "entitlements":(TableSpec("principal_plans","meemee_principal_plans",("principal","plan","updated_at"),("principal",)),),
  "runs":(TableSpec("runs","meemee_runs",("run_id","principal","goal","final","steps_used","tool_results","created_at","approvals_required"),("run_id",)),),
- "idempotency":(TableSpec("idempotency","meemee_idempotency",("principal","route","key","request_hash","response","status","created_at","expires_at"),("principal","route","key")),),
+ "idempotency":(TableSpec("idempotency","meemee_idempotency",("principal","route","key","request_hash","response","status","created_at","expires_at","claim_token"),("principal","route","key")),),
  "webhooks":(TableSpec("webhook_subscriptions","meemee_webhook_subscriptions",("id","principal","url","secret","events","fields","headers","active","created_at"),("id",)),
               TableSpec("webhook_deliveries","meemee_webhook_deliveries",("id","subscription_id","event_id","event_type","payload","payload_sha256","status","attempts","next_attempt_at","response_status","last_error","sending_started_at","created_at"),("id",)),
               TableSpec("webhook_attempts","meemee_webhook_attempts",("id","delivery_id","attempt","started_at","finished_at","outcome","response_status","error"),("id",))),
@@ -89,6 +89,14 @@ def _json(value):
     if value is None:return None
     if isinstance(value,(dict,list)):return value
     return json.loads(value)
+
+def source_columns(spec: TableSpec, conn: sqlite3.Connection) -> str:
+    """Old offline sources have no ownership column; represent that as tokenless legacy rows."""
+    if spec.source == "idempotency":
+        available = {row[1] for row in conn.execute("PRAGMA table_info(idempotency)")}
+        return ",".join("NULL AS claim_token" if col == "claim_token" and col not in available else col for col in spec.columns)
+    return ",".join(spec.columns)
+
 
 def transform(spec:TableSpec,row:sqlite3.Row)->tuple[Any,...]:
     values=[]
@@ -152,7 +160,7 @@ class Cutover:
                         columns=",".join(spec.columns); placeholders=",".join(["%s"]*len(spec.columns))
                         override=" OVERRIDING SYSTEM VALUE" if spec.target in IDENTITY_TARGETS else ""
                         statement=f"INSERT INTO {spec.target} ({columns}){override} VALUES ({placeholders})"
-                        cursor=src[group].execute(f"SELECT {columns} FROM {spec.source} ORDER BY {','.join(spec.order)}")
+                        cursor=src[group].execute(f"SELECT {source_columns(spec, src[group])} FROM {spec.source} ORDER BY {','.join(spec.order)}")
                         count=0
                         while True:
                             rows=cursor.fetchmany(batch_size)
@@ -176,7 +184,7 @@ class Cutover:
                 for group,specs in self.specs.items():
                     for spec in specs:
                         columns=",".join(spec.columns); order=",".join(spec.order)
-                        source_rows=(dict(zip(spec.columns,transform(spec,row))) for row in src[group].execute(f"SELECT {columns} FROM {spec.source} ORDER BY {order}"))
+                        source_rows=(dict(zip(spec.columns,transform(spec,row))) for row in src[group].execute(f"SELECT {source_columns(spec, src[group])} FROM {spec.source} ORDER BY {order}"))
                         source_count,source_hash=digest_rows(source_rows)
                         pg_rows=target.execute(f"SELECT {columns} FROM {spec.target} ORDER BY {order}")
                         target_count,target_hash=digest_rows(pg_rows)

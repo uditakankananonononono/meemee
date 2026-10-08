@@ -4,6 +4,7 @@ import asyncio
 import hmac
 import json
 import logging
+import secrets
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -627,9 +628,10 @@ def create_job(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ):
     payload = request.model_dump()
+    claim_token = secrets.token_urlsafe(32) if idempotency_key else None
     if idempotency_key:
         try:  # claim is atomic, so concurrent retries (even on other hosts) cannot both create a job
-            cached = idempotency.claim(principal.id, "/v1/jobs", idempotency_key, payload)
+            cached = idempotency.claim(principal.id, "/v1/jobs", idempotency_key, payload, claim_token=claim_token)
         except IdempotencyConflict as exc:
             raise HTTPException(409, str(exc)) from exc
         except ValueError as exc:
@@ -650,11 +652,14 @@ def create_job(
         ident = jobs.enqueue(request.goal, run_at, principal=principal.id)
     except BaseException:
         if idempotency_key:
-            idempotency.release(principal.id, "/v1/jobs", idempotency_key)
+            idempotency.release(principal.id, "/v1/jobs", idempotency_key, claim_token=claim_token)
         raise
     response = {"id": ident, "quota": quota}
     if idempotency_key:
-        idempotency.put(principal.id, "/v1/jobs", idempotency_key, payload, 200, response)
+        try:
+            idempotency.put(principal.id, "/v1/jobs", idempotency_key, payload, 200, response, claim_token=claim_token)
+        except IdempotencyConflict as exc:
+            raise HTTPException(409, str(exc)) from exc
     audit.append(principal.id, "job.create", ident, "success", {"scheduled": bool(run_at)})
     JOBS_CREATED.inc()
     return response
