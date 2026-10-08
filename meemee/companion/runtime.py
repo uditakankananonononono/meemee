@@ -19,17 +19,20 @@ class Companion:
     engine: CompanionEngine
     channels: dict
     model: OpenAICompatibleModel | RoutedModel
+    owned_persistence: Any = None
 
 
 def build_companion(settings: Settings | None = None, store: CompanionStore | None = None, persistence: Any = None) -> Companion:
     """Compose the companion layer from runtime settings."""
     settings = settings or Settings()
     shared = persistence
+    owned_persistence = None
     if shared is None and settings.persistence_backend.strip().lower() == "postgresql":
         # PostgreSQL mode: shared companion, context and personal-model tables, not local files.
         from ..persistence import persistence_from_settings
 
         shared = persistence_from_settings(settings)
+        owned_persistence = shared
         store = store or shared.companion
     companion_store = store or CompanionStore(settings.data_dir / "companion.sqlite3")
     context_store = shared.context if shared else ContextStore(settings.data_dir / "context.sqlite3")
@@ -45,4 +48,4 @@ def build_companion(settings: Settings | None = None, store: CompanionStore | No
         personal_model=personal_model,
     )
     channels = build_channels(settings, companion_store)
-    return Companion(companion_store, engine, channels, model)
+    return Companion(companion_store, engine, channels, model, owned_persistence)
