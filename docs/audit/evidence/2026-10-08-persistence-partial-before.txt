@@ -1,0 +1,68 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+__________ test_pg_composition_failure_closes_actual_pool[migration] ___________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f6dbc933280>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-750/test_pg_composition_failure_cl0')
+failure = 'migration'
+
+    @pytest.mark.skipif(not PG_DSN, reason='requires real PostgreSQL')
+    @pytest.mark.parametrize('failure', ['migration', 'quota'])
+    def test_pg_composition_failure_closes_actual_pool(monkeypatch, tmp_path, failure):
+        dsn, drop = _pg_dsn()
+        pools = []
+        original = pg.Database
+    
+        def capture(*args, **kwargs):
+            db = original(*args, **kwargs)
+            pools.append(db.pool)
+            return db
+    
+        monkeypatch.setattr(pg, 'Database', capture)
+        if failure == 'migration':
+            def broken(*args):
+                raise RuntimeError('migration failed')
+            monkeypatch.setattr(pg.MigrationStore, 'apply', broken)
+        try:
+            with pytest.raises((RuntimeError, ValueError)):
+                build_persistence('postgresql', tmp_path, dsn, default_daily_jobs=True if failure == 'quota' else 100)
+>           assert pools[0].closed
+E           AssertionError: assert False
+E            +  where False = <psycopg_pool.pool.ConnectionPool 'pool-1' at 0x7f6dbc931de0>.closed
+
+tests/test_persistence_partial_pg_cleanup.py:30: AssertionError
+____________ test_pg_composition_failure_closes_actual_pool[quota] _____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f6dbc9afd30>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-750/test_pg_composition_failure_cl1')
+failure = 'quota'
+
+    @pytest.mark.skipif(not PG_DSN, reason='requires real PostgreSQL')
+    @pytest.mark.parametrize('failure', ['migration', 'quota'])
+    def test_pg_composition_failure_closes_actual_pool(monkeypatch, tmp_path, failure):
+        dsn, drop = _pg_dsn()
+        pools = []
+        original = pg.Database
+    
+        def capture(*args, **kwargs):
+            db = original(*args, **kwargs)
+            pools.append(db.pool)
+            return db
+    
+        monkeypatch.setattr(pg, 'Database', capture)
+        if failure == 'migration':
+            def broken(*args):
+                raise RuntimeError('migration failed')
+            monkeypatch.setattr(pg.MigrationStore, 'apply', broken)
+        try:
+            with pytest.raises((RuntimeError, ValueError)):
+                build_persistence('postgresql', tmp_path, dsn, default_daily_jobs=True if failure == 'quota' else 100)
+>           assert pools[0].closed
+E           AssertionError: assert False
+E            +  where False = <psycopg_pool.pool.ConnectionPool 'pool-2' at 0x7f6dbc9adbd0>.closed
+
+tests/test_persistence_partial_pg_cleanup.py:30: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_persistence_partial_pg_cleanup.py::test_pg_composition_failure_closes_actual_pool[migration]
+FAILED tests/test_persistence_partial_pg_cleanup.py::test_pg_composition_failure_closes_actual_pool[quota]
+2 failed in 0.87s
