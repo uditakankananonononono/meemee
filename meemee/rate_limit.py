@@ -10,6 +10,8 @@ from pathlib import Path
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
+from ._sqlite_guard import close_db_on_init_failure
+
 
 def request_identity(request) -> str:
     """Rate-limit key: a hash of the bearer token, else the client IP. Backend-independent."""
@@ -27,6 +29,7 @@ def validate_rate_config(limit: int, window_seconds: int) -> None:
 class SQLiteRateLimiter:
     """Atomic fixed-window limiter shared by all processes on one host."""
 
+    @close_db_on_init_failure
     def __init__(self, path: Path, limit: int = 60, window_seconds: int = 60):
         validate_rate_config(limit, window_seconds)
         path.parent.mkdir(parents=True, exist_ok=True)

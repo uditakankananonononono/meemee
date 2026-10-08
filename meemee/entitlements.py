@@ -4,6 +4,7 @@ import sqlite3
 import threading
 from pathlib import Path
 
+from ._sqlite_guard import close_db_on_init_failure
 from .schema_registry import register_schema
 
 PLANS = {
@@ -16,6 +17,7 @@ PLANS = {
 class EntitlementStore:
     """Plan assignment and enforceable product limits. Billing is intentionally external."""
 
+    @close_db_on_init_failure
     def __init__(self, path: Path, default_plan: str = "starter"):
         if default_plan not in PLANS:
             raise ValueError("unknown default plan")

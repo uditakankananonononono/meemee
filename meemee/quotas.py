@@ -5,6 +5,8 @@ import threading
 from datetime import date, datetime, timezone
 from pathlib import Path
 
+from ._sqlite_guard import close_db_on_init_failure
+
 
 def quota_day(now: datetime | None = None) -> date:
     instant = now if now is not None else datetime.now(timezone.utc)
@@ -25,6 +27,7 @@ class QuotaExceeded(ValueError):
 class QuotaStore:
     """Atomic per-principal daily quotas shared by all supported-host processes."""
 
+    @close_db_on_init_failure
     def __init__(self, path: Path, default_daily_jobs: int = 100):
         validate_quota_limit(default_daily_jobs)
         path.parent.mkdir(parents=True, exist_ok=True)

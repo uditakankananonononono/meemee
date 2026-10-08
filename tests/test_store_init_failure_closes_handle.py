@@ -110,3 +110,47 @@ def test_close_error_never_replaces_original_constructor_exception(close_error):
     with pytest.raises(ValueError) as caught:
         Store()
     assert caught.value is original
+
+
+def _vault_key():
+    from meemee.vault import SecretVault
+
+    return SecretVault.generate_key()
+
+
+MORE_STORES = [
+    ("meemee.device_protocol", "SQLiteReplayGuard", lambda p: ((p, "ns"), {})),
+    ("meemee.entitlements", "EntitlementStore", lambda p: ((p,), {})),
+    ("meemee.vault", "SecretVault", lambda p: ((p, _vault_key()), {})),
+    ("meemee.devices", "DeviceRegistry", lambda p: ((p,), {})),
+    ("meemee.checkpoints", "CheckpointStore", lambda p: ((p,), {})),
+    ("meemee.account_deletion", "DeletionLedger", lambda p: ((p,), {})),
+    ("meemee.email_verification", "EmailVerificationStore", lambda p: ((p,), {})),
+    ("meemee.rate_limit", "SQLiteRateLimiter", lambda p: ((p,), {})),
+    ("meemee.webhooks", "WebhookStore", lambda p: ((p,), {"encryption_key": _vault_key()})),
+    ("meemee.approvals", "ApprovalStore", lambda p: ((p,), {})),
+    ("meemee.quotas", "QuotaStore", lambda p: ((p,), {})),
+    ("meemee.audit", "AuditLog", lambda p: ((p,), {})),
+]
+
+
+@pytest.mark.parametrize("module_name,class_name,make_args", MORE_STORES)
+def test_failed_constructor_closes_handle_remaining_stores(
+    tmp_path, monkeypatch, module_name, class_name, make_args
+):
+    module = importlib.import_module(module_name)
+    opened = []
+
+    def connect(*args, **kwargs):
+        tracked = _Tracked(sqlite3.connect(*args, **kwargs))
+        opened.append(tracked)
+        return tracked
+
+    patched = types.SimpleNamespace(**vars(sqlite3))
+    patched.connect = connect
+    monkeypatch.setattr(module, "sqlite3", patched)
+    args, kwargs = make_args(tmp_path / "store.sqlite3")
+    with pytest.raises(sqlite3.OperationalError, match="injected schema failure"):
+        getattr(module, class_name)(*args, **kwargs)
+    assert opened, "constructor never opened SQLite"
+    assert all(handle.closed for handle in opened)

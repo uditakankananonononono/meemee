@@ -8,10 +8,13 @@ from pathlib import Path
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from ._sqlite_guard import close_db_on_init_failure
+
 
 class SecretVault:
     """Small encrypted-at-rest secret store using AES-256-GCM and per-record nonces."""
 
+    @close_db_on_init_failure
     def __init__(self, path: Path, key: str):
         path.parent.mkdir(parents=True, exist_ok=True)
         try:

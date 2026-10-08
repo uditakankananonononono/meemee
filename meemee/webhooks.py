@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 
 import httpx
 
+from ._sqlite_guard import close_db_on_init_failure
 from .cursors import decode_cursor, encode_cursor
 from .schema_registry import register_schema
 from .secret_cipher import SecretCipher
@@ -68,6 +69,7 @@ def validate_webhook_url(url: str) -> str:
 class WebhookStore:
     """Durable webhook subscriptions and transactional delivery outbox."""
 
+    @close_db_on_init_failure
     def __init__(self, path: Path, max_payload_bytes: int = 256_000, encryption_key: str | None = None):
         if max_payload_bytes < 1024:
             raise ValueError("webhook payload ceiling must be at least 1024 bytes")

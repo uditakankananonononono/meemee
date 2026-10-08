@@ -11,12 +11,14 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from ._sqlite_guard import close_db_on_init_failure
 from .device_protocol import ReplayGuard, SQLiteReplayGuard, make_command, verify_command
 
 
 class DeviceRegistry:
     """SQLite pairing, manifest, command, and execution audit store."""
 
+    @close_db_on_init_failure
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False)
