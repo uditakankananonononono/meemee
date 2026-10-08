@@ -46,4 +46,4 @@ def build_agent(settings: Settings | None = None, include_delegation: bool = Tru
     # PostgreSQL mode: the shared personal model and context index, not per-host files.
     context = persistence.context if persistence is not None else ContextStore(settings.data_dir / "context.sqlite3")
     personal_model = persistence.personal_model if persistence is not None else PersonalModelStore(settings.data_dir / "personal-model.sqlite3")
-    return Agent(model, registry, selected_memory, settings.max_steps, PolicyEngine.from_file(settings.policy_file), context, personal_model)
+    return Agent(model, registry, selected_memory, settings.max_steps, PolicyEngine.from_file(settings.policy_file), context, personal_model, owns_model=True)

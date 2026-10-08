@@ -1,0 +1,25 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+______________ test_team_keeps_borrowed_actual_model_client_open _______________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-771/test_team_keeps_borrowed_actua0')
+
+    async def test_team_keeps_borrowed_actual_model_client_open(tmp_path):
+        client = httpx.AsyncClient()
+        model = OpenAICompatibleModel('http://unused', 'model', 'key', client=client)
+        child = Agent(model, ToolRegistry(), MemoryStore(tmp_path / 'memory.db'))
+    
+        async def run(goal, *, owner_id):
+            return RunReport(run_id='run', goal=goal, final='done', steps_used=0, tool_results=[])
+    
+        child.run = run
+        try:
+            assert (await AgentTeam(lambda: child).delegate(['work'], owner_id='owner'))[0]['ok']
+>           assert not client.is_closed
+E           assert not True
+E            +  where True = <httpx.AsyncClient object at 0x7f5e1a365390>.is_closed
+
+tests/test_team_borrowed_model.py:24: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_team_borrowed_model.py::test_team_keeps_borrowed_actual_model_client_open
+1 failed in 0.19s

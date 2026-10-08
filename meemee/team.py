@@ -43,7 +43,7 @@ class AgentTeam:
                     return {"index": index, "goal": goal, "ok": False, "error": str(exc)}
                 finally:
                     close = getattr(getattr(child, "model", None), "aclose", None)
-                    if close is not None:
+                    if close is not None and getattr(child, "owns_model", False):
                         await close()
 
         return await asyncio.gather(*(one(index, goal) for index, goal in enumerate(goals)))
