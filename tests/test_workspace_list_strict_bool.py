@@ -1,5 +1,8 @@
 import pytest
+
 from meemee.tools.filesystem import ListArgs
+
+
 @pytest.mark.parametrize('value',['false','true',0,1])
 def test_hidden_toggle_refuses_coercion(value):
  with pytest.raises(ValueError):ListArgs(path='.',include_hidden=value)

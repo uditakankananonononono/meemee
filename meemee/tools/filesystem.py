@@ -6,7 +6,7 @@ import stat
 import tempfile
 from pathlib import Path
 
-from pydantic import BaseModel, Field, StrictInt, StrictBool
+from pydantic import BaseModel, Field, StrictBool, StrictInt
 
 from ..types import Risk
 from .base import Tool
