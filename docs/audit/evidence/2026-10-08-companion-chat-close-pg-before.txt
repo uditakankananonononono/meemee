@@ -1,0 +1,193 @@
+FFFF.                                                                    [100%]
+=================================== FAILURES ===================================
+___________ test_chat_closes_actual_owned_model_and_channels[empty] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f40637386a0>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-856/test_chat_closes_actual_owned_0')
+failure = 'empty'
+
+    @pytest.mark.parametrize('failure', ['empty', 'reply', 'output'])
+    def test_chat_closes_actual_owned_model_and_channels(monkeypatch, tmp_path, failure):
+        released, made = [], []
+        original = cli.build_companion_async
+        class Transport(httpx.AsyncBaseTransport):
+            def __init__(self, name):
+                self.name = name
+            async def aclose(self):
+                released.append(self.name)
+        async def build(*args):
+            companion = await original(Settings(_env_file=None, data_dir=tmp_path))
+            made.append(companion)
+            for name, client in [('model', companion.model.client)] + [(n, c.client) for n, c in companion.channels.items() if hasattr(c, 'client')]:
+                await client._transport.aclose()
+                client._transport = Transport(name)
+            async def reply(*args):
+                if failure == 'reply':
+                    raise TypeError('reply failed')
+                from types import SimpleNamespace
+                return SimpleNamespace(persona='test', reply='test')
+            companion.engine.reply = reply
+            return companion
+        monkeypatch.setattr(cli, 'build_companion_async', build)
+        monkeypatch.setattr(cli.typer, 'prompt', lambda *args, **kwargs: '' if failure == 'empty' else 'test')
+        def echo(*args):
+            raise ValueError('output failed')
+        monkeypatch.setattr(cli.typer, 'echo', echo)
+        try:
+            if failure == 'empty':
+                cli.chat('owner')
+            else:
+                with pytest.raises(TypeError if failure == 'reply' else ValueError):
+                    cli.chat('owner')
+>           assert released == ['imessage', 'whatsapp', 'webhook', 'model']
+E           AssertionError: assert [] == ['imessage', ...ook', 'model']
+E             
+E             Right contains 4 more items, first extra item: 'imessage'
+E             Use -v to get more diff
+
+tests/test_companion_chat_http_cleanup.py:44: AssertionError
+___________ test_chat_closes_actual_owned_model_and_channels[reply] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f40637d3b80>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-856/test_chat_closes_actual_owned_1')
+failure = 'reply'
+
+    @pytest.mark.parametrize('failure', ['empty', 'reply', 'output'])
+    def test_chat_closes_actual_owned_model_and_channels(monkeypatch, tmp_path, failure):
+        released, made = [], []
+        original = cli.build_companion_async
+        class Transport(httpx.AsyncBaseTransport):
+            def __init__(self, name):
+                self.name = name
+            async def aclose(self):
+                released.append(self.name)
+        async def build(*args):
+            companion = await original(Settings(_env_file=None, data_dir=tmp_path))
+            made.append(companion)
+            for name, client in [('model', companion.model.client)] + [(n, c.client) for n, c in companion.channels.items() if hasattr(c, 'client')]:
+                await client._transport.aclose()
+                client._transport = Transport(name)
+            async def reply(*args):
+                if failure == 'reply':
+                    raise TypeError('reply failed')
+                from types import SimpleNamespace
+                return SimpleNamespace(persona='test', reply='test')
+            companion.engine.reply = reply
+            return companion
+        monkeypatch.setattr(cli, 'build_companion_async', build)
+        monkeypatch.setattr(cli.typer, 'prompt', lambda *args, **kwargs: '' if failure == 'empty' else 'test')
+        def echo(*args):
+            raise ValueError('output failed')
+        monkeypatch.setattr(cli.typer, 'echo', echo)
+        try:
+            if failure == 'empty':
+                cli.chat('owner')
+            else:
+                with pytest.raises(TypeError if failure == 'reply' else ValueError):
+                    cli.chat('owner')
+>           assert released == ['imessage', 'whatsapp', 'webhook', 'model']
+E           AssertionError: assert [] == ['imessage', ...ook', 'model']
+E             
+E             Right contains 4 more items, first extra item: 'imessage'
+E             Use -v to get more diff
+
+tests/test_companion_chat_http_cleanup.py:44: AssertionError
+___________ test_chat_closes_actual_owned_model_and_channels[output] ___________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f40637d3760>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-856/test_chat_closes_actual_owned_2')
+failure = 'output'
+
+    @pytest.mark.parametrize('failure', ['empty', 'reply', 'output'])
+    def test_chat_closes_actual_owned_model_and_channels(monkeypatch, tmp_path, failure):
+        released, made = [], []
+        original = cli.build_companion_async
+        class Transport(httpx.AsyncBaseTransport):
+            def __init__(self, name):
+                self.name = name
+            async def aclose(self):
+                released.append(self.name)
+        async def build(*args):
+            companion = await original(Settings(_env_file=None, data_dir=tmp_path))
+            made.append(companion)
+            for name, client in [('model', companion.model.client)] + [(n, c.client) for n, c in companion.channels.items() if hasattr(c, 'client')]:
+                await client._transport.aclose()
+                client._transport = Transport(name)
+            async def reply(*args):
+                if failure == 'reply':
+                    raise TypeError('reply failed')
+                from types import SimpleNamespace
+                return SimpleNamespace(persona='test', reply='test')
+            companion.engine.reply = reply
+            return companion
+        monkeypatch.setattr(cli, 'build_companion_async', build)
+        monkeypatch.setattr(cli.typer, 'prompt', lambda *args, **kwargs: '' if failure == 'empty' else 'test')
+        def echo(*args):
+            raise ValueError('output failed')
+        monkeypatch.setattr(cli.typer, 'echo', echo)
+        try:
+            if failure == 'empty':
+                cli.chat('owner')
+            else:
+                with pytest.raises(TypeError if failure == 'reply' else ValueError):
+                    cli.chat('owner')
+>           assert released == ['imessage', 'whatsapp', 'webhook', 'model']
+E           AssertionError: assert [] == ['imessage', ...ook', 'model']
+E             
+E             Right contains 4 more items, first extra item: 'imessage'
+E             Use -v to get more diff
+
+tests/test_companion_chat_http_cleanup.py:44: AssertionError
+_____________________ test_chat_actual_pg_ownership[False] _____________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f40637d71f0>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-856/test_chat_actual_pg_ownership_0')
+borrowed = False
+
+    @pytest.mark.parametrize('borrowed', [False, True])
+    def test_chat_actual_pg_ownership(monkeypatch, tmp_path, borrowed):
+        from test_token_audit_backends import PG_DSN, _pg_dsn
+        if not PG_DSN:
+            pytest.skip('requires actual PostgreSQL')
+        from meemee.persistence import build_persistence
+        dsn, drop = _pg_dsn()
+        shared = build_persistence('postgresql', tmp_path, dsn) if borrowed else None
+        original = cli.build_companion_async
+        made = []
+        async def build(*args):
+            companion = await original(Settings(_env_file=None, data_dir=tmp_path, persistence_backend='postgresql', postgres_dsn=dsn), persistence=shared)
+            made.append(companion)
+            return companion
+        monkeypatch.setattr(cli, 'build_companion_async', build)
+        monkeypatch.setattr(cli.typer, 'prompt', lambda *args, **kwargs: '')
+        try:
+            cli.chat('owner')
+            if borrowed:
+                assert made[0].owned_persistence is None
+                assert not shared.database.pool.closed
+                assert shared.context.ping()
+            else:
+>               assert made[0].owned_persistence.database.pool.closed
+E               AssertionError: assert False
+E                +  where False = <psycopg_pool.pool.ConnectionPool 'pool-1' at 0x7f4064644850>.closed
+E                +    where <psycopg_pool.pool.ConnectionPool 'pool-1' at 0x7f4064644850> = <meemee_persist_pg._db.Database object at 0x7f4064644070>.pool
+E                +      where <meemee_persist_pg._db.Database object at 0x7f4064644070> = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f4061fbd4b0>, jobs=<meemee...re object at 0x7f4061fbdd80>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f4061fbdde0>).database
+E                +        where Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f4061fbd4b0>, jobs=<meemee...re object at 0x7f4061fbdd80>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f4061fbdde0>) = Companion(store=<meemee_persist_pg.companion.CompanionStore object at 0x7f4061fbdb70>, engine=<meemee.companion.engine...e object at 0x7f4061fbdd80>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f4061fbdde0>)).owned_persistence
+
+tests/test_companion_chat_http_cleanup.py:78: AssertionError
+=============================== warnings summary ===============================
+.venv/lib/python3.10/site-packages/fastapi/testclient.py:1
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+.venv/lib/python3.10/site-packages/starlette/testclient.py:53
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_companion_chat_http_cleanup.py::test_chat_closes_actual_owned_model_and_channels[empty]
+FAILED tests/test_companion_chat_http_cleanup.py::test_chat_closes_actual_owned_model_and_channels[reply]
+FAILED tests/test_companion_chat_http_cleanup.py::test_chat_closes_actual_owned_model_and_channels[output]
+FAILED tests/test_companion_chat_http_cleanup.py::test_chat_actual_pg_ownership[False]
+4 failed, 1 passed, 2 warnings in 1.79s
