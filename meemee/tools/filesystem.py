@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import hashlib
 import stat
 import tempfile
 from pathlib import Path
@@ -17,6 +18,7 @@ class PathArgs(BaseModel):
 
 class WriteArgs(PathArgs):
     content: str = Field(max_length=2_000_000)
+    expected_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
 
 class WorkspaceTool(Tool):
@@ -48,9 +50,18 @@ class WriteFile(WorkspaceTool):
 
     async def run(self, arguments: WriteArgs) -> dict[str, object]:
         path = self.resolve(arguments.path)
+        if arguments.expected_sha256 is not None:
+            if not path.is_file():
+                raise ValueError("file changed or missing")
+            digest = hashlib.sha256()
+            with path.open("rb") as stream:
+                while chunk := stream.read(65536):
+                    digest.update(chunk)
+            if digest.hexdigest() != arguments.expected_sha256:
+                raise ValueError("file changed since expected hash")
         path.parent.mkdir(parents=True, exist_ok=True)
         self._publish(path, arguments.content)
-        return {"path": str(path.relative_to(self.root)), "bytes": len(arguments.content.encode())}
+        return {"path": str(path.relative_to(self.root)), "bytes": len(arguments.content.encode()), "sha256": hashlib.sha256(arguments.content.encode()).hexdigest()}
 
     @staticmethod
     def _publish(path: Path, content: str) -> None:
