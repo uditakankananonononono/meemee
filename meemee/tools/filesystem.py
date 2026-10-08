@@ -91,3 +91,41 @@ class WriteFile(WorkspaceTool):
             os.replace(temporary, path)
         finally:
             temporary.unlink(missing_ok=True)
+
+
+class ListArgs(PathArgs):
+    limit: StrictInt = Field(default=100, ge=1, le=1000)
+    scan_limit: StrictInt = Field(default=2000, ge=1, le=10000)
+    include_hidden: bool = False
+
+
+class ListFiles(WorkspaceTool):
+    name = "workspace.list_files"
+    description = "List a bounded single workspace directory without following entry symlinks."
+    arguments_model = ListArgs
+
+    async def run(self, arguments: ListArgs) -> dict[str, object]:
+        path = self.resolve(arguments.path)
+        entries = []
+        scanned = 0
+        with os.scandir(path) as iterator:
+            for item in iterator:
+                scanned += 1
+                if scanned > arguments.scan_limit:
+                    raise ValueError("directory scan cap exceeded")
+                if not arguments.include_hidden and item.name.startswith("."):
+                    continue
+                if item.is_symlink():
+                    kind = "symlink"
+                elif item.is_dir(follow_symlinks=False):
+                    kind = "directory"
+                elif item.is_file(follow_symlinks=False):
+                    kind = "file"
+                else:
+                    kind = "other"
+                entries.append({"name": item.name, "kind": kind})
+        entries.sort(key=lambda entry: entry["name"])
+        return {"path": str(path.relative_to(self.root)),
+                "entries": entries[:arguments.limit],
+                "truncated": len(entries) > arguments.limit,
+                "scanned_entries": scanned}
