@@ -74,3 +74,46 @@ def test_http_job_passes_unique_owner_token_through_publication(monkeypatch):
         assert api.create_job(api.JobRequest(goal='work'), SimpleNamespace(id='owner'), 'key')['id'] == 'job'
     assert seen[0][1] == seen[1][1] and seen[2][1] == seen[3][1]
     assert seen[0][1] != seen[2][1] and len(seen[0][1]) >= 32
+
+
+@pytest.mark.parametrize('failure', ['validation', 'publication'])
+def test_http_owned_release_or_conflict_preserves_token(monkeypatch, failure):
+    from types import SimpleNamespace
+
+    from fastapi import HTTPException
+
+    from meemee import api
+
+    seen = []
+    monkeypatch.setattr(api.idempotency, 'claim', lambda *args, **kw: seen.append(('claim', kw['claim_token'])))
+    monkeypatch.setattr(api.idempotency, 'release', lambda *args, **kw: seen.append(('release', kw['claim_token'])))
+    monkeypatch.setattr(api.quotas, 'consume_job', lambda owner: {'used': 1})
+    monkeypatch.setattr(api.jobs, 'enqueue', lambda *args, **kw: 'job')
+
+    def lost(*args, **kw):
+        seen.append(('put', kw['claim_token']))
+        raise IdempotencyConflict('lost')
+
+    monkeypatch.setattr(api.idempotency, 'put', lost)
+    request = api.JobRequest(goal='work', run_at='2026-10-08T09:00:00' if failure == 'validation' else None)
+    with pytest.raises(HTTPException) as exc:
+        api.create_job(request, SimpleNamespace(id='owner'), 'key')
+    assert exc.value.status_code == (422 if failure == 'validation' else 409)
+    assert seen[0][1] == seen[1][1]
+    assert seen[1][0] == ('release' if failure == 'validation' else 'put')
+
+
+def test_concurrent_owned_claims_have_one_winner(persistence):  # noqa: F811
+    from concurrent.futures import ThreadPoolExecutor
+
+    store = persistence.idempotency
+
+    def attempt(n):
+        try:
+            return store.claim('owner', '/jobs', 'key', {}, claim_token=f'token-{n}')
+        except IdempotencyInProgress:
+            return 'busy'
+
+    with ThreadPoolExecutor(8) as pool:
+        results = list(pool.map(attempt, range(16)))
+    assert results.count(None) == 1 and results.count('busy') == 15
