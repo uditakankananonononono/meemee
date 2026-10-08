@@ -66,10 +66,10 @@ class GitInspect(GitBase):
 
     async def run(self, arguments: GitReadArgs) -> dict[str, object]:
         if arguments.operation == "status":
-            return await self.git("status", "--short", "--branch", cap=arguments.max_output_bytes, timeout=arguments.timeout_seconds)
+            return await self.git("-c", "core.fsmonitor=false", "status", "--short", "--branch", cap=arguments.max_output_bytes, timeout=arguments.timeout_seconds)
         if arguments.operation == "diff":
-            return await self.git("diff", "--no-ext-diff", "--no-textconv", "--", cap=arguments.max_output_bytes, timeout=arguments.timeout_seconds)
-        return await self.git("log", f"-{arguments.limit}", "--oneline", "--decorate", cap=arguments.max_output_bytes, timeout=arguments.timeout_seconds)
+            return await self.git("-c", "core.fsmonitor=false", "diff", "--no-ext-diff", "--no-textconv", "--", cap=arguments.max_output_bytes, timeout=arguments.timeout_seconds)
+        return await self.git("-c", "core.fsmonitor=false", "log", f"-{arguments.limit}", "--oneline", "--decorate", cap=arguments.max_output_bytes, timeout=arguments.timeout_seconds)
 
 
 class GitCommit(GitBase):
