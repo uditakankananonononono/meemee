@@ -19,12 +19,16 @@ def request_identity(request) -> str:
     return "ip:" + (request.client.host if request.client else "unknown")
 
 
+def validate_rate_config(limit: int, window_seconds: int) -> None:
+    if type(limit) is not int or type(window_seconds) is not int or limit < 1 or window_seconds < 1:
+        raise ValueError("rate limit and window must be positive integers")
+
+
 class SQLiteRateLimiter:
     """Atomic fixed-window limiter shared by all processes on one host."""
 
     def __init__(self, path: Path, limit: int = 60, window_seconds: int = 60):
-        if limit < 1 or window_seconds < 1:
-            raise ValueError("rate limit and window must be positive")
+        validate_rate_config(limit, window_seconds)
         path.parent.mkdir(parents=True, exist_ok=True)
         self.limit, self.window = limit, window_seconds
         self.db = sqlite3.connect(path, check_same_thread=False, isolation_level=None, timeout=5)

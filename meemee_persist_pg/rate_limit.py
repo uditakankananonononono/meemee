@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import time
 
+from meemee.rate_limit import validate_rate_config
+
 from ._db import Database
 
 
 class PostgreSQLRateLimiter:
     """Atomic fixed-window limiter shared by every process using one PostgreSQL database."""
     def __init__(self, database: Database, limit: int = 60, window_seconds: int = 60):
-        if limit < 1 or window_seconds < 1: raise ValueError("rate limit and window must be positive")
+        validate_rate_config(limit, window_seconds)
         self.db,self.limit,self.window=database,limit,window_seconds
         with self.db.transaction() as connection:
             connection.execute("""CREATE TABLE IF NOT EXISTS meemee_rate_limits(

@@ -1,0 +1,132 @@
+FFFFFFFF                                                                 [100%]
+=================================== FAILURES ===================================
+____ test_rate_configuration_rejects_non_integer_counts[sqlite-True-limit] _____
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7f452cf473d0>, jobs=<meemee.jobs.JobStore ...Store object at 0x7f452cfc3eb0>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7f452cfc3e50>)
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-673/test_rate_configuration_reject0')
+field = 'limit', value = True
+
+    @pytest.mark.parametrize('field', ['limit', 'window_seconds'])
+    @pytest.mark.parametrize('value', [True, 1.5])
+    def test_rate_configuration_rejects_non_integer_counts(persistence, tmp_path, field, value):  # noqa: F811
+        cls = SQLiteRateLimiter if persistence.backend == 'sqlite' else PostgreSQLRateLimiter
+        target = tmp_path / 'rate.db' if persistence.backend == 'sqlite' else persistence.idempotency.db
+>       with pytest.raises(ValueError, match='positive integers'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_rate_limit_integer_config.py:15: Failed
+_ test_rate_configuration_rejects_non_integer_counts[sqlite-True-window_seconds] _
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7f452cfc35b0>, jobs=<meemee.jobs.JobStore ...Store object at 0x7f452cf473d0>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7f452cf478e0>)
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-673/test_rate_configuration_reject1')
+field = 'window_seconds', value = True
+
+    @pytest.mark.parametrize('field', ['limit', 'window_seconds'])
+    @pytest.mark.parametrize('value', [True, 1.5])
+    def test_rate_configuration_rejects_non_integer_counts(persistence, tmp_path, field, value):  # noqa: F811
+        cls = SQLiteRateLimiter if persistence.backend == 'sqlite' else PostgreSQLRateLimiter
+        target = tmp_path / 'rate.db' if persistence.backend == 'sqlite' else persistence.idempotency.db
+>       with pytest.raises(ValueError, match='positive integers'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_rate_limit_integer_config.py:15: Failed
+_____ test_rate_configuration_rejects_non_integer_counts[sqlite-1.5-limit] _____
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7f452cfc1f90>, jobs=<meemee.jobs.JobStore ...Store object at 0x7f452cf47d00>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7f452cf477f0>)
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-673/test_rate_configuration_reject2')
+field = 'limit', value = 1.5
+
+    @pytest.mark.parametrize('field', ['limit', 'window_seconds'])
+    @pytest.mark.parametrize('value', [True, 1.5])
+    def test_rate_configuration_rejects_non_integer_counts(persistence, tmp_path, field, value):  # noqa: F811
+        cls = SQLiteRateLimiter if persistence.backend == 'sqlite' else PostgreSQLRateLimiter
+        target = tmp_path / 'rate.db' if persistence.backend == 'sqlite' else persistence.idempotency.db
+>       with pytest.raises(ValueError, match='positive integers'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_rate_limit_integer_config.py:15: Failed
+_ test_rate_configuration_rejects_non_integer_counts[sqlite-1.5-window_seconds] _
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7f452cfc08b0>, jobs=<meemee.jobs.JobStore ...Store object at 0x7f452cfc2350>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7f452cfc2380>)
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-673/test_rate_configuration_reject3')
+field = 'window_seconds', value = 1.5
+
+    @pytest.mark.parametrize('field', ['limit', 'window_seconds'])
+    @pytest.mark.parametrize('value', [True, 1.5])
+    def test_rate_configuration_rejects_non_integer_counts(persistence, tmp_path, field, value):  # noqa: F811
+        cls = SQLiteRateLimiter if persistence.backend == 'sqlite' else PostgreSQLRateLimiter
+        target = tmp_path / 'rate.db' if persistence.backend == 'sqlite' else persistence.idempotency.db
+>       with pytest.raises(ValueError, match='positive integers'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_rate_limit_integer_config.py:15: Failed
+__ test_rate_configuration_rejects_non_integer_counts[postgresql-True-limit] ___
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f452fde93c0>, jobs=<meemee...re object at 0x7f452cfc3100>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f452cfc17e0>)
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-673/test_rate_configuration_reject4')
+field = 'limit', value = True
+
+    @pytest.mark.parametrize('field', ['limit', 'window_seconds'])
+    @pytest.mark.parametrize('value', [True, 1.5])
+    def test_rate_configuration_rejects_non_integer_counts(persistence, tmp_path, field, value):  # noqa: F811
+        cls = SQLiteRateLimiter if persistence.backend == 'sqlite' else PostgreSQLRateLimiter
+        target = tmp_path / 'rate.db' if persistence.backend == 'sqlite' else persistence.idempotency.db
+>       with pytest.raises(ValueError, match='positive integers'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_rate_limit_integer_config.py:15: Failed
+_ test_rate_configuration_rejects_non_integer_counts[postgresql-True-window_seconds] _
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f4530178d90>, jobs=<meemee...re object at 0x7f453017bfa0>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f453017bdc0>)
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-673/test_rate_configuration_reject5')
+field = 'window_seconds', value = True
+
+    @pytest.mark.parametrize('field', ['limit', 'window_seconds'])
+    @pytest.mark.parametrize('value', [True, 1.5])
+    def test_rate_configuration_rejects_non_integer_counts(persistence, tmp_path, field, value):  # noqa: F811
+        cls = SQLiteRateLimiter if persistence.backend == 'sqlite' else PostgreSQLRateLimiter
+        target = tmp_path / 'rate.db' if persistence.backend == 'sqlite' else persistence.idempotency.db
+>       with pytest.raises(ValueError, match='positive integers'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_rate_limit_integer_config.py:15: Failed
+___ test_rate_configuration_rejects_non_integer_counts[postgresql-1.5-limit] ___
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f4530164af0>, jobs=<meemee...re object at 0x7f452cfc2260>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f452cfc18a0>)
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-673/test_rate_configuration_reject6')
+field = 'limit', value = 1.5
+
+    @pytest.mark.parametrize('field', ['limit', 'window_seconds'])
+    @pytest.mark.parametrize('value', [True, 1.5])
+    def test_rate_configuration_rejects_non_integer_counts(persistence, tmp_path, field, value):  # noqa: F811
+        cls = SQLiteRateLimiter if persistence.backend == 'sqlite' else PostgreSQLRateLimiter
+        target = tmp_path / 'rate.db' if persistence.backend == 'sqlite' else persistence.idempotency.db
+>       with pytest.raises(ValueError, match='positive integers'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_rate_limit_integer_config.py:15: Failed
+_ test_rate_configuration_rejects_non_integer_counts[postgresql-1.5-window_seconds] _
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f452cf47f70>, jobs=<meemee...re object at 0x7f452cfc2680>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f452cfc26b0>)
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-673/test_rate_configuration_reject7')
+field = 'window_seconds', value = 1.5
+
+    @pytest.mark.parametrize('field', ['limit', 'window_seconds'])
+    @pytest.mark.parametrize('value', [True, 1.5])
+    def test_rate_configuration_rejects_non_integer_counts(persistence, tmp_path, field, value):  # noqa: F811
+        cls = SQLiteRateLimiter if persistence.backend == 'sqlite' else PostgreSQLRateLimiter
+        target = tmp_path / 'rate.db' if persistence.backend == 'sqlite' else persistence.idempotency.db
+>       with pytest.raises(ValueError, match='positive integers'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_rate_limit_integer_config.py:15: Failed
+=========================== short test summary info ============================
+FAILED tests/test_rate_limit_integer_config.py::test_rate_configuration_rejects_non_integer_counts[sqlite-True-limit]
+FAILED tests/test_rate_limit_integer_config.py::test_rate_configuration_rejects_non_integer_counts[sqlite-True-window_seconds]
+FAILED tests/test_rate_limit_integer_config.py::test_rate_configuration_rejects_non_integer_counts[sqlite-1.5-limit]
+FAILED tests/test_rate_limit_integer_config.py::test_rate_configuration_rejects_non_integer_counts[sqlite-1.5-window_seconds]
+FAILED tests/test_rate_limit_integer_config.py::test_rate_configuration_rejects_non_integer_counts[postgresql-True-limit]
+FAILED tests/test_rate_limit_integer_config.py::test_rate_configuration_rejects_non_integer_counts[postgresql-True-window_seconds]
+FAILED tests/test_rate_limit_integer_config.py::test_rate_configuration_rejects_non_integer_counts[postgresql-1.5-limit]
+FAILED tests/test_rate_limit_integer_config.py::test_rate_configuration_rejects_non_integer_counts[postgresql-1.5-window_seconds]
+8 failed in 1.84s
