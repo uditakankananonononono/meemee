@@ -5,5 +5,6 @@ from .filesystem import ListFiles, ReadFile, WriteFile
 from .git import GitCommit, GitInspect
 from .github import GitHubCreatePullRequest, GitHubPushBranch, GitHubRepoSearch
 from .shell import ShellCommand
+from .text_search import SearchText
 
-__all__ = ["BrowserNavigate", "DelegateTasks", "GitCommit", "GitHubCreatePullRequest", "GitHubPushBranch", "GitHubRepoSearch", "GitInspect", "ListFiles", "ReadFile", "ShellCommand", "Tool", "ToolRegistry", "WriteFile"]
+__all__ = ['BrowserNavigate', 'DelegateTasks', 'GitCommit', 'GitHubCreatePullRequest', 'GitHubPushBranch', 'GitHubRepoSearch', 'GitInspect', 'ListFiles', 'ReadFile', 'SearchText', 'ShellCommand', 'Tool', 'ToolRegistry', 'WriteFile']
