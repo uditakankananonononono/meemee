@@ -1,6 +1,10 @@
-import asyncio,sys
+import asyncio
+import sys
+
 import pytest
-from meemee.tools.shell import ShellArgs,ShellCommand
+
+from meemee.tools.shell import ShellArgs, ShellCommand
+
 
 def test_actual_multibyte_budget(tmp_path):
  tool=ShellCommand(tmp_path,{sys.executable})

@@ -1,7 +1,10 @@
 import asyncio
+
 import pytest
-from meemee.tools.filesystem import ReadFile,PathArgs
+
 from meemee.tools.base import ToolRegistry
+from meemee.tools.filesystem import ReadFile
+
 
 def test_real_registry_bounded_read(tmp_path):
  (tmp_path/'large').write_bytes(b'x'*10000)
@@ -23,9 +26,11 @@ def test_default_cap_and_binary_refusal(tmp_path):
  with pytest.raises(ValueError):asyncio.run(ReadFile(tmp_path).run(ReadFile.arguments_model(path='file')))
 
 def test_posix_fifo_refuses_without_waiting_for_writer(tmp_path):
- import os,subprocess,sys
+ import os
+ import subprocess
+ import sys
  if not hasattr(os,'mkfifo'):pytest.skip('POSIX FIFO only')
  os.mkfifo(tmp_path/'fifo')
  script='import asyncio;from pathlib import Path;from meemee.tools.filesystem import ReadFile;from meemee.tools.base import ToolRegistry;r=ToolRegistry();r.register(ReadFile(Path('+repr(str(tmp_path))+')));v=asyncio.run(r.execute("workspace.read_file",{"path":"fifo"},owner_id="owner"));assert not v.ok and "regular" in v.error'
- p=subprocess.run([sys.executable,'-c',script],capture_output=True,text=True,timeout=3)
+ p=subprocess.run([sys.executable,'-c',script],capture_output=True,text=True,timeout=3,check=False)
  assert p.returncode==0,p.stderr
