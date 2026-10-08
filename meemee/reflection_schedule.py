@@ -101,6 +101,7 @@ class ReflectionSchedule:
         return out
 
     def record(self, owner_id: str, status: str, result: dict[str, Any], watermark: int | None, now: datetime | None = None) -> None:
+        encoded = json.dumps(result, sort_keys=True, default=str, allow_nan=False)
         at = reflection_clock(now).isoformat()
         with self.lock, self.db:
             self.db.execute(
@@ -110,7 +111,7 @@ class ReflectionSchedule:
                 " last_success_at=COALESCE(excluded.last_success_at, last_success_at),"
                 " last_status=excluded.last_status, last_result=excluded.last_result",
                 (owner_id, watermark or 0, at, at if status == "ok" else None, status,
-                 json.dumps(result, sort_keys=True, default=str), watermark),
+                 encoded, watermark),
             )
 
     def delete_owner(self, owner_id: str) -> int:
