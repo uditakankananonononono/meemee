@@ -23,3 +23,16 @@ async def test_reflection_worker_closes_persistence_after_model_close_failure(mo
     with pytest.raises(RuntimeError, match='model close failed'):
         await reflection_schedule.reflection_forever(settings)
     assert closed == ['persistence']
+
+
+async def test_reflection_worker_closes_persistence_after_model_build_failure(monkeypatch):
+    closed = []
+    stores = SimpleNamespace(context=object(), personal_model=object(), reflection_schedule=object(),
+                             audit=object(), close=lambda: closed.append('persistence'))
+    monkeypatch.setattr(persistence, 'persistence_from_settings', lambda settings: stores)
+    def broken_model(settings, role):
+        raise RuntimeError('model build failed')
+    monkeypatch.setattr(model_profiles, 'build_role_model', broken_model)
+    with pytest.raises(RuntimeError, match='model build failed'):
+        await reflection_schedule.reflection_forever(SimpleNamespace(reflection_interval_minutes=1))
+    assert closed == ['persistence']

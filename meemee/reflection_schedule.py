@@ -170,13 +170,14 @@ async def reflection_forever(settings: Any | None = None) -> None:
     if settings.reflection_interval_minutes <= 0:
         raise ValueError("scheduled reflection is disabled (MEEMEE_REFLECTION_INTERVAL_MINUTES <= 0)")
     persistence = persistence_from_settings(settings)
-    context = persistence.context  # PostgreSQL mode: shared with every API host
-    personal = persistence.personal_model
-    schedule = persistence.reflection_schedule  # PostgreSQL mode: one set of watermarks for every worker
-    audit = persistence.audit  # PostgreSQL mode: the shared global chain
-    model = build_role_model(settings, "reflection")
-    interval = timedelta(minutes=settings.reflection_interval_minutes)
+    model = None
     try:
+        context = persistence.context  # PostgreSQL mode: shared with every API host
+        personal = persistence.personal_model
+        schedule = persistence.reflection_schedule  # PostgreSQL mode: one set of watermarks for every worker
+        audit = persistence.audit  # PostgreSQL mode: the shared global chain
+        model = build_role_model(settings, "reflection")
+        interval = timedelta(minutes=settings.reflection_interval_minutes)
         while True:
             summaries = await reflect_due_once(context, personal, model, schedule, interval, audit)
             if summaries:
@@ -184,6 +185,7 @@ async def reflection_forever(settings: Any | None = None) -> None:
             await asyncio.sleep(settings.reflection_poll_seconds)
     finally:
         try:
-            await model.aclose()
+            if model is not None:
+                await model.aclose()
         finally:
             persistence.close()
