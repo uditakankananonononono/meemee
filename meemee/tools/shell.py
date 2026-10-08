@@ -6,7 +6,7 @@ import shutil
 import signal
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictInt
 
 from ..types import Risk
 from .base import Tool
@@ -15,6 +15,7 @@ from .base import Tool
 class ShellArgs(BaseModel):
     argv: list[str] = Field(min_length=1, max_length=64)
     timeout_seconds: float = Field(default=30, ge=0.1, le=300)
+    max_output_bytes: StrictInt = Field(default=200_000, ge=1, le=1_000_000)
 
 
 class ShellCommand(Tool):
@@ -52,16 +53,18 @@ class ShellCommand(Tool):
             stderr=asyncio.subprocess.PIPE,
             start_new_session=(os.name == "posix"),
         )
-        cap = 200_000
+        cap = arguments.max_output_bytes
 
         async def capture(stream):
             retained = bytearray()
             truncated = False
+            total = 0
             while chunk := await stream.read(65536):
+                total += len(chunk)
                 room = cap - len(retained)
                 retained.extend(chunk[:room])
                 truncated = truncated or len(chunk) > room
-            return retained.decode("utf-8", errors="replace"), truncated
+            return retained.decode("utf-8", errors="replace"), truncated, total, len(retained)
 
         tasks = [asyncio.create_task(capture(process.stdout)),
                  asyncio.create_task(capture(process.stderr)),
@@ -99,4 +102,8 @@ class ShellCommand(Tool):
             "stdout": stdout[0],
             "stderr": stderr[0],
             "truncated": stdout[1] or stderr[1],
+            "stdout_bytes": stdout[2], "stderr_bytes": stderr[2],
+            "stdout_retained_bytes": stdout[3], "stderr_retained_bytes": stderr[3],
+            "stdout_truncated_bytes": stdout[2]-stdout[3],
+            "stderr_truncated_bytes": stderr[2]-stderr[3],
         }
