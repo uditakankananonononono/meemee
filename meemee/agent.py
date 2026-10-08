@@ -46,8 +46,9 @@ def refusal(step: int, name: str, risk: Risk, reason: str, detail: str, argument
 
 
 class Agent:
-    def __init__(self, model: Model, tools: ToolRegistry, memory: MemoryStore, max_steps: int = 12, policy: PolicyEngine | None = None, context: ContextStore | None = None, personal_model: PersonalModelStore | None = None):
+    def __init__(self, model: Model, tools: ToolRegistry, memory: MemoryStore, max_steps: int = 12, policy: PolicyEngine | None = None, context: ContextStore | None = None, personal_model: PersonalModelStore | None = None, *, owns_model: bool = False):
         self.model = model
+        self.owns_model = owns_model
         self.tools = tools
         self.memory = memory
         self.max_steps = max_steps

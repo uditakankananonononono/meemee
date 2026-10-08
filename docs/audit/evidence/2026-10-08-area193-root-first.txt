@@ -1,0 +1,21 @@
+.......................................................s.s.s.s.s.s.s.s.s [ 10%]
+.s.s....................................s.s..s.s..sss................... [ 20%]
+............ss........ssss.....................s.s.s.s.s.s..ss..ss..ss.s [ 31%]
+................................................................s....... [ 41%]
+s.ss.........................................................ss...ss..ss [ 52%]
+.....ss...............s.sss.....................................sss..... [ 62%]
+s.s.s.s.s.s..............................................s...s.......... [ 73%]
+...............................s........s...s....sss.s....sss....s.s.s.s [ 83%]
+..........ssss..ss.s.s...s.ss..ss.s..ss.s.s.s..ss............ssss...sss. [ 94%]
+.....ssss.s.....s..ssss.s...s.ssss.......                                [100%]
+=============================== warnings summary ===============================
+.venv/lib/python3.10/site-packages/fastapi/testclient.py:1
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+.venv/lib/python3.10/site-packages/starlette/testclient.py:53
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+567 passed, 122 skipped, 2 warnings in 65.71s (0:01:05)
