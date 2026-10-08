@@ -61,6 +61,11 @@ class IdempotencyStore:
                                     VALUES (%s, %s, %s, %s, 'null'::jsonb, %s, clock_timestamp(), clock_timestamp() + %s, %s)
                                     ON CONFLICT (principal, route, key) DO NOTHING""",
                                  (principal, route, key, digest, PENDING, CLAIM_LEASE, claim_token)).rowcount
+            if inserted:
+                # The insert can block after evaluating VALUES timestamps. The row is
+                # still transaction-private; start its lease only after insertion finishes.
+                c.execute("UPDATE meemee_idempotency SET created_at=clock_timestamp(), expires_at=clock_timestamp()+%s WHERE principal=%s AND route=%s AND key=%s",
+                          (CLAIM_LEASE, principal, route, key))
         return None if inserted else self.get(principal, route, key, payload)
 
     def release(self, principal: str, route: str, key: str, *, claim_token: str | None = None) -> None:
