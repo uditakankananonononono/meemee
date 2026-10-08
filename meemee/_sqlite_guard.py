@@ -32,3 +32,19 @@ def close_db_on_init_failure(init: F) -> F:
             raise
 
     return wrapper  # type: ignore[return-value]
+
+
+def rollback_quietly(connection: Any) -> None:
+    """Roll back, containing any error so it cannot replace the failure being handled."""
+    try:
+        connection.rollback()
+    except BaseException:  # noqa: BLE001,S110 - cleanup must not replace the original
+        pass
+
+
+def close_quietly(connection: Any) -> None:
+    """Close, containing any error so it cannot replace the failure being handled."""
+    try:
+        connection.close()
+    except BaseException:  # noqa: BLE001,S110 - cleanup must not replace the original
+        pass

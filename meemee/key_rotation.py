@@ -9,6 +9,7 @@ from pathlib import Path
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from ._sqlite_guard import close_quietly, rollback_quietly
 from .secret_cipher import SecretCipher
 
 
@@ -112,14 +113,14 @@ def rotate_keys(data_dir: Path, old_key: str, new_key: str) -> dict[str, int]:
             }
         except Exception:
             if vault:
-                vault.rollback()
+                rollback_quietly(vault)
             if hooks:
-                hooks.rollback()
+                rollback_quietly(hooks)
             if vault:
-                vault.close()
+                close_quietly(vault)
                 vault = None
             if hooks:
-                hooks.close()
+                close_quietly(hooks)
                 hooks = None
             if mutated:
                 for path, backup in backups.items():
