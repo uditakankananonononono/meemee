@@ -153,18 +153,23 @@ def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = N
         WebhookStore,
     )
     database = Database(postgres_dsn)
-    MigrationStore(database).apply()
-    return Persistence("postgresql", MemoryStore(database, memory_embedder), JobStore(database), database.close, database,
-                       approvals=ApprovalStore(database), tokens=TokenStore(database), audit=AuditLog(database),
-                       email_verifications=EmailVerificationStore(database),
-                       quotas=QuotaStore(database, default_daily_jobs), entitlements=EntitlementStore(database, default_plan),
-                       runs=RunStore(database), idempotency=IdempotencyStore(database),
-                       webhooks=WebhookStore(database, webhook_max_payload_bytes, vault_key) if vault_key else None,
-                       companion=CompanionStore(database), personal_model=PersonalModelStore(database),
-                       context=ContextStore(database), monitors=MonitorStore(database),
-                       reflection_schedule=ReflectionSchedule(database), deletion_ledger=DeletionLedger(database),
-                       browser_sessions=BrowserSessionStore(database, default_host_id(data_dir)),
-                       browser_notices=TakeoverNoticeQueue(database))
+    try:
+        MigrationStore(database).apply()
+        return Persistence("postgresql", MemoryStore(database, memory_embedder), JobStore(database), database.close, database,
+                           approvals=ApprovalStore(database), tokens=TokenStore(database), audit=AuditLog(database),
+                           email_verifications=EmailVerificationStore(database),
+                           quotas=QuotaStore(database, default_daily_jobs), entitlements=EntitlementStore(database, default_plan),
+                           runs=RunStore(database), idempotency=IdempotencyStore(database),
+                           webhooks=WebhookStore(database, webhook_max_payload_bytes, vault_key) if vault_key else None,
+                           companion=CompanionStore(database), personal_model=PersonalModelStore(database),
+                           context=ContextStore(database), monitors=MonitorStore(database),
+                           reflection_schedule=ReflectionSchedule(database), deletion_ledger=DeletionLedger(database),
+                           browser_sessions=BrowserSessionStore(database, default_host_id(data_dir)),
+                           browser_notices=TakeoverNoticeQueue(database))
+
+    except BaseException:
+        database.close()
+        raise
 
 
 def persistence_from_settings(settings: Any) -> Persistence:
