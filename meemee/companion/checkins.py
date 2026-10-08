@@ -25,6 +25,8 @@ def in_quiet_hours(moment: datetime, quiet: QuietHours) -> bool:
 
 def next_due(prefs: CheckInPreferences, tz, after: datetime) -> datetime:
     """Next check-in instant strictly after `after`, honoring quiet hours."""
+    if after.tzinfo is None or after.utcoffset() is None:
+        raise ValueError("planning clock must include a timezone")
     candidate = (after.astimezone(timezone.utc) + timedelta(minutes=prefs.cadence_minutes)).astimezone(tz)
     if prefs.quiet_hours is None:
         return candidate.astimezone(timezone.utc)
