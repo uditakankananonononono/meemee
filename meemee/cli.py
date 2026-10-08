@@ -191,10 +191,13 @@ def scout(query: str, language: str | None = None, min_stars: int = 0, limit: in
     async def execute():
         settings = Settings()
         tool = GitHubRepoSearch(settings.github_token)
-        rows = await tool.run(GitHubSearchArgs(
-            query=query, language=language, min_stars=min_stars, limit=limit
-        ))
-        typer.echo(json.dumps(rows, indent=2))
+        try:
+            rows = await tool.run(GitHubSearchArgs(
+                query=query, language=language, min_stars=min_stars, limit=limit
+            ))
+            typer.echo(json.dumps(rows, indent=2))
+        finally:
+            await tool.aclose()
     asyncio.run(execute())
 
 
