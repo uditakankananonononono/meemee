@@ -1,6 +1,8 @@
 """Literal single-file search using the existing bounded workspace reader."""
 from pydantic import Field, StrictInt
-from .filesystem import PathArgs, ReadFile, ReadArgs, WorkspaceTool
+
+from .filesystem import PathArgs, ReadArgs, ReadFile, WorkspaceTool
+
 
 class SearchArgs(PathArgs):
     query: str = Field(min_length=1, max_length=1000)

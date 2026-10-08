@@ -7,4 +7,4 @@ from .github import GitHubCreatePullRequest, GitHubPushBranch, GitHubRepoSearch
 from .shell import ShellCommand
 from .text_search import SearchText
 
-__all__ = ["SearchText", "BrowserNavigate", "DelegateTasks", "GitCommit", "GitHubCreatePullRequest", "GitHubPushBranch", "GitHubRepoSearch", "GitInspect", "ReadFile", "ShellCommand", "Tool", "ToolRegistry", "WriteFile"]
+__all__ = ["BrowserNavigate", "DelegateTasks", "GitCommit", "GitHubCreatePullRequest", "GitHubPushBranch", "GitHubRepoSearch", "GitInspect", "ReadFile", "SearchText", "ShellCommand", "Tool", "ToolRegistry", "WriteFile"]
