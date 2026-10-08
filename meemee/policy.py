@@ -42,7 +42,10 @@ class PolicyEngine:
             return PolicyDecision(False, "tool is explicitly denied", False)
         if self.allowed_tools and tool not in self.allowed_tools:
             return PolicyDecision(False, "tool is not in the allowlist", False)
-        encoded = json.dumps(arguments, sort_keys=True, default=str).encode()
+        try:
+            encoded = json.dumps(arguments, sort_keys=True, default=str, allow_nan=False).encode()
+        except ValueError:
+            return PolicyDecision(False, "arguments must contain finite JSON numbers", False)
         if len(encoded) > self.max_argument_bytes:
             return PolicyDecision(False, "arguments exceed policy size limit", False)
         def path_denied(raw):
