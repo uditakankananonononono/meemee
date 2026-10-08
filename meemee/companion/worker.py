@@ -129,9 +129,9 @@ async def deliver_due_once(
 async def checkin_forever(settings: Settings | None = None) -> None:
     """Durable proactive check-in loop: plan slots, then deliver what is due."""
     settings = settings or Settings()
-    from .runtime import build_companion
+    from .runtime import build_companion_async
 
-    companion = build_companion(settings)
+    companion = await build_companion_async(settings)
     async with AsyncExitStack() as cleanup:
         owned_persistence = getattr(companion, "owned_persistence", None)
         if owned_persistence is not None:

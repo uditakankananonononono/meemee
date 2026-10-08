@@ -1,0 +1,138 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+_________ test_runtime_model_failure_releases_constructed_tool_clients _________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f792b8575e0>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-820/test_runtime_model_failure_rel0')
+
+    async def test_runtime_model_failure_releases_constructed_tool_clients(monkeypatch, tmp_path):
+        tools = []
+        original = runtime.GitHubRepoSearch
+        def capture(*args, **kwargs):
+            tool = original(*args, **kwargs)
+            tools.append(tool)
+            return tool
+        def fail(*args, **kwargs):
+            raise RuntimeError('construction failed')
+        monkeypatch.setattr(runtime, 'GitHubRepoSearch', capture)
+        monkeypatch.setattr(runtime, 'build_role_model', fail)
+        try:
+            with pytest.raises(RuntimeError, match='construction failed'):
+                await runtime.build_agent_async(Settings(_env_file=None, data_dir=tmp_path), memory=MemoryStore(tmp_path / 'memory.db'))
+>           assert tools[0].client.is_closed
+E           assert False
+E            +  where False = <httpx.AsyncClient object at 0x7f792b854f40>.is_closed
+E            +    where <httpx.AsyncClient object at 0x7f792b854f40> = <meemee.tools.github.GitHubRepoSearch object at 0x7f792b8579a0>.client
+
+tests/test_runtime_partial_http_cleanup.py:23: AssertionError
+_________ test_agent_failure_releases_model_and_tools_in_reverse_order _________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f792b8e78b0>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-820/test_agent_failure_releases_mo0')
+
+    async def test_agent_failure_releases_model_and_tools_in_reverse_order(monkeypatch, tmp_path):
+        import httpx
+    
+        from meemee.llm import OpenAICompatibleModel
+        events = []
+        class Transport(httpx.AsyncBaseTransport):
+            def __init__(self, name):
+                self.name = name
+            async def aclose(self):
+                events.append(self.name)
+        model = OpenAICompatibleModel('http://unused', 'model', 'key')
+        await model.client._transport.aclose()
+        model.client._transport = Transport('model')
+        monkeypatch.setattr(runtime, 'build_role_model', lambda *args: model)
+        originals = {name: getattr(runtime, name) for name in ['GitHubRepoSearch', 'GitHubPushBranch', 'GitHubCreatePullRequest']}
+        made = []
+        for name, original in originals.items():
+            def capture(*args, _original=original, _name=name):
+                tool = _original(*args)
+                # Unused default transports have acquired no connections.
+                tool.client._transport = Transport(_name)
+                made.append(tool)
+                return tool
+            monkeypatch.setattr(runtime, name, capture)
+        def fail(*args):
+            raise RuntimeError('policy rejected')
+        monkeypatch.setattr(runtime.PolicyEngine, 'from_file', fail)
+        try:
+            with pytest.raises(RuntimeError, match='policy rejected'):
+                await runtime.build_agent_async(Settings(_env_file=None, data_dir=tmp_path), memory=MemoryStore(tmp_path / 'memory.db'))
+>           assert events == ['model', 'GitHubCreatePullRequest', 'GitHubPushBranch', 'GitHubRepoSearch']
+E           AssertionError: assert [] == ['model', 'Gi...ubRepoSearch']
+E             
+E             Right contains 4 more items, first extra item: 'model'
+E             Use -v to get more diff
+
+tests/test_runtime_partial_http_cleanup.py:67: AssertionError
+_____________ test_companion_channel_failure_releases_actual_model _____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f792b856350>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-820/test_companion_channel_failure0')
+
+    async def test_companion_channel_failure_releases_actual_model(monkeypatch, tmp_path):
+        import httpx
+    
+        from meemee.companion import runtime as companion_runtime
+        from meemee.llm import OpenAICompatibleModel
+        released = []
+        class Transport(httpx.AsyncBaseTransport):
+            async def aclose(self):
+                released.append('model')
+        model = OpenAICompatibleModel('http://unused', 'model', 'key')
+        await model.client._transport.aclose()
+        model.client._transport = Transport()
+        monkeypatch.setattr(companion_runtime, 'build_role_model', lambda *args: model)
+        async def fail(*args):
+            raise RuntimeError('channel rejected')
+        monkeypatch.setattr(companion_runtime, 'build_channels_async', fail)
+        try:
+            with pytest.raises(RuntimeError, match='channel rejected'):
+                await companion_runtime.build_companion_async(Settings(_env_file=None, data_dir=tmp_path))
+>           assert released == ['model']
+E           AssertionError: assert [] == ['model']
+E             
+E             Right contains one more item: 'model'
+E             Use -v to get more diff
+
+tests/test_runtime_partial_http_cleanup.py:94: AssertionError
+_____________ test_channel_partial_build_releases_earlier_adapter ______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f792b8e66b0>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-820/test_channel_partial_build_rel0')
+
+    async def test_channel_partial_build_releases_earlier_adapter(monkeypatch, tmp_path):
+        from meemee.companion import channels
+        released = []
+        original = channels.WebhookChannel
+        made = []
+        def capture(*args, **kwargs):
+            channel = original(*args, **kwargs)
+            import httpx
+            class Transport(httpx.AsyncBaseTransport):
+                async def aclose(self):
+                    released.append('webhook')
+            channel.client._transport = Transport()
+            made.append(channel)
+            return channel
+        def fail(*args, **kwargs):
+            raise RuntimeError('provider rejected')
+        monkeypatch.setattr(channels, 'WebhookChannel', capture)
+        monkeypatch.setattr(channels, 'ProviderChannel', fail)
+        try:
+            with pytest.raises(RuntimeError, match='provider rejected'):
+                await channels.build_channels_async(Settings(_env_file=None, data_dir=tmp_path), object())
+>           assert made[0].client.is_closed
+E           assert False
+E            +  where False = <httpx.AsyncClient object at 0x7f792b8e5ed0>.is_closed
+E            +    where <httpx.AsyncClient object at 0x7f792b8e5ed0> = <meemee.companion.channels.WebhookChannel object at 0x7f792b8e6020>.client
+
+tests/test_runtime_partial_http_cleanup.py:120: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_runtime_partial_http_cleanup.py::test_runtime_model_failure_releases_constructed_tool_clients
+FAILED tests/test_runtime_partial_http_cleanup.py::test_agent_failure_releases_model_and_tools_in_reverse_order
+FAILED tests/test_runtime_partial_http_cleanup.py::test_companion_channel_failure_releases_actual_model
+FAILED tests/test_runtime_partial_http_cleanup.py::test_channel_partial_build_releases_earlier_adapter
+4 failed, 2 deselected in 0.82s

@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import json
 import time
+from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -179,3 +180,21 @@ def build_channels(settings, store, client: httpx.AsyncClient | None = None) -> 
             "imessage", settings.imessage_provider_url, settings.imessage_provider_token, client=client
         ),
     }
+
+
+async def build_channels_async(settings, store, client: httpx.AsyncClient | None = None) -> dict[str, ChannelAdapter]:
+    """Construct each adapter into cleanup ownership before creating the next."""
+    async with AsyncExitStack() as cleanup:
+        channels = {"local": LocalChannel(store)}
+        channels["webhook"] = WebhookChannel(
+            secret=settings.companion_webhook_secret or None,
+            max_payload_bytes=settings.webhook_max_payload_bytes, client=client,
+        )
+        cleanup.push_async_callback(channels["webhook"].aclose)
+        for name in ("whatsapp", "imessage"):
+            channel = ProviderChannel(name, getattr(settings, f"{name}_provider_url"),
+                                      getattr(settings, f"{name}_provider_token"), client=client)
+            cleanup.push_async_callback(channel.aclose)
+            channels[name] = channel
+        cleanup.pop_all()
+        return channels

@@ -6,7 +6,7 @@ import pytest
 
 from meemee.config import Settings
 from meemee.persistence import build_persistence
-from meemee.runtime import build_agent
+from meemee.runtime import build_agent_async
 from meemee.team import AgentTeam
 
 
@@ -16,8 +16,8 @@ async def test_team_error_joins_sibling_and_closes_actual_model(tmp_path):
     stopped = asyncio.Event()
     children = []
 
-    def factory():
-        child = build_agent(Settings(_env_file=None, data_dir=tmp_path), False, persistence=stores)
+    async def factory():
+        child = await build_agent_async(Settings(_env_file=None, data_dir=tmp_path), False, persistence=stores)
         children.append(child)
 
         async def run(goal, *, owner_id):

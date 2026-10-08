@@ -1,0 +1,148 @@
+FFFFF                                                                    [100%]
+=================================== FAILURES ===================================
+___________ test_lifespan_releases_actual_owned_http_clients[tools] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f416c970d00>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-811/test_lifespan_releases_actual_0')
+resource = 'tools'
+
+    @pytest.mark.parametrize('resource', ['tools', 'companion', 'reflection'])
+    async def test_lifespan_releases_actual_owned_http_clients(monkeypatch, tmp_path, resource):
+>       from meemee import api
+
+tests/test_api_owned_http_cleanup.py:17: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee/api.py:117: in <module>
+    agent = build_agent(settings, memory=persistence.memory, browser_sessions=browser_sessions, persistence=persistence)
+meemee/runtime.py:62: in build_agent
+    return run_composition(lambda: build_agent_async(settings, include_delegation, memory, browser_sessions, persistence))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+factory = <function build_agent.<locals>.<lambda> at 0x7f416c7d8ca0>
+
+    def run_composition(factory: Callable[[], Coroutine[Any, Any, Any]]) -> Any:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(factory())
+>       raise RuntimeError('synchronous composition cannot run inside an event loop; await the async factory')
+E       RuntimeError: synchronous composition cannot run inside an event loop; await the async factory
+
+meemee/composition.py:12: RuntimeError
+_________ test_lifespan_releases_actual_owned_http_clients[companion] __________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f416e8b96c0>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-811/test_lifespan_releases_actual_1')
+resource = 'companion'
+
+    @pytest.mark.parametrize('resource', ['tools', 'companion', 'reflection'])
+    async def test_lifespan_releases_actual_owned_http_clients(monkeypatch, tmp_path, resource):
+>       from meemee import api
+
+tests/test_api_owned_http_cleanup.py:17: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee/api.py:117: in <module>
+    agent = build_agent(settings, memory=persistence.memory, browser_sessions=browser_sessions, persistence=persistence)
+meemee/runtime.py:62: in build_agent
+    return run_composition(lambda: build_agent_async(settings, include_delegation, memory, browser_sessions, persistence))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+factory = <function build_agent.<locals>.<lambda> at 0x7f416c65e440>
+
+    def run_composition(factory: Callable[[], Coroutine[Any, Any, Any]]) -> Any:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(factory())
+>       raise RuntimeError('synchronous composition cannot run inside an event loop; await the async factory')
+E       RuntimeError: synchronous composition cannot run inside an event loop; await the async factory
+
+meemee/composition.py:12: RuntimeError
+_________ test_lifespan_releases_actual_owned_http_clients[reflection] _________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f416c503e20>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-811/test_lifespan_releases_actual_2')
+resource = 'reflection'
+
+    @pytest.mark.parametrize('resource', ['tools', 'companion', 'reflection'])
+    async def test_lifespan_releases_actual_owned_http_clients(monkeypatch, tmp_path, resource):
+>       from meemee import api
+
+tests/test_api_owned_http_cleanup.py:17: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee/api.py:117: in <module>
+    agent = build_agent(settings, memory=persistence.memory, browser_sessions=browser_sessions, persistence=persistence)
+meemee/runtime.py:62: in build_agent
+    return run_composition(lambda: build_agent_async(settings, include_delegation, memory, browser_sessions, persistence))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+factory = <function build_agent.<locals>.<lambda> at 0x7f416c65f760>
+
+    def run_composition(factory: Callable[[], Coroutine[Any, Any, Any]]) -> Any:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(factory())
+>       raise RuntimeError('synchronous composition cannot run inside an event loop; await the async factory')
+E       RuntimeError: synchronous composition cannot run inside an event loop; await the async factory
+
+meemee/composition.py:12: RuntimeError
+__________ test_shutdown_attempts_remaining_cleanup_after_close_error __________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f416c689030>
+
+    async def test_shutdown_attempts_remaining_cleanup_after_close_error(monkeypatch):
+>       from meemee import api
+
+tests/test_api_owned_http_cleanup.py:55: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee/api.py:117: in <module>
+    agent = build_agent(settings, memory=persistence.memory, browser_sessions=browser_sessions, persistence=persistence)
+meemee/runtime.py:62: in build_agent
+    return run_composition(lambda: build_agent_async(settings, include_delegation, memory, browser_sessions, persistence))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+factory = <function build_agent.<locals>.<lambda> at 0x7f416c65fbe0>
+
+    def run_composition(factory: Callable[[], Coroutine[Any, Any, Any]]) -> Any:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(factory())
+>       raise RuntimeError('synchronous composition cannot run inside an event loop; await the async factory')
+E       RuntimeError: synchronous composition cannot run inside an event loop; await the async factory
+
+meemee/composition.py:12: RuntimeError
+_____________ test_shutdown_closes_shared_model_once_on_body_error _____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f416c6d0220>
+
+    async def test_shutdown_closes_shared_model_once_on_body_error(monkeypatch):
+>       from meemee import api
+
+tests/test_api_owned_http_cleanup.py:83: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+meemee/api.py:117: in <module>
+    agent = build_agent(settings, memory=persistence.memory, browser_sessions=browser_sessions, persistence=persistence)
+meemee/runtime.py:62: in build_agent
+    return run_composition(lambda: build_agent_async(settings, include_delegation, memory, browser_sessions, persistence))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+factory = <function build_agent.<locals>.<lambda> at 0x7f416c6d8e50>
+
+    def run_composition(factory: Callable[[], Coroutine[Any, Any, Any]]) -> Any:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(factory())
+>       raise RuntimeError('synchronous composition cannot run inside an event loop; await the async factory')
+E       RuntimeError: synchronous composition cannot run inside an event loop; await the async factory
+
+meemee/composition.py:12: RuntimeError
+=========================== short test summary info ============================
+FAILED tests/test_api_owned_http_cleanup.py::test_lifespan_releases_actual_owned_http_clients[tools]
+FAILED tests/test_api_owned_http_cleanup.py::test_lifespan_releases_actual_owned_http_clients[companion]
+FAILED tests/test_api_owned_http_cleanup.py::test_lifespan_releases_actual_owned_http_clients[reflection]
+FAILED tests/test_api_owned_http_cleanup.py::test_shutdown_attempts_remaining_cleanup_after_close_error
+FAILED tests/test_api_owned_http_cleanup.py::test_shutdown_closes_shared_model_once_on_body_error
+5 failed in 0.72s

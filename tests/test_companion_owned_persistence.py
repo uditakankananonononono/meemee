@@ -41,7 +41,7 @@ def test_standalone_companion_releases_actual_owned_pg_pool(monkeypatch, tmp_pat
 
 async def test_borrowed_persistence_is_not_owned_by_companion(tmp_path):
     shared = persistence.build_persistence('sqlite', tmp_path)
-    companion = runtime.build_companion(Settings(_env_file=None, data_dir=tmp_path), persistence=shared)
+    companion = await runtime.build_companion_async(Settings(_env_file=None, data_dir=tmp_path), persistence=shared)
     try:
         assert companion.owned_persistence is None
         assert shared.jobs.db.execute('SELECT 1').fetchone()[0] == 1
@@ -56,8 +56,8 @@ async def test_borrowed_persistence_is_not_owned_by_companion(tmp_path):
 def test_standalone_loop_does_not_close_borrowed_actual_pg_pool(monkeypatch, tmp_path):
     dsn, drop = _pg_dsn()
     shared = persistence.build_persistence('postgresql', tmp_path, dsn)
-    original = runtime.build_companion
-    monkeypatch.setattr(runtime, 'build_companion', lambda settings: original(settings, persistence=shared))
+    original = runtime.build_companion_async
+    monkeypatch.setattr(runtime, 'build_companion_async', lambda settings: original(settings, persistence=shared))
     monkeypatch.setattr(worker, 'CheckInScheduler', lambda store: SimpleNamespace(plan_all=lambda: None))
 
     async def cancel(*args):

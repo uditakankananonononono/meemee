@@ -25,7 +25,7 @@ from .postgres_copy import export_sqlite, import_postgresql
 from .preflight import run_preflight
 from .release_audit import audit_tree
 from .retention import RetentionManager
-from .runtime import build_agent
+from .runtime import build_agent_async
 from .schema_registry import schema_status
 from .tools.github import GitHubRepoSearch, GitHubSearchArgs
 from .vault import SecretVault, vault_from_settings
@@ -175,7 +175,7 @@ ROOT_ARGUMENT = typer.Argument(Path("."))
 def run(goal: str, approve_writes: bool = typer.Option(False, "--approve-writes")) -> None:
     """Run an agent goal. Writes require --approve-writes."""
     async def execute():
-        agent = build_agent()
+        agent = await build_agent_async()
         # Local single-user CLI runs intentionally use the legacy "default" owner bucket.
         report = await agent.run(goal, approve=lambda _n, _a, _r: approve_writes, owner_id="default")
         typer.echo(report.model_dump_json(indent=2))
