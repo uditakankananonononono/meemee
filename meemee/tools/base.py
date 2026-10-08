@@ -95,7 +95,8 @@ class ToolRegistry:
                 return ToolResult(ok=False, error=outcome.error, elapsed_ms=elapsed)
             # Signature errors occur before invoking the action. An internal TypeError/
             # ValueError may follow a side effect and must never trigger a replay.
-            parameters = inspect.signature(tool.run).parameters
+            signature = inspect.signature(tool.run)
+            parameters = signature.parameters
             options = {}
             if "cancel" in parameters:
                 options["cancel"] = cancel
@@ -103,6 +104,7 @@ class ToolRegistry:
                 options["owner_id"] = owner_id
             if cancel is not None and cancel.is_set():
                 return ToolResult(ok=False, error="tool cancelled", elapsed_ms=round((time.perf_counter()-started)*1000))
+            signature.bind(parsed, **options)
             dispatched = True
             value = tool.run(parsed, **options)
             if inspect.isawaitable(value):
