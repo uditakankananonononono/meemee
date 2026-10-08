@@ -358,9 +358,6 @@ class RoutedModel:
         return await self._run("chat", messages, temperature=temperature, max_tokens=max_tokens)
 
     async def aclose(self) -> None:
-        if self.client is not None:
-            await self.client.aclose()
-            return
         async with AsyncExitStack() as cleanup:
             for model in self._clients.values():
                 cleanup.push_async_callback(model.aclose)

@@ -36,6 +36,7 @@ class OpenAICompatibleModel:
         self.model = model
         self.api_key = api_key
         self.max_attempts = max_attempts
+        self.owns_client = client is None
         self.client = client or httpx.AsyncClient(
             timeout=httpx.Timeout(timeout, connect=min(timeout, 10)),
             limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
@@ -154,4 +155,5 @@ class OpenAICompatibleModel:
         raise ModelError(f"model request failed after {attempts_used} attempts: {last_error}") from last_error
 
     async def aclose(self) -> None:
-        await self.client.aclose()
+        if self.owns_client:
+            await self.client.aclose()
