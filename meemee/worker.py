@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import builtins
+import sys
 import threading
 import uuid
 
@@ -20,12 +22,25 @@ JOB_FAILURE_CLASSES = (OSError, ValueError, RuntimeError, httpx.HTTPError, httpx
                        httpx.StreamError, httpx.CookieConflict)
 
 
+def _trusted_class(cls: type) -> bool:
+    """Identity check, never __module__ metadata: the class must be the very object found under its own
+    name in builtins, in httpx, or in a meemee module. A forged class that merely claims one of those
+    modules is not that object."""
+    if getattr(builtins, cls.__name__, None) is cls:
+        return True
+    if getattr(httpx, cls.__name__, None) is cls:
+        return True
+    module = sys.modules.get(cls.__module__)
+    return bool(module is not None and cls.__module__.split(".")[0] == "meemee"
+                and getattr(module, cls.__name__, None) is cls)
+
+
 def error_label(exc: BaseException) -> str:
-    """Class-name label safe to send to a webhook endpoint: the nearest ancestor that is a builtin, an
-    exact httpx class or a meemee class. Never the exception text, never a third-party class name."""
+    """Class-name label safe to send to a webhook endpoint: the nearest ancestor that is a trusted class
+    by identity (builtin, exact httpx class, or a meemee class object). Never the exception text, never
+    a third-party or forged class name."""
     for cls in type(exc).__mro__:
-        if cls.__module__ == "builtins" or cls.__module__.split(".")[0] == "meemee" or (
-                cls.__name__ in dir(httpx) and getattr(httpx, cls.__name__) is cls):
+        if _trusted_class(cls):
             return cls.__name__
     return "error"
 

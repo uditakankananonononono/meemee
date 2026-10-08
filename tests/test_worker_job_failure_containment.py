@@ -114,3 +114,20 @@ async def test_PROTECTION_owner_visible_job_error_text_unchanged(monkeypatch, tm
     _, _, status = await drive(monkeypatch, tmp_path, ValueError("diagnostic for owner"), keep=row)
     assert status == "failed"
     assert "diagnostic for owner" in json.dumps(row, default=str)
+
+
+@pytest.mark.parametrize("module", ["builtins", "meemee.vendor", "meemee.llm", "meemee.worker", "httpx", "httpx._exceptions"])
+async def test_forged_module_metadata_does_not_launder_a_class_name(monkeypatch, tmp_path, module):
+    Forged = type("PrivateTokenError", (ValueError,), {"__module__": module})
+    _, payloads, _ = await drive(monkeypatch, tmp_path, Forged("x"))
+    assert payloads[0]["data"]["error"] == "ValueError"
+
+
+def test_error_label_identity_cases():
+    assert worker.error_label(ModelError("x")) == "ModelError"
+    assert worker.error_label(httpx.ReadError("x")) == "ReadError"
+    assert worker.error_label(FileNotFoundError("x")) == "FileNotFoundError"
+    Sub = type("PrivateTokenError", (ModelError,), {"__module__": "meemee.llm"})
+    assert worker.error_label(Sub("x")) == "ModelError"
+    Lone = type("PrivateTokenError", (Exception,), {"__module__": "builtins"})
+    assert worker.error_label(Lone("x")) == "Exception"
