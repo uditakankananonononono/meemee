@@ -4,6 +4,7 @@ import asyncio
 import json
 import uuid
 from collections.abc import Callable
+from contextlib import AsyncExitStack
 from threading import Event
 
 from .context import ContextStore
@@ -46,9 +47,10 @@ def refusal(step: int, name: str, risk: Risk, reason: str, detail: str, argument
 
 
 class Agent:
-    def __init__(self, model: Model, tools: ToolRegistry, memory: MemoryStore, max_steps: int = 12, policy: PolicyEngine | None = None, context: ContextStore | None = None, personal_model: PersonalModelStore | None = None, *, owns_model: bool = False):
+    def __init__(self, model: Model, tools: ToolRegistry, memory: MemoryStore, max_steps: int = 12, policy: PolicyEngine | None = None, context: ContextStore | None = None, personal_model: PersonalModelStore | None = None, *, owns_model: bool = False, owns_tools: bool = False):
         self.model = model
         self.owns_model = owns_model
+        self.owns_tools = owns_tools
         self.tools = tools
         self.memory = memory
         self.max_steps = max_steps
@@ -56,6 +58,15 @@ class Agent:
         self.policy = policy or PolicyEngine()
         self.context = context
         self.personal_model = personal_model
+
+    async def aclose(self) -> None:
+        async with AsyncExitStack() as cleanup:
+            if self.owns_model:
+                close = getattr(self.model, "aclose", None)
+                if close is not None:
+                    cleanup.push_async_callback(close)
+            if self.owns_tools:
+                cleanup.push_async_callback(self.tools.aclose)
 
     async def run(self, goal: str, approve: Approval | None = None, cancel: Event | None = None, *, owner_id: str, run_id: str | None = None) -> RunReport:
         run_id = run_id or uuid.uuid4().hex

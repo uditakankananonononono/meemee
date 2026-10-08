@@ -119,7 +119,7 @@ async def work_forever(settings: Settings | None = None) -> None:
                         webhooks.enqueue(f"job:{job['id']}:failed", "job.failed", {"job_id": job["id"], "status": "failed", "error": str(exc)}, principal=owner)
             finally:
                 stop.set(); watcher.join(timeout=1)
-                close = getattr(getattr(agent, "model", None), "aclose", None)
+                close = getattr(agent, "aclose", None) or getattr(getattr(agent, "model", None), "aclose", None)
                 if close is not None:
                     await close()
     finally:
