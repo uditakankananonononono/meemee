@@ -8,6 +8,8 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+from ._sqlite_guard import rollback_quietly
+
 FORMAT = "meemee.account.v1"
 
 
@@ -84,8 +86,8 @@ def import_account(data_dir: Path, source: Path, target_principal: str | None = 
         for row in payload["entitlements"]:
             db.execute("INSERT INTO imported_entitlements.principal_plans(principal,plan,updated_at) VALUES(?,?,?)", (target, row["plan"], row["updated_at"]))
         db.commit()
-    except Exception:
-        db.rollback()
+    except BaseException:
+        rollback_quietly(db)
         raise
     finally:
         db.close()

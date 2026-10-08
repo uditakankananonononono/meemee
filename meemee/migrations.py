@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from ._sqlite_guard import rollback_quietly
+
 
 @dataclass(frozen=True)
 class Migration:
@@ -79,7 +81,7 @@ class Migrator:
                 applied.append(migration.version)
             connection.commit()
         except BaseException:
-            connection.rollback()
+            rollback_quietly(connection)
             raise
         finally:
             connection.close()
