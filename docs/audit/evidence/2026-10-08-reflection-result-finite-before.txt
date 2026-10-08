@@ -1,0 +1,52 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+____ test_reflection_result_rejects_nonfinite_before_watermark[sqlite-nan] _____
+
+stores = <function stores.<locals>.<lambda> at 0x7f3518d969e0>, value = nan
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf')])
+    def test_reflection_result_rejects_nonfinite_before_watermark(stores, value):  # noqa: F811
+        _, schedule = stores()
+>       with pytest.raises(ValueError, match='JSON'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_reflection_result_finite.py:10: Failed
+____ test_reflection_result_rejects_nonfinite_before_watermark[sqlite-inf] _____
+
+stores = <function stores.<locals>.<lambda> at 0x7f3518de31c0>, value = inf
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf')])
+    def test_reflection_result_rejects_nonfinite_before_watermark(stores, value):  # noqa: F811
+        _, schedule = stores()
+>       with pytest.raises(ValueError, match='JSON'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_reflection_result_finite.py:10: Failed
+__ test_reflection_result_rejects_nonfinite_before_watermark[postgresql-nan] ___
+
+stores = <function stores.<locals>.<lambda> at 0x7f3518de3130>, value = nan
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf')])
+    def test_reflection_result_rejects_nonfinite_before_watermark(stores, value):  # noqa: F811
+        _, schedule = stores()
+>       with pytest.raises(ValueError, match='JSON'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_reflection_result_finite.py:10: Failed
+__ test_reflection_result_rejects_nonfinite_before_watermark[postgresql-inf] ___
+
+stores = <function stores.<locals>.<lambda> at 0x7f3518908430>, value = inf
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf')])
+    def test_reflection_result_rejects_nonfinite_before_watermark(stores, value):  # noqa: F811
+        _, schedule = stores()
+>       with pytest.raises(ValueError, match='JSON'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_reflection_result_finite.py:10: Failed
+=========================== short test summary info ============================
+FAILED tests/test_reflection_result_finite.py::test_reflection_result_rejects_nonfinite_before_watermark[sqlite-nan]
+FAILED tests/test_reflection_result_finite.py::test_reflection_result_rejects_nonfinite_before_watermark[sqlite-inf]
+FAILED tests/test_reflection_result_finite.py::test_reflection_result_rejects_nonfinite_before_watermark[postgresql-nan]
+FAILED tests/test_reflection_result_finite.py::test_reflection_result_rejects_nonfinite_before_watermark[postgresql-inf]
+4 failed in 1.26s

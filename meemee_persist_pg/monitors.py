@@ -157,6 +157,7 @@ class ReflectionSchedule:
         return out
 
     def record(self, owner_id: str, status: str, result: dict[str, Any], watermark: int | None, now: datetime | None = None) -> None:
+        encoded = json.dumps(result, sort_keys=True, default=str, allow_nan=False)
         at = reflection_clock(now).isoformat()
         with self.db.transaction() as c:
             c.execute("""INSERT INTO meemee_reflection_runs(owner_id,watermark,last_attempt_at,last_success_at,last_status,last_result)
@@ -165,7 +166,7 @@ class ReflectionSchedule:
                 last_success_at=COALESCE(EXCLUDED.last_success_at, meemee_reflection_runs.last_success_at),
                 last_status=EXCLUDED.last_status, last_result=EXCLUDED.last_result""",
                       (owner_id, watermark or 0, at, at if status == "ok" else None, status,
-                       json.dumps(result, sort_keys=True, default=str), watermark))
+                       encoded, watermark))
 
     def delete_owner(self, owner_id: str) -> int:
         with self.db.transaction() as c:
