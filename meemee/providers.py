@@ -86,6 +86,8 @@ def extract_json_object(text: str) -> str:
                         return candidate
                     except json.JSONDecodeError:
                         break
+                    except RecursionError:
+                        raise ModelError("model output JSON is nested too deeply") from None
         start = text.find("{", start + 1)
     raise ModelError("model output contains no JSON object")
 
