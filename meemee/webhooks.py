@@ -15,6 +15,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
+from cryptography.exceptions import InvalidTag
 
 from ._sqlite_guard import close_db_on_init_failure
 from .cursors import decode_cursor, encode_cursor
@@ -226,7 +227,12 @@ class WebhookStore:
             )
             self.db.execute("COMMIT")
         delivery = dict(row)
-        delivery["secret"] = self._decrypt_secret(delivery["subscription_id"], delivery["secret"])
+        try:
+            delivery["secret"] = self._decrypt_secret(delivery["subscription_id"], delivery["secret"])
+        except (InvalidTag, ValueError):  # undecryptable/corrupt secret (binascii.Error is a ValueError)
+            # The row is already claimed ('sending'); hand it back so the dispatcher can retry it
+            # through the normal max_attempts path instead of raising and leaving it stuck.
+            delivery["secret"] = None
         return delivery
 
     def succeed(self, ident: str, status: int) -> None:
@@ -460,10 +466,25 @@ class WebhookDispatcher:
         return "sha256=" + hmac.new(secret.encode(), f"{timestamp}.{body}".encode(), hashlib.sha256).hexdigest()
 
     async def deliver_one(self) -> bool:
+        """Attempt one delivery. Per-delivery network/encoding/decoder failures are contained and
+        retried with a class-name-only last_error; store (sqlite) failures are NOT contained, so a
+        broken DB ends the loop loudly. Delivery is at-least-once: if the store write after a
+        successful POST fails, the row stays 'sending' and lease recovery re-sends it with the same
+        X-Meemee-Delivery id (receivers should dedupe on it)."""
         delivery = self.store.claim()
         if delivery is None: return False
+        if delivery["secret"] is None:
+            self.store.retry(delivery["id"], "secret unreadable")
+            return True
+        try:
+            headers = json.loads(delivery["headers"] or "{}")
+        except (json.JSONDecodeError, RecursionError) as exc:
+            self.store.retry(delivery["id"], f"headers unreadable ({type(exc).__name__})")
+            return True
+        if not isinstance(headers, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in headers.items()):
+            self.store.retry(delivery["id"], "headers unreadable (not a string map)")
+            return True
         timestamp = str(int(time.time()))
-        headers = json.loads(delivery["headers"] or "{}")
         headers.update({
             "Content-Type":"application/json",
             "X-Meemee-Event":delivery["event_type"],
@@ -473,18 +494,19 @@ class WebhookDispatcher:
         })
         try:
             response = await self.client.post(delivery["url"], content=delivery["payload"], headers=headers)
-            if 200 <= response.status_code < 300:
-                self.store.succeed(delivery["id"], response.status_code)
-            else:
-                self.store.retry(delivery["id"], f"HTTP {response.status_code}")
-        except httpx.HTTPError as exc:
+        except (httpx.HTTPError, httpx.InvalidURL, httpx.StreamError, httpx.CookieConflict, UnicodeError, RecursionError) as exc:
             self.store.retry(delivery["id"], type(exc).__name__)
+            return True
+        if 200 <= response.status_code < 300:
+            self.store.succeed(delivery["id"], response.status_code)
+        else:
+            self.store.retry(delivery["id"], f"HTTP {response.status_code}")
         return True
 
 
-async def dispatch_forever(store: WebhookStore, poll_seconds: float = 1.0) -> None:
+async def dispatch_forever(store: WebhookStore, poll_seconds: float = 1.0, client: httpx.AsyncClient | None = None) -> None:
     """Deliver queued webhooks continuously. Safe to run in multiple processes."""
-    dispatcher = WebhookDispatcher(store)
+    dispatcher = WebhookDispatcher(store, client)
     store.recover_stale(time.time() - 300)
     deliveries = 0
     try:
