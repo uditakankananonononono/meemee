@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import os
+import signal
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictInt
 
 from ..types import Risk
 from .base import Tool
@@ -12,6 +14,8 @@ from .base import Tool
 class GitReadArgs(BaseModel):
     operation: str = Field(pattern="^(status|diff|log)$")
     limit: int = Field(default=20, ge=1, le=100)
+    max_output_bytes: StrictInt = Field(default=200_000, ge=1, le=1_000_000)
+    timeout_seconds: float = Field(default=30, ge=0.1, le=300)
 
 
 class GitCommitArgs(BaseModel):
@@ -23,13 +27,33 @@ class GitBase(Tool):
     def __init__(self, root: Path):
         self.root = root.resolve()
 
-    async def git(self, *argv: str) -> dict[str, object]:
+    async def git(self, *argv: str, cap=200_000, timeout=30) -> dict[str, object]:
         process = await asyncio.create_subprocess_exec(
             "git", *argv, cwd=self.root,
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            start_new_session=(os.name == "posix"),
         )
-        stdout, stderr = await process.communicate()
-        result = {"exit_code": process.returncode, "stdout": stdout.decode(), "stderr": stderr.decode()}
+        async def capture(stream):
+            retained=bytearray();truncated=False
+            while chunk := await stream.read(65536):
+                room=cap-len(retained);retained.extend(chunk[:room])
+                truncated=truncated or len(chunk)>room
+            return retained.decode(errors="replace"),truncated
+        tasks=[asyncio.create_task(capture(process.stdout)),asyncio.create_task(capture(process.stderr)),asyncio.create_task(process.wait())]
+        async def stop():
+            try:
+                if os.name=="posix":os.killpg(process.pid,signal.SIGKILL)
+                elif process.returncode is None:process.kill()
+            except ProcessLookupError:pass
+            for task in tasks:task.cancel()
+            await asyncio.gather(*tasks,return_exceptions=True)
+            await process.wait()
+        try:stdout,stderr,_=await asyncio.wait_for(asyncio.gather(*tasks),timeout)
+        except asyncio.TimeoutError:
+            await stop();raise ValueError("git command timed out; write outcome unknown") from None
+        except BaseException:
+            await stop();raise
+        result={"exit_code":process.returncode,"stdout":stdout[0],"stderr":stderr[0],"truncated":stdout[1] or stderr[1]}
         if process.returncode:
             raise ValueError(f"git {' '.join(argv)} failed: {result['stderr']}")
         return result
@@ -42,10 +66,10 @@ class GitInspect(GitBase):
 
     async def run(self, arguments: GitReadArgs) -> dict[str, object]:
         if arguments.operation == "status":
-            return await self.git("status", "--short", "--branch")
+            return await self.git("status", "--short", "--branch", cap=arguments.max_output_bytes, timeout=arguments.timeout_seconds)
         if arguments.operation == "diff":
-            return await self.git("diff", "--no-ext-diff", "--")
-        return await self.git("log", f"-{arguments.limit}", "--oneline", "--decorate")
+            return await self.git("diff", "--no-ext-diff", "--", cap=arguments.max_output_bytes, timeout=arguments.timeout_seconds)
+        return await self.git("log", f"-{arguments.limit}", "--oneline", "--decorate", cap=arguments.max_output_bytes, timeout=arguments.timeout_seconds)
 
 
 class GitCommit(GitBase):
