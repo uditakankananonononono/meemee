@@ -48,6 +48,8 @@ async def _receive_object(websocket: WebSocket, timeout: float | None = None) ->
         raise _BadFrame("text frames only") from None
     try:
         value = json.loads(raw)
+    except RecursionError:
+        raise _BadFrame("message nesting is too deep") from None
     except (ValueError, TypeError):
         raise _BadFrame("message must be valid JSON") from None
     if not isinstance(value, dict):
