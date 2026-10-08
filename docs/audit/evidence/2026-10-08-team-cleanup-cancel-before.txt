@@ -1,0 +1,47 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+____________ test_team_sibling_error_waits_for_started_tool_cleanup ____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-793/test_team_sibling_error_waits_0')
+
+    async def test_team_sibling_error_waits_for_started_tool_cleanup(tmp_path):
+        entered, release = asyncio.Event(), asyncio.Event()
+        events = []
+        children = []
+    
+        class SlowTool:
+            name = 'slow'
+            async def aclose(self):
+                events.append('tool-close-enter')
+                entered.set()
+                await release.wait()
+                events.append('tool-close-done')
+    
+        def factory():
+            tools = ToolRegistry()
+            if not children:
+                tools.register(SlowTool())
+            model = OpenAICompatibleModel('http://unused', 'model', 'key')
+            child = Agent(model, tools, MemoryStore(tmp_path / f'{len(children)}.db'), owns_model=True, owns_tools=True)
+            children.append(child)
+            async def run(goal, *, owner_id):
+                if goal == 'bad':
+                    await entered.wait()
+                    asyncio.get_running_loop().call_later(.02, release.set)
+                    raise TypeError('original error')
+                return SimpleNamespace(model_dump=lambda: {})
+            child.run = run
+            return child
+    
+        try:
+            with pytest.raises(TypeError, match='original error'):
+                await AgentTeam(factory).delegate(['good', 'bad'], owner_id='owner')
+>           assert events.count('tool-close-done') == 1
+E           AssertionError: assert 0 == 1
+E            +  where 0 = <built-in method count of list object at 0x7f9f91ffe000>('tool-close-done')
+E            +    where <built-in method count of list object at 0x7f9f91ffe000> = ['tool-close-enter'].count
+
+tests/test_team_cleanup_cancellation.py:47: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_team_cleanup_cancellation.py::test_team_sibling_error_waits_for_started_tool_cleanup
+1 failed in 0.28s

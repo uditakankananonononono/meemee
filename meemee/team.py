@@ -44,7 +44,14 @@ class AgentTeam:
                 finally:
                     close = getattr(child, "aclose", None)
                     if close is not None:
-                        await close()
+                        # A sibling failure may cancel this task after close has
+                        # begun. Keep its finalizer alive and join it before exit.
+                        cleanup = asyncio.create_task(close())
+                        try:
+                            await asyncio.shield(cleanup)
+                        except asyncio.CancelledError:
+                            await cleanup
+                            raise
                     elif getattr(child, "owns_model", False):
                         close_model = getattr(getattr(child, "model", None), "aclose", None)
                         if close_model is not None:
