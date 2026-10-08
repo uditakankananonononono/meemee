@@ -206,3 +206,23 @@ async def test_rethrown_provider_error_subclass_with_canonical_prefix_and_secret
         await model.chat([{"role": "user", "content": "x"}])
     observed = str(ei.value) + json.dumps(model.last_attempts)
     assert "PRIVATE" not in observed and "secret.test" not in observed
+
+
+@pytest.mark.parametrize("cls", ["PrivateTokenError", "SecretHostError", "ABCError", "RecursionErrorX"])
+async def test_alphabetic_secret_class_name_in_canonical_form_not_echoed(cls):
+    from meemee._vendor.instinct_models.providers import ProviderError
+
+    def t(*a):
+        raise ProviderError(f"ornith-local: undecodable response ({cls})")
+    model = _model(t)
+    with pytest.raises(ModelError) as ei:
+        await model.chat([{"role": "user", "content": "x"}])
+    observed = str(ei.value) + json.dumps(model.last_attempts)
+    assert cls not in observed
+    assert "provider error" in observed
+
+
+def test_safe_detail_only_allowlisted_class_names_roundtrip():
+    for c in sm._CLASS_NAMES:
+        assert sm._safe_detail("error", f"ornith-local: transport failure ({c})") == f"transport failure ({c})"
+    assert sm._safe_detail("error", "ornith-local: transport failure (PrivateTokenError)") == "provider error"
