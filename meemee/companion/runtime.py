@@ -34,18 +34,23 @@ def build_companion(settings: Settings | None = None, store: CompanionStore | No
         shared = persistence_from_settings(settings)
         owned_persistence = shared
         store = store or shared.companion
-    companion_store = store or CompanionStore(settings.data_dir / "companion.sqlite3")
-    context_store = shared.context if shared else ContextStore(settings.data_dir / "context.sqlite3")
-    personal_model = shared.personal_model if shared else PersonalModelStore(settings.data_dir / "personal-model.sqlite3")
-    model = build_role_model(settings, "chat")
-    engine = CompanionEngine(
-        model,
-        companion_store,
-        history_limit=settings.companion_history_limit,
-        fact_limit=settings.companion_fact_limit,
-        temperature=settings.companion_model_temperature,
-        context=context_store,
-        personal_model=personal_model,
-    )
-    channels = build_channels(settings, companion_store)
-    return Companion(companion_store, engine, channels, model, owned_persistence)
+    try:
+        companion_store = store or CompanionStore(settings.data_dir / "companion.sqlite3")
+        context_store = shared.context if shared else ContextStore(settings.data_dir / "context.sqlite3")
+        personal_model = shared.personal_model if shared else PersonalModelStore(settings.data_dir / "personal-model.sqlite3")
+        model = build_role_model(settings, "chat")
+        engine = CompanionEngine(
+            model,
+            companion_store,
+            history_limit=settings.companion_history_limit,
+            fact_limit=settings.companion_fact_limit,
+            temperature=settings.companion_model_temperature,
+            context=context_store,
+            personal_model=personal_model,
+        )
+        channels = build_channels(settings, companion_store)
+        return Companion(companion_store, engine, channels, model, owned_persistence)
+    except BaseException:
+        if owned_persistence is not None:
+            owned_persistence.close()
+        raise

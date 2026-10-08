@@ -72,3 +72,29 @@ def test_standalone_loop_does_not_close_borrowed_actual_pg_pool(monkeypatch, tmp
     finally:
         shared.close()
         drop()
+
+
+@pytest.mark.skipif(not PG_DSN, reason='requires real PostgreSQL')
+def test_companion_builder_model_failure_releases_owned_actual_pg_pool(monkeypatch, tmp_path):
+    dsn, drop = _pg_dsn()
+    created = []
+    original = persistence.persistence_from_settings
+
+    def capture(settings):
+        value = original(settings)
+        created.append(value)
+        return value
+
+    def broken_model(*args):
+        raise RuntimeError('model configuration rejected')
+
+    monkeypatch.setattr(persistence, 'persistence_from_settings', capture)
+    monkeypatch.setattr(runtime, 'build_role_model', broken_model)
+    try:
+        with pytest.raises(RuntimeError, match='model configuration rejected'):
+            runtime.build_companion(Settings(_env_file=None, data_dir=tmp_path, persistence_backend='postgresql', postgres_dsn=dsn))
+        assert created[0].database.pool.closed
+    finally:
+        for value in created:
+            value.close()
+        drop()
