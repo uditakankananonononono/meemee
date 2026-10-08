@@ -9,6 +9,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Literal
 
+from ._sqlite_guard import close_db_on_init_failure
+
 GoalStatus = Literal["pending", "active", "blocked", "completed", "failed", "cancelled"]
 _TERMINAL = {"completed", "failed", "cancelled"}
 _TRANSITIONS = {
@@ -34,6 +36,7 @@ class GoalConflict(RuntimeError):
 class GoalStore:
     """Principal-scoped goal graph with priorities, dependencies and expiring leases."""
 
+    @close_db_on_init_failure
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False, isolation_level=None)

@@ -13,6 +13,7 @@ from pathlib import Path
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from ._sqlite_guard import close_db_on_init_failure
 from .cursors import decode_cursor, encode_cursor
 
 
@@ -58,6 +59,7 @@ def token_introspection(row: dict, now: datetime) -> dict:
 class TokenStore:
     """Persistent, revocable, scoped API tokens. Only SHA-256 token digests are stored."""
 
+    @close_db_on_init_failure
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False)

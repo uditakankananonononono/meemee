@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
+from ._sqlite_guard import close_db_on_init_failure
+
 Kind = Literal["event", "document", "entity", "relationship"]
 Visibility = Literal["private", "agent", "shared"]
 
@@ -49,6 +51,7 @@ def context_utc(value: str) -> str:
 class ContextStore:
     """Owner-scoped source/event ledger and unified context index."""
 
+    @close_db_on_init_failure
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False)

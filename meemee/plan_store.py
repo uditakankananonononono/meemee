@@ -8,12 +8,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from ._sqlite_guard import close_db_on_init_failure
 from .types import Plan, PlanStep
 
 
 class PlanStore:
     """Versioned, durable plans with optimistic concurrency and validated DAG edits."""
 
+    @close_db_on_init_failure
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False)

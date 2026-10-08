@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from ._sqlite_guard import close_db_on_init_failure
 from .cursors import decode_cursor, encode_cursor
 from .schema_registry import register_schema
 
@@ -16,6 +17,7 @@ from .schema_registry import register_schema
 class JobStore:
     """Durable SQLite queue with atomic claims and an append-only event stream."""
 
+    @close_db_on_init_failure
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False, isolation_level=None)

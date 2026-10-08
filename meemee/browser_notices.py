@@ -17,6 +17,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from ._sqlite_guard import close_db_on_init_failure
 from .companion.channels import ChannelError, DeliveryOutcomeUnknown, validate_delivery_address
 
 
@@ -25,6 +26,7 @@ def _now() -> str:
 
 
 class TakeoverNoticeQueue:
+    @close_db_on_init_failure
     def __init__(self, path: Path, max_attempts: int = 3):
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False)

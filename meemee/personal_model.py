@@ -10,6 +10,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from ._sqlite_guard import close_db_on_init_failure
+
 PersonalKind = Literal["goal", "relationship", "project", "preference", "routine", "constraint"]
 
 
@@ -62,6 +64,7 @@ class PersonalItemInput(BaseModel):
 class PersonalModelStore:
     """Owner-scoped personal model whose claims always retain source evidence."""
 
+    @close_db_on_init_failure
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False)

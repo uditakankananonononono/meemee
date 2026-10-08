@@ -8,10 +8,13 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from ._sqlite_guard import close_db_on_init_failure
+
 
 class SourceHealthStore:
     """Persistent source check ledger with freshness and failure state."""
 
+    @close_db_on_init_failure
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False)
