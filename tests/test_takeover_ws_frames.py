@@ -202,3 +202,34 @@ def test_human_input_bad_numbers_raise_browser_session_error(manager_and_live, e
     manager, live = manager_and_live
     with pytest.raises(BrowserSessionError):
         asyncio.run(manager._human_input(live, event))
+
+
+# ---- decoder resource limits: deep nesting and huge integers are bad frames ----
+
+HOSTILE = {
+    "nested_arrays": "[" * 1500 + "0" + "]" * 1500,
+    "nested_objects": '{"a":' * 1500 + "0" + "}" * 1500,
+    "huge_integer": '{"type":"click","x":' + "9" * 5000 + "}",
+}
+
+
+@pytest.mark.parametrize("name", sorted(HOSTILE))
+def test_handshake_hostile_decoder_input_gets_error_and_4403(name):
+    with _client(FakeManager()).websocket_connect("/v1/browser/takeover/ws") as ws:
+        ws.send_text(HOSTILE[name])
+        assert ws.receive_json()["type"] == "error"
+        with pytest.raises(WebSocketDisconnect) as closed:
+            ws.receive_json()
+        assert closed.value.code == 4403
+
+
+@pytest.mark.parametrize("name", sorted(HOSTILE))
+def test_established_session_survives_hostile_decoder_input(name):
+    manager = FakeManager()
+    with _client(manager).websocket_connect("/v1/browser/takeover/ws") as ws:
+        _claim(ws)
+        ws.send_text(HOSTILE[name])
+        assert _next_non_frame(ws)["type"] == "error"
+        ws.send_text(json.dumps({"type": "release"}))
+        assert _next_non_frame(ws)["type"] == "released"
+    assert manager.released == [(None, "completed")]
