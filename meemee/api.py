@@ -6,7 +6,7 @@ import json
 import logging
 import secrets
 import uuid
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any
 
@@ -73,15 +73,25 @@ log = logging.getLogger("meemee.api")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    yield
-    drained = await run_gate.drain(settings.shutdown_grace_seconds)
-    if not drained:
-        log.warning("shutdown grace period elapsed", extra={"active_runs": run_gate.active})
-    close = getattr(agent.model, "aclose", None)
-    if close is not None:
-        await close()
-    browser_sessions.shutdown()
-    persistence.close()
+    async with AsyncExitStack() as cleanup:
+        # LIFO order: owned HTTP clients, then browser and persistence. All
+        # callbacks are attempted even when an earlier closer raises.
+        cleanup.callback(persistence.close)
+        cleanup.callback(browser_sessions.shutdown)
+        seen = {id(agent.model)}
+        for model in (reflection_model, companion.model):
+            if id(model) not in seen:
+                seen.add(id(model))
+                close = getattr(model, "aclose", None)
+                if close is not None:
+                    cleanup.push_async_callback(close)
+        cleanup.push_async_callback(agent.aclose)
+        try:
+            yield
+        finally:
+            drained = await run_gate.drain(settings.shutdown_grace_seconds)
+            if not drained:
+                log.warning("shutdown grace period elapsed", extra={"active_runs": run_gate.active})
 
 app = FastAPI(title="Meemee", version=__version__, lifespan=lifespan)
 trusted_hosts = [host.strip() for host in settings.trusted_hosts.split(",") if host.strip()]
