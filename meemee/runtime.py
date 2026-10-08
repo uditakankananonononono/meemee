@@ -17,6 +17,7 @@ from .tools import (
     GitHubPushBranch,
     GitHubRepoSearch,
     GitInspect,
+    ReadChunk,
     ReadFile,
     ShellCommand,
     ToolRegistry,
@@ -38,6 +39,7 @@ async def build_agent_async(settings: Settings | None = None, include_delegation
         register(GitHubPushBranch(settings.github_token))
         register(GitHubCreatePullRequest(settings.github_token))
         register(ReadFile(settings.workspace))
+        register(ReadChunk(settings.workspace))
         register(WriteFile(settings.workspace))
         register(ShellCommand(settings.workspace, set(settings.shell_allowlist.split(","))))
         register(GitInspect(settings.workspace))
@@ -76,6 +78,7 @@ def build_agent(settings: Settings | None = None, include_delegation: bool = Tru
     registry.register(GitHubPushBranch(settings.github_token))
     registry.register(GitHubCreatePullRequest(settings.github_token))
     registry.register(ReadFile(settings.workspace))
+    registry.register(ReadChunk(settings.workspace))
     registry.register(WriteFile(settings.workspace))
     registry.register(ShellCommand(settings.workspace, set(settings.shell_allowlist.split(","))))
     registry.register(GitInspect(settings.workspace))
