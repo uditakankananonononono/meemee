@@ -1,5 +1,9 @@
-import asyncio,pytest
+import asyncio
+
+import pytest
+
 from meemee.tools.base import ToolRegistry
+
 
 def tool(root):
  from meemee.tools.text_search import SearchText
@@ -26,8 +30,8 @@ def test_literal_not_regex_and_preview_bound(tmp_path):
 
 @pytest.mark.asyncio
 async def test_real_runtime_search_registration(tmp_path):
- from meemee.runtime import build_agent_async
  from meemee.config import Settings
+ from meemee.runtime import build_agent_async
  (tmp_path/'file').write_text('needle')
  agent=await build_agent_async(Settings(_env_file=None,data_dir=tmp_path/'data',workspace=tmp_path),include_delegation=False)
  try:
