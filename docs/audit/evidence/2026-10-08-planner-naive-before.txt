@@ -1,0 +1,34 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+___________________ test_next_due_rejects_naive_caller_clock ___________________
+
+    def test_next_due_rejects_naive_caller_clock():
+>       with pytest.raises(ValueError, match='timezone'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_checkin_planner_naive.py:15: Failed
+__________ test_planner_rejects_naive_clock_without_enqueuing[sqlite] __________
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7f3c7f3c3730>, jobs=<meemee.jobs.JobStore ...Store object at 0x7f3c7f3ddb70>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7f3c7f3dc340>)
+
+    def test_planner_rejects_naive_clock_without_enqueuing(persistence):  # noqa: F811
+        store = persistence.companion
+>       store.upsert_profile(UserProfile(user_id='owner', display_name='Owner', checkins=CheckInPreferences(enabled=True)))
+E       AttributeError: 'CompanionStore' object has no attribute 'upsert_profile'
+
+tests/test_checkin_planner_naive.py:21: AttributeError
+________ test_planner_rejects_naive_clock_without_enqueuing[postgresql] ________
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f3c8289ff10>, jobs=<meemee...re object at 0x7f3c7f3dc8b0>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f3c7f3dcb80>)
+
+    def test_planner_rejects_naive_clock_without_enqueuing(persistence):  # noqa: F811
+        store = persistence.companion
+>       store.upsert_profile(UserProfile(user_id='owner', display_name='Owner', checkins=CheckInPreferences(enabled=True)))
+E       AttributeError: 'CompanionStore' object has no attribute 'upsert_profile'
+
+tests/test_checkin_planner_naive.py:21: AttributeError
+=========================== short test summary info ============================
+FAILED tests/test_checkin_planner_naive.py::test_next_due_rejects_naive_caller_clock
+FAILED tests/test_checkin_planner_naive.py::test_planner_rejects_naive_clock_without_enqueuing[sqlite]
+FAILED tests/test_checkin_planner_naive.py::test_planner_rejects_naive_clock_without_enqueuing[postgresql]
+3 failed in 0.89s
