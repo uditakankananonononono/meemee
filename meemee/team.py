@@ -23,6 +23,7 @@ class AgentTeam:
 
         async def one(index: int, goal: str) -> dict[str, Any]:
             async with self.limit:
+                child = None
                 try:
                     if cancel is not None and cancel.is_set():
                         return {"index": index, "goal": goal, "ok": False, "error": "delegation cancelled"}
@@ -40,5 +41,9 @@ class AgentTeam:
                     return {"index": index, "goal": goal, "ok": True, "report": report.model_dump()}
                 except (OSError, ValueError, RuntimeError) as exc:
                     return {"index": index, "goal": goal, "ok": False, "error": str(exc)}
+                finally:
+                    close = getattr(getattr(child, "model", None), "aclose", None)
+                    if close is not None:
+                        await close()
 
         return await asyncio.gather(*(one(index, goal) for index, goal in enumerate(goals)))
