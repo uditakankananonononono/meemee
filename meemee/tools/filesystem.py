@@ -6,7 +6,7 @@ import stat
 import tempfile
 from pathlib import Path
 
-from pydantic import BaseModel, Field, StrictInt
+from pydantic import BaseModel, Field, StrictInt, StrictBool
 
 from ..types import Risk
 from .base import Tool
@@ -96,7 +96,7 @@ class WriteFile(WorkspaceTool):
 class ListArgs(PathArgs):
     limit: StrictInt = Field(default=100, ge=1, le=1000)
     scan_limit: StrictInt = Field(default=2000, ge=1, le=10000)
-    include_hidden: bool = False
+    include_hidden: StrictBool = False
 
 
 class ListFiles(WorkspaceTool):
