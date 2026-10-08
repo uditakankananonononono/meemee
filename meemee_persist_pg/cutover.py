@@ -77,7 +77,7 @@ BOOL_COLUMNS={("meemee_webhook_subscriptions","active")}
 @contextmanager
 def sqlite_snapshot(path:Path)->Iterator[sqlite3.Connection]:
     resolved=path.resolve(strict=True)
-    conn=sqlite3.connect(f"file:{resolved}?mode=ro",uri=True,isolation_level=None)
+    conn=sqlite3.connect(f"{resolved.as_uri()}?mode=ro",uri=True,isolation_level=None)
     conn.row_factory=sqlite3.Row
     try:
         conn.execute("PRAGMA query_only=ON"); conn.execute("BEGIN")
