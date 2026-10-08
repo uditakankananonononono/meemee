@@ -1,0 +1,88 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+________ test_stale_claimant_cannot_change_replacement[sqlite-release] _________
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7f9ae015a6e0>, jobs=<meemee.jobs.JobStore ...Store object at 0x7f9ae01aaad0>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7f9ae01aaef0>)
+stale_action = 'release'
+
+    @pytest.mark.parametrize('stale_action', ['release', 'put'])
+    def test_stale_claimant_cannot_change_replacement(persistence, stale_action):  # noqa: F811
+        store = persistence.idempotency
+        payload = {'goal': 'same'}
+        assert store.claim('owner', '/jobs', 'key', payload) is None
+        expire_claim(persistence)
+        assert store.claim('owner', '/jobs', 'key', payload) is None
+        if stale_action == 'release':
+            store.release('owner', '/jobs', 'key')
+        else:
+            store.put('owner', '/jobs', 'key', payload, 200, {'id': 'stale-job'})
+>       with pytest.raises(IdempotencyInProgress):
+E       Failed: DID NOT RAISE <class 'meemee.idempotency.IdempotencyInProgress'>
+
+docs/audit/evidence/2026-10-08-idempotency-owner-gap.py:30: Failed
+__________ test_stale_claimant_cannot_change_replacement[sqlite-put] ___________
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7f9ae0159db0>, jobs=<meemee.jobs.JobStore ...Store object at 0x7f9ae015b550>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7f9ae015b3d0>)
+stale_action = 'put'
+
+    @pytest.mark.parametrize('stale_action', ['release', 'put'])
+    def test_stale_claimant_cannot_change_replacement(persistence, stale_action):  # noqa: F811
+        store = persistence.idempotency
+        payload = {'goal': 'same'}
+        assert store.claim('owner', '/jobs', 'key', payload) is None
+        expire_claim(persistence)
+        assert store.claim('owner', '/jobs', 'key', payload) is None
+        if stale_action == 'release':
+            store.release('owner', '/jobs', 'key')
+        else:
+            store.put('owner', '/jobs', 'key', payload, 200, {'id': 'stale-job'})
+>       with pytest.raises(IdempotencyInProgress):
+E       Failed: DID NOT RAISE <class 'meemee.idempotency.IdempotencyInProgress'>
+
+docs/audit/evidence/2026-10-08-idempotency-owner-gap.py:30: Failed
+______ test_stale_claimant_cannot_change_replacement[postgresql-release] _______
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f9adeb944c0>, jobs=<meemee...re object at 0x7f9adeb95240>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f9adeb95270>)
+stale_action = 'release'
+
+    @pytest.mark.parametrize('stale_action', ['release', 'put'])
+    def test_stale_claimant_cannot_change_replacement(persistence, stale_action):  # noqa: F811
+        store = persistence.idempotency
+        payload = {'goal': 'same'}
+        assert store.claim('owner', '/jobs', 'key', payload) is None
+        expire_claim(persistence)
+        assert store.claim('owner', '/jobs', 'key', payload) is None
+        if stale_action == 'release':
+            store.release('owner', '/jobs', 'key')
+        else:
+            store.put('owner', '/jobs', 'key', payload, 200, {'id': 'stale-job'})
+>       with pytest.raises(IdempotencyInProgress):
+E       Failed: DID NOT RAISE <class 'meemee.idempotency.IdempotencyInProgress'>
+
+docs/audit/evidence/2026-10-08-idempotency-owner-gap.py:30: Failed
+________ test_stale_claimant_cannot_change_replacement[postgresql-put] _________
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f9adeb97520>, jobs=<meemee...re object at 0x7f9adeb96aa0>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f9adeb96a70>)
+stale_action = 'put'
+
+    @pytest.mark.parametrize('stale_action', ['release', 'put'])
+    def test_stale_claimant_cannot_change_replacement(persistence, stale_action):  # noqa: F811
+        store = persistence.idempotency
+        payload = {'goal': 'same'}
+        assert store.claim('owner', '/jobs', 'key', payload) is None
+        expire_claim(persistence)
+        assert store.claim('owner', '/jobs', 'key', payload) is None
+        if stale_action == 'release':
+            store.release('owner', '/jobs', 'key')
+        else:
+            store.put('owner', '/jobs', 'key', payload, 200, {'id': 'stale-job'})
+>       with pytest.raises(IdempotencyInProgress):
+E       Failed: DID NOT RAISE <class 'meemee.idempotency.IdempotencyInProgress'>
+
+docs/audit/evidence/2026-10-08-idempotency-owner-gap.py:30: Failed
+=========================== short test summary info ============================
+FAILED docs/audit/evidence/2026-10-08-idempotency-owner-gap.py::test_stale_claimant_cannot_change_replacement[sqlite-release]
+FAILED docs/audit/evidence/2026-10-08-idempotency-owner-gap.py::test_stale_claimant_cannot_change_replacement[sqlite-put]
+FAILED docs/audit/evidence/2026-10-08-idempotency-owner-gap.py::test_stale_claimant_cannot_change_replacement[postgresql-release]
+FAILED docs/audit/evidence/2026-10-08-idempotency-owner-gap.py::test_stale_claimant_cannot_change_replacement[postgresql-put]
+4 failed in 1.21s
