@@ -1,0 +1,102 @@
+.............................FFFF........................                [100%]
+=================================== FAILURES ===================================
+____________ test_pg_owned_expiry_ignores_client_clock_skew[-86400] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f0de2146bc0>
+client_offset = -86400
+
+    @pytest.mark.skipif(not PG_DSN, reason='requires real PostgreSQL')
+    @pytest.mark.parametrize('client_offset', [-86400, 86400])
+    def test_pg_owned_expiry_ignores_client_clock_skew(monkeypatch, client_offset):
+        dsn, drop = _pg_dsn()
+        db = Database(dsn)
+        try:
+            MigrationStore(db).apply()
+            store = IdempotencyStore(db)
+            store.claim('owner', '/jobs', 'key', {}, claim_token='fresh')
+    
+            class Clock(datetime):
+                @classmethod
+                def now(cls, tz=None):
+                    return datetime.now(timezone.utc) + timedelta(seconds=client_offset)
+    
+>           monkeypatch.setattr(adapter, 'datetime', Clock)
+E           AttributeError: <module 'meemee_persist_pg.idempotency' from '/home/sandbox/meemee/meemee_persist_pg/idempotency.py'> has no attribute 'datetime'
+
+tests/test_idempotency_pg_owner_clock.py:28: AttributeError
+____________ test_pg_owned_expiry_ignores_client_clock_skew[86400] _____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f0de11efc70>
+client_offset = 86400
+
+    @pytest.mark.skipif(not PG_DSN, reason='requires real PostgreSQL')
+    @pytest.mark.parametrize('client_offset', [-86400, 86400])
+    def test_pg_owned_expiry_ignores_client_clock_skew(monkeypatch, client_offset):
+        dsn, drop = _pg_dsn()
+        db = Database(dsn)
+        try:
+            MigrationStore(db).apply()
+            store = IdempotencyStore(db)
+            store.claim('owner', '/jobs', 'key', {}, claim_token='fresh')
+    
+            class Clock(datetime):
+                @classmethod
+                def now(cls, tz=None):
+                    return datetime.now(timezone.utc) + timedelta(seconds=client_offset)
+    
+>           monkeypatch.setattr(adapter, 'datetime', Clock)
+E           AttributeError: <module 'meemee_persist_pg.idempotency' from '/home/sandbox/meemee/meemee_persist_pg/idempotency.py'> has no attribute 'datetime'
+
+tests/test_idempotency_pg_owner_clock.py:28: AttributeError
+______________ test_pg_response_ttl_uses_database_clock[-172800] _______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f0de0d2fc40>
+client_offset = -172800
+
+    @pytest.mark.skipif(not PG_DSN, reason='requires real PostgreSQL')
+    @pytest.mark.parametrize('client_offset', [-172800, 172800])
+    def test_pg_response_ttl_uses_database_clock(monkeypatch, client_offset):
+        dsn, drop = _pg_dsn()
+        db = Database(dsn)
+        try:
+            MigrationStore(db).apply()
+            store = IdempotencyStore(db)
+    
+            class Clock(datetime):
+                @classmethod
+                def now(cls, tz=None):
+                    return datetime.now(timezone.utc) + timedelta(seconds=client_offset)
+    
+>           monkeypatch.setattr(adapter, 'datetime', Clock)
+E           AttributeError: <module 'meemee_persist_pg.idempotency' from '/home/sandbox/meemee/meemee_persist_pg/idempotency.py'> has no attribute 'datetime'
+
+tests/test_idempotency_pg_response_clock.py:26: AttributeError
+_______________ test_pg_response_ttl_uses_database_clock[172800] _______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f0de11d79d0>
+client_offset = 172800
+
+    @pytest.mark.skipif(not PG_DSN, reason='requires real PostgreSQL')
+    @pytest.mark.parametrize('client_offset', [-172800, 172800])
+    def test_pg_response_ttl_uses_database_clock(monkeypatch, client_offset):
+        dsn, drop = _pg_dsn()
+        db = Database(dsn)
+        try:
+            MigrationStore(db).apply()
+            store = IdempotencyStore(db)
+    
+            class Clock(datetime):
+                @classmethod
+                def now(cls, tz=None):
+                    return datetime.now(timezone.utc) + timedelta(seconds=client_offset)
+    
+>           monkeypatch.setattr(adapter, 'datetime', Clock)
+E           AttributeError: <module 'meemee_persist_pg.idempotency' from '/home/sandbox/meemee/meemee_persist_pg/idempotency.py'> has no attribute 'datetime'
+
+tests/test_idempotency_pg_response_clock.py:26: AttributeError
+=========================== short test summary info ============================
+FAILED tests/test_idempotency_pg_owner_clock.py::test_pg_owned_expiry_ignores_client_clock_skew[-86400]
+FAILED tests/test_idempotency_pg_owner_clock.py::test_pg_owned_expiry_ignores_client_clock_skew[86400]
+FAILED tests/test_idempotency_pg_response_clock.py::test_pg_response_ttl_uses_database_clock[-172800]
+FAILED tests/test_idempotency_pg_response_clock.py::test_pg_response_ttl_uses_database_clock[172800]
+4 failed, 53 passed in 13.11s

@@ -1,0 +1,66 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+______________ test_pg_response_ttl_uses_database_clock[-172800] _______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fad2e53ba60>
+client_offset = -172800
+
+    @pytest.mark.skipif(not PG_DSN, reason='requires real PostgreSQL')
+    @pytest.mark.parametrize('client_offset', [-172800, 172800])
+    def test_pg_response_ttl_uses_database_clock(monkeypatch, client_offset):
+        dsn, drop = _pg_dsn()
+        db = Database(dsn)
+        try:
+            MigrationStore(db).apply()
+            store = IdempotencyStore(db)
+    
+            class Clock(datetime):
+                @classmethod
+                def now(cls, tz=None):
+                    return datetime.now(timezone.utc) + timedelta(seconds=client_offset)
+    
+            monkeypatch.setattr(adapter, 'datetime', Clock)
+            store.put('owner', '/jobs', 'key', {}, 200, {'id': 'job'})
+            with db.transaction() as c:
+                row = c.execute('SELECT created_at,expires_at,clock_timestamp() AS now FROM meemee_idempotency').fetchone()
+>           assert abs((row['created_at'] - row['now']).total_seconds()) < 2
+E           AssertionError: assert 172800.004718 < 2
+E            +  where 172800.004718 = abs(-172800.004718)
+E            +    where -172800.004718 = <built-in method total_seconds of datetime.timedelta object at 0x7fad2e5ae9d0>()
+E            +      where <built-in method total_seconds of datetime.timedelta object at 0x7fad2e5ae9d0> = (datetime.datetime(2026, 10, 6, 9, 35, 34, 13981, tzinfo=zoneinfo.ZoneInfo(key='Asia/Calcutta')) - datetime.datetime(2026, 10, 8, 9, 35, 34, 18699, tzinfo=zoneinfo.ZoneInfo(key='Asia/Calcutta'))).total_seconds
+
+tests/test_idempotency_pg_response_clock.py:30: AssertionError
+_______________ test_pg_response_ttl_uses_database_clock[172800] _______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fad2e5ae530>
+client_offset = 172800
+
+    @pytest.mark.skipif(not PG_DSN, reason='requires real PostgreSQL')
+    @pytest.mark.parametrize('client_offset', [-172800, 172800])
+    def test_pg_response_ttl_uses_database_clock(monkeypatch, client_offset):
+        dsn, drop = _pg_dsn()
+        db = Database(dsn)
+        try:
+            MigrationStore(db).apply()
+            store = IdempotencyStore(db)
+    
+            class Clock(datetime):
+                @classmethod
+                def now(cls, tz=None):
+                    return datetime.now(timezone.utc) + timedelta(seconds=client_offset)
+    
+            monkeypatch.setattr(adapter, 'datetime', Clock)
+            store.put('owner', '/jobs', 'key', {}, 200, {'id': 'job'})
+            with db.transaction() as c:
+                row = c.execute('SELECT created_at,expires_at,clock_timestamp() AS now FROM meemee_idempotency').fetchone()
+>           assert abs((row['created_at'] - row['now']).total_seconds()) < 2
+E           AssertionError: assert 172799.996943 < 2
+E            +  where 172799.996943 = abs(172799.996943)
+E            +    where 172799.996943 = <built-in method total_seconds of datetime.timedelta object at 0x7fad2e5af7e0>()
+E            +      where <built-in method total_seconds of datetime.timedelta object at 0x7fad2e5af7e0> = (datetime.datetime(2026, 10, 10, 9, 35, 34, 420042, tzinfo=zoneinfo.ZoneInfo(key='Asia/Calcutta')) - datetime.datetime(2026, 10, 8, 9, 35, 34, 423099, tzinfo=zoneinfo.ZoneInfo(key='Asia/Calcutta'))).total_seconds
+
+tests/test_idempotency_pg_response_clock.py:30: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_idempotency_pg_response_clock.py::test_pg_response_ttl_uses_database_clock[-172800]
+FAILED tests/test_idempotency_pg_response_clock.py::test_pg_response_ttl_uses_database_clock[172800]
+2 failed in 1.46s

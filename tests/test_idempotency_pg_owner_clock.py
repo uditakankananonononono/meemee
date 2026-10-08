@@ -25,7 +25,7 @@ def test_pg_owned_expiry_ignores_client_clock_skew(monkeypatch, client_offset):
             def now(cls, tz=None):
                 return datetime.now(timezone.utc) + timedelta(seconds=client_offset)
 
-        monkeypatch.setattr(adapter, 'datetime', Clock)
+        monkeypatch.setattr(adapter, 'datetime', Clock, raising=False)
         if client_offset < 0:
             with db.transaction() as c:
                 c.execute("UPDATE meemee_idempotency SET expires_at=clock_timestamp()-interval '1 second'")
