@@ -60,7 +60,10 @@ class PolicyEngine:
         raw_url = arguments.get("url")
         if isinstance(raw_url, str):
             from urllib.parse import urlparse
-            host = (urlparse(raw_url).hostname or "").rstrip(".").lower()
+            try:
+                host = (urlparse(raw_url).hostname or "").rstrip(".").lower()
+            except ValueError:
+                return PolicyDecision(False, "URL is invalid", False)
             if any(fnmatch.fnmatchcase(host, pattern.rstrip(".").lower()) for pattern in self.denied_hosts):
                 return PolicyDecision(False, "URL host is denied", False)
         return PolicyDecision(True, "allowed", risk not in self.auto_approve)
