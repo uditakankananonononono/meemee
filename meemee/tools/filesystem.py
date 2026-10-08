@@ -5,7 +5,7 @@ import stat
 import tempfile
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictInt
 
 from ..types import Risk
 from .base import Tool
@@ -30,14 +30,25 @@ class WorkspaceTool(Tool):
         return path
 
 
+class ReadArgs(PathArgs):
+    max_bytes: StrictInt = Field(default=1_000_000, ge=1, le=1_000_000)
+
+
 class ReadFile(WorkspaceTool):
     name = "workspace.read_file"
     description = "Read a UTF-8 text file inside the configured workspace."
-    arguments_model = PathArgs
+    arguments_model = ReadArgs
 
-    async def run(self, arguments: PathArgs) -> dict[str, str]:
+    async def run(self, arguments: ReadArgs) -> dict[str, object]:
         path = self.resolve(arguments.path)
-        return {"path": str(path.relative_to(self.root)), "content": path.read_text(encoding="utf-8")}
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0))
+        with os.fdopen(fd, "rb") as stream:
+            if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                raise ValueError("regular workspace file required")
+            data = stream.read(arguments.max_bytes + 1)
+        if len(data) > arguments.max_bytes:
+            raise ValueError("file byte cap exceeded")
+        return {"path": str(path.relative_to(self.root)), "content": data.decode("utf-8"), "bytes": len(data)}
 
 
 class WriteFile(WorkspaceTool):
