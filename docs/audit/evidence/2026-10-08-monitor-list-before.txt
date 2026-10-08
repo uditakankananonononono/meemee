@@ -1,0 +1,44 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+______________ test_monitor_list_uses_single_row_snapshot[sqlite] ______________
+
+stores = <function stores.<locals>.<lambda> at 0x7f8602992d40>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f860294f970>
+
+    def test_monitor_list_uses_single_row_snapshot(stores, monkeypatch):  # noqa: F811
+        monitors, _ = stores()
+        row = monitors.create('owner', MonitorInput(name='watch', source_id='source', field='v', operator='exists'))
+        original = monitors.get
+        def deleted_before_fetch(owner, ident):
+            monitors.delete_owner(owner)
+            return original(owner, ident)
+        monkeypatch.setattr(monitors, 'get', deleted_before_fetch)
+        result = monitors.list('owner')
+>       assert all(isinstance(item, dict) for item in result)
+E       assert False
+E        +  where False = all(<generator object test_monitor_list_uses_single_row_snapshot.<locals>.<genexpr> at 0x7f8602980e40>)
+
+tests/test_monitor_list_snapshot.py:17: AssertionError
+____________ test_monitor_list_uses_single_row_snapshot[postgresql] ____________
+
+stores = <function stores.<locals>.<lambda> at 0x7f86029db910>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f86029c76d0>
+
+    def test_monitor_list_uses_single_row_snapshot(stores, monkeypatch):  # noqa: F811
+        monitors, _ = stores()
+        row = monitors.create('owner', MonitorInput(name='watch', source_id='source', field='v', operator='exists'))
+        original = monitors.get
+        def deleted_before_fetch(owner, ident):
+            monitors.delete_owner(owner)
+            return original(owner, ident)
+        monkeypatch.setattr(monitors, 'get', deleted_before_fetch)
+        result = monitors.list('owner')
+>       assert all(isinstance(item, dict) for item in result)
+E       assert False
+E        +  where False = all(<generator object test_monitor_list_uses_single_row_snapshot.<locals>.<genexpr> at 0x7f8602982c00>)
+
+tests/test_monitor_list_snapshot.py:17: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_monitor_list_snapshot.py::test_monitor_list_uses_single_row_snapshot[sqlite]
+FAILED tests/test_monitor_list_snapshot.py::test_monitor_list_uses_single_row_snapshot[postgresql]
+2 failed in 0.84s

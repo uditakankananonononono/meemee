@@ -62,12 +62,12 @@ class MonitorStore:
         result = dict(row); result["predicate"] = json.loads(result["predicate"]); return result
 
     def list(self, owner_id, status=None):
-        query, values = "SELECT id FROM meemee_monitors WHERE owner_id=%s", [owner_id]
+        query, values = "SELECT * FROM meemee_monitors WHERE owner_id=%s", [owner_id]
         if status:
             query += " AND status=%s"; values.append(status)
         with self.db.transaction() as c:
             rows = c.execute(query + " ORDER BY created_at DESC,id DESC", values).fetchall()
-        return [self.get(owner_id, row["id"]) for row in rows]
+        return [{**dict(row), "predicate": json.loads(row["predicate"])} for row in rows]
 
     def evaluate(self, owner_id, source_id, event, at=None):
         json.dumps(event, allow_nan=False)
