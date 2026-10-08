@@ -24,6 +24,7 @@ import hashlib
 import hmac
 import ipaddress
 import json
+import math
 import os
 import secrets
 import socket
@@ -47,6 +48,17 @@ except ImportError:  # browser extra not installed; open() reports it
         """Placeholder so except clauses stay valid without Playwright."""
 
 PAGE_ERRORS = (PlaywrightError, asyncio.TimeoutError)
+
+
+def _number(value: Any, label: str) -> float:
+    """Coerce client input like float() did, but report bad input as a session error."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError):
+        raise BrowserSessionError(f"{label} must be a finite number") from None
+    if not math.isfinite(number):
+        raise BrowserSessionError(f"{label} must be a finite number")
+    return number
 
 CHALLENGE_MARKERS = (
     "verify you are human",
@@ -687,7 +699,7 @@ class BrowserSessionManager:
             if live.takeover_expires:
                 live.takeover_expires = max(live.takeover_expires, time.monotonic() + 120)
             if kind == "click":
-                x, y = float(event.get("x", -1)), float(event.get("y", -1))
+                x, y = _number(event.get("x", -1), "x"), _number(event.get("y", -1), "y")
                 if not (0 <= x <= width and 0 <= y <= height):
                     raise BrowserSessionError("click outside viewport")
                 button = event.get("button", "left")
@@ -699,10 +711,10 @@ class BrowserSessionManager:
                 start, end = event.get("from"), event.get("to")
                 if not (isinstance(start, list) and isinstance(end, list) and len(start) == 2 and len(end) == 2):
                     raise BrowserSessionError("drag needs from=[x,y] and to=[x,y]")
-                (x1, y1), (x2, y2) = (float(v) for v in start), (float(v) for v in end)
+                (x1, y1), (x2, y2) = (_number(v, "from") for v in start), (_number(v, "to") for v in end)
                 if not all(0 <= x <= width for x in (x1, x2)) or not all(0 <= y <= height for y in (y1, y2)):
                     raise BrowserSessionError("drag outside viewport")
-                steps = max(2, min(int(event.get("steps", 20)), 100))
+                steps = max(2, min(int(_number(event.get("steps", 20), "steps")), 100))
                 await page.mouse.move(x1, y1)
                 await page.mouse.down()
                 await page.mouse.move(x2, y2, steps=steps)
@@ -723,7 +735,7 @@ class BrowserSessionManager:
                 await page.keyboard.press(key)
                 detail = {"key": key if len(base) > 1 else "<char>"}
             elif kind == "scroll":
-                dx, dy = float(event.get("dx", 0)), float(event.get("dy", 0))
+                dx, dy = _number(event.get("dx", 0), "dx"), _number(event.get("dy", 0), "dy")
                 await page.mouse.wheel(max(-5000, min(dx, 5000)), max(-5000, min(dy, 5000)))
                 detail = {"dy": round(dy)}
             elif kind == "goto":
@@ -738,8 +750,10 @@ class BrowserSessionManager:
 
     async def release(self, takeover_id: str, token: str, note: str | None = None, outcome: str = "completed") -> dict[str, Any]:
         takeover = self.authenticate_takeover(takeover_id, token)
-        if outcome not in {"completed", "declined"}:
+        if not isinstance(outcome, str) or outcome not in {"completed", "declined"}:
             raise BrowserSessionError("outcome must be completed or declined")
+        if note is not None and not isinstance(note, str):
+            raise BrowserSessionError("note must be a string")
         session_id = takeover["session_id"]
         live = self._live[session_id]
         self.store.finish_takeover(takeover_id, outcome, (note or "")[:1000] or None)
