@@ -4,12 +4,30 @@ import asyncio
 import threading
 import uuid
 
+import httpx
+
 from .approvals import ApprovalStore
 from .config import Settings
 from .job_errors import LeaseLostError
 from .persistence import persistence_from_settings
 from .runtime import build_agent_async
 from .webhooks import WebhookStore
+
+# Per-job failure classes: the original (OSError, ValueError, RuntimeError; RecursionError is a
+# RuntimeError) plus the httpx classes that are not OSErrors. Named classes only, no blanket catch: any
+# other exception is a bug and still stops the worker loudly.
+JOB_FAILURE_CLASSES = (OSError, ValueError, RuntimeError, httpx.HTTPError, httpx.InvalidURL,
+                       httpx.StreamError, httpx.CookieConflict)
+
+
+def error_label(exc: BaseException) -> str:
+    """Class-name label safe to send to a webhook endpoint: the nearest ancestor that is a builtin, an
+    exact httpx class or a meemee class. Never the exception text, never a third-party class name."""
+    for cls in type(exc).__mro__:
+        if cls.__module__ == "builtins" or cls.__module__.split(".")[0] == "meemee" or (
+                cls.__name__ in dir(httpx) and getattr(httpx, cls.__name__) is cls):
+            return cls.__name__
+    return "error"
 
 
 def cancellation_watcher(jobs, job_id: str, event: threading.Event, stop: threading.Event,
@@ -106,7 +124,7 @@ async def work_forever(settings: Settings | None = None) -> None:
             except LeaseLostError:
                 # Fencing refusal is not a task failure under this stale lease.
                 continue
-            except (OSError, ValueError, RuntimeError) as exc:
+            except JOB_FAILURE_CLASSES as exc:
                 if lease_lost.is_set():
                     continue
                 try:
@@ -116,7 +134,7 @@ async def work_forever(settings: Settings | None = None) -> None:
                 if not purge_if_deleted(jobs, persistence.memory, job["id"], run_id, owner):
                     state = jobs.get(job["id"])["status"]
                     if state == "failed":
-                        webhooks.enqueue(f"job:{job['id']}:failed", "job.failed", {"job_id": job["id"], "status": "failed", "error": str(exc)}, principal=owner)
+                        webhooks.enqueue(f"job:{job['id']}:failed", "job.failed", {"job_id": job["id"], "status": "failed", "error": error_label(exc)}, principal=owner)
             finally:
                 stop.set(); watcher.join(timeout=1)
                 close = getattr(agent, "aclose", None) or getattr(getattr(agent, "model", None), "aclose", None)
