@@ -147,6 +147,7 @@ async def test_PROTECTION_store_failure_after_post_is_not_contained_and_replay_k
     assert _row(store)[0] == "sending"  # at-least-once: recoverable, not lost
     assert store.recover_stale(9e12) == 1
     monkeypatch.undo()
+    monkeypatch.setattr(socket, "getaddrinfo", _dns)
     assert await _run(store, handler) is True
     assert len(ids) == 2 and ids[0] == ids[1]
     assert _row(store)[0] == "delivered"

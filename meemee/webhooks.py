@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import ipaddress
@@ -65,6 +66,51 @@ def validate_webhook_url(url: str) -> str:
         if not ipaddress.ip_address(address[4][0]).is_global:
             raise ValueError("webhook URL resolves to a private or reserved address")
     return url
+
+
+def _delivery_destination_allowed(url: str) -> bool:
+    """Delivery-time re-check of where a stored webhook URL resolves right now.
+
+    Blocking (getaddrinfo); run it in a thread. This closes the re-validation gap (a host that was
+    public at subscribe time and resolves to a private/loopback/link-local address later) but NOT the
+    rebinding race: httpx resolves again when it connects, so a host can still change between this
+    check and the connection. validate_webhook_url is deliberately left untouched (companion channels
+    share it).
+    """
+    if private_hosts_allowed():
+        return True
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme != "https" or not parsed.hostname:
+            return False
+        infos = socket.getaddrinfo(parsed.hostname, parsed.port or 443)
+    except UnicodeError:
+        raise  # idna-invalid host: the caller retries it as a contained network-class failure
+    except ValueError:  # malformed port in the stored URL
+        return False
+    if not infos:
+        return False
+    for info in infos:
+        try:
+            if not ipaddress.ip_address(str(info[4][0]).split("%", 1)[0]).is_global:
+                return False
+        except ValueError:
+            return False
+    return True
+
+
+_ERROR_BASES = (httpx.InvalidURL, httpx.StreamError, httpx.CookieConflict, httpx.HTTPError, UnicodeError, RecursionError)
+
+
+def _error_label(exc: BaseException) -> str:
+    """last_error text: a fixed allowlisted class name, never an arbitrary subclass name."""
+    cls = type(exc)
+    if getattr(httpx, cls.__name__, None) is cls or cls in (UnicodeEncodeError, UnicodeDecodeError, UnicodeError, RecursionError, socket.gaierror):
+        return cls.__name__
+    for base in _ERROR_BASES:
+        if isinstance(exc, base):
+            return base.__name__
+    return "error"
 
 
 class WebhookStore:
@@ -484,6 +530,14 @@ class WebhookDispatcher:
         if not isinstance(headers, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in headers.items()):
             self.store.retry(delivery["id"], "headers unreadable (not a string map)")
             return True
+        try:
+            allowed = await asyncio.to_thread(_delivery_destination_allowed, delivery["url"])
+        except (socket.gaierror, UnicodeError) as exc:  # DNS failure / idna-invalid host: a normal retry
+            self.store.retry(delivery["id"], _error_label(exc))
+            return True
+        if not allowed:
+            self.store.retry(delivery["id"], "destination not allowed")
+            return True
         timestamp = str(int(time.time()))
         headers.update({
             "Content-Type":"application/json",
@@ -495,7 +549,7 @@ class WebhookDispatcher:
         try:
             response = await self.client.post(delivery["url"], content=delivery["payload"], headers=headers)
         except (httpx.HTTPError, httpx.InvalidURL, httpx.StreamError, httpx.CookieConflict, UnicodeError, RecursionError) as exc:
-            self.store.retry(delivery["id"], type(exc).__name__)
+            self.store.retry(delivery["id"], _error_label(exc))
             return True
         if 200 <= response.status_code < 300:
             self.store.succeed(delivery["id"], response.status_code)
@@ -516,8 +570,6 @@ async def dispatch_forever(store: WebhookStore, poll_seconds: float = 1.0, clien
             if deliveries and deliveries % 1000 == 0:
                 store.recover_stale(time.time() - 300)
             if not delivered:
-                import asyncio
-
                 await asyncio.sleep(poll_seconds)
     finally:
         await dispatcher.client.aclose()
