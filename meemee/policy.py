@@ -26,10 +26,10 @@ class PolicyEngine:
         self.allowed_tools = set(doc.get("allow_tools", []))
         self.denied_paths = tuple(doc.get("deny_paths", []))
         self.denied_hosts = tuple(doc.get("deny_hosts", []))
-        self.max_argument_bytes = int(doc.get("max_argument_bytes", 1_000_000))
+        self.max_argument_bytes = doc.get("max_argument_bytes", 1_000_000)
         self.auto_approve = {Risk(value) for value in doc.get("auto_approve_risks", ["read"])}
-        if self.max_argument_bytes < 1:
-            raise ValueError("max_argument_bytes must be positive")
+        if type(self.max_argument_bytes) is not int or self.max_argument_bytes < 1:
+            raise ValueError("max_argument_bytes must be a positive integer")
 
     @classmethod
     def from_file(cls, path: Path | None) -> PolicyEngine:

@@ -1,0 +1,26 @@
+FF...                                                                    [100%]
+=================================== FAILURES ===================================
+___________ test_policy_byte_budget_rejects_non_integer_counts[True] ___________
+
+value = True
+
+    @pytest.mark.parametrize('value', [True, 1.5])
+    def test_policy_byte_budget_rejects_non_integer_counts(value):
+>       with pytest.raises(ValueError, match='positive integer'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_policy_integer_budget.py:11: Failed
+___________ test_policy_byte_budget_rejects_non_integer_counts[1.5] ____________
+
+value = 1.5
+
+    @pytest.mark.parametrize('value', [True, 1.5])
+    def test_policy_byte_budget_rejects_non_integer_counts(value):
+>       with pytest.raises(ValueError, match='positive integer'):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_policy_integer_budget.py:11: Failed
+=========================== short test summary info ============================
+FAILED tests/test_policy_integer_budget.py::test_policy_byte_budget_rejects_non_integer_counts[True]
+FAILED tests/test_policy_integer_budget.py::test_policy_byte_budget_rejects_non_integer_counts[1.5]
+2 failed, 3 passed in 0.15s
