@@ -1,0 +1,72 @@
+..FF....                                                                 [100%]
+=================================== FAILURES ===================================
+___________ test_idle_worker_releases_real_backend_resources[sqlite] ___________
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7f282a47e440>, jobs=<meemee.jobs.JobStore ...Store object at 0x7f282a4f0850>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7f282a4f0a00>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f282a4f0910>
+
+    async def test_idle_worker_releases_real_backend_resources(persistence, monkeypatch):  # noqa: F811
+        import sqlite3
+    
+        monkeypatch.setattr(worker, 'persistence_from_settings', lambda settings: persistence)
+        async def cancelled_sleep(delay):
+            raise asyncio.CancelledError
+        monkeypatch.setattr(worker.asyncio, 'sleep', cancelled_sleep)
+        with pytest.raises(asyncio.CancelledError):
+>           await worker.work_forever(SimpleNamespace(worker_poll_seconds=1))
+
+tests/test_worker_cleanup.py:48: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+settings = namespace(worker_poll_seconds=1)
+
+    async def work_forever(settings: Settings | None = None) -> None:
+        settings = settings or Settings()
+        persistence = persistence_from_settings(settings)
+        try:
+            jobs = persistence.jobs
+            webhooks = persistence.webhooks or WebhookStore(
+>               settings.data_dir / "webhooks.sqlite3",
+                settings.webhook_max_payload_bytes,
+                settings.vault_key,
+            )  # PostgreSQL mode: the shared outbox
+E           AttributeError: 'types.SimpleNamespace' object has no attribute 'data_dir'
+
+meemee/worker.py:60: AttributeError
+_________ test_idle_worker_releases_real_backend_resources[postgresql] _________
+
+persistence = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f28291358a0>, jobs=<meemee...re object at 0x7f2829136620>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f2829136650>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f2829136770>
+
+    async def test_idle_worker_releases_real_backend_resources(persistence, monkeypatch):  # noqa: F811
+        import sqlite3
+    
+        monkeypatch.setattr(worker, 'persistence_from_settings', lambda settings: persistence)
+        async def cancelled_sleep(delay):
+            raise asyncio.CancelledError
+        monkeypatch.setattr(worker.asyncio, 'sleep', cancelled_sleep)
+        with pytest.raises(asyncio.CancelledError):
+>           await worker.work_forever(SimpleNamespace(worker_poll_seconds=1))
+
+tests/test_worker_cleanup.py:48: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+settings = namespace(worker_poll_seconds=1)
+
+    async def work_forever(settings: Settings | None = None) -> None:
+        settings = settings or Settings()
+        persistence = persistence_from_settings(settings)
+        try:
+            jobs = persistence.jobs
+            webhooks = persistence.webhooks or WebhookStore(
+>               settings.data_dir / "webhooks.sqlite3",
+                settings.webhook_max_payload_bytes,
+                settings.vault_key,
+            )  # PostgreSQL mode: the shared outbox
+E           AttributeError: 'types.SimpleNamespace' object has no attribute 'data_dir'
+
+meemee/worker.py:60: AttributeError
+=========================== short test summary info ============================
+FAILED tests/test_worker_cleanup.py::test_idle_worker_releases_real_backend_resources[sqlite]
+FAILED tests/test_worker_cleanup.py::test_idle_worker_releases_real_backend_resources[postgresql]
+2 failed, 6 passed in 1.64s

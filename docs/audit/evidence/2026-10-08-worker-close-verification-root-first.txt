@@ -1,0 +1,46 @@
+.......................................................s.s.s.s.s.s.s.s.s [ 11%]
+.s.s....................................s.s..s.s..sss................... [ 23%]
+............ss........ssss.....................s.s.s.s.s.s..ss..ss..ss.s [ 34%]
+................................................................s....... [ 46%]
+s.ss.........................................................ss...ss..ss [ 57%]
+.....ss...............s.sss.....................................sss..... [ 69%]
+s.s.s.s.s.s..............................................s...s.......... [ 80%]
+...............................s........s...s....sss.s....sss....s.s.s.s [ 92%]
+..........ssss..ss.s.s...s.ss..ss.s..ss.s.s.s..Fs                        [100%]
+=================================== FAILURES ===================================
+___________ test_idle_worker_releases_real_backend_resources[sqlite] ___________
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7f328fae0cd0>, jobs=<meemee.jobs.JobStore ...Store object at 0x7f328fae1420>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7f328fae1de0>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f328fae1750>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-651/test_idle_worker_releases_real0')
+
+    async def test_idle_worker_releases_real_backend_resources(persistence, monkeypatch, tmp_path):  # noqa: F811
+        import sqlite3
+    
+        from meemee.config import Settings
+    
+        monkeypatch.setattr(worker, 'persistence_from_settings', lambda settings: persistence)
+        async def cancelled_sleep(delay):
+            raise asyncio.CancelledError
+        monkeypatch.setattr(worker.asyncio, 'sleep', cancelled_sleep)
+        with pytest.raises(asyncio.CancelledError):
+            await worker.work_forever(Settings(_env_file=None, data_dir=tmp_path))
+        if persistence.backend == 'sqlite':
+            with pytest.raises(sqlite3.ProgrammingError, match='closed'):
+>               persistence.jobs.ping()
+E               AttributeError: 'JobStore' object has no attribute 'ping'
+
+tests/test_worker_cleanup.py:52: AttributeError
+=============================== warnings summary ===============================
+.venv/lib/python3.10/site-packages/fastapi/testclient.py:1
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+.venv/lib/python3.10/site-packages/starlette/testclient.py:53
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_worker_cleanup.py::test_idle_worker_releases_real_backend_resources[sqlite]
+1 failed, 526 passed, 98 skipped, 2 warnings in 69.37s (0:01:09)

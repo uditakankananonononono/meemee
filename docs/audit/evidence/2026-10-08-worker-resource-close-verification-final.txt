@@ -1,0 +1,27 @@
+..F.....                                                                 [100%]
+=================================== FAILURES ===================================
+___________ test_idle_worker_releases_real_backend_resources[sqlite] ___________
+
+persistence = Persistence(backend='sqlite', memory=<meemee.memory.MemoryStore object at 0x7fbac1d75a80>, jobs=<meemee.jobs.JobStore ...Store object at 0x7fbac1de8730>, browser_notices=<meemee.browser_notices.TakeoverNoticeQueue object at 0x7fbac1de88e0>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fbac1de87f0>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-652/test_idle_worker_releases_real0')
+
+    async def test_idle_worker_releases_real_backend_resources(persistence, monkeypatch, tmp_path):  # noqa: F811
+        import sqlite3
+    
+        from meemee.config import Settings
+    
+        monkeypatch.setattr(worker, 'persistence_from_settings', lambda settings: persistence)
+        async def cancelled_sleep(delay):
+            raise asyncio.CancelledError
+        monkeypatch.setattr(worker.asyncio, 'sleep', cancelled_sleep)
+        with pytest.raises(asyncio.CancelledError):
+            await worker.work_forever(Settings(_env_file=None, data_dir=tmp_path))
+        if persistence.backend == 'sqlite':
+>           with pytest.raises(sqlite3.ProgrammingError, match='closed'):
+E           Failed: DID NOT RAISE <class 'sqlite3.ProgrammingError'>
+
+tests/test_worker_cleanup.py:51: Failed
+=========================== short test summary info ============================
+FAILED tests/test_worker_cleanup.py::test_idle_worker_releases_real_backend_resources[sqlite]
+1 failed, 7 passed in 1.65s
