@@ -1,0 +1,22 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___________ test_personal_list_preserves_callers_pending_transaction ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-714/test_personal_list_preserves_c0')
+
+    def test_personal_list_preserves_callers_pending_transaction(tmp_path):
+        store = PersonalModelStore(tmp_path / 'personal.db')
+        item = store.upsert('owner', PersonalItemInput(kind='goal', title='goal', value='value', source_id='user', source_record_id='record'))
+        store.db.execute('BEGIN IMMEDIATE')
+        store.db.execute('UPDATE personal_items SET confidence=.123 WHERE id=?', (item['id'],))
+        assert store.db.in_transaction
+        assert store.list('owner', include_history=True)[0]['confidence'] == .123
+>       assert store.db.in_transaction
+E       assert False
+E        +  where False = <sqlite3.Connection object at 0x7fd654de4440>.in_transaction
+E        +    where <sqlite3.Connection object at 0x7fd654de4440> = <meemee.personal_model.PersonalModelStore object at 0x7fd6544a2b90>.db
+
+tests/test_personal_list_transaction_owner.py:13: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_personal_list_transaction_owner.py::test_personal_list_preserves_callers_pending_transaction
+1 failed in 0.17s
