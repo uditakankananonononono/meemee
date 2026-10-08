@@ -1,0 +1,113 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+____________ test_idempotency_claim_clock_after_lock_wait[process] _____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-697/test_idempotency_claim_clock_a0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fb2fa799990>
+boundary = 'process'
+
+    @pytest.mark.parametrize('boundary', ['process', 'database'])
+    def test_idempotency_claim_clock_after_lock_wait(tmp_path, monkeypatch, boundary):
+        clock = [datetime(2026, 10, 8, tzinfo=timezone.utc)]
+        sampled = Event()
+    
+        class Clock(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                sampled.set()
+                return clock[0]
+    
+        monkeypatch.setattr(idempotency, 'datetime', Clock)
+        path = tmp_path / 'keys.db'
+        store = idempotency.IdempotencyStore(path)
+        if boundary == 'process':
+            original = store.lock
+    
+            class DelayedLock:
+                def __enter__(self):
+                    original.acquire()
+                    clock[0] += timedelta(minutes=10)
+    
+                def __exit__(self, *args):
+                    original.release()
+    
+            store.lock = DelayedLock()
+            store.claim('owner', '/jobs', 'key', {}, claim_token='fresh')
+        else:
+            blocked = Event()
+            store.db.set_trace_callback(lambda sql: blocked.set() if sql.startswith(('BEGIN', 'DELETE')) else None)
+            other = sqlite3.connect(path)
+            other.execute('BEGIN IMMEDIATE')
+            try:
+                with ThreadPoolExecutor(1) as pool:
+                    future = pool.submit(store.claim, 'owner', '/jobs', 'key', {}, claim_token='fresh')
+                    try:
+                        assert blocked.wait(2)
+                        assert not sampled.is_set(), 'clock sampled before database writer lock'
+                        clock[0] += timedelta(minutes=10)
+                    finally:
+                        other.rollback()
+                    assert future.result(timeout=2) is None
+            finally:
+                other.close()
+        row = store.db.execute('SELECT created_at, expires_at FROM idempotency').fetchone()
+>       assert datetime.fromisoformat(row['created_at']) == clock[0]
+E       AssertionError: assert datetime.datetime(2026, 10, 8, 0, 0, tzinfo=datetime.timezone.utc) == datetime.datetime(2026, 10, 8, 0, 10, tzinfo=datetime.timezone.utc)
+E        +  where datetime.datetime(2026, 10, 8, 0, 0, tzinfo=datetime.timezone.utc) = <built-in method fromisoformat of type object at 0x55ed08da4e20>('2026-10-08T00:00:00+00:00')
+E        +    where <built-in method fromisoformat of type object at 0x55ed08da4e20> = datetime.fromisoformat
+
+tests/test_idempotency_claim_clock.py:58: AssertionError
+____________ test_idempotency_claim_clock_after_lock_wait[database] ____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-697/test_idempotency_claim_clock_a1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fb2fa708d00>
+boundary = 'database'
+
+    @pytest.mark.parametrize('boundary', ['process', 'database'])
+    def test_idempotency_claim_clock_after_lock_wait(tmp_path, monkeypatch, boundary):
+        clock = [datetime(2026, 10, 8, tzinfo=timezone.utc)]
+        sampled = Event()
+    
+        class Clock(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                sampled.set()
+                return clock[0]
+    
+        monkeypatch.setattr(idempotency, 'datetime', Clock)
+        path = tmp_path / 'keys.db'
+        store = idempotency.IdempotencyStore(path)
+        if boundary == 'process':
+            original = store.lock
+    
+            class DelayedLock:
+                def __enter__(self):
+                    original.acquire()
+                    clock[0] += timedelta(minutes=10)
+    
+                def __exit__(self, *args):
+                    original.release()
+    
+            store.lock = DelayedLock()
+            store.claim('owner', '/jobs', 'key', {}, claim_token='fresh')
+        else:
+            blocked = Event()
+            store.db.set_trace_callback(lambda sql: blocked.set() if sql.startswith(('BEGIN', 'DELETE')) else None)
+            other = sqlite3.connect(path)
+            other.execute('BEGIN IMMEDIATE')
+            try:
+                with ThreadPoolExecutor(1) as pool:
+                    future = pool.submit(store.claim, 'owner', '/jobs', 'key', {}, claim_token='fresh')
+                    try:
+                        assert blocked.wait(2)
+>                       assert not sampled.is_set(), 'clock sampled before database writer lock'
+E                       AssertionError: clock sampled before database writer lock
+E                       assert not True
+E                        +  where True = is_set()
+E                        +    where is_set = <threading.Event object at 0x7fb2fa708d60>.is_set
+
+tests/test_idempotency_claim_clock.py:50: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_idempotency_claim_clock.py::test_idempotency_claim_clock_after_lock_wait[process]
+FAILED tests/test_idempotency_claim_clock.py::test_idempotency_claim_clock_after_lock_wait[database]
+2 failed in 0.10s
