@@ -4,6 +4,7 @@ import asyncio
 import inspect
 import time
 from abc import ABC, abstractmethod
+from contextlib import AsyncExitStack
 from typing import Any
 
 from pydantic import BaseModel, ValidationError
@@ -42,6 +43,13 @@ class ToolRegistry:
         if tool.name in self._tools:
             raise ValueError(f"tool already registered: {tool.name}")
         self._tools[tool.name] = tool
+
+    async def aclose(self) -> None:
+        async with AsyncExitStack() as cleanup:
+            for tool in self._tools.values():
+                close = getattr(tool, "aclose", None)
+                if close is not None:
+                    cleanup.push_async_callback(close)
 
     def get(self, name: str) -> Tool:
         try:

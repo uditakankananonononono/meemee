@@ -25,7 +25,12 @@ class GitHubRepoSearch(Tool):
 
     def __init__(self, token: str | None = None, client: httpx.AsyncClient | None = None):
         self.client = client or httpx.AsyncClient(timeout=30)
+        self.owns_client = client is None
         self.token = token
+
+    async def aclose(self) -> None:
+        if self.owns_client:
+            await self.client.aclose()
 
     @staticmethod
     def _score(repo: dict[str, Any]) -> float:
@@ -102,7 +107,12 @@ class GitHubMutation(Tool):
 
     def __init__(self, token: str | None, client: httpx.AsyncClient | None = None):
         self.client = client or httpx.AsyncClient(timeout=30)
+        self.owns_client = client is None
         self.token = token
+
+    async def aclose(self) -> None:
+        if self.owns_client:
+            await self.client.aclose()
 
     def headers(self) -> dict[str, str]:
         if not self.token: raise ValueError("MEEMEE_GITHUB_TOKEN is required")

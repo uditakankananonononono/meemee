@@ -1,0 +1,104 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+___________ test_worker_releases_actual_per_job_tool_clients[False] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f9b21c40820>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-787/test_worker_releases_actual_pe0')
+cancelled = False
+
+    @pytest.mark.parametrize('cancelled', [False, True])
+    async def test_worker_releases_actual_per_job_tool_clients(monkeypatch, tmp_path, cancelled):
+        stores = build_persistence('sqlite', tmp_path, vault_key='AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=')
+        stores.jobs.enqueue('work', principal='owner')
+        original_claim = stores.jobs.claim
+        claimed = []
+    
+        class EndLoop(Exception):
+            pass
+    
+        def claim():
+            if claimed:
+                raise EndLoop
+            claimed.append(True)
+            return original_claim()
+    
+        monkeypatch.setattr(stores.jobs, 'claim', claim)
+        monkeypatch.setattr(worker, 'persistence_from_settings', lambda settings: stores)
+        agents = []
+        original = worker.build_agent
+    
+        def capture(*args, **kwargs):
+            agent = original(*args, **kwargs)
+            agents.append(agent)
+    
+            async def run(goal, **kw):
+                if cancelled:
+                    raise asyncio.CancelledError
+                return RunReport(run_id=kw['run_id'], goal=goal, final='done', steps_used=0, tool_results=[])
+    
+            agent.run = run
+            return agent
+    
+        monkeypatch.setattr(worker, 'build_agent', capture)
+        try:
+            with pytest.raises(asyncio.CancelledError if cancelled else EndLoop):
+                await worker.work_forever(Settings(_env_file=None, data_dir=tmp_path))
+>           assert all(agents[0].tools.get(name).client.is_closed for name in
+                       ['github.search_repositories', 'github.push_branch', 'github.create_pull_request'])
+E                      assert False
+E                       +  where False = all(<generator object test_worker_releases_actual_per_job_tool_clients.<locals>.<genexpr> at 0x7f9b21c16030>)
+
+tests/test_worker_tool_http_cleanup.py:50: AssertionError
+____________ test_worker_releases_actual_per_job_tool_clients[True] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f9b21c9ce50>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-787/test_worker_releases_actual_pe1')
+cancelled = True
+
+    @pytest.mark.parametrize('cancelled', [False, True])
+    async def test_worker_releases_actual_per_job_tool_clients(monkeypatch, tmp_path, cancelled):
+        stores = build_persistence('sqlite', tmp_path, vault_key='AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=')
+        stores.jobs.enqueue('work', principal='owner')
+        original_claim = stores.jobs.claim
+        claimed = []
+    
+        class EndLoop(Exception):
+            pass
+    
+        def claim():
+            if claimed:
+                raise EndLoop
+            claimed.append(True)
+            return original_claim()
+    
+        monkeypatch.setattr(stores.jobs, 'claim', claim)
+        monkeypatch.setattr(worker, 'persistence_from_settings', lambda settings: stores)
+        agents = []
+        original = worker.build_agent
+    
+        def capture(*args, **kwargs):
+            agent = original(*args, **kwargs)
+            agents.append(agent)
+    
+            async def run(goal, **kw):
+                if cancelled:
+                    raise asyncio.CancelledError
+                return RunReport(run_id=kw['run_id'], goal=goal, final='done', steps_used=0, tool_results=[])
+    
+            agent.run = run
+            return agent
+    
+        monkeypatch.setattr(worker, 'build_agent', capture)
+        try:
+            with pytest.raises(asyncio.CancelledError if cancelled else EndLoop):
+                await worker.work_forever(Settings(_env_file=None, data_dir=tmp_path))
+>           assert all(agents[0].tools.get(name).client.is_closed for name in
+                       ['github.search_repositories', 'github.push_branch', 'github.create_pull_request'])
+E                      assert False
+E                       +  where False = all(<generator object test_worker_releases_actual_per_job_tool_clients.<locals>.<genexpr> at 0x7f9b21c17840>)
+
+tests/test_worker_tool_http_cleanup.py:50: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_worker_tool_http_cleanup.py::test_worker_releases_actual_per_job_tool_clients[False]
+FAILED tests/test_worker_tool_http_cleanup.py::test_worker_releases_actual_per_job_tool_clients[True]
+2 failed in 0.98s

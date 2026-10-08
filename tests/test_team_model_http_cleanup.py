@@ -41,3 +41,26 @@ async def test_team_child_actual_model_client_closes(monkeypatch, tmp_path, outc
     finally:
         for child in children:
             await child.model.aclose()
+
+
+async def test_team_owned_actual_tool_clients_close(tmp_path):
+    stores = build_persistence('sqlite', tmp_path)
+    children = []
+
+    def factory():
+        child = build_agent(Settings(_env_file=None, data_dir=tmp_path), False, persistence=stores)
+        children.append(child)
+
+        async def run(goal, *, owner_id):
+            return RunReport(run_id='run', goal=goal, final='done', steps_used=0, tool_results=[])
+
+        child.run = run
+        return child
+
+    try:
+        await AgentTeam(factory).delegate(['work'], owner_id='owner')
+        assert all(children[0].tools.get(name).client.is_closed for name in
+                   ['github.search_repositories', 'github.push_branch', 'github.create_pull_request'])
+    finally:
+        for child in children:
+            await child.aclose()

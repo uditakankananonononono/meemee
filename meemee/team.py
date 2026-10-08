@@ -42,9 +42,13 @@ class AgentTeam:
                 except (OSError, ValueError, RuntimeError) as exc:
                     return {"index": index, "goal": goal, "ok": False, "error": str(exc)}
                 finally:
-                    close = getattr(getattr(child, "model", None), "aclose", None)
-                    if close is not None and getattr(child, "owns_model", False):
+                    close = getattr(child, "aclose", None)
+                    if close is not None:
                         await close()
+                    elif getattr(child, "owns_model", False):
+                        close_model = getattr(getattr(child, "model", None), "aclose", None)
+                        if close_model is not None:
+                            await close_model()
 
         tasks = [asyncio.create_task(one(index, goal)) for index, goal in enumerate(goals)]
         try:
