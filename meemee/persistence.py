@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -110,7 +109,7 @@ def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = N
     """Select and initialize the supported persistence composition root."""
     normalized = backend.strip().lower()
     if normalized == "sqlite":
-        result = Persistence("sqlite", SQLiteMemoryStore(data_dir / "meemee.sqlite3", memory_embedder), SQLiteJobStore(data_dir / "jobs.sqlite3"), lambda: None,
+        return Persistence("sqlite", SQLiteMemoryStore(data_dir / "meemee.sqlite3", memory_embedder), SQLiteJobStore(data_dir / "jobs.sqlite3"), lambda: None,
                            approvals=SQLiteApprovalStore(data_dir / "approvals.sqlite3"),
                            tokens=SQLiteTokenStore(data_dir / "auth.sqlite3"), audit=SQLiteAuditLog(data_dir / "audit.sqlite3"),
                            email_verifications=SQLiteEmailVerificationStore(data_dir / "email-verifications.sqlite3"),
@@ -126,17 +125,6 @@ def build_persistence(backend: str, data_dir: Path, postgres_dsn: str | None = N
                            deletion_ledger=_sqlite_deletion_ledger(data_dir),
                            browser_sessions=SQLiteBrowserSessionStore(data_dir / "browser-sessions.sqlite3"),
                            browser_notices=SQLiteTakeoverNoticeQueue(data_dir / "browser-notices.sqlite3"))
-        def close_sqlite() -> None:
-            seen = set()
-            for name in result.__dataclass_fields__:
-                store = getattr(result, name)
-                for attr in ("connection", "db"):
-                    connection = getattr(store, attr, None)
-                    if isinstance(connection, sqlite3.Connection) and id(connection) not in seen:
-                        seen.add(id(connection))
-                        connection.close()
-        result.close = close_sqlite
-        return result
     if normalized != "postgresql":
         raise ValueError("MEEMEE_PERSISTENCE_BACKEND must be sqlite or postgresql")
     if not postgres_dsn:
