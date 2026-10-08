@@ -47,10 +47,11 @@ def refusal(step: int, name: str, risk: Risk, reason: str, detail: str, argument
 
 
 class Agent:
-    def __init__(self, model: Model, tools: ToolRegistry, memory: MemoryStore, max_steps: int = 12, policy: PolicyEngine | None = None, context: ContextStore | None = None, personal_model: PersonalModelStore | None = None, *, owns_model: bool = False, owns_tools: bool = False):
+    def __init__(self, model: Model, tools: ToolRegistry, memory: MemoryStore, max_steps: int = 12, policy: PolicyEngine | None = None, context: ContextStore | None = None, personal_model: PersonalModelStore | None = None, *, owns_model: bool = False, owns_tools: bool = False, owned_persistence=None):
         self.model = model
         self.owns_model = owns_model
         self.owns_tools = owns_tools
+        self.owned_persistence = owned_persistence
         self.tools = tools
         self.memory = memory
         self.max_steps = max_steps
@@ -61,6 +62,8 @@ class Agent:
 
     async def aclose(self) -> None:
         async with AsyncExitStack() as cleanup:
+            if self.owned_persistence is not None:
+                cleanup.callback(self.owned_persistence.close)
             if self.owns_model:
                 close = getattr(self.model, "aclose", None)
                 if close is not None:

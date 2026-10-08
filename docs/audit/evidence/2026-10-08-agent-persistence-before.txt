@@ -1,0 +1,43 @@
+F.                                                                       [100%]
+=================================== FAILURES ===================================
+_______________ test_agent_close_actual_pg_pool_ownership[False] _______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fbcda150c10>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-872/test_agent_close_actual_pg_poo0')
+borrowed = False
+
+    @pytest.mark.skipif(not PG_DSN, reason='requires actual PostgreSQL')
+    @pytest.mark.parametrize('borrowed', [False, True])
+    async def test_agent_close_actual_pg_pool_ownership(monkeypatch, tmp_path, borrowed):
+        dsn, drop = _pg_dsn()
+        shared = build_persistence('postgresql', tmp_path, dsn) if borrowed else None
+        created = []
+        original = runtime.persistence_from_settings
+        def capture(settings):
+            value = original(settings)
+            created.append(value)
+            return value
+        monkeypatch.setattr(runtime, 'persistence_from_settings', capture)
+        agent = None
+        try:
+            agent = await runtime.build_agent_async(Settings(_env_file=None, data_dir=tmp_path, persistence_backend='postgresql', postgres_dsn=dsn), persistence=shared)
+            await agent.aclose()
+            pool = shared.database.pool if borrowed else created[0].database.pool
+>           assert pool.closed is (not borrowed)
+E           AssertionError: assert False is not False
+E            +  where False = <psycopg_pool.pool.ConnectionPool 'pool-1' at 0x7fbcd8fa1090>.closed
+
+tests/test_agent_persistence_ownership.py:27: AssertionError
+=============================== warnings summary ===============================
+.venv/lib/python3.10/site-packages/fastapi/testclient.py:1
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+.venv/lib/python3.10/site-packages/starlette/testclient.py:53
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_agent_persistence_ownership.py::test_agent_close_actual_pg_pool_ownership[False]
+1 failed, 1 passed, 2 warnings in 1.19s
