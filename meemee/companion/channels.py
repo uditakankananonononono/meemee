@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import json
+import socket
 import time
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
@@ -11,6 +13,31 @@ from typing import Protocol
 import httpx
 
 from ..webhooks import validate_webhook_url
+
+_HTTPX_NAMES = frozenset(n for n in dir(httpx) if isinstance(getattr(httpx, n), type) and issubclass(getattr(httpx, n), Exception))
+
+# Failures raised while building the request, before any I/O: nothing was sent.
+_PRE_SEND = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout, httpx.InvalidURL, UnicodeEncodeError)
+# Failures that can happen after bytes left: the outcome is unknown. Everything else is not caught here.
+_UNKNOWN = (httpx.HTTPError, httpx.StreamError, httpx.CookieConflict)
+
+
+def _error_label(exc: BaseException) -> str:
+    """Fixed allowlisted class name for messages: the nearest ancestor that is an exact httpx class (or
+    UnicodeEncodeError). A custom subclass therefore reports its allowlisted ancestor, never its own
+    name, and never the exception text."""
+    for cls in type(exc).__mro__:
+        if cls is UnicodeEncodeError or (cls.__name__ in _HTTPX_NAMES and getattr(httpx, cls.__name__) is cls):
+            return cls.__name__
+    return "error"
+
+
+async def _validated(address: str, what: str) -> str:
+    """validate_webhook_url off the event loop; DNS/idna failures are definite (nothing was sent)."""
+    try:
+        return await asyncio.to_thread(validate_webhook_url, address)
+    except (socket.gaierror, UnicodeError):
+        raise ChannelError(f"{what} address could not be resolved") from None
 
 
 class ChannelError(RuntimeError):
@@ -85,7 +112,7 @@ class WebhookChannel:
         self.owns_client = client is None
 
     async def send(self, address: str, text: str) -> DeliveryResult:
-        url = validate_webhook_url(address)
+        url = await _validated(address, "webhook")
         body = json.dumps({"kind": "companion.message", "text": text}, separators=(",", ":"))
         if len(body.encode()) > self.max_payload_bytes:
             raise ChannelError("companion message exceeds the webhook payload ceiling")
@@ -99,10 +126,10 @@ class WebhookChannel:
             headers["X-Meemee-Signature"] = f"sha256={signature}"
         try:
             response = await self.client.post(url, content=body, headers=headers, follow_redirects=False)
-        except (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout) as exc:
-            raise ChannelError(f"webhook delivery failed before connection: {exc}") from exc
-        except httpx.HTTPError as exc:
-            raise DeliveryOutcomeUnknown(f"webhook delivery outcome unknown: {exc}") from exc
+        except _PRE_SEND as exc:
+            raise ChannelError(f"webhook delivery failed before connection ({_error_label(exc)})") from None
+        except _UNKNOWN as exc:
+            raise DeliveryOutcomeUnknown(f"webhook delivery outcome unknown ({_error_label(exc)})") from None
         if not 200 <= response.status_code < 300:
             raise ChannelError(f"webhook endpoint returned HTTP {response.status_code}")
         return DeliveryResult(self.name, url, True, f"HTTP {response.status_code}")
@@ -143,7 +170,7 @@ class ProviderChannel:
                 f"{self.name} delivery is not configured: set {prefix}_URL and {prefix}_TOKEN "
                 "for a real provider account"
             )
-        url = validate_webhook_url(self.provider_url or "")
+        url = await _validated(self.provider_url or "", f"{self.name} provider")
         try:
             response = await self.client.post(
                 f"{url.rstrip('/')}/messages",
@@ -151,10 +178,10 @@ class ProviderChannel:
                 json={"to": address, "text": text},
                 follow_redirects=False,
             )
-        except (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout) as exc:
-            raise ChannelError(f"{self.name} provider delivery failed before connection: {exc}") from exc
-        except httpx.HTTPError as exc:
-            raise DeliveryOutcomeUnknown(f"{self.name} delivery outcome unknown: {exc}") from exc
+        except _PRE_SEND as exc:
+            raise ChannelError(f"{self.name} provider delivery failed before connection ({_error_label(exc)})") from None
+        except _UNKNOWN as exc:
+            raise DeliveryOutcomeUnknown(f"{self.name} delivery outcome unknown ({_error_label(exc)})") from None
         if not 200 <= response.status_code < 300:
             raise ChannelError(f"{self.name} provider returned HTTP {response.status_code}")
         return DeliveryResult(self.name, address, True, f"HTTP {response.status_code}")
