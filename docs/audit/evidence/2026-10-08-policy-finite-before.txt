@@ -1,0 +1,43 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+_________________ test_policy_denies_nonfinite_arguments[nan] __________________
+
+value = nan
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf'), float('-inf')])
+    def test_policy_denies_nonfinite_arguments(value):
+        decision = PolicyEngine().evaluate('tool', {'value': value}, Risk.READ)
+>       assert decision.allowed is False
+E       AssertionError: assert True is False
+E        +  where True = PolicyDecision(allowed=True, reason='allowed', require_approval=False).allowed
+
+tests/test_policy_finite_arguments.py:12: AssertionError
+_________________ test_policy_denies_nonfinite_arguments[inf] __________________
+
+value = inf
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf'), float('-inf')])
+    def test_policy_denies_nonfinite_arguments(value):
+        decision = PolicyEngine().evaluate('tool', {'value': value}, Risk.READ)
+>       assert decision.allowed is False
+E       AssertionError: assert True is False
+E        +  where True = PolicyDecision(allowed=True, reason='allowed', require_approval=False).allowed
+
+tests/test_policy_finite_arguments.py:12: AssertionError
+_________________ test_policy_denies_nonfinite_arguments[-inf] _________________
+
+value = -inf
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf'), float('-inf')])
+    def test_policy_denies_nonfinite_arguments(value):
+        decision = PolicyEngine().evaluate('tool', {'value': value}, Risk.READ)
+>       assert decision.allowed is False
+E       AssertionError: assert True is False
+E        +  where True = PolicyDecision(allowed=True, reason='allowed', require_approval=False).allowed
+
+tests/test_policy_finite_arguments.py:12: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_policy_finite_arguments.py::test_policy_denies_nonfinite_arguments[nan]
+FAILED tests/test_policy_finite_arguments.py::test_policy_denies_nonfinite_arguments[inf]
+FAILED tests/test_policy_finite_arguments.py::test_policy_denies_nonfinite_arguments[-inf]
+3 failed in 0.14s
