@@ -46,4 +46,14 @@ class AgentTeam:
                     if close is not None and getattr(child, "owns_model", False):
                         await close()
 
-        return await asyncio.gather(*(one(index, goal) for index, goal in enumerate(goals)))
+        tasks = [asyncio.create_task(one(index, goal)) for index, goal in enumerate(goals)]
+        try:
+            return await asyncio.gather(*tasks)
+        except BaseException:
+            # Propagate the original error only after every sibling has stopped
+            # and completed its own resource cleanup. Never replay a child.
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            raise
