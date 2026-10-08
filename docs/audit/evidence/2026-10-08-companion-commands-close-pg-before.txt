@@ -1,0 +1,558 @@
+FFFFFFFFFFFFFF                                                           [100%]
+=================================== FAILURES ===================================
+___________ test_commands_release_actual_transports[False-command0] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f9570a41a20>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-862/test_commands_release_actual_t0')
+command = ['upsert-user', 'owner', '--display-name', 'Owner']
+output_fails = False
+
+    @pytest.mark.parametrize('command', COMMANDS)
+    @pytest.mark.parametrize('output_fails', [False, True])
+    def test_commands_release_actual_transports(monkeypatch, tmp_path, command, output_fails):
+        released, made = [], []
+        original = cli.build_companion_sync
+        class Transport(httpx.AsyncBaseTransport):
+            def __init__(self, name):
+                self.name = name
+            async def aclose(self):
+                released.append(self.name)
+        def build(*args):
+            value = original(Settings(_env_file=None, data_dir=tmp_path))
+            made.append(value)
+            value.store.upsert_user(UserProfile(user_id='owner', display_name='Owner', timezone='UTC'))
+            for name, client in [('model', value.model.client)] + [(n, c.client) for n, c in value.channels.items() if hasattr(c, 'client')]:
+                client._transport = Transport(name)
+            return value
+        monkeypatch.setattr(cli, 'build_companion_sync', build)
+        if output_fails:
+            def echo(*args, **kwargs):
+                raise ValueError('output failed')
+            monkeypatch.setattr(cli.typer, 'echo', echo)
+        try:
+            result = CliRunner().invoke(app, ['companion'] + command)
+            assert result.exit_code == (1 if output_fails else 0), result.output
+>           assert released == ['imessage', 'whatsapp', 'webhook', 'model']
+E           AssertionError: assert [] == ['imessage', ...ook', 'model']
+E             
+E             Right contains 4 more items, first extra item: 'imessage'
+E             Use -v to get more diff
+
+tests/test_companion_commands_http_cleanup.py:48: AssertionError
+___________ test_commands_release_actual_transports[False-command1] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f9570a8f4f0>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-862/test_commands_release_actual_t1')
+command = ['show-user', 'owner'], output_fails = False
+
+    @pytest.mark.parametrize('command', COMMANDS)
+    @pytest.mark.parametrize('output_fails', [False, True])
+    def test_commands_release_actual_transports(monkeypatch, tmp_path, command, output_fails):
+        released, made = [], []
+        original = cli.build_companion_sync
+        class Transport(httpx.AsyncBaseTransport):
+            def __init__(self, name):
+                self.name = name
+            async def aclose(self):
+                released.append(self.name)
+        def build(*args):
+            value = original(Settings(_env_file=None, data_dir=tmp_path))
+            made.append(value)
+            value.store.upsert_user(UserProfile(user_id='owner', display_name='Owner', timezone='UTC'))
+            for name, client in [('model', value.model.client)] + [(n, c.client) for n, c in value.channels.items() if hasattr(c, 'client')]:
+                client._transport = Transport(name)
+            return value
+        monkeypatch.setattr(cli, 'build_companion_sync', build)
+        if output_fails:
+            def echo(*args, **kwargs):
+                raise ValueError('output failed')
+            monkeypatch.setattr(cli.typer, 'echo', echo)
+        try:
+            result = CliRunner().invoke(app, ['companion'] + command)
+            assert result.exit_code == (1 if output_fails else 0), result.output
+>           assert released == ['imessage', 'whatsapp', 'webhook', 'model']
+E           AssertionError: assert [] == ['imessage', ...ook', 'model']
+E             
+E             Right contains 4 more items, first extra item: 'imessage'
+E             Use -v to get more diff
+
+tests/test_companion_commands_http_cleanup.py:48: AssertionError
+___________ test_commands_release_actual_transports[False-command2] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f957092f7c0>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-862/test_commands_release_actual_t2')
+command = ['set-persona', 'owner', '--tone', 'direct'], output_fails = False
+
+    @pytest.mark.parametrize('command', COMMANDS)
+    @pytest.mark.parametrize('output_fails', [False, True])
+    def test_commands_release_actual_transports(monkeypatch, tmp_path, command, output_fails):
+        released, made = [], []
+        original = cli.build_companion_sync
+        class Transport(httpx.AsyncBaseTransport):
+            def __init__(self, name):
+                self.name = name
+            async def aclose(self):
+                released.append(self.name)
+        def build(*args):
+            value = original(Settings(_env_file=None, data_dir=tmp_path))
+            made.append(value)
+            value.store.upsert_user(UserProfile(user_id='owner', display_name='Owner', timezone='UTC'))
+            for name, client in [('model', value.model.client)] + [(n, c.client) for n, c in value.channels.items() if hasattr(c, 'client')]:
+                client._transport = Transport(name)
+            return value
+        monkeypatch.setattr(cli, 'build_companion_sync', build)
+        if output_fails:
+            def echo(*args, **kwargs):
+                raise ValueError('output failed')
+            monkeypatch.setattr(cli.typer, 'echo', echo)
+        try:
+            result = CliRunner().invoke(app, ['companion'] + command)
+            assert result.exit_code == (1 if output_fails else 0), result.output
+>           assert released == ['imessage', 'whatsapp', 'webhook', 'model']
+E           AssertionError: assert [] == ['imessage', ...ook', 'model']
+E             
+E             Right contains 4 more items, first extra item: 'imessage'
+E             Use -v to get more diff
+
+tests/test_companion_commands_http_cleanup.py:48: AssertionError
+___________ test_commands_release_actual_transports[False-command3] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f957095bc10>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-862/test_commands_release_actual_t3')
+command = ['set-checkins', 'owner', '--enabled'], output_fails = False
+
+    @pytest.mark.parametrize('command', COMMANDS)
+    @pytest.mark.parametrize('output_fails', [False, True])
+    def test_commands_release_actual_transports(monkeypatch, tmp_path, command, output_fails):
+        released, made = [], []
+        original = cli.build_companion_sync
+        class Transport(httpx.AsyncBaseTransport):
+            def __init__(self, name):
+                self.name = name
+            async def aclose(self):
+                released.append(self.name)
+        def build(*args):
+            value = original(Settings(_env_file=None, data_dir=tmp_path))
+            made.append(value)
+            value.store.upsert_user(UserProfile(user_id='owner', display_name='Owner', timezone='UTC'))
+            for name, client in [('model', value.model.client)] + [(n, c.client) for n, c in value.channels.items() if hasattr(c, 'client')]:
+                client._transport = Transport(name)
+            return value
+        monkeypatch.setattr(cli, 'build_companion_sync', build)
+        if output_fails:
+            def echo(*args, **kwargs):
+                raise ValueError('output failed')
+            monkeypatch.setattr(cli.typer, 'echo', echo)
+        try:
+            result = CliRunner().invoke(app, ['companion'] + command)
+            assert result.exit_code == (1 if output_fails else 0), result.output
+>           assert released == ['imessage', 'whatsapp', 'webhook', 'model']
+E           AssertionError: assert [] == ['imessage', ...ook', 'model']
+E             
+E             Right contains 4 more items, first extra item: 'imessage'
+E             Use -v to get more diff
+
+tests/test_companion_commands_http_cleanup.py:48: AssertionError
+___________ test_commands_release_actual_transports[False-command4] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f957098fb20>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-862/test_commands_release_actual_t4')
+command = ['add-fact', 'owner', 'test fact'], output_fails = False
+
+    @pytest.mark.parametrize('command', COMMANDS)
+    @pytest.mark.parametrize('output_fails', [False, True])
+    def test_commands_release_actual_transports(monkeypatch, tmp_path, command, output_fails):
+        released, made = [], []
+        original = cli.build_companion_sync
+        class Transport(httpx.AsyncBaseTransport):
+            def __init__(self, name):
+                self.name = name
+            async def aclose(self):
+                released.append(self.name)
+        def build(*args):
+            value = original(Settings(_env_file=None, data_dir=tmp_path))
+            made.append(value)
+            value.store.upsert_user(UserProfile(user_id='owner', display_name='Owner', timezone='UTC'))
+            for name, client in [('model', value.model.client)] + [(n, c.client) for n, c in value.channels.items() if hasattr(c, 'client')]:
+                client._transport = Transport(name)
+            return value
+        monkeypatch.setattr(cli, 'build_companion_sync', build)
+        if output_fails:
+            def echo(*args, **kwargs):
+                raise ValueError('output failed')
+            monkeypatch.setattr(cli.typer, 'echo', echo)
+        try:
+            result = CliRunner().invoke(app, ['companion'] + command)
+            assert result.exit_code == (1 if output_fails else 0), result.output
+>           assert released == ['imessage', 'whatsapp', 'webhook', 'model']
+E           AssertionError: assert [] == ['imessage', ...ook', 'model']
+E             
+E             Right contains 4 more items, first extra item: 'imessage'
+E             Use -v to get more diff
+
+tests/test_companion_commands_http_cleanup.py:48: AssertionError
+___________ test_commands_release_actual_transports[False-command5] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f9570a74100>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-862/test_commands_release_actual_t5')
+command = ['facts', 'owner'], output_fails = False
+
+    @pytest.mark.parametrize('command', COMMANDS)
+    @pytest.mark.parametrize('output_fails', [False, True])
+    def test_commands_release_actual_transports(monkeypatch, tmp_path, command, output_fails):
+        released, made = [], []
+        original = cli.build_companion_sync
+        class Transport(httpx.AsyncBaseTransport):
+            def __init__(self, name):
+                self.name = name
+            async def aclose(self):
+                released.append(self.name)
+        def build(*args):
+            value = original(Settings(_env_file=None, data_dir=tmp_path))
+            made.append(value)
+            value.store.upsert_user(UserProfile(user_id='owner', display_name='Owner', timezone='UTC'))
+            for name, client in [('model', value.model.client)] + [(n, c.client) for n, c in value.channels.items() if hasattr(c, 'client')]:
+                client._transport = Transport(name)
+            return value
+        monkeypatch.setattr(cli, 'build_companion_sync', build)
+        if output_fails:
+            def echo(*args, **kwargs):
+                raise ValueError('output failed')
+            monkeypatch.setattr(cli.typer, 'echo', echo)
+        try:
+            result = CliRunner().invoke(app, ['companion'] + command)
+            assert result.exit_code == (1 if output_fails else 0), result.output
+>           assert released == ['imessage', 'whatsapp', 'webhook', 'model']
+E           AssertionError: assert [] == ['imessage', ...ook', 'model']
+E             
+E             Right contains 4 more items, first extra item: 'imessage'
+E             Use -v to get more diff
+
+tests/test_companion_commands_http_cleanup.py:48: AssertionError
+____________ test_commands_release_actual_transports[True-command0] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f9570a8e290>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-862/test_commands_release_actual_t6')
+command = ['upsert-user', 'owner', '--display-name', 'Owner']
+output_fails = True
+
+    @pytest.mark.parametrize('command', COMMANDS)
+    @pytest.mark.parametrize('output_fails', [False, True])
+    def test_commands_release_actual_transports(monkeypatch, tmp_path, command, output_fails):
+        released, made = [], []
+        original = cli.build_companion_sync
+        class Transport(httpx.AsyncBaseTransport):
+            def __init__(self, name):
+                self.name = name
+            async def aclose(self):
+                released.append(self.name)
+        def build(*args):
+            value = original(Settings(_env_file=None, data_dir=tmp_path))
+            made.append(value)
+            value.store.upsert_user(UserProfile(user_id='owner', display_name='Owner', timezone='UTC'))
+            for name, client in [('model', value.model.client)] + [(n, c.client) for n, c in value.channels.items() if hasattr(c, 'client')]:
+                client._transport = Transport(name)
+            return value
+        monkeypatch.setattr(cli, 'build_companion_sync', build)
+        if output_fails:
+            def echo(*args, **kwargs):
+                raise ValueError('output failed')
+            monkeypatch.setattr(cli.typer, 'echo', echo)
+        try:
+            result = CliRunner().invoke(app, ['companion'] + command)
+            assert result.exit_code == (1 if output_fails else 0), result.output
+>           assert released == ['imessage', 'whatsapp', 'webhook', 'model']
+E           AssertionError: assert [] == ['imessage', ...ook', 'model']
+E             
+E             Right contains 4 more items, first extra item: 'imessage'
+E             Use -v to get more diff
+
+tests/test_companion_commands_http_cleanup.py:48: AssertionError
+____________ test_commands_release_actual_transports[True-command1] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f957092d270>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-862/test_commands_release_actual_t7')
+command = ['show-user', 'owner'], output_fails = True
+
+    @pytest.mark.parametrize('command', COMMANDS)
+    @pytest.mark.parametrize('output_fails', [False, True])
+    def test_commands_release_actual_transports(monkeypatch, tmp_path, command, output_fails):
+        released, made = [], []
+        original = cli.build_companion_sync
+        class Transport(httpx.AsyncBaseTransport):
+            def __init__(self, name):
+                self.name = name
+            async def aclose(self):
+                released.append(self.name)
+        def build(*args):
+            value = original(Settings(_env_file=None, data_dir=tmp_path))
+            made.append(value)
+            value.store.upsert_user(UserProfile(user_id='owner', display_name='Owner', timezone='UTC'))
+            for name, client in [('model', value.model.client)] + [(n, c.client) for n, c in value.channels.items() if hasattr(c, 'client')]:
+                client._transport = Transport(name)
+            return value
+        monkeypatch.setattr(cli, 'build_companion_sync', build)
+        if output_fails:
+            def echo(*args, **kwargs):
+                raise ValueError('output failed')
+            monkeypatch.setattr(cli.typer, 'echo', echo)
+        try:
+            result = CliRunner().invoke(app, ['companion'] + command)
+            assert result.exit_code == (1 if output_fails else 0), result.output
+>           assert released == ['imessage', 'whatsapp', 'webhook', 'model']
+E           AssertionError: assert [] == ['imessage', ...ook', 'model']
+E             
+E             Right contains 4 more items, first extra item: 'imessage'
+E             Use -v to get more diff
+
+tests/test_companion_commands_http_cleanup.py:48: AssertionError
+____________ test_commands_release_actual_transports[True-command2] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f957092d3c0>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-862/test_commands_release_actual_t8')
+command = ['set-persona', 'owner', '--tone', 'direct'], output_fails = True
+
+    @pytest.mark.parametrize('command', COMMANDS)
+    @pytest.mark.parametrize('output_fails', [False, True])
+    def test_commands_release_actual_transports(monkeypatch, tmp_path, command, output_fails):
+        released, made = [], []
+        original = cli.build_companion_sync
+        class Transport(httpx.AsyncBaseTransport):
+            def __init__(self, name):
+                self.name = name
+            async def aclose(self):
+                released.append(self.name)
+        def build(*args):
+            value = original(Settings(_env_file=None, data_dir=tmp_path))
+            made.append(value)
+            value.store.upsert_user(UserProfile(user_id='owner', display_name='Owner', timezone='UTC'))
+            for name, client in [('model', value.model.client)] + [(n, c.client) for n, c in value.channels.items() if hasattr(c, 'client')]:
+                client._transport = Transport(name)
+            return value
+        monkeypatch.setattr(cli, 'build_companion_sync', build)
+        if output_fails:
+            def echo(*args, **kwargs):
+                raise ValueError('output failed')
+            monkeypatch.setattr(cli.typer, 'echo', echo)
+        try:
+            result = CliRunner().invoke(app, ['companion'] + command)
+            assert result.exit_code == (1 if output_fails else 0), result.output
+>           assert released == ['imessage', 'whatsapp', 'webhook', 'model']
+E           AssertionError: assert [] == ['imessage', ...ook', 'model']
+E             
+E             Right contains 4 more items, first extra item: 'imessage'
+E             Use -v to get more diff
+
+tests/test_companion_commands_http_cleanup.py:48: AssertionError
+____________ test_commands_release_actual_transports[True-command3] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f95709968f0>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-862/test_commands_release_actual_t9')
+command = ['set-checkins', 'owner', '--enabled'], output_fails = True
+
+    @pytest.mark.parametrize('command', COMMANDS)
+    @pytest.mark.parametrize('output_fails', [False, True])
+    def test_commands_release_actual_transports(monkeypatch, tmp_path, command, output_fails):
+        released, made = [], []
+        original = cli.build_companion_sync
+        class Transport(httpx.AsyncBaseTransport):
+            def __init__(self, name):
+                self.name = name
+            async def aclose(self):
+                released.append(self.name)
+        def build(*args):
+            value = original(Settings(_env_file=None, data_dir=tmp_path))
+            made.append(value)
+            value.store.upsert_user(UserProfile(user_id='owner', display_name='Owner', timezone='UTC'))
+            for name, client in [('model', value.model.client)] + [(n, c.client) for n, c in value.channels.items() if hasattr(c, 'client')]:
+                client._transport = Transport(name)
+            return value
+        monkeypatch.setattr(cli, 'build_companion_sync', build)
+        if output_fails:
+            def echo(*args, **kwargs):
+                raise ValueError('output failed')
+            monkeypatch.setattr(cli.typer, 'echo', echo)
+        try:
+            result = CliRunner().invoke(app, ['companion'] + command)
+            assert result.exit_code == (1 if output_fails else 0), result.output
+>           assert released == ['imessage', 'whatsapp', 'webhook', 'model']
+E           AssertionError: assert [] == ['imessage', ...ook', 'model']
+E             
+E             Right contains 4 more items, first extra item: 'imessage'
+E             Use -v to get more diff
+
+tests/test_companion_commands_http_cleanup.py:48: AssertionError
+____________ test_commands_release_actual_transports[True-command4] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f9570941a50>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-862/test_commands_release_actual_t10')
+command = ['add-fact', 'owner', 'test fact'], output_fails = True
+
+    @pytest.mark.parametrize('command', COMMANDS)
+    @pytest.mark.parametrize('output_fails', [False, True])
+    def test_commands_release_actual_transports(monkeypatch, tmp_path, command, output_fails):
+        released, made = [], []
+        original = cli.build_companion_sync
+        class Transport(httpx.AsyncBaseTransport):
+            def __init__(self, name):
+                self.name = name
+            async def aclose(self):
+                released.append(self.name)
+        def build(*args):
+            value = original(Settings(_env_file=None, data_dir=tmp_path))
+            made.append(value)
+            value.store.upsert_user(UserProfile(user_id='owner', display_name='Owner', timezone='UTC'))
+            for name, client in [('model', value.model.client)] + [(n, c.client) for n, c in value.channels.items() if hasattr(c, 'client')]:
+                client._transport = Transport(name)
+            return value
+        monkeypatch.setattr(cli, 'build_companion_sync', build)
+        if output_fails:
+            def echo(*args, **kwargs):
+                raise ValueError('output failed')
+            monkeypatch.setattr(cli.typer, 'echo', echo)
+        try:
+            result = CliRunner().invoke(app, ['companion'] + command)
+            assert result.exit_code == (1 if output_fails else 0), result.output
+>           assert released == ['imessage', 'whatsapp', 'webhook', 'model']
+E           AssertionError: assert [] == ['imessage', ...ook', 'model']
+E             
+E             Right contains 4 more items, first extra item: 'imessage'
+E             Use -v to get more diff
+
+tests/test_companion_commands_http_cleanup.py:48: AssertionError
+____________ test_commands_release_actual_transports[True-command5] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f957099cb50>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-862/test_commands_release_actual_t11')
+command = ['facts', 'owner'], output_fails = True
+
+    @pytest.mark.parametrize('command', COMMANDS)
+    @pytest.mark.parametrize('output_fails', [False, True])
+    def test_commands_release_actual_transports(monkeypatch, tmp_path, command, output_fails):
+        released, made = [], []
+        original = cli.build_companion_sync
+        class Transport(httpx.AsyncBaseTransport):
+            def __init__(self, name):
+                self.name = name
+            async def aclose(self):
+                released.append(self.name)
+        def build(*args):
+            value = original(Settings(_env_file=None, data_dir=tmp_path))
+            made.append(value)
+            value.store.upsert_user(UserProfile(user_id='owner', display_name='Owner', timezone='UTC'))
+            for name, client in [('model', value.model.client)] + [(n, c.client) for n, c in value.channels.items() if hasattr(c, 'client')]:
+                client._transport = Transport(name)
+            return value
+        monkeypatch.setattr(cli, 'build_companion_sync', build)
+        if output_fails:
+            def echo(*args, **kwargs):
+                raise ValueError('output failed')
+            monkeypatch.setattr(cli.typer, 'echo', echo)
+        try:
+            result = CliRunner().invoke(app, ['companion'] + command)
+            assert result.exit_code == (1 if output_fails else 0), result.output
+>           assert released == ['imessage', 'whatsapp', 'webhook', 'model']
+E           AssertionError: assert [] == ['imessage', ...ook', 'model']
+E             
+E             Right contains 4 more items, first extra item: 'imessage'
+E             Use -v to get more diff
+
+tests/test_companion_commands_http_cleanup.py:48: AssertionError
+___________________ test_commands_actual_pg_ownership[False] ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f957099f250>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-862/test_commands_actual_pg_owners0')
+borrowed = False
+
+    @pytest.mark.parametrize('borrowed', [False, True])
+    def test_commands_actual_pg_ownership(monkeypatch, tmp_path, borrowed):
+        from test_token_audit_backends import PG_DSN, _pg_dsn
+        if not PG_DSN:
+            pytest.skip('requires actual PostgreSQL')
+        from meemee.companion.runtime import build_companion_sync
+        from meemee.persistence import build_persistence
+        dsn, drop = _pg_dsn()
+        shared = build_persistence('postgresql', tmp_path, dsn) if borrowed else None
+        made = []
+        def build(*args):
+            value = build_companion_sync(Settings(_env_file=None, data_dir=tmp_path, persistence_backend='postgresql', postgres_dsn=dsn), persistence=shared)
+            made.append(value)
+            return value
+        monkeypatch.setattr(cli, 'build_companion_sync', build)
+        try:
+            result = CliRunner().invoke(app, ['companion', 'show-user', 'unknown'])
+            assert result.exit_code != 0
+            if borrowed:
+                assert not shared.database.pool.closed
+                assert shared.context.ping()
+            else:
+>               assert made[0].owned_persistence.database.pool.closed
+E               AssertionError: assert False
+E                +  where False = <psycopg_pool.pool.ConnectionPool 'pool-1' at 0x7f956f74f040>.closed
+E                +    where <psycopg_pool.pool.ConnectionPool 'pool-1' at 0x7f956f74f040> = <meemee_persist_pg._db.Database object at 0x7f956f74f010>.pool
+E                +      where <meemee_persist_pg._db.Database object at 0x7f956f74f010> = Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f956f3444c0>, jobs=<meemee...re object at 0x7f956f344d90>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f956f344df0>).database
+E                +        where Persistence(backend='postgresql', memory=<meemee_persist_pg.memory.MemoryStore object at 0x7f956f3444c0>, jobs=<meemee...re object at 0x7f956f344d90>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f956f344df0>) = Companion(store=<meemee_persist_pg.companion.CompanionStore object at 0x7f956f344b80>, engine=<meemee.companion.engine...e object at 0x7f956f344d90>, browser_notices=<meemee_persist_pg.browser.TakeoverNoticeQueue object at 0x7f956f344df0>)).owned_persistence
+
+tests/test_companion_commands_http_cleanup.py:81: AssertionError
+___________________ test_commands_actual_pg_ownership[True] ____________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f956f74e620>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-862/test_commands_actual_pg_owners1')
+borrowed = True
+
+    @pytest.mark.parametrize('borrowed', [False, True])
+    def test_commands_actual_pg_ownership(monkeypatch, tmp_path, borrowed):
+        from test_token_audit_backends import PG_DSN, _pg_dsn
+        if not PG_DSN:
+            pytest.skip('requires actual PostgreSQL')
+        from meemee.companion.runtime import build_companion_sync
+        from meemee.persistence import build_persistence
+        dsn, drop = _pg_dsn()
+        shared = build_persistence('postgresql', tmp_path, dsn) if borrowed else None
+        made = []
+        def build(*args):
+            value = build_companion_sync(Settings(_env_file=None, data_dir=tmp_path, persistence_backend='postgresql', postgres_dsn=dsn), persistence=shared)
+            made.append(value)
+            return value
+        monkeypatch.setattr(cli, 'build_companion_sync', build)
+        try:
+            result = CliRunner().invoke(app, ['companion', 'show-user', 'unknown'])
+            assert result.exit_code != 0
+            if borrowed:
+                assert not shared.database.pool.closed
+                assert shared.context.ping()
+            else:
+                assert made[0].owned_persistence.database.pool.closed
+>           assert made[0].model.client.is_closed
+E           assert False
+E            +  where False = <httpx.AsyncClient object at 0x7f956efee7a0>.is_closed
+E            +    where <httpx.AsyncClient object at 0x7f956efee7a0> = <meemee.llm.OpenAICompatibleModel object at 0x7f956efee5f0>.client
+E            +      where <meemee.llm.OpenAICompatibleModel object at 0x7f956efee5f0> = Companion(store=<meemee.companion.store.CompanionStore object at 0x7f956efee620>, engine=<meemee.companion.engine.Comp... object at 0x7f956efef430>}, model=<meemee.llm.OpenAICompatibleModel object at 0x7f956efee5f0>, owned_persistence=None).model
+
+tests/test_companion_commands_http_cleanup.py:82: AssertionError
+=============================== warnings summary ===============================
+.venv/lib/python3.10/site-packages/fastapi/testclient.py:1
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+.venv/lib/python3.10/site-packages/starlette/testclient.py:53
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_companion_commands_http_cleanup.py::test_commands_release_actual_transports[False-command0]
+FAILED tests/test_companion_commands_http_cleanup.py::test_commands_release_actual_transports[False-command1]
+FAILED tests/test_companion_commands_http_cleanup.py::test_commands_release_actual_transports[False-command2]
+FAILED tests/test_companion_commands_http_cleanup.py::test_commands_release_actual_transports[False-command3]
+FAILED tests/test_companion_commands_http_cleanup.py::test_commands_release_actual_transports[False-command4]
+FAILED tests/test_companion_commands_http_cleanup.py::test_commands_release_actual_transports[False-command5]
+FAILED tests/test_companion_commands_http_cleanup.py::test_commands_release_actual_transports[True-command0]
+FAILED tests/test_companion_commands_http_cleanup.py::test_commands_release_actual_transports[True-command1]
+FAILED tests/test_companion_commands_http_cleanup.py::test_commands_release_actual_transports[True-command2]
+FAILED tests/test_companion_commands_http_cleanup.py::test_commands_release_actual_transports[True-command3]
+FAILED tests/test_companion_commands_http_cleanup.py::test_commands_release_actual_transports[True-command4]
+FAILED tests/test_companion_commands_http_cleanup.py::test_commands_release_actual_transports[True-command5]
+FAILED tests/test_companion_commands_http_cleanup.py::test_commands_actual_pg_ownership[False]
+FAILED tests/test_companion_commands_http_cleanup.py::test_commands_actual_pg_ownership[True]
+14 failed, 2 warnings in 4.16s

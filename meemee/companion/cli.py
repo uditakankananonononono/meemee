@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from contextlib import AsyncExitStack
+from contextlib import AsyncExitStack, contextmanager
 from typing import Annotated
 
 import typer
@@ -13,6 +13,25 @@ from .runtime import build_companion_async, build_companion_sync
 from .worker import checkin_forever
 
 companion_app = typer.Typer(no_args_is_help=True, help="Companion layer: users, persona, chat, facts and check-ins")
+
+
+@contextmanager
+def command_companion():
+    """Keep sync CLI signatures while owning the returned async clients."""
+    companion = build_companion_sync(Settings())
+    try:
+        yield companion
+    finally:
+        async def close():
+            async with AsyncExitStack() as cleanup:
+                if companion.owned_persistence is not None:
+                    cleanup.callback(companion.owned_persistence.close)
+                cleanup.push_async_callback(companion.model.aclose)
+                for channel in companion.channels.values():
+                    closer = getattr(channel, "aclose", None)
+                    if closer is not None:
+                        cleanup.push_async_callback(closer)
+        asyncio.run(close())
 
 
 @companion_app.command("upsert-user")
@@ -27,32 +46,32 @@ def upsert_user(
     instructions: str = typer.Option("", "--instructions"),
 ) -> None:
     """Create or update a companion user and persona."""
-    companion = build_companion_sync(Settings())
-    profile = UserProfile(
-        user_id=user_id,
-        display_name=display_name,
-        timezone=timezone,
-        persona=PersonaConfig(
-            tone=tone, language=language, use_emoji=emoji,
-            style_rules=style_rule or [], custom_instructions=instructions,
-        ),
-        checkins=CheckInPreferences(),
-    )
-    existing = companion.store.profile(user_id)
-    if existing is not None:
-        profile.checkins = existing.checkins
-        profile.persona.display_name = existing.persona.display_name
-    typer.echo(json.dumps(companion.store.upsert_user(profile), indent=2))
+    with command_companion() as companion:
+        profile = UserProfile(
+            user_id=user_id,
+            display_name=display_name,
+            timezone=timezone,
+            persona=PersonaConfig(
+                tone=tone, language=language, use_emoji=emoji,
+                style_rules=style_rule or [], custom_instructions=instructions,
+            ),
+            checkins=CheckInPreferences(),
+        )
+        existing = companion.store.profile(user_id)
+        if existing is not None:
+            profile.checkins = existing.checkins
+            profile.persona.display_name = existing.persona.display_name
+        typer.echo(json.dumps(companion.store.upsert_user(profile), indent=2))
 
 
 @companion_app.command("show-user")
 def show_user(user_id: str) -> None:
     """Show one companion profile with persona and check-in preferences."""
-    companion = build_companion_sync(Settings())
-    record = companion.store.get_user(user_id)
-    if record is None:
-        raise typer.BadParameter(f"unknown companion user: {user_id}")
-    typer.echo(json.dumps(record, indent=2))
+    with command_companion() as companion:
+        record = companion.store.get_user(user_id)
+        if record is None:
+            raise typer.BadParameter(f"unknown companion user: {user_id}")
+        typer.echo(json.dumps(record, indent=2))
 
 
 @companion_app.command("set-persona")
@@ -66,25 +85,25 @@ def set_persona(
     instructions: str = typer.Option(None, "--instructions"),
 ) -> None:
     """Update only the persona of an existing companion user."""
-    companion = build_companion_sync(Settings())
-    profile = companion.store.profile(user_id)
-    if profile is None:
-        raise typer.BadParameter(f"unknown companion user: {user_id}")
-    persona = profile.persona
-    if persona_name is not None:
-        persona.display_name = persona_name
-    if tone is not None:
-        persona.tone = tone
-    if language is not None:
-        persona.language = language
-    if emoji is not None:
-        persona.use_emoji = emoji
-    if style_rule:
-        persona.style_rules = style_rule
-    if instructions is not None:
-        persona.custom_instructions = instructions
-    profile.persona = persona
-    typer.echo(json.dumps(companion.store.upsert_user(profile), indent=2))
+    with command_companion() as companion:
+        profile = companion.store.profile(user_id)
+        if profile is None:
+            raise typer.BadParameter(f"unknown companion user: {user_id}")
+        persona = profile.persona
+        if persona_name is not None:
+            persona.display_name = persona_name
+        if tone is not None:
+            persona.tone = tone
+        if language is not None:
+            persona.language = language
+        if emoji is not None:
+            persona.use_emoji = emoji
+        if style_rule:
+            persona.style_rules = style_rule
+        if instructions is not None:
+            persona.custom_instructions = instructions
+        profile.persona = persona
+        typer.echo(json.dumps(companion.store.upsert_user(profile), indent=2))
 
 
 @companion_app.command("set-checkins")
@@ -98,22 +117,22 @@ def set_checkins(
     address: str = typer.Option(None, "--address"),
 ) -> None:
     """Configure proactive check-ins for a user."""
-    companion = build_companion_sync(Settings())
-    profile = companion.store.profile(user_id)
-    if profile is None:
-        raise typer.BadParameter(f"unknown companion user: {user_id}")
-    if (quiet_start is None) != (quiet_end is None):
-        raise typer.BadParameter("quiet hours need both --quiet-start and --quiet-end")
-    quiet = QuietHours(start=quiet_start, end=quiet_end) if quiet_start else None
-    profile.checkins = CheckInPreferences(
-        enabled=enabled, cadence_minutes=cadence_minutes, quiet_hours=quiet,
-        channel=channel, address=address,
-    )
-    saved = companion.store.upsert_user(profile)
-    if not enabled:
-        cancelled = companion.store.cancel_pending_checkins(user_id)
-        typer.echo(f"cancelled {cancelled} pending check-ins", err=True)
-    typer.echo(json.dumps(saved["checkins"], indent=2))
+    with command_companion() as companion:
+        profile = companion.store.profile(user_id)
+        if profile is None:
+            raise typer.BadParameter(f"unknown companion user: {user_id}")
+        if (quiet_start is None) != (quiet_end is None):
+            raise typer.BadParameter("quiet hours need both --quiet-start and --quiet-end")
+        quiet = QuietHours(start=quiet_start, end=quiet_end) if quiet_start else None
+        profile.checkins = CheckInPreferences(
+            enabled=enabled, cadence_minutes=cadence_minutes, quiet_hours=quiet,
+            channel=channel, address=address,
+        )
+        saved = companion.store.upsert_user(profile)
+        if not enabled:
+            cancelled = companion.store.cancel_pending_checkins(user_id)
+            typer.echo(f"cancelled {cancelled} pending check-ins", err=True)
+        typer.echo(json.dumps(saved["checkins"], indent=2))
 
 
 @companion_app.command("add-fact")
@@ -124,22 +143,22 @@ def add_fact(
     confidence: float = typer.Option(1.0, "--confidence"),
 ) -> None:
     """Record a durable fact about a user."""
-    companion = build_companion_sync(Settings())
-    if companion.store.get_user(user_id) is None:
-        raise typer.BadParameter(f"unknown companion user: {user_id}")
-    fact = companion.store.add_fact(user_id, FactInput(category=category, text=text, confidence=confidence), "cli")
-    typer.echo(json.dumps(fact, indent=2))
+    with command_companion() as companion:
+        if companion.store.get_user(user_id) is None:
+            raise typer.BadParameter(f"unknown companion user: {user_id}")
+        fact = companion.store.add_fact(user_id, FactInput(category=category, text=text, confidence=confidence), "cli")
+        typer.echo(json.dumps(fact, indent=2))
 
 
 @companion_app.command("facts")
 def facts(user_id: str, query: str = typer.Option(None, "--query")) -> None:
     """List or search a user's durable facts."""
-    companion = build_companion_sync(Settings())
-    if query:
-        rows = companion.store.search_facts(user_id, query)
-    else:
-        rows = companion.store.list_facts(user_id)
-    typer.echo(json.dumps(rows, indent=2))
+    with command_companion() as companion:
+        if query:
+            rows = companion.store.search_facts(user_id, query)
+        else:
+            rows = companion.store.list_facts(user_id)
+        typer.echo(json.dumps(rows, indent=2))
 
 
 @companion_app.command("chat")
