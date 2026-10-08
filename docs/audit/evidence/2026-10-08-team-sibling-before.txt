@@ -1,0 +1,42 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+____________ test_team_error_joins_sibling_and_closes_actual_model _____________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-783/test_team_error_joins_sibling_0')
+
+    async def test_team_error_joins_sibling_and_closes_actual_model(tmp_path):
+        stores = build_persistence('sqlite', tmp_path)
+        started = asyncio.Event()
+        stopped = asyncio.Event()
+        children = []
+    
+        def factory():
+            child = build_agent(Settings(_env_file=None, data_dir=tmp_path), False, persistence=stores)
+            children.append(child)
+    
+            async def run(goal, *, owner_id):
+                if goal == 'bad':
+                    await started.wait()
+                    raise TypeError('internal failure after effect')
+                started.set()
+                try:
+                    await asyncio.Event().wait()
+                finally:
+                    stopped.set()
+    
+            child.run = run
+            return child
+    
+        before = asyncio.all_tasks()
+        try:
+            with pytest.raises(TypeError, match='internal failure after effect'):
+                await AgentTeam(factory).delegate(['bad', 'slow'], owner_id='owner')
+>           assert stopped.is_set()
+E           assert False
+E            +  where False = is_set()
+E            +    where is_set = <asyncio.locks.Event object at 0x7f5fdb7aa1a0 [unset]>.is_set
+
+tests/test_team_sibling_cleanup.py:40: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_team_sibling_cleanup.py::test_team_error_joins_sibling_and_closes_actual_model
+1 failed in 0.83s
