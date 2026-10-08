@@ -7,7 +7,7 @@ host sees the stored response. Responses are kept as jsonb for the TTL (24 hours
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from typing import Any
 
 from psycopg.types.json import Jsonb
@@ -74,7 +74,6 @@ class IdempotencyStore:
         if not key or len(key) > 200:
             raise ValueError("idempotency key must contain 1-200 characters")
         encoded_response = json.dumps(response, default=str, allow_nan=False)
-        now = datetime.now(timezone.utc)
         digest = self.request_hash(payload)
         with self.db.transaction() as c:
             # Serialize owner verification with replacement/release/publication.
@@ -96,7 +95,7 @@ class IdempotencyStore:
                            AND meemee_idempotency.claim_token IS NOT DISTINCT FROM %s
                          RETURNING request_hash""",
                       (principal, route, key, digest, Jsonb(json.loads(encoded_response)),
-                       status, now, now + self.ttl, claim_token)).fetchone()
+                       status, server_now, server_now + self.ttl, claim_token)).fetchone()
             if published is None:
                 reserved = c.execute(
                     "SELECT request_hash, claim_token FROM meemee_idempotency WHERE principal=%s AND route=%s AND key=%s",
