@@ -1,0 +1,48 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+__________________ test_cutover_snapshot_escapes_filename[?] ___________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-682/test_cutover_snapshot_escapes_0')
+delimiter = '?'
+
+    @pytest.mark.parametrize('delimiter', ['?', '#'])
+    def test_cutover_snapshot_escapes_filename(tmp_path, delimiter):
+        decoy = tmp_path / 'source'
+        actual = tmp_path / f'source{delimiter}part.sqlite3'
+        for path, value in [(decoy, 'decoy'), (actual, 'actual')]:
+            with sqlite3.connect(path) as db:
+                db.execute('CREATE TABLE marker(value TEXT)')
+                db.execute('INSERT INTO marker VALUES(?)', (value,))
+        with sqlite_snapshot(actual) as db:
+>           assert db.execute('SELECT value FROM marker').fetchone()[0] == 'actual'
+E           AssertionError: assert 'decoy' == 'actual'
+E             
+E             - actual
+E             + decoy
+
+tests/test_cutover_snapshot_uri.py:19: AssertionError
+__________________ test_cutover_snapshot_escapes_filename[#] ___________________
+
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-682/test_cutover_snapshot_escapes_1')
+delimiter = '#'
+
+    @pytest.mark.parametrize('delimiter', ['?', '#'])
+    def test_cutover_snapshot_escapes_filename(tmp_path, delimiter):
+        decoy = tmp_path / 'source'
+        actual = tmp_path / f'source{delimiter}part.sqlite3'
+        for path, value in [(decoy, 'decoy'), (actual, 'actual')]:
+            with sqlite3.connect(path) as db:
+                db.execute('CREATE TABLE marker(value TEXT)')
+                db.execute('INSERT INTO marker VALUES(?)', (value,))
+        with sqlite_snapshot(actual) as db:
+>           assert db.execute('SELECT value FROM marker').fetchone()[0] == 'actual'
+E           AssertionError: assert 'decoy' == 'actual'
+E             
+E             - actual
+E             + decoy
+
+tests/test_cutover_snapshot_uri.py:19: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_cutover_snapshot_uri.py::test_cutover_snapshot_escapes_filename[?]
+FAILED tests/test_cutover_snapshot_uri.py::test_cutover_snapshot_escapes_filename[#]
+2 failed in 0.32s
