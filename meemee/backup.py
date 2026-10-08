@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import sqlite3
@@ -18,15 +19,15 @@ class BackupManager:
         files: list[dict[str, object]] = []
         for source in sorted(self.data_dir.glob("*.sqlite3")):
             target = destination / source.name
-            source_db = sqlite3.connect(source.resolve().as_uri() + "?mode=ro", uri=True)
-            target_db = sqlite3.connect(target)
-            try:
+            with contextlib.ExitStack() as stack:
+                source_db = sqlite3.connect(source.resolve().as_uri() + "?mode=ro", uri=True)
+                stack.callback(source_db.close)
+                target_db = sqlite3.connect(target)
+                stack.callback(target_db.close)
                 source_db.backup(target_db)
                 integrity = target_db.execute("PRAGMA integrity_check").fetchone()[0]
                 if integrity != "ok":
                     raise RuntimeError(f"backup integrity failed for {source.name}: {integrity}")
-            finally:
-                source_db.close(); target_db.close()
             digest = hashlib.sha256(target.read_bytes()).hexdigest()
             files.append({"name": source.name, "bytes": target.stat().st_size, "sha256": digest})
         manifest = {
@@ -91,12 +92,14 @@ class BackupManager:
             for expected in manifest["files"]:
                 source=BackupManager._file(directory, expected["name"]); target=BackupManager._file(destination, expected["name"])
                 started.append(expected["name"])
-                source_db=sqlite3.connect(source.resolve().as_uri() + "?mode=ro",uri=True); target_db=sqlite3.connect(target)
-                try:
+                with contextlib.ExitStack() as stack:
+                    source_db=sqlite3.connect(source.resolve().as_uri() + "?mode=ro",uri=True)
+                    stack.callback(source_db.close)
+                    target_db=sqlite3.connect(target)
+                    stack.callback(target_db.close)
                     source_db.backup(target_db)
                     if target_db.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
                         raise RuntimeError(f"restored database corrupt: {expected['name']}")
-                finally: source_db.close(); target_db.close()
                 if hashlib.sha256(target.read_bytes()).hexdigest()!=expected["sha256"]:
                     raise RuntimeError(f"restored checksum mismatch: {expected['name']}")
                 restored.append(expected["name"])

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import contextlib
 import os
 import sqlite3
 import tempfile
@@ -22,25 +23,23 @@ def _material(key: str) -> bytes:
 
 
 def _backup(database: Path, destination: Path) -> None:
-    source = sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True)
-    target = sqlite3.connect(destination)
-    try:
+    with contextlib.ExitStack() as stack:
+        source = sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True)
+        stack.callback(source.close)
+        target = sqlite3.connect(destination)
+        stack.callback(target.close)
         source.backup(target)
         if target.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
             raise RuntimeError(f"rotation backup integrity failed for {database.name}")
-    finally:
-        source.close()
-        target.close()
 
 
 def _restore(backup: Path, database: Path) -> None:
-    source = sqlite3.connect(backup.resolve().as_uri() + "?mode=ro", uri=True)
-    target = sqlite3.connect(database)
-    try:
+    with contextlib.ExitStack() as stack:
+        source = sqlite3.connect(backup.resolve().as_uri() + "?mode=ro", uri=True)
+        stack.callback(source.close)
+        target = sqlite3.connect(database)
+        stack.callback(target.close)
         source.backup(target)
-    finally:
-        source.close()
-        target.close()
 
 
 def rotate_keys(data_dir: Path, old_key: str, new_key: str) -> dict[str, int]:
@@ -60,11 +59,13 @@ def rotate_keys(data_dir: Path, old_key: str, new_key: str) -> dict[str, int]:
             _backup(path, backup)
         # Exclusive publication closes the check/backup/write race between operators.
         fd = os.open(marker, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(fd, "w") as output:
-            output.write("Do not start Meemee; key rotation is in progress.\n")
-        vault = sqlite3.connect(vault_path) if vault_path.exists() else None
-        hooks = sqlite3.connect(webhook_path) if webhook_path.exists() else None
+        vault = hooks = None
+        mutated = False
         try:
+            with os.fdopen(fd, "w") as output:
+                output.write("Do not start Meemee; key rotation is in progress.\n")
+            vault = sqlite3.connect(vault_path) if vault_path.exists() else None
+            hooks = sqlite3.connect(webhook_path) if webhook_path.exists() else None
             vault_rows = vault.execute("SELECT name,nonce,ciphertext FROM secrets").fetchall() if vault else []
             hook_rows = hooks.execute("SELECT id,secret FROM webhook_subscriptions").fetchall() if hooks else []
             decoded_vault = [
@@ -89,6 +90,7 @@ def rotate_keys(data_dir: Path, old_key: str, new_key: str) -> dict[str, int]:
                 (new_cipher.encrypt(value, f"webhook-subscription:{ident}"), ident)
                 for ident, value in decoded_hooks
             ]
+            mutated = True
             if vault:
                 vault.execute("BEGIN IMMEDIATE")
                 vault.executemany(
@@ -119,8 +121,9 @@ def rotate_keys(data_dir: Path, old_key: str, new_key: str) -> dict[str, int]:
             if hooks:
                 hooks.close()
                 hooks = None
-            for path, backup in backups.items():
-                _restore(backup, path)
+            if mutated:
+                for path, backup in backups.items():
+                    _restore(backup, path)
             marker.unlink(missing_ok=True)
             raise
         finally:
