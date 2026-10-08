@@ -184,7 +184,7 @@ class WebhookStore:
 
         Subscriptions of other principals never receive the event."""
         envelope = {"schema":"meemee.webhook.v1","event_id":event_id,"event_type":event_type,"data":payload}
-        encoded, now = json.dumps(envelope, sort_keys=True, separators=(",", ":")), time.time()
+        encoded, now = json.dumps(envelope, sort_keys=True, separators=(",", ":"), allow_nan=False), time.time()
         if len(encoded.encode()) > self.max_payload_bytes:
             raise ValueError(f"webhook payload exceeds {self.max_payload_bytes} bytes")
         with self.lock, self.db:
@@ -199,7 +199,7 @@ class WebhookStore:
                 if subscription["fields"]:
                     selected = {key: payload[key] for key in subscription["fields"].split() if key in payload}
                     selected_envelope = {"schema":"meemee.webhook.v1","event_id":event_id,"event_type":event_type,"data":selected}
-                    body = json.dumps(selected_envelope, sort_keys=True, separators=(",", ":"))
+                    body = json.dumps(selected_envelope, sort_keys=True, separators=(",", ":"), allow_nan=False)
                 digest = hashlib.sha256(body.encode()).hexdigest()
                 created += self.db.execute(
                     "INSERT OR IGNORE INTO webhook_deliveries(id,subscription_id,event_id,event_type,payload,payload_sha256,status,next_attempt_at,created_at) VALUES(?,?,?,?,?,?,'queued',?,?)",
@@ -357,7 +357,7 @@ class WebhookStore:
     def enqueue_test(self, ident: str, principal: str) -> str | None:
         """Queue a ``webhook.test`` delivery to one active owned subscription; None if not found."""
         event_id = f"test:{uuid.uuid4().hex}"
-        payload = json.dumps({"webhook_id": ident, "test": True}, sort_keys=True, separators=(",", ":"))
+        payload = json.dumps({"webhook_id": ident, "test": True}, sort_keys=True, separators=(",", ":"), allow_nan=False)
         with self.lock, self.db:
             owned = self.db.execute("SELECT 1 FROM webhook_subscriptions WHERE id=? AND principal=? AND active=1", (ident, principal)).fetchone()
             if owned is None:
