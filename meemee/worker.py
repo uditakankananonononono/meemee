@@ -77,6 +77,7 @@ async def work_forever(settings: Settings | None = None) -> None:
                 args=(jobs, job["id"], cancel, stop, lease_token, lease_lost), daemon=True)
             watcher.start()
             run_id = uuid.uuid4().hex
+            agent = None
             try:
                 owner = job.get("principal")
                 if not owner:
@@ -85,7 +86,8 @@ async def work_forever(settings: Settings | None = None) -> None:
                     # shared "default" bucket would leak its memory across owners.
                     jobs.fail(job["id"], "job has no principal owner; refusing to run unowned work", **terminal_kwargs)
                     continue
-                report = await build_agent(settings, memory=persistence.memory, persistence=persistence).run(
+                agent = build_agent(settings, memory=persistence.memory, persistence=persistence)
+                report = await agent.run(
                     job["goal"], approve=job_approval(approvals, owner), cancel=cancel, owner_id=owner, run_id=run_id)
                 if lease_lost.is_set():
                     # A different claimant may own the row. Never fail, finish,
@@ -117,5 +119,8 @@ async def work_forever(settings: Settings | None = None) -> None:
                         webhooks.enqueue(f"job:{job['id']}:failed", "job.failed", {"job_id": job["id"], "status": "failed", "error": str(exc)}, principal=owner)
             finally:
                 stop.set(); watcher.join(timeout=1)
+                close = getattr(getattr(agent, "model", None), "aclose", None)
+                if close is not None:
+                    await close()
     finally:
         persistence.close()
