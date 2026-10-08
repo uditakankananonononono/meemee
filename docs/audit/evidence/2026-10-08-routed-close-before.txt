@@ -1,0 +1,88 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_____ test_routed_model_attempts_all_actual_cached_transports_after_error ______
+
+    async def test_routed_model_attempts_all_actual_cached_transports_after_error():
+        catalog = ModelCatalog.from_settings(Settings(_env_file=None))
+        routed = RoutedModel(catalog)
+        released = []
+        class Transport(httpx.AsyncBaseTransport):
+            def __init__(self, label, fails=False):
+                self.label, self.fails = label, fails
+            async def aclose(self):
+                released.append(self.label)
+                if self.fails:
+                    raise RuntimeError('close failed')
+        first = routed._model_for(catalog.profiles['local'])
+        second = routed._model_for(catalog.profiles['inkling-vllm'])
+        # Fail both iteration orders: LIFO finalization must attempt all as well.
+        for label, model in [('first', first), ('second', second)]:
+            await model.client._transport.aclose()
+            model.client._transport = Transport(label, fails=True)
+        try:
+            with pytest.raises(RuntimeError, match='close failed'):
+                await routed.aclose()
+>           assert sorted(released) == ['first', 'second']
+E           AssertionError: assert ['first'] == ['first', 'second']
+E             
+E             Right contains one more item: 'second'
+E             Use -v to get more diff
+
+tests/test_routed_model_cleanup_failure.py:29: AssertionError
+
+During handling of the above exception, another exception occurred:
+
+    async def test_routed_model_attempts_all_actual_cached_transports_after_error():
+        catalog = ModelCatalog.from_settings(Settings(_env_file=None))
+        routed = RoutedModel(catalog)
+        released = []
+        class Transport(httpx.AsyncBaseTransport):
+            def __init__(self, label, fails=False):
+                self.label, self.fails = label, fails
+            async def aclose(self):
+                released.append(self.label)
+                if self.fails:
+                    raise RuntimeError('close failed')
+        first = routed._model_for(catalog.profiles['local'])
+        second = routed._model_for(catalog.profiles['inkling-vllm'])
+        # Fail both iteration orders: LIFO finalization must attempt all as well.
+        for label, model in [('first', first), ('second', second)]:
+            await model.client._transport.aclose()
+            model.client._transport = Transport(label, fails=True)
+        try:
+            with pytest.raises(RuntimeError, match='close failed'):
+                await routed.aclose()
+            assert sorted(released) == ['first', 'second']
+            assert first.client.is_closed and second.client.is_closed
+        finally:
+            for model in [first, second]:
+>               await model.client.aclose()
+
+tests/test_routed_model_cleanup_failure.py:33: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+.venv/lib/python3.10/site-packages/httpx/_client.py:1985: in aclose
+    await self._transport.aclose()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <test_routed_model_cleanup_failure.test_routed_model_attempts_all_actual_cached_transports_after_error.<locals>.Transport object at 0x7f9fd1a7b310>
+
+    async def aclose(self):
+        released.append(self.label)
+        if self.fails:
+>           raise RuntimeError('close failed')
+E           RuntimeError: close failed
+
+tests/test_routed_model_cleanup_failure.py:19: RuntimeError
+=============================== warnings summary ===============================
+.venv/lib/python3.10/site-packages/fastapi/testclient.py:1
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+.venv/lib/python3.10/site-packages/starlette/testclient.py:53
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_routed_model_cleanup_failure.py::test_routed_model_attempts_all_actual_cached_transports_after_error
+1 failed, 2 warnings in 0.23s
