@@ -1,0 +1,31 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_____ test_reflection_worker_closes_persistence_after_model_close_failure ______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fa06a781900>
+
+    async def test_reflection_worker_closes_persistence_after_model_close_failure(monkeypatch):
+        closed = []
+        class Model:
+            async def aclose(self):
+                raise RuntimeError('model close failed')
+        stores = SimpleNamespace(context=object(), personal_model=object(), reflection_schedule=object(),
+                                 audit=object(), close=lambda: closed.append('persistence'))
+        monkeypatch.setattr(persistence, 'persistence_from_settings', lambda settings: stores)
+        monkeypatch.setattr(model_profiles, 'build_role_model', lambda settings, role: Model())
+        async def stopped(*args, **kwargs):
+            raise RuntimeError('worker stopped')
+        monkeypatch.setattr(reflection_schedule, 'reflect_due_once', stopped)
+        settings = SimpleNamespace(reflection_interval_minutes=1)
+        with pytest.raises(RuntimeError, match='model close failed'):
+            await reflection_schedule.reflection_forever(settings)
+>       assert closed == ['persistence']
+E       AssertionError: assert [] == ['persistence']
+E         
+E         Right contains one more item: 'persistence'
+E         Use -v to get more diff
+
+tests/test_reflection_cleanup_failure.py:25: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_reflection_cleanup_failure.py::test_reflection_worker_closes_persistence_after_model_close_failure
+1 failed in 0.38s

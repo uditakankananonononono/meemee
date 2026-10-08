@@ -183,5 +183,7 @@ async def reflection_forever(settings: Any | None = None) -> None:
                 log.info("scheduled reflection pass", extra={"owners": len(summaries)})
             await asyncio.sleep(settings.reflection_poll_seconds)
     finally:
-        await model.aclose()
-        persistence.close()
+        try:
+            await model.aclose()
+        finally:
+            persistence.close()
