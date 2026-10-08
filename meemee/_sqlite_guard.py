@@ -13,7 +13,8 @@ def close_db_on_init_failure(init: F) -> F:
     """Wrap ``__init__`` so a failure after ``sqlite3.connect`` closes the handle.
 
     Only for classes whose ``__init__`` itself opens ``self.db``/``self.connection``.
-    A close error never replaces the constructor's original exception.
+    Any close error, including cancellation or interrupts raised by close, is
+    contained and never replaces the constructor's original exception.
     """
 
     @functools.wraps(init)
@@ -26,7 +27,7 @@ def close_db_on_init_failure(init: F) -> F:
                 if handle is not None and hasattr(handle, "close"):
                     try:
                         handle.close()
-                    except Exception:  # noqa: BLE001,S110 - keep the original failure
+                    except BaseException:  # noqa: BLE001,S110 - cleanup must not replace the original
                         pass
             raise
 

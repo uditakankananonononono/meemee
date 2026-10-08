@@ -1,9 +1,12 @@
 """A store whose constructor fails after opening SQLite must not leak the handle (area 208)."""
+import asyncio
 import importlib
 import sqlite3
 import types
 
 import pytest
+
+from meemee._sqlite_guard import close_db_on_init_failure
 
 STORES = [
     ("meemee.reflection_schedule", "ReflectionSchedule"),
@@ -79,3 +82,31 @@ def test_failed_constructor_closes_sqlite_handle(tmp_path, monkeypatch, module_n
         getattr(module, class_name)(tmp_path / "store.sqlite3")
     assert opened, "constructor never opened SQLite"
     assert all(handle.closed for handle in opened)
+
+
+class _BadCloser:
+    def __init__(self, error):
+        self.error, self.calls = error, 0
+
+    def close(self):
+        self.calls += 1
+        raise self.error
+
+
+@pytest.mark.parametrize(
+    "close_error",
+    [asyncio.CancelledError(), KeyboardInterrupt(), SystemExit(3), RuntimeError("close boom")],
+)
+def test_close_error_never_replaces_original_constructor_exception(close_error):
+    original = ValueError("constructor failed")
+
+    class Store:
+        @close_db_on_init_failure
+        def __init__(self):
+            self.db = _BadCloser(close_error)
+            self.connection = _BadCloser(close_error)
+            raise original
+
+    with pytest.raises(ValueError) as caught:
+        Store()
+    assert caught.value is original
