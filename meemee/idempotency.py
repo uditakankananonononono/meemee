@@ -73,9 +73,10 @@ class IdempotencyStore:
         """
         if not key or len(key) > 200:
             raise ValueError("idempotency key must contain 1-200 characters")
-        now = datetime.now(timezone.utc)
         digest = self.request_hash(payload)
         with self.lock, self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            now = datetime.now(timezone.utc)
             self.db.execute("DELETE FROM idempotency WHERE expires_at<=?", (now.isoformat(),))
             inserted = self.db.execute(
                 "INSERT OR IGNORE INTO idempotency VALUES(?,?,?,?,?,?,?,?,?)",
