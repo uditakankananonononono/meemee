@@ -8,6 +8,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from ._sqlite_guard import close_db_on_init_failure
+
 
 class IdempotencyConflict(ValueError):
     pass
@@ -25,6 +27,7 @@ IN_PROGRESS = "a request with this idempotency key is still in progress; retry s
 class IdempotencyStore:
     """Durable mutation deduplication keyed by principal, route, key and request digest."""
 
+    @close_db_on_init_failure
     def __init__(self, path: Path, ttl_hours: int = 24):
         path.parent.mkdir(parents=True, exist_ok=True)
         self.ttl = timedelta(hours=ttl_hours)

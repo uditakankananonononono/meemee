@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from ._sqlite_guard import close_db_on_init_failure
 from .semantic_memory import (
     Embedder,
     HashingEmbedder,
@@ -20,6 +21,7 @@ from .sensitive import scrub_text
 class MemoryStore:
     """Durable SQLite event memory with full-text retrieval."""
 
+    @close_db_on_init_failure
     def __init__(self, path: Path, embedder: Embedder | None = None):
         path.parent.mkdir(parents=True, exist_ok=True)
         self.connection = sqlite3.connect(path, check_same_thread=False)

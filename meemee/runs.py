@@ -7,6 +7,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from ._sqlite_guard import close_db_on_init_failure
 from .cursors import decode_cursor, encode_cursor
 from .schema_registry import register_schema
 from .types import RunReport
@@ -21,6 +22,7 @@ def _cutoff(value: str) -> str:
 class RunStore:
     """Principal-owned completed run reports for durable account history."""
 
+    @close_db_on_init_failure
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db=sqlite3.connect(path,check_same_thread=False)

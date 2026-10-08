@@ -38,6 +38,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+from ._sqlite_guard import close_db_on_init_failure
+
 try:
     from playwright.async_api import Error as PlaywrightError
 except ImportError:  # browser extra not installed; open() reports it
@@ -131,6 +133,7 @@ def _not_here(record: dict[str, Any], host_id: str) -> str:
 class BrowserSessionStore:
     """SQLite record of sessions, takeovers and events."""
 
+    @close_db_on_init_failure
     def __init__(self, path: Path, host_id: str | None = None):
         path.parent.mkdir(parents=True, exist_ok=True)
         self.host_id = host_id or default_host_id(path.parent)

@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from ._sqlite_guard import close_db_on_init_failure
 from .context import ContextStore
 from .model_profiles import last_model_trace
 from .personal_model import PersonalModelStore
@@ -38,6 +39,7 @@ def reflection_clock(now: datetime | None = None) -> datetime:
 
 
 class ReflectionSchedule:
+    @close_db_on_init_failure
     def __init__(self, path: Path):
         self.guard_dir = path.parent / (path.name + ".owner-locks")
         path.parent.mkdir(parents=True, exist_ok=True)

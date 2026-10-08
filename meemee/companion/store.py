@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .._sqlite_guard import close_db_on_init_failure
 from ..schema_registry import register_schema
 from ..sensitive import scrub_text
 from .models import CheckInPreferences, FactInput, PersonaConfig, UserProfile
@@ -27,6 +28,7 @@ def _now() -> str:
 class CompanionStore:
     """Durable per-user companion state: profiles, facts, conversations and check-ins."""
 
+    @close_db_on_init_failure
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False, isolation_level=None)
