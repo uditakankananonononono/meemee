@@ -65,11 +65,31 @@ class GitInspect(GitBase):
     arguments_model = GitReadArgs
 
     async def run(self, arguments: GitReadArgs) -> dict[str, object]:
+        # Read effective config keys, never filter command values. Refuse an
+        # incomplete list rather than leaving undiscovered filters enabled.
+        config = await self.git("config", "--null", "--name-only", "--list",
+                                cap=1_000_000, timeout=arguments.timeout_seconds)
+        if config["truncated"]:
+            raise ValueError("git inspection filter config exceeds discovery limit")
+        filters = set()
+        for key in str(config["stdout"]).split("\0"):
+            if key.startswith("filter.") and "." in key[len("filter."):]:
+                name, setting = key[len("filter."):].rsplit(".", 1)
+                if setting in {"clean", "smudge", "process", "required"}:
+                    filters.add(name)
+        overrides = ["-c", "core.fsmonitor=false"]
+        for name in sorted(filters):
+            for setting in ("clean", "smudge", "process"):
+                overrides.extend(["-c", f"filter.{name}.{setting}="])
+            overrides.extend(["-c", f"filter.{name}.required=false"])
         if arguments.operation == "status":
-            return await self.git("-c", "core.fsmonitor=false", "status", "--short", "--branch", cap=arguments.max_output_bytes, timeout=arguments.timeout_seconds)
-        if arguments.operation == "diff":
-            return await self.git("-c", "core.fsmonitor=false", "diff", "--no-ext-diff", "--no-textconv", "--", cap=arguments.max_output_bytes, timeout=arguments.timeout_seconds)
-        return await self.git("-c", "core.fsmonitor=false", "log", f"-{arguments.limit}", "--oneline", "--decorate", cap=arguments.max_output_bytes, timeout=arguments.timeout_seconds)
+            command = ("status", "--short", "--branch")
+        elif arguments.operation == "diff":
+            command = ("diff", "--no-ext-diff", "--no-textconv", "--")
+        else:
+            command = ("log", f"-{arguments.limit}", "--oneline", "--decorate")
+        return await self.git(*overrides, *command, cap=arguments.max_output_bytes,
+                              timeout=arguments.timeout_seconds)
 
 
 class GitCommit(GitBase):
