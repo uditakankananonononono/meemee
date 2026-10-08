@@ -281,6 +281,14 @@ sticky routing, and do not survive restart. Chromium UI behavior is not reproduc
 here. No production/multi-region deployment or full product constitution closeout
 is claimed. Read each table limit before relying on a feature.
 
+Error text that leaves the process (job.failed webhook payloads, model and channel
+error messages) is reduced to allowlisted class names by identity, not by
+`__module__` metadata. Identity anchoring protects against metadata-only forgery.
+It does NOT protect against hostile code already running in the process (a fake
+`meemee.*` entry in `sys.modules`, reassigned builtins, a malicious loaded plugin);
+there is no in-process plugin isolation. Webhook and browser destination checks
+narrow but do not close the DNS-rebinding race between the check and the connection.
+
 ## Install
 
 Python 3.10+ is required.
