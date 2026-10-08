@@ -1,0 +1,254 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_______ test_post_bootstrap_setup_failure_clears_state_and_allows_retry ________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ff6d9515ed0>
+
+    async def test_post_bootstrap_setup_failure_clears_state_and_allows_retry(monkeypatch):
+        from meemee.shutdown import RunGate
+        events = []
+        class Browser:
+            def __setattr__(self, name, value):
+                if name == 'notice_delivery':
+                    raise RuntimeError('notice setter rejected')
+        async def bootstrap(cleanup):
+            cleanup.callback(lambda: events.append('closed'))
+            return {'browser_sessions': Browser(), 'run_gate': RunGate()}
+        monkeypatch.setattr(api, 'bootstrap_api', bootstrap)
+        try:
+            for _ in range(2):
+                with pytest.raises(RuntimeError, match='notice setter rejected'):
+                    async with api.lifespan(api.app):
+                        pass
+>               assert not api._resources
+E               AssertionError: assert not {'browser_sessions': <test_api_bootstrap_lifecycle.test_post_bootstrap_setup_failure_clears_state_and_allows_retry.<locals>.Browser object at 0x7ff6d9515c30>, 'run_gate': <meemee.shutdown.RunGate object at 0x7ff6d9515c60>}
+E                +  where {'browser_sessions': <test_api_bootstrap_lifecycle.test_post_bootstrap_setup_failure_clears_state_and_allows_retry.<locals>.Browser object at 0x7ff6d9515c30>, 'run_gate': <meemee.shutdown.RunGate object at 0x7ff6d9515c60>} = api._resources
+
+tests/test_api_bootstrap_lifecycle.py:130: AssertionError
+__________ test_concurrent_startup_rejects_second_before_acquisition ___________
+
+    async def second():
+>       async with api.lifespan(api.app):
+
+tests/test_api_bootstrap_lifecycle.py:155: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.10/contextlib.py:199: in __aenter__
+    return await anext(self.gen)
+meemee/api.py:81: in lifespan
+    resources = await bootstrap_api(cleanup)
+tests/test_api_bootstrap_lifecycle.py:145: in bootstrap
+    await release.wait()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <asyncio.locks.Event object at 0x7ff6d957f9d0 [set]>
+
+    async def wait(self):
+        """Block until the internal flag is true.
+    
+        If the internal flag is true on entry, return True
+        immediately.  Otherwise, block until another coroutine calls
+        set() to set the flag to true, then return True.
+        """
+        if self._value:
+            return True
+    
+        fut = self._get_loop().create_future()
+        self._waiters.append(fut)
+        try:
+>           await fut
+E           asyncio.exceptions.CancelledError
+
+/usr/lib/python3.10/asyncio/locks.py:214: CancelledError
+
+During handling of the above exception, another exception occurred:
+
+fut = <Task cancelled name='Task-5' coro=<test_concurrent_startup_rejects_second_before_acquisition.<locals>.second() done, defined at /home/sandbox/meemee/tests/test_api_bootstrap_lifecycle.py:154>>
+timeout = 0.1
+
+    async def wait_for(fut, timeout):
+        """Wait for the single Future or coroutine to complete, with timeout.
+    
+        Coroutine will be wrapped in Task.
+    
+        Returns result of the Future or coroutine.  When a timeout occurs,
+        it cancels the task and raises TimeoutError.  To avoid the task
+        cancellation, wrap it in shield().
+    
+        If the wait is cancelled, the task is also cancelled.
+    
+        This function is a coroutine.
+        """
+        loop = events.get_running_loop()
+    
+        if timeout is None:
+            return await fut
+    
+        if timeout <= 0:
+            fut = ensure_future(fut, loop=loop)
+    
+            if fut.done():
+                return fut.result()
+    
+            await _cancel_and_wait(fut, loop=loop)
+            try:
+                return fut.result()
+            except exceptions.CancelledError as exc:
+                raise exceptions.TimeoutError() from exc
+    
+        waiter = loop.create_future()
+        timeout_handle = loop.call_later(timeout, _release_waiter, waiter)
+        cb = functools.partial(_release_waiter, waiter)
+    
+        fut = ensure_future(fut, loop=loop)
+        fut.add_done_callback(cb)
+    
+        try:
+            # wait until the future completes or the timeout
+            try:
+                await waiter
+            except exceptions.CancelledError:
+                if fut.done():
+                    return fut.result()
+                else:
+                    fut.remove_done_callback(cb)
+                    # We must ensure that the task is not running
+                    # after wait_for() returns.
+                    # See https://bugs.python.org/issue32751
+                    await _cancel_and_wait(fut, loop=loop)
+                    raise
+    
+            if fut.done():
+                return fut.result()
+            else:
+                fut.remove_done_callback(cb)
+                # We must ensure that the task is not running
+                # after wait_for() returns.
+                # See https://bugs.python.org/issue32751
+                await _cancel_and_wait(fut, loop=loop)
+                # In case task cancellation failed with some
+                # exception, we should re-raise it
+                # See https://bugs.python.org/issue40607
+                try:
+>                   return fut.result()
+E                   asyncio.exceptions.CancelledError
+
+/usr/lib/python3.10/asyncio/tasks.py:456: CancelledError
+
+The above exception was the direct cause of the following exception:
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ff6d957f9a0>
+
+    async def test_concurrent_startup_rejects_second_before_acquisition(monkeypatch):
+        import asyncio
+        from types import SimpleNamespace
+        from meemee.shutdown import RunGate
+        entered, release = asyncio.Event(), asyncio.Event()
+        calls = []
+        async def bootstrap(cleanup):
+            calls.append(True)
+            entered.set()
+            await release.wait()
+            return {'browser_sessions': SimpleNamespace(), 'run_gate': RunGate()}
+        monkeypatch.setattr(api, 'bootstrap_api', bootstrap)
+        async def first():
+            async with api.lifespan(api.app):
+                pass
+        task = asyncio.create_task(first())
+        await entered.wait()
+        try:
+            async def second():
+                async with api.lifespan(api.app):
+                    pass
+            with pytest.raises(RuntimeError, match='already starting or started'):
+>               await asyncio.wait_for(second(), .1)
+
+tests/test_api_bootstrap_lifecycle.py:158: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+fut = <Task cancelled name='Task-5' coro=<test_concurrent_startup_rejects_second_before_acquisition.<locals>.second() done, defined at /home/sandbox/meemee/tests/test_api_bootstrap_lifecycle.py:154>>
+timeout = 0.1
+
+    async def wait_for(fut, timeout):
+        """Wait for the single Future or coroutine to complete, with timeout.
+    
+        Coroutine will be wrapped in Task.
+    
+        Returns result of the Future or coroutine.  When a timeout occurs,
+        it cancels the task and raises TimeoutError.  To avoid the task
+        cancellation, wrap it in shield().
+    
+        If the wait is cancelled, the task is also cancelled.
+    
+        This function is a coroutine.
+        """
+        loop = events.get_running_loop()
+    
+        if timeout is None:
+            return await fut
+    
+        if timeout <= 0:
+            fut = ensure_future(fut, loop=loop)
+    
+            if fut.done():
+                return fut.result()
+    
+            await _cancel_and_wait(fut, loop=loop)
+            try:
+                return fut.result()
+            except exceptions.CancelledError as exc:
+                raise exceptions.TimeoutError() from exc
+    
+        waiter = loop.create_future()
+        timeout_handle = loop.call_later(timeout, _release_waiter, waiter)
+        cb = functools.partial(_release_waiter, waiter)
+    
+        fut = ensure_future(fut, loop=loop)
+        fut.add_done_callback(cb)
+    
+        try:
+            # wait until the future completes or the timeout
+            try:
+                await waiter
+            except exceptions.CancelledError:
+                if fut.done():
+                    return fut.result()
+                else:
+                    fut.remove_done_callback(cb)
+                    # We must ensure that the task is not running
+                    # after wait_for() returns.
+                    # See https://bugs.python.org/issue32751
+                    await _cancel_and_wait(fut, loop=loop)
+                    raise
+    
+            if fut.done():
+                return fut.result()
+            else:
+                fut.remove_done_callback(cb)
+                # We must ensure that the task is not running
+                # after wait_for() returns.
+                # See https://bugs.python.org/issue32751
+                await _cancel_and_wait(fut, loop=loop)
+                # In case task cancellation failed with some
+                # exception, we should re-raise it
+                # See https://bugs.python.org/issue40607
+                try:
+                    return fut.result()
+                except exceptions.CancelledError as exc:
+>                   raise exceptions.TimeoutError() from exc
+E                   asyncio.exceptions.TimeoutError
+
+/usr/lib/python3.10/asyncio/tasks.py:458: TimeoutError
+=============================== warnings summary ===============================
+.venv/lib/python3.10/site-packages/fastapi/testclient.py:1
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+.venv/lib/python3.10/site-packages/starlette/testclient.py:53
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_api_bootstrap_lifecycle.py::test_post_bootstrap_setup_failure_clears_state_and_allows_retry
+FAILED tests/test_api_bootstrap_lifecycle.py::test_concurrent_startup_rejects_second_before_acquisition
+2 failed, 5 deselected, 2 warnings in 0.54s
