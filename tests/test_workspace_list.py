@@ -1,5 +1,9 @@
-import asyncio,pytest
+import asyncio
+
+import pytest
+
 from meemee.tools.base import ToolRegistry
+
 
 def tool(root):
  from meemee.tools.filesystem import ListFiles
@@ -26,8 +30,8 @@ def test_symlink_not_followed(tmp_path):
 
 @pytest.mark.asyncio
 async def test_actual_async_runtime_registration(tmp_path):
- from meemee.runtime import build_agent_async
  from meemee.config import Settings
+ from meemee.runtime import build_agent_async
  agent=await build_agent_async(Settings(_env_file=None,data_dir=tmp_path/'data',workspace=tmp_path),include_delegation=False)
  try:
   result=await agent.tools.execute('workspace.list_files',{'path':'.'},owner_id='owner')
