@@ -7,10 +7,25 @@ from abc import ABC, abstractmethod
 from contextlib import AsyncExitStack
 from typing import Any
 
+import httpx
 from pydantic import BaseModel, ValidationError
 
 from ..isolation import IsolationPolicy, run_isolated
 from ..types import Risk, ToolResult
+
+
+def _network_error_text(exc: BaseException, tool: Any) -> str:
+    """Short, URL-free description of a contained network or decoder failure."""
+    if isinstance(exc, httpx.HTTPStatusError):
+        detail = f"HTTP {exc.response.status_code}"
+    elif isinstance(exc, RecursionError):
+        detail = "response nesting too deep"
+    else:
+        detail = "network request failed"
+    text = f"{type(exc).__name__}: {detail}"
+    if getattr(tool, "risk", Risk.READ) != Risk.READ:
+        text += "; outcome unknown, verify before retrying"
+    return text
 
 
 class Tool(ABC):
@@ -111,6 +126,14 @@ class ToolRegistry:
             return ToolResult(
                 ok=False,
                 error=str(exc),
+                elapsed_ms=round((time.perf_counter() - started) * 1000),
+            )
+        except (httpx.HTTPError, RecursionError) as exc:
+            # Network faults and decoder recursion are normal tool failures. The text names the
+            # class and status only: str(HTTPStatusError) embeds the request URL and query.
+            return ToolResult(
+                ok=False,
+                error=_network_error_text(exc, tool),
                 elapsed_ms=round((time.perf_counter() - started) * 1000),
             )
 
