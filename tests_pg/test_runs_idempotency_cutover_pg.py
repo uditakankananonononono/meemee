@@ -53,18 +53,22 @@ def test_runs_and_idempotency_survive_cutover(dsn, tmp_path, capsys):
     keys.put("alice", "/v1/jobs", "done", {"goal": "x"}, 200, {"id": "job-1", "quota": {"used": 1}})
     assert keys.claim("alice", "/v1/jobs", "open", {"goal": "y"}) is None  # in flight at cutover time
 
+    assert keys.claim("alice", "/v1/jobs", "owned", {"goal": "owned"}, claim_token="ownership-token") is None
+
     args = ["--dsn", dsn, "--memory", str(tmp_path / "meemee.sqlite3"), "--plans", str(tmp_path / "plans.sqlite3"),
             "--jobs", str(tmp_path / "jobs.sqlite3"), "--tokens", str(tmp_path / "auth.sqlite3"),
             "--audit", str(tmp_path / "audit.sqlite3"), "--runs", str(tmp_path / "runs.sqlite3"),
             "--idempotency", str(tmp_path / "idempotency.sqlite3")]
     assert main(args + ["copy"]) == 0
     report = json.loads(capsys.readouterr().out)
-    assert report["copied"]["meemee_runs"] == 2 and report["copied"]["meemee_idempotency"] == 2
+    assert report["copied"]["meemee_runs"] == 2 and report["copied"]["meemee_idempotency"] == 3
     assert all(item["match"] for item in report["verification"].values()), report["verification"]
 
     db = Database(dsn, min_size=1, max_size=2)
     try:
         pg_runs, pg_keys = PGRuns(db), PGIdempotency(db)
+        pg_keys.put("alice", "/v1/jobs", "owned", {"goal": "owned"}, 200, {"id": "owned-job"}, claim_token="ownership-token")
+        assert pg_keys.get("alice", "/v1/jobs", "owned", {"goal": "owned"}) == (200, {"id": "owned-job"})
         assert pg_runs.get("alice", "r1") == runs.get("alice", "r1")
         assert pg_runs.get("alice", "r2") == runs.get("alice", "r2") and pg_runs.get("bob", "r1") is None
         assert [r["run_id"] for r in pg_runs.list("alice")[0]] == [r["run_id"] for r in runs.list("alice")[0]]

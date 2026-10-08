@@ -46,7 +46,7 @@ class IdempotencyStore:
             raise IdempotencyInProgress(IN_PROGRESS)
         return row["status"], row["response"]
 
-    def claim(self, principal: str, route: str, key: str, payload: Any) -> tuple[int, Any] | None:
+    def claim(self, principal: str, route: str, key: str, payload: Any, *, claim_token: str | None = None) -> tuple[int, Any] | None:
         """Atomically reserve ``key`` across every host (primary key + ON CONFLICT DO NOTHING).
 
         None means this caller owns the key and must ``put`` or ``release``; otherwise the stored
@@ -57,18 +57,18 @@ class IdempotencyStore:
         digest = self.request_hash(payload)
         with self.db.transaction() as c:
             c.execute("DELETE FROM meemee_idempotency WHERE expires_at <= clock_timestamp()")
-            inserted = c.execute("""INSERT INTO meemee_idempotency(principal, route, key, request_hash, response, status, created_at, expires_at)
-                                    VALUES (%s, %s, %s, %s, 'null'::jsonb, %s, clock_timestamp(), clock_timestamp() + %s)
+            inserted = c.execute("""INSERT INTO meemee_idempotency(principal, route, key, request_hash, response, status, created_at, expires_at, claim_token)
+                                    VALUES (%s, %s, %s, %s, 'null'::jsonb, %s, clock_timestamp(), clock_timestamp() + %s, %s)
                                     ON CONFLICT (principal, route, key) DO NOTHING""",
-                                 (principal, route, key, digest, PENDING, CLAIM_LEASE)).rowcount
+                                 (principal, route, key, digest, PENDING, CLAIM_LEASE, claim_token)).rowcount
         return None if inserted else self.get(principal, route, key, payload)
 
-    def release(self, principal: str, route: str, key: str) -> None:
+    def release(self, principal: str, route: str, key: str, *, claim_token: str | None = None) -> None:
         with self.db.transaction() as c:
-            c.execute("DELETE FROM meemee_idempotency WHERE principal=%s AND route=%s AND key=%s AND status=%s",
-                      (principal, route, key, PENDING))
+            c.execute("DELETE FROM meemee_idempotency WHERE principal=%s AND route=%s AND key=%s AND status=%s AND claim_token IS NOT DISTINCT FROM %s",
+                      (principal, route, key, PENDING, claim_token))
 
-    def put(self, principal: str, route: str, key: str, payload: Any, status: int, response: Any) -> None:
+    def put(self, principal: str, route: str, key: str, payload: Any, status: int, response: Any, *, claim_token: str | None = None) -> None:
         if type(status) is not int or not 100 <= status <= 599:
             raise ValueError("response status must be an HTTP status integer (100-599)")
         if not key or len(key) > 200:
@@ -77,6 +77,13 @@ class IdempotencyStore:
         now = datetime.now(timezone.utc)
         digest = self.request_hash(payload)
         with self.db.transaction() as c:
+            # Serialize owner verification with replacement/release/publication.
+            reserved = c.execute("SELECT request_hash, status, claim_token, expires_at FROM meemee_idempotency WHERE principal=%s AND route=%s AND key=%s FOR UPDATE",
+                                 (principal, route, key)).fetchone()
+            protected = claim_token is not None or (reserved is not None and reserved["claim_token"] is not None)
+            if protected and (reserved is None or reserved["claim_token"] != claim_token
+                              or reserved["status"] != PENDING or reserved["expires_at"] <= datetime.now(timezone.utc)):
+                raise IdempotencyConflict("idempotency claim ownership was lost")
             # ON CONFLICT locks the existing row even when its WHERE rejects the update.
             # Check the digest while that lock is held, including completed-key replays.
             published = c.execute("""INSERT INTO meemee_idempotency(principal, route, key, request_hash, response, status, created_at, expires_at)
@@ -85,14 +92,17 @@ class IdempotencyStore:
                            response=EXCLUDED.response, status=EXCLUDED.status, created_at=EXCLUDED.created_at,
                            expires_at=EXCLUDED.expires_at WHERE meemee_idempotency.status = 0
                            AND meemee_idempotency.request_hash=EXCLUDED.request_hash
+                           AND meemee_idempotency.claim_token IS NOT DISTINCT FROM %s
                          RETURNING request_hash""",
                       (principal, route, key, digest, Jsonb(json.loads(encoded_response)),
-                       status, now, now + self.ttl)).fetchone()
+                       status, now, now + self.ttl, claim_token)).fetchone()
             if published is None:
                 reserved = c.execute(
-                    "SELECT request_hash FROM meemee_idempotency WHERE principal=%s AND route=%s AND key=%s",
+                    "SELECT request_hash, claim_token FROM meemee_idempotency WHERE principal=%s AND route=%s AND key=%s",
                     (principal, route, key),
                 ).fetchone()
+                if reserved is not None and reserved["claim_token"] is not None:
+                    raise IdempotencyConflict("idempotency claim ownership was lost")
                 if reserved is not None and reserved["request_hash"] != digest:
                     raise IdempotencyConflict("idempotency key was already used with a different request")
 
