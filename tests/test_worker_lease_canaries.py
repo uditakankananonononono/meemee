@@ -57,7 +57,7 @@ async def test_worker_renews_lease_and_never_settles_lost_work(tmp_path, monkeyp
         async def run(self, goal, **kwargs):
             await asyncio.sleep(0.35)
             return RunReport(run_id='r', goal=goal, final='done', steps_used=1, tool_results=[])
-    persistence = SimpleNamespace(jobs=jobs, webhooks=SimpleNamespace(enqueue=lambda *a, **kw: events.append(a)),
+    persistence = SimpleNamespace(close=lambda: None, jobs=jobs, webhooks=SimpleNamespace(enqueue=lambda *a, **kw: events.append(a)),
         memory=SimpleNamespace(delete_runs=lambda *a, **kw: None), approvals=SimpleNamespace(allows=lambda *a, **kw: False))
     monkeypatch.setattr(worker, 'persistence_from_settings', lambda settings: persistence)
     monkeypatch.setattr(worker, 'build_agent', lambda *a, **kw: Agent())
