@@ -2,11 +2,11 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import httpx
 import pytest
-
 from meemee_client import MeemeeClient
 
 BASE_URL = "http://testserver"

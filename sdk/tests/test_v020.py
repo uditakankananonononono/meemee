@@ -4,7 +4,6 @@ from __future__ import annotations
 import httpx
 import pytest
 from conftest import FakeSleeper, make_client
-
 from meemee_client import (
     IdempotencyConflictError,
     RateLimitError,

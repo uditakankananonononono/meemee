@@ -1,5 +1,7 @@
-import hashlib,json,sqlite3
-from meemee_persist_pg.cutover import TableSpec,canonical,digest_rows,transform
+import sqlite3
+
+from meemee_persist_pg.cutover import TableSpec, digest_rows, transform
+
 
 def row(values):
     db=sqlite3.connect(":memory:");db.row_factory=sqlite3.Row

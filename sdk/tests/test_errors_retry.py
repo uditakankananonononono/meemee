@@ -4,12 +4,10 @@ from __future__ import annotations
 import httpx
 import pytest
 from conftest import JOB_ID, FakeSleeper, make_client
-
 from meemee_client import (
     AuthenticationError,
     BadRequestError,
     ConflictError,
-    IdempotencyConflictError,
     NetworkError,
     NotFoundError,
     PermissionDeniedError,

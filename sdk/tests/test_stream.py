@@ -4,7 +4,6 @@ from __future__ import annotations
 import httpx
 import pytest
 from conftest import JOB_ID, FlakyStream, make_client, sse_frame, sse_heartbeat
-
 from meemee_client import NetworkError, NotFoundError, StreamError
 
 

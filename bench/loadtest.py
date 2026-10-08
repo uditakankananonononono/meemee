@@ -246,16 +246,15 @@ def scenario_sse_fanout(server: ServerHandle, subscribers: int) -> dict:
         result = results[index]
         try:
             timeout = httpx.Timeout(connect=5.0, read=60.0, write=5.0, pool=5.0)
-            with server.client(token, timeout=timeout) as client:
-                with client.stream("GET", f"/v1/jobs/{job_id}/stream") as resp:
-                    result["status"] = resp.status_code
-                    for line in resp.iter_lines():
-                        if line.startswith("event:"):
-                            kind = line.split(":", 1)[1].strip()
-                            result["events"].append(
-                                {"kind": kind, "t": round(time.perf_counter() - t0, 4)})
-                            if kind in TERMINAL_EVENTS:
-                                return
+            with server.client(token, timeout=timeout) as client, client.stream("GET", f"/v1/jobs/{job_id}/stream") as resp:
+                result["status"] = resp.status_code
+                for line in resp.iter_lines():
+                    if line.startswith("event:"):
+                        kind = line.split(":", 1)[1].strip()
+                        result["events"].append(
+                            {"kind": kind, "t": round(time.perf_counter() - t0, 4)})
+                        if kind in TERMINAL_EVENTS:
+                            return
         except Exception as exc:  # noqa: BLE001 - record, do not crash the fan-out
             result["error"] = repr(exc)
 
@@ -581,7 +580,7 @@ def scenario_retention_sweep(old_jobs: int, events_per_job: int) -> dict:
     # meemee.cli has no __main__ guard, so invoke the typer app explicitly.
     proc = subprocess.run(
         [sys.executable, "-c", "from meemee.cli import app; app()", "retention-run"],
-        env=env, capture_output=True, text=True, timeout=300,
+        env=env, capture_output=True, text=True, timeout=300, check=False,
     )
     wall = time.perf_counter() - started
     report = json.loads(proc.stdout) if proc.returncode == 0 else {"error": proc.stderr[-500:]}

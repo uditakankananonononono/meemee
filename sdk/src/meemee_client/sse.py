@@ -72,9 +72,8 @@ class SSEParser:
             self._data_lines.append(value)
         elif field == "event":
             self._event_type = value
-        elif field == "id":
-            if "\x00" not in value:
-                self._last_event_id = value
+        elif field == "id" and "\x00" not in value:
+            self._last_event_id = value
         # Unknown fields (including "retry", which the server never sends) are ignored.
         return None
 
