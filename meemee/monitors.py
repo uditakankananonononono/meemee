@@ -59,11 +59,11 @@ class MonitorStore:
         if not row:return None
         result=dict(row);result['predicate']=json.loads(result['predicate']);return result
     def list(self,owner_id,status=None):
-        query='SELECT id FROM monitors WHERE owner_id=?';values=[owner_id]
+        query='SELECT * FROM monitors WHERE owner_id=?';values=[owner_id]
         if status:query+=' AND status=?';values.append(status)
         query+=' ORDER BY created_at DESC,id DESC'
         with self.lock:rows=self.db.execute(query,values).fetchall()
-        return [self.get(owner_id,row['id']) for row in rows]
+        return [{**dict(row), 'predicate': json.loads(row['predicate'])} for row in rows]
     @staticmethod
     def matches(predicate,event):
         value=event.get(predicate['field']);op=predicate['operator'];expected=predicate.get('expected')
