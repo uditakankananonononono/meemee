@@ -88,6 +88,10 @@ class OpenAICompatibleModel:
                 except ValueError:
                     delay = min(2 ** (attempt - 1), 8)
                 await asyncio.sleep(delay)
+            except (httpx.RequestError, RecursionError) as exc:
+                # Non-transient transport faults (bad encoding, proxy, protocol, redirects) and
+                # decoder recursion on hostile bodies: report as ModelError, never retry.
+                raise ModelError(f"model response could not be processed: {exc!r}") from exc
             except (KeyError, IndexError, TypeError, json.JSONDecodeError, ValueError) as exc:
                 raise ModelError(f"model returned an invalid decision payload: {exc}") from exc
         raise ModelError(f"model request failed after {attempts_used} attempts: {last_error}") from last_error
@@ -148,6 +152,8 @@ class OpenAICompatibleModel:
                 except ValueError:
                     delay = min(2 ** (attempt - 1), 8)
                 await asyncio.sleep(delay)
+            except (httpx.RequestError, RecursionError) as exc:
+                raise ModelError(f"model response could not be processed: {exc!r}") from exc
             except (KeyError, IndexError, TypeError, json.JSONDecodeError, ValueError) as exc:
                 if isinstance(exc, ModelError):
                     raise
