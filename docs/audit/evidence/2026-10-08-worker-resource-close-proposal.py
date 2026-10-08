@@ -37,14 +37,18 @@ async def test_worker_startup_error_closes_created_persistence(monkeypatch):
 
 
 async def test_idle_worker_releases_real_backend_resources(persistence, monkeypatch, tmp_path):  # noqa: F811
+    import sqlite3
+
     from meemee.config import Settings
 
-    if persistence.backend == "sqlite":
-        pytest.skip("SQLite close remains no-op pending reusable API lifecycle ownership")
     monkeypatch.setattr(worker, 'persistence_from_settings', lambda settings: persistence)
     async def cancelled_sleep(delay):
         raise asyncio.CancelledError
     monkeypatch.setattr(worker.asyncio, 'sleep', cancelled_sleep)
     with pytest.raises(asyncio.CancelledError):
         await worker.work_forever(Settings(_env_file=None, data_dir=tmp_path))
-    assert persistence.database.pool.closed is True
+    if persistence.backend == 'sqlite':
+        with pytest.raises(sqlite3.ProgrammingError, match='closed'):
+            persistence.jobs.db.execute("SELECT 1")
+    else:
+        assert persistence.database.pool.closed is True
