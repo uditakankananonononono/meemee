@@ -1,0 +1,155 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+___________ test_cli_run_releases_owned_actual_http_transports[none] ___________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f88f5a58490>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-846/test_cli_run_releases_owned_ac0')
+failure = 'none'
+
+    @pytest.mark.parametrize('failure', ['none', 'run', 'output'])
+    def test_cli_run_releases_owned_actual_http_transports(monkeypatch, tmp_path, failure):
+        released, made = [], []
+        class Transport(httpx.AsyncBaseTransport):
+            def __init__(self, name):
+                self.name = name
+            async def aclose(self):
+                released.append(self.name)
+        async def build():
+            agent = await build_agent_async(Settings(_env_file=None, data_dir=tmp_path), memory=MemoryStore(tmp_path / 'memory.db'))
+            made.append(agent)
+            for name, client in [('model', agent.model.client)] + [(n, agent.tools.get(n).client) for n in
+                    ['github.search_repositories', 'github.push_branch', 'github.create_pull_request']]:
+                await client._transport.aclose()
+                client._transport = Transport(name)
+            async def run(goal, **kwargs):
+                if failure == 'run':
+                    raise TypeError('run failed')
+                assert kwargs['owner_id'] == 'default'
+                return RunReport(run_id='run', goal=goal, final='done', steps_used=0, tool_results=[])
+            agent.run = run
+            return agent
+        def echo(*args, **kwargs):
+            if failure == 'output':
+                raise ValueError('output failed')
+        monkeypatch.setattr(cli, 'build_agent_async', build)
+        monkeypatch.setattr(cli.typer, 'echo', echo)
+        try:
+            if failure == 'none':
+                cli.run('goal', approve_writes=False)
+            else:
+                with pytest.raises(TypeError if failure == 'run' else ValueError, match=f'{failure} failed'):
+                    cli.run('goal', approve_writes=False)
+>           assert released == ['github.create_pull_request', 'github.push_branch', 'github.search_repositories', 'model']
+E           AssertionError: assert [] == ['github.crea...ies', 'model']
+E             
+E             Right contains 4 more items, first extra item: 'github.create_pull_request'
+E             Use -v to get more diff
+
+tests/test_cli_agent_http_cleanup.py:47: AssertionError
+___________ test_cli_run_releases_owned_actual_http_transports[run] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f88f5a5b070>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-846/test_cli_run_releases_owned_ac1')
+failure = 'run'
+
+    @pytest.mark.parametrize('failure', ['none', 'run', 'output'])
+    def test_cli_run_releases_owned_actual_http_transports(monkeypatch, tmp_path, failure):
+        released, made = [], []
+        class Transport(httpx.AsyncBaseTransport):
+            def __init__(self, name):
+                self.name = name
+            async def aclose(self):
+                released.append(self.name)
+        async def build():
+            agent = await build_agent_async(Settings(_env_file=None, data_dir=tmp_path), memory=MemoryStore(tmp_path / 'memory.db'))
+            made.append(agent)
+            for name, client in [('model', agent.model.client)] + [(n, agent.tools.get(n).client) for n in
+                    ['github.search_repositories', 'github.push_branch', 'github.create_pull_request']]:
+                await client._transport.aclose()
+                client._transport = Transport(name)
+            async def run(goal, **kwargs):
+                if failure == 'run':
+                    raise TypeError('run failed')
+                assert kwargs['owner_id'] == 'default'
+                return RunReport(run_id='run', goal=goal, final='done', steps_used=0, tool_results=[])
+            agent.run = run
+            return agent
+        def echo(*args, **kwargs):
+            if failure == 'output':
+                raise ValueError('output failed')
+        monkeypatch.setattr(cli, 'build_agent_async', build)
+        monkeypatch.setattr(cli.typer, 'echo', echo)
+        try:
+            if failure == 'none':
+                cli.run('goal', approve_writes=False)
+            else:
+                with pytest.raises(TypeError if failure == 'run' else ValueError, match=f'{failure} failed'):
+                    cli.run('goal', approve_writes=False)
+>           assert released == ['github.create_pull_request', 'github.push_branch', 'github.search_repositories', 'model']
+E           AssertionError: assert [] == ['github.crea...ies', 'model']
+E             
+E             Right contains 4 more items, first extra item: 'github.create_pull_request'
+E             Use -v to get more diff
+
+tests/test_cli_agent_http_cleanup.py:47: AssertionError
+__________ test_cli_run_releases_owned_actual_http_transports[output] __________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f88f5ae66e0>
+tmp_path = PosixPath('/tmp/pytest-of-sandbox/pytest-846/test_cli_run_releases_owned_ac2')
+failure = 'output'
+
+    @pytest.mark.parametrize('failure', ['none', 'run', 'output'])
+    def test_cli_run_releases_owned_actual_http_transports(monkeypatch, tmp_path, failure):
+        released, made = [], []
+        class Transport(httpx.AsyncBaseTransport):
+            def __init__(self, name):
+                self.name = name
+            async def aclose(self):
+                released.append(self.name)
+        async def build():
+            agent = await build_agent_async(Settings(_env_file=None, data_dir=tmp_path), memory=MemoryStore(tmp_path / 'memory.db'))
+            made.append(agent)
+            for name, client in [('model', agent.model.client)] + [(n, agent.tools.get(n).client) for n in
+                    ['github.search_repositories', 'github.push_branch', 'github.create_pull_request']]:
+                await client._transport.aclose()
+                client._transport = Transport(name)
+            async def run(goal, **kwargs):
+                if failure == 'run':
+                    raise TypeError('run failed')
+                assert kwargs['owner_id'] == 'default'
+                return RunReport(run_id='run', goal=goal, final='done', steps_used=0, tool_results=[])
+            agent.run = run
+            return agent
+        def echo(*args, **kwargs):
+            if failure == 'output':
+                raise ValueError('output failed')
+        monkeypatch.setattr(cli, 'build_agent_async', build)
+        monkeypatch.setattr(cli.typer, 'echo', echo)
+        try:
+            if failure == 'none':
+                cli.run('goal', approve_writes=False)
+            else:
+                with pytest.raises(TypeError if failure == 'run' else ValueError, match=f'{failure} failed'):
+                    cli.run('goal', approve_writes=False)
+>           assert released == ['github.create_pull_request', 'github.push_branch', 'github.search_repositories', 'model']
+E           AssertionError: assert [] == ['github.crea...ies', 'model']
+E             
+E             Right contains 4 more items, first extra item: 'github.create_pull_request'
+E             Use -v to get more diff
+
+tests/test_cli_agent_http_cleanup.py:47: AssertionError
+=============================== warnings summary ===============================
+.venv/lib/python3.10/site-packages/fastapi/testclient.py:1
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+.venv/lib/python3.10/site-packages/starlette/testclient.py:53
+  /home/sandbox/meemee/.venv/lib/python3.10/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_cli_agent_http_cleanup.py::test_cli_run_releases_owned_actual_http_transports[none]
+FAILED tests/test_cli_agent_http_cleanup.py::test_cli_run_releases_owned_actual_http_transports[run]
+FAILED tests/test_cli_agent_http_cleanup.py::test_cli_run_releases_owned_actual_http_transports[output]
+3 failed, 2 warnings in 0.88s
