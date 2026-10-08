@@ -8,7 +8,7 @@ from .approvals import ApprovalStore
 from .config import Settings
 from .job_errors import LeaseLostError
 from .persistence import persistence_from_settings
-from .runtime import build_agent
+from .runtime import build_agent_async
 from .webhooks import WebhookStore
 
 
@@ -86,7 +86,7 @@ async def work_forever(settings: Settings | None = None) -> None:
                     # shared "default" bucket would leak its memory across owners.
                     jobs.fail(job["id"], "job has no principal owner; refusing to run unowned work", **terminal_kwargs)
                     continue
-                agent = build_agent(settings, memory=persistence.memory, persistence=persistence)
+                agent = await build_agent_async(settings, memory=persistence.memory, persistence=persistence)
                 report = await agent.run(
                     job["goal"], approve=job_approval(approvals, owner), cancel=cancel, owner_id=owner, run_id=run_id)
                 if lease_lost.is_set():

@@ -6,7 +6,7 @@ import pytest
 
 from meemee.config import Settings
 from meemee.persistence import build_persistence
-from meemee.runtime import build_agent
+from meemee.runtime import build_agent_async
 from meemee.team import AgentTeam
 from meemee.types import RunReport
 
@@ -16,8 +16,8 @@ async def test_team_child_actual_model_client_closes(monkeypatch, tmp_path, outc
     stores = build_persistence('sqlite', tmp_path)
     children = []
 
-    def factory():
-        child = build_agent(Settings(_env_file=None, data_dir=tmp_path), False, persistence=stores)
+    async def factory():
+        child = await build_agent_async(Settings(_env_file=None, data_dir=tmp_path), False, persistence=stores)
         children.append(child)
 
         async def run(goal, *, owner_id, cancel=None):
@@ -47,8 +47,8 @@ async def test_team_owned_actual_tool_clients_close(tmp_path):
     stores = build_persistence('sqlite', tmp_path)
     children = []
 
-    def factory():
-        child = build_agent(Settings(_env_file=None, data_dir=tmp_path), False, persistence=stores)
+    async def factory():
+        child = await build_agent_async(Settings(_env_file=None, data_dir=tmp_path), False, persistence=stores)
         children.append(child)
 
         async def run(goal, *, owner_id):

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
@@ -28,6 +29,8 @@ class AgentTeam:
                     if cancel is not None and cancel.is_set():
                         return {"index": index, "goal": goal, "ok": False, "error": "delegation cancelled"}
                     child = self.factory()
+                    if inspect.isawaitable(child):
+                        child = await child
                     parameters = __import__("inspect").signature(child.run).parameters
                     options = {}
                     if "cancel" in parameters:

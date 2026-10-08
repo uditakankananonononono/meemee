@@ -29,10 +29,10 @@ async def test_worker_releases_actual_per_job_model(monkeypatch, tmp_path, cance
     monkeypatch.setattr(stores.jobs, 'claim', claim)
     monkeypatch.setattr(worker, 'persistence_from_settings', lambda settings: stores)
     agents = []
-    original = worker.build_agent
+    original = worker.build_agent_async
 
-    def capture(*args, **kwargs):
-        agent = original(*args, **kwargs)
+    async def capture(*args, **kwargs):
+        agent = await original(*args, **kwargs)
         agents.append(agent)
 
         async def run(goal, **kw):
@@ -43,7 +43,7 @@ async def test_worker_releases_actual_per_job_model(monkeypatch, tmp_path, cance
         agent.run = run
         return agent
 
-    monkeypatch.setattr(worker, 'build_agent', capture)
+    monkeypatch.setattr(worker, 'build_agent_async', capture)
     try:
         with pytest.raises(asyncio.CancelledError if cancelled else EndLoop):
             await worker.work_forever(Settings(_env_file=None, data_dir=tmp_path))

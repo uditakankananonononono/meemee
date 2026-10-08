@@ -1,0 +1,23 @@
+
+==================================== ERRORS ====================================
+_________ ERROR collecting tests/test_runtime_partial_http_cleanup.py __________
+ImportError while importing test module '/home/sandbox/meemee/tests/test_runtime_partial_http_cleanup.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/usr/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_runtime_partial_http_cleanup.py:4: in <module>
+    from meemee import runtime
+meemee/runtime.py:5: in <module>
+    from .persistence import persistence_from_settings
+meemee/persistence.py:10: in <module>
+    from .browser_notices import TakeoverNoticeQueue as SQLiteTakeoverNoticeQueue
+meemee/browser_notices.py:20: in <module>
+    from .companion.channels import ChannelError, DeliveryOutcomeUnknown, validate_delivery_address
+meemee/companion/__init__.py:23: in <module>
+    from .runtime import Companion, build_companion
+E   ImportError: cannot import name 'build_companion' from 'meemee.companion.runtime' (/home/sandbox/meemee/meemee/companion/runtime.py)
+=========================== short test summary info ============================
+ERROR tests/test_runtime_partial_http_cleanup.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.44s

@@ -23,7 +23,9 @@ def test_companion_loop_closes_model_and_all_channels_on_cancel(monkeypatch, cha
 
     companion = SimpleNamespace(store=object(), engine=object(), model=Client('model'),
                                 channels={'plain': object(), 'good': Client('good'), 'failing': Client('failing')})
-    monkeypatch.setattr(runtime, 'build_companion', lambda settings: companion)
+    async def make_companion(settings):
+        return companion
+    monkeypatch.setattr(runtime, 'build_companion_async', make_companion)
     monkeypatch.setattr(worker, 'CheckInScheduler', lambda store: SimpleNamespace(plan_all=lambda: None))
 
     async def cancel(*args):
@@ -39,14 +41,14 @@ def test_standalone_companion_actual_http_clients_are_closed(monkeypatch, tmp_pa
     from meemee.config import Settings
 
     created = []
-    original = runtime.build_companion
+    original = runtime.build_companion_async
 
-    def capture(settings):
-        companion = original(settings)
+    async def capture(settings):
+        companion = await original(settings)
         created.append(companion)
         return companion
 
-    monkeypatch.setattr(runtime, 'build_companion', capture)
+    monkeypatch.setattr(runtime, 'build_companion_async', capture)
     monkeypatch.setattr(worker, 'CheckInScheduler', lambda store: SimpleNamespace(plan_all=lambda: None))
 
     async def cancel(*args):

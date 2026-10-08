@@ -8,7 +8,7 @@ import typer
 
 from ..config import Settings
 from .models import CheckInPreferences, FactInput, PersonaConfig, QuietHours, UserProfile
-from .runtime import build_companion
+from .runtime import build_companion_async, build_companion_sync
 from .worker import checkin_forever
 
 companion_app = typer.Typer(no_args_is_help=True, help="Companion layer: users, persona, chat, facts and check-ins")
@@ -26,7 +26,7 @@ def upsert_user(
     instructions: str = typer.Option("", "--instructions"),
 ) -> None:
     """Create or update a companion user and persona."""
-    companion = build_companion(Settings())
+    companion = build_companion_sync(Settings())
     profile = UserProfile(
         user_id=user_id,
         display_name=display_name,
@@ -47,7 +47,7 @@ def upsert_user(
 @companion_app.command("show-user")
 def show_user(user_id: str) -> None:
     """Show one companion profile with persona and check-in preferences."""
-    companion = build_companion(Settings())
+    companion = build_companion_sync(Settings())
     record = companion.store.get_user(user_id)
     if record is None:
         raise typer.BadParameter(f"unknown companion user: {user_id}")
@@ -65,7 +65,7 @@ def set_persona(
     instructions: str = typer.Option(None, "--instructions"),
 ) -> None:
     """Update only the persona of an existing companion user."""
-    companion = build_companion(Settings())
+    companion = build_companion_sync(Settings())
     profile = companion.store.profile(user_id)
     if profile is None:
         raise typer.BadParameter(f"unknown companion user: {user_id}")
@@ -97,7 +97,7 @@ def set_checkins(
     address: str = typer.Option(None, "--address"),
 ) -> None:
     """Configure proactive check-ins for a user."""
-    companion = build_companion(Settings())
+    companion = build_companion_sync(Settings())
     profile = companion.store.profile(user_id)
     if profile is None:
         raise typer.BadParameter(f"unknown companion user: {user_id}")
@@ -123,7 +123,7 @@ def add_fact(
     confidence: float = typer.Option(1.0, "--confidence"),
 ) -> None:
     """Record a durable fact about a user."""
-    companion = build_companion(Settings())
+    companion = build_companion_sync(Settings())
     if companion.store.get_user(user_id) is None:
         raise typer.BadParameter(f"unknown companion user: {user_id}")
     fact = companion.store.add_fact(user_id, FactInput(category=category, text=text, confidence=confidence), "cli")
@@ -133,7 +133,7 @@ def add_fact(
 @companion_app.command("facts")
 def facts(user_id: str, query: str = typer.Option(None, "--query")) -> None:
     """List or search a user's durable facts."""
-    companion = build_companion(Settings())
+    companion = build_companion_sync(Settings())
     if query:
         rows = companion.store.search_facts(user_id, query)
     else:
@@ -144,9 +144,8 @@ def facts(user_id: str, query: str = typer.Option(None, "--query")) -> None:
 @companion_app.command("chat")
 def chat(user_id: str, channel: str = typer.Option("local", "--channel")) -> None:
     """Interactive companion chat on the local channel. Empty line exits."""
-    companion = build_companion(Settings())
-
     async def loop() -> None:
+        companion = await build_companion_async(Settings())
         while True:
             text = typer.prompt("you", default="", show_default=False)
             if not text.strip():
