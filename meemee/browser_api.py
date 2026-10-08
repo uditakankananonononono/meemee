@@ -54,6 +54,12 @@ async def _receive_object(websocket: WebSocket, timeout: float | None = None) ->
         raise _BadFrame("message must be valid JSON") from None
     if not isinstance(value, dict):
         raise _BadFrame("message must be a JSON object")
+    pending=[(value,0)]
+    while pending:
+        node,depth=pending.pop()
+        if depth>64:raise _BadFrame("JSON nesting too deep")
+        if isinstance(node,dict):pending.extend((child,depth+1) for child in node.values())
+        elif isinstance(node,list):pending.extend((child,depth+1) for child in node)
     return value
 
 
