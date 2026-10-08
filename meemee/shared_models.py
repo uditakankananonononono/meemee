@@ -17,7 +17,12 @@ the hosted Hugging Face router unless ``MEEMEE_SHARED_ALLOW_HOSTED=true``.
 from __future__ import annotations
 
 import asyncio
+import functools
+import http.client
 import json
+import re
+import ssl
+import urllib.error
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -58,6 +63,52 @@ def vendor_pin() -> dict[str, str]:
     return out
 
 
+def _contained(chat: Any, name: str) -> Any:
+    """Convert transport/decoder failures from one provider's chat() into ProviderError.
+
+    Only network, transport, decoder and RecursionError classes are caught (no blanket catch), and the
+    message carries the class name only: never the URL, response body or exception text.
+    """
+    from ._vendor.instinct_models.providers import ProviderError, ProviderUnavailable
+
+    @functools.wraps(chat)
+    def guarded(*a: Any, **kw: Any):
+        try:
+            return chat(*a, **kw)
+        except (ProviderError, ProviderUnavailable):
+            raise
+        except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException, ssl.SSLError) as exc:
+            raise ProviderUnavailable(f"{name}: transport failure ({type(exc).__name__})") from None
+        except (json.JSONDecodeError, UnicodeDecodeError, RecursionError) as exc:
+            raise ProviderError(f"{name}: undecodable response ({type(exc).__name__})") from None
+
+    guarded._meemee_contained = True  # type: ignore[attr-defined]
+    return guarded
+
+
+def contain_chain(chain: list[Provider]) -> list[Provider]:
+    """Wrap each provider's chat() so response-parsing failures fail over instead of escaping the router."""
+    for p in chain:
+        if not getattr(p.chat, "_meemee_contained", False):
+            p.chat = _contained(p.chat, p.name)  # type: ignore[method-assign]
+    return chain
+
+
+_HTTP_STATUS = re.compile(r"^(?:HTTP|OpenClaw HTTP) (\d{3})\b")
+
+
+def _safe_detail(outcome: str, detail: str) -> str:
+    """Attempt detail that is safe for model-visible text: fixed router strings, or class/status only."""
+    if outcome != "error":
+        return detail
+    m = _HTTP_STATUS.match(detail or "")
+    if m:
+        return f"HTTP {m.group(1)}"
+    if detail.startswith(("transport failure", "undecodable response")) or ": transport failure" in detail or ": undecodable response" in detail:
+        return detail
+    return "provider error"
+
+
 def build_chain(settings: Any) -> list[Provider]:
     """Needle (on-device, tool turns only) -> Ornith local -> Inkling local -> HF router (opt-in)."""
     chain: list[Provider] = [
@@ -69,7 +120,7 @@ def build_chain(settings: Any) -> list[Provider]:
         chain.append(HermesLocal(settings.shared_hermes_url, settings.shared_hermes_model))
     if settings.shared_allow_hosted:
         chain.append(InklingHFRouter(settings.hf_inkling_model, token=settings.hf_token or ""))
-    return chain
+    return contain_chain(chain)
 
 
 def build_jev(env: dict | None = None) -> JevEval:
@@ -129,9 +180,9 @@ class SharedLayerModel:
                     max_tokens=max_tokens or 1024)
         assert self.router is not None
         routed = await asyncio.to_thread(self.router.run, task)
-        self.last_attempts = [{"profile": a.provider, "outcome": a.outcome, "detail": a.detail} for a in routed.attempts]
+        self.last_attempts = [{"profile": a.provider, "outcome": a.outcome, "detail": _safe_detail(a.outcome, a.detail)} for a in routed.attempts]
         if not routed.ok or routed.result is None:
-            summary = "; ".join(f"{a.provider}: {a.outcome}" + (f" ({a.detail})" if a.detail else "") for a in routed.attempts)
+            summary = "; ".join(f"{a.provider}: {a.outcome}" + (f" ({d})" if d else "") for a in routed.attempts for d in [_safe_detail(a.outcome, a.detail)])
             raise ModelError(f"shared model layer produced no answer: {summary}")
         self.last_provider = routed.result.provider
         text = (routed.result.text or "").strip()
@@ -143,8 +194,8 @@ class SharedLayerModel:
         text = await self._run(messages, None)
         try:
             return AgentDecision.model_validate_json(_extract_json(text))
-        except ValueError as exc:
-            raise ModelError(f"shared model returned an invalid decision: {exc}") from exc
+        except (ValueError, RecursionError) as exc:
+            raise ModelError(f"shared model returned an invalid decision ({type(exc).__name__})") from None
 
     async def chat(self, messages: list[dict[str, str]], temperature: float = 0.7, max_tokens: int | None = None) -> str:
         return await self._run(messages, max_tokens)
