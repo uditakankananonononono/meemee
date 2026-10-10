@@ -1,0 +1,323 @@
+From 7cbad75cba98388b63cd02bbbc39f53fb4c8eed4 Mon Sep 17 00:00:00 2001
+From: Udita assistant <uditakankana@users.noreply.github.com>
+Date: Sat, 10 Oct 2026 09:57:43 +0530
+Subject: [PATCH] Correct supplied recovery contract to deny active claims
+ before quarantine
+
+---
+ meemee/checkin_recovery_policy.py     | 122 ++++++++++++++++++
+ tests/test_checkin_recovery_policy.py | 173 ++++++++++++++++++++++++++
+ 2 files changed, 295 insertions(+)
+ create mode 100644 meemee/checkin_recovery_policy.py
+ create mode 100644 tests/test_checkin_recovery_policy.py
+
+diff --git a/meemee/checkin_recovery_policy.py b/meemee/checkin_recovery_policy.py
+new file mode 100644
+index 0000000..606ac29
+--- /dev/null
++++ b/meemee/checkin_recovery_policy.py
+@@ -0,0 +1,122 @@
++"""Standalone check-in recovery decisions, with no persistence or delivery effects.
++
++Explicit proposed interface, not an adapter for today's store schema:
++* ``claim`` is one authoritative snapshot of the current running generation.
++* ``expected_*`` identify the check-in, user owner, worker lease token and
++  generation the caller observed. Tokens must be unique for each acquisition;
++  generation must increase on acquisition. Neither rule is enforced here.
++* ``attempts`` counts started generations, including this one; ``max_attempts``
++  is the total generation budget, not a budget of additional retries.
++* Times are finite nonnegative epoch seconds from one trusted clock domain.
++  A lease is active before ``expires_at`` and expired at equality.
++* ``not_started`` means delivery has never begun for this generation. Delivery
++  intent must be durably marked ``started`` before any external send. Missing
++  or ambiguous delivery evidence must be represented as ``unknown``.
++
++Correction to delivered PREP: validate clocks/lease and deny active claims before
++any quarantine advice. Never quarantine a still-owned running claim. Invalid
++clocks/budgets/intervals deny without mutation. Only expired, identity-valid claims
++with ambiguous/started/accepted delivery may advise quarantine.
++
++REQUEST_RETRY is only advice. The integrating owner must atomically re-read
++and compare identity, token, generation, lease, budget and delivery evidence
++before changing state, enforce token fencing on old workers, and recheck current
++permission before any send. Without that storage/worker protocol this helper
++cannot provide crash recovery or prevent replay. No store bindings are implied.
++"""
++from dataclasses import dataclass
++from enum import Enum
++from math import isfinite
++
++
++class RecoveryAction(str, Enum):
++    DENY = "deny"
++    QUARANTINE = "quarantine"
++    REQUEST_RETRY = "request_retry"
++
++
++@dataclass(frozen=True)
++class CheckinClaim:
++    checkin_id: str
++    owner_id: str
++    token: str
++    generation: int
++    status: str
++    delivery_state: str
++    claimed_at: float
++    expires_at: float
++    attempts: int
++    max_attempts: int
++
++
++@dataclass(frozen=True)
++class RecoveryDecision:
++    action: RecoveryAction
++    reason: str
++
++
++def _identifier(value: object) -> bool:
++    # Cap untrusted input; never echo tokens or identifiers in a decision.
++    return (type(value) is str and 0 < len(value) <= 256 and value.strip() == value
++            and not any(ord(c) < 32 or ord(c) == 127 for c in value))
++
++
++def _clock(value: object) -> bool:
++    if type(value) not in (int, float):
++        return False
++    try:
++        return value >= 0 and isfinite(value)
++    except OverflowError:
++        return False
++
++
++def decide_checkin_recovery(
++    claim: CheckinClaim,
++    *,
++    expected_checkin_id: str,
++    expected_owner_id: str,
++    expected_token: str,
++    expected_generation: int,
++    now: float,
++) -> RecoveryDecision:
++    """Return one bounded, pure decision. Invalid input fails closed.
++
++    No I/O, sends, state changes, clock reads or budget consumption occur.
++    A repeated call can return the same advice; this is not a replay ledger.
++    """
++    deny = RecoveryAction.DENY
++    quarantine = RecoveryAction.QUARANTINE
++    if type(claim) is not CheckinClaim:
++        return RecoveryDecision(deny, "invalid_snapshot")
++    identities = (
++        claim.checkin_id, claim.owner_id, claim.token,
++        expected_checkin_id, expected_owner_id, expected_token,
++    )
++    if not all(_identifier(value) for value in identities):
++        return RecoveryDecision(deny, "invalid_identity")
++    if (claim.checkin_id != expected_checkin_id or claim.owner_id != expected_owner_id
++            or claim.token != expected_token):
++        return RecoveryDecision(deny, "identity_mismatch")
++    if (type(claim.generation) is not int or claim.generation < 1
++            or type(expected_generation) is not int or expected_generation < 1):
++        return RecoveryDecision(deny, "invalid_generation")
++    if claim.generation != expected_generation:
++        return RecoveryDecision(deny, "generation_mismatch")
++    if type(claim.status) is not str or claim.status != "running":
++        return RecoveryDecision(deny, "not_running")
++    if (type(claim.attempts) is not int or type(claim.max_attempts) is not int
++            or claim.attempts < 1 or claim.max_attempts < 1
++            or claim.attempts > claim.max_attempts):
++        return RecoveryDecision(deny, "invalid_budget")
++    if not all(_clock(value) for value in (now, claim.claimed_at, claim.expires_at)):
++        return RecoveryDecision(deny, "invalid_clock")
++    if claim.expires_at <= claim.claimed_at or now < claim.claimed_at:
++        return RecoveryDecision(deny, "invalid_lease_interval")
++    if now < claim.expires_at:
++        return RecoveryDecision(deny, "active_claim")
++    if type(claim.delivery_state) is not str or claim.delivery_state != "not_started":
++        # started, accepted, unknown, and unrecognized values are never retryable.
++        return RecoveryDecision(quarantine, "delivery_not_proven_unstarted")
++    if claim.attempts == claim.max_attempts:
++        return RecoveryDecision(deny, "budget_exhausted")
++    return RecoveryDecision(RecoveryAction.REQUEST_RETRY, "expired_before_delivery")
+diff --git a/tests/test_checkin_recovery_policy.py b/tests/test_checkin_recovery_policy.py
+new file mode 100644
+index 0000000..32f23cb
+--- /dev/null
++++ b/tests/test_checkin_recovery_policy.py
+@@ -0,0 +1,173 @@
++"""Executed supplied-policy checks; not store/worker crash-recovery tests."""
++from dataclasses import replace
++
++import pytest
++
++from meemee.checkin_recovery_policy import (
++    CheckinClaim,
++    RecoveryAction,
++    decide_checkin_recovery,
++)
++
++
++def snapshot(**changes):
++    return replace(CheckinClaim(
++        checkin_id="checkin-1", owner_id="user-1", token="lease-1", generation=2,
++        status="running", delivery_state="not_started", claimed_at=100.0,
++        expires_at=200.0, attempts=2, max_attempts=3,
++    ), **changes)
++
++
++def decide(claim=None, **changes):
++    arguments = dict(expected_checkin_id="checkin-1", expected_owner_id="user-1",
++                     expected_token="lease-1", expected_generation=2, now=201.0)
++    arguments.update(changes)
++    return decide_checkin_recovery(snapshot() if claim is None else claim, **arguments)
++
++
++def test_expired_before_send_requests_retry():
++    assert decide().action is RecoveryAction.REQUEST_RETRY
++
++
++def test_expiry_boundary_is_expired():
++    assert decide(now=200.0).action is RecoveryAction.REQUEST_RETRY
++
++
++def test_active_claim_is_denied():
++    result = decide(now=199.999)
++    assert result.action is RecoveryAction.DENY
++    assert result.reason == "active_claim"
++
++
++@pytest.mark.parametrize("delivery", ["started", "accepted", "unknown", "failed", "", None])
++def test_delivery_evidence_quarantines_even_expired(delivery):
++    assert decide(snapshot(delivery_state=delivery)).action is RecoveryAction.QUARANTINE
++
++
++def test_active_delivery_denies_before_quarantine():
++    assert decide(snapshot(delivery_state="started"), now=150.0).action is RecoveryAction.DENY
++
++
++@pytest.mark.parametrize("key,value", [
++    ("expected_checkin_id", "other"), ("expected_owner_id", "other"),
++    ("expected_token", "old-token"),
++])
++def test_identity_mismatch_denied(key, value):
++    assert decide(**{key: value}).reason == "identity_mismatch"
++
++
++def test_replayed_generation_denied():
++    result = decide(expected_generation=1)
++    assert result.action is RecoveryAction.DENY
++    assert result.reason == "generation_mismatch"
++
++
++def test_old_snapshot_against_new_lease_denied():
++    result = decide(snapshot(token="lease-2", generation=3, attempts=3))
++    assert result.action is RecoveryAction.DENY
++
++
++@pytest.mark.parametrize("field", ["checkin_id", "owner_id", "token"])
++@pytest.mark.parametrize("value", ["", " padded ", "x" * 257, None, True, 1])
++def test_invalid_snapshot_identity_denied(field, value):
++    assert decide(snapshot(**{field: value})).reason == "invalid_identity"
++
++
++@pytest.mark.parametrize("field", ["expected_checkin_id", "expected_owner_id", "expected_token"])
++@pytest.mark.parametrize("value", ["", " padded ", "x" * 257, None, True, 1])
++def test_invalid_expected_identity_denied(field, value):
++    assert decide(**{field: value}).reason == "invalid_identity"
++
++
++@pytest.mark.parametrize("value", [True, False, 0, -1, 2.0, "2", None])
++def test_invalid_generation_denied(value):
++    assert decide(snapshot(generation=value)).reason == "invalid_generation"
++    assert decide(expected_generation=value).reason == "invalid_generation"
++
++
++@pytest.mark.parametrize("status", ["queued", "done", "failed", "cancelled", "", None])
++def test_nonrunning_denied(status):
++    assert decide(snapshot(status=status)).reason == "not_running"
++
++
++@pytest.mark.parametrize("field", ["attempts", "max_attempts"])
++@pytest.mark.parametrize("value", [True, False, 0, -1, 2.0, "2", None])
++def test_exact_int_budget_required(field, value):
++    result = decide(snapshot(**{field: value}))
++    assert result.action is RecoveryAction.DENY
++    assert result.reason == "invalid_budget"
++
++
++def test_overdrawn_budget_denied():
++    assert decide(snapshot(attempts=4)).reason == "invalid_budget"
++
++
++def test_exhausted_budget_denied():
++    result = decide(snapshot(attempts=3))
++    assert result.action is RecoveryAction.DENY
++    assert result.reason == "budget_exhausted"
++
++
++def test_one_remaining_generation_allowed():
++    assert decide(snapshot(attempts=1, max_attempts=2)).action is RecoveryAction.REQUEST_RETRY
++
++
++@pytest.mark.parametrize("field", ["now", "claimed_at", "expires_at"])
++@pytest.mark.parametrize("value", [float("nan"), float("inf"), -float("inf"),
++                                    -1, True, False, "201", None, 10 ** 1000])
++def test_nonfinite_or_invalid_clock_denied(field, value):
++    result = decide(**{field: value}) if field == "now" else decide(snapshot(**{field: value}))
++    assert result.action is RecoveryAction.DENY
++    assert result.reason == "invalid_clock"
++
++
++@pytest.mark.parametrize("expiry", [99.0, 100.0])
++def test_invalid_lease_order_denied(expiry):
++    assert decide(snapshot(expires_at=expiry)).reason == "invalid_lease_interval"
++
++
++def test_backwards_clock_denied():
++    assert decide(now=99.0).reason == "invalid_lease_interval"
++
++
++def test_finite_integer_clock_allowed():
++    result = decide(snapshot(claimed_at=100, expires_at=200), now=201)
++    assert result.action is RecoveryAction.REQUEST_RETRY
++
++
++@pytest.mark.parametrize("claim", [None, {}, "running", 1])
++def test_wrong_snapshot_type_denied(claim):
++    result = decide_checkin_recovery(
++        claim, expected_checkin_id="checkin-1", expected_owner_id="user-1",
++        expected_token="lease-1", expected_generation=2, now=201.0,
++    )
++    assert result.action is RecoveryAction.DENY
++    assert result.reason == "invalid_snapshot"
++
++
++def test_repeated_advice_has_no_replay_protection_or_mutation():
++    claim = snapshot()
++    before = replace(claim)
++    first = decide(claim)
++    second = decide(claim)
++    assert first == second
++    assert claim == before
++    assert first.action is RecoveryAction.REQUEST_RETRY
++
++
++def test_decision_never_echoes_token():
++    result = decide(snapshot(token="secret-marker"))
++    assert "secret-marker" not in repr(result)
++
++
++def test_invalid_clock_and_budget_deny_before_quarantine():
++    result = decide(snapshot(delivery_state="unknown", max_attempts=True), now=float("nan"))
++    assert result.action is RecoveryAction.DENY
++
++@pytest.mark.parametrize('delivery',['started','accepted','unknown',None])
++def test_all_active_delivery_states_never_quarantine(delivery):
++    assert decide(snapshot(delivery_state=delivery),now=199).action is RecoveryAction.DENY
++
++@pytest.mark.parametrize('value',['x\x00','x\n','x\x7f'])
++def test_identity_controls_refused(value):
++    assert decide(expected_token=value).action is RecoveryAction.DENY
+-- 
+2.34.1
+
