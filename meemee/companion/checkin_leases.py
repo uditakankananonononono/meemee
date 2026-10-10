@@ -103,7 +103,7 @@ class CheckinLeaseMixin:
             c.execute('UPDATE companion_checkins SET lease_until=?,updated_at=? WHERE id=?',((instant+timedelta(seconds=lease_seconds)).isoformat(),clock,claim['id']))
         return True
 
-    def _permission_current(self,c,row,instant):
+    def _permission_profile_locked(self,c,row):
         # PG profile lock and SQLite write transaction fence current preferences
         # at intent/local commit. Revocation after commit cannot unsend a provider call.
         if self._checkin_pg:
@@ -111,17 +111,24 @@ class CheckinLeaseMixin:
             from .models import UserProfile
             p=UserProfile(**{k:self._profile(user)[k] for k in ('user_id','display_name','timezone','persona','checkins')}) if user else None
         else:p=self.profile(row['user_id'])
+        return p
+
+    def _permission_current(self,p,row,instant):
         from .checkins import in_quiet_hours
         return bool(p and p.checkins.enabled and p.checkins.channel==row['channel'] and p.checkins.address==row['address'] and not(p.checkins.quiet_hours and in_quiet_hours(instant.astimezone(p.tz()),p.checkins.quiet_hours)))
 
     def start_checkin_delivery(self,claim,now=None):
         with self._lease_transaction() as c:
             row=self._owned_claim(c,claim,now)
-            instant=self._validate_claim_time(row,now);clock=instant.isoformat()
             if row['delivery_state']!='not_started':raise LostCheckinClaim('check-in send intent already used')
-            allowed=self._permission_current(c,row,instant)
-            allowed=allowed and self._destination_verified_locked(c,row['user_id'],row['channel'],row['address'],now)
+            # Acquire every blocking lock before any time-dependent permission.
+            # Preserve check-in -> profile -> destination lock order. Runtime None
+            # uses one fresh post-lock instant; explicit test clocks stay fixed.
+            profile=self._permission_profile_locked(c,row)
+            grants=self._destination_grants_locked(c,row['user_id'],row['channel'],row['address'])
             instant=self._validate_claim_time(row,now);clock=instant.isoformat()
+            allowed=self._permission_current(profile,row,instant)
+            allowed=allowed and self._destination_grants_valid(row['channel'],grants,instant)
             if not allowed:
                 c.execute("UPDATE companion_checkins SET status='cancelled',updated_at=? WHERE id=?",(clock,row['id']))
                 return False

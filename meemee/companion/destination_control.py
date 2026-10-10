@@ -149,17 +149,21 @@ class DestinationControlMixin:
             ).fetchone()
         return _public(grant)
 
-    def _destination_verified_locked(self, c, owner, channel, destination, now=None):
-        if channel == "local":
-            return True
+    def _destination_grants_locked(self, c, owner, channel, destination):
+        """Fetch proof rows with locks; do not evaluate a pre-lock clock."""
         if channel != "webhook":
-            return False
-        rows = c.execute(
+            return []
+        return c.execute(
             "SELECT * FROM companion_destination_grants WHERE owner_id=? AND channel='webhook' AND destination=? ORDER BY id"
             + c.for_share,
             (owner, destination),
         ).fetchall()
-        clock = lease_clock(now)
+
+    def _destination_grants_valid(self, channel, rows, clock):
+        if channel == "local":
+            return True
+        if channel != "webhook":
+            return False
         return any(
             row["revoked_at"] is None
             and lease_clock(datetime.fromisoformat(str(row["issued_at"])))
@@ -167,6 +171,10 @@ class DestinationControlMixin:
             < lease_clock(datetime.fromisoformat(str(row["expires_at"])))
             for row in rows
         )
+
+    def _destination_verified_locked(self, c, owner, channel, destination, now=None):
+        rows = self._destination_grants_locked(c, owner, channel, destination)
+        return self._destination_grants_valid(channel, rows, lease_clock(now))
 
     def destination_is_verified(self, owner, channel, destination, now=None):
         with self._lease_transaction() as c:

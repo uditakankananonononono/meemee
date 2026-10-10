@@ -48,7 +48,9 @@ state; older snapshots have zero grants rather than guessed proof.
 Runtime None clocks are read after authoritative locks. Test-only explicit clocks
 and direct store proof setup are not API capabilities. At send intent the worker
 locks current check-in identity/preferences and matching grant rows, validates
-fresh expiry, then marks durable delivery started. Revocation which commits before
+fresh expiry and quiet hours using one aware runtime instant after every blocking
+check-in/profile/grant lock has been acquired, then marks durable delivery started.
+Quiet-hour decisions never reuse a timestamp from before a lock wait. Revocation which commits before
 intent refuses delivery. Revocation after intent cannot retract a network call.
 A granted endpoint changing hands before seven days is not detectable; disable or
 revoke immediately when ownership changes. Address changes require new exact proof.
