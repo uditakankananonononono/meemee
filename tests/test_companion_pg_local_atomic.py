@@ -40,9 +40,9 @@ async def test_local_commit_rechecks_changed_preferences(store, monkeypatch):  #
     store.schedule_checkin('owner', datetime.now(timezone.utc), 'slot', 'local', None)
     original = store.finish_local_checkin
 
-    def preference_changed(checkin, conversation, message):
+    def preference_changed(checkin, conversation, message, *, claim=None):
         store.upsert_user(UserProfile(user_id='owner', display_name='Owner', checkins=CheckInPreferences(enabled=False)))
-        return original(checkin, conversation, message)
+        return original(checkin, conversation, message, claim=claim)
 
     monkeypatch.setattr(store, 'finish_local_checkin', preference_changed)
 

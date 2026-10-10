@@ -16,12 +16,13 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+from meemee.companion.checkin_leases import CheckinLeaseMixin, lease_clock
 from meemee.companion.models import CheckInPreferences, FactInput, PersonaConfig, UserProfile
 from meemee.sensitive import scrub_text
 
 from ._db import Database
 
-_TIME_COLUMNS = ("created_at", "updated_at", "last_message_at", "due_at")
+_TIME_COLUMNS = ("created_at", "updated_at", "last_message_at", "due_at", "claimed_at", "lease_until")
 
 
 def _now() -> datetime:
@@ -38,7 +39,8 @@ def _row(row: dict[str, Any] | None) -> dict[str, Any] | None:
     return result
 
 
-class CompanionStore:
+class CompanionStore(CheckinLeaseMixin):
+    _checkin_pg = True
     """Durable per-user companion state: profiles, facts, conversations and check-ins (PostgreSQL)."""
 
     def __init__(self, db: Database):
@@ -219,20 +221,20 @@ class CompanionStore:
                     (user_id,),
                 ).fetchone()
                 if pending is not None:
-                    return _row(pending), False
+                    return {k:v for k,v in _row(pending).items() if k != "claim_token"}, False
             created = c.execute("""INSERT INTO meemee_companion_checkins(id,user_id,slot,due_at,status,max_attempts,channel,address,created_at,updated_at)
                                    VALUES (%s,%s,%s,%s,'queued',%s,%s,%s,%s,%s) ON CONFLICT (user_id, slot) DO NOTHING""",
                                 (uuid.uuid4().hex, user_id, slot, due_at.astimezone(timezone.utc), max_attempts, channel, address,
                                  now, now)).rowcount
             row = c.execute("SELECT * FROM meemee_companion_checkins WHERE user_id=%s AND slot=%s", (user_id, slot)).fetchone()
-        return _row(row), bool(created)  # type: ignore[return-value]
+        return {k:v for k,v in _row(row).items() if k != "claim_token"}, bool(created)  # type: ignore[return-value]
 
     def claim_checkin(self, now: datetime | None = None) -> dict[str, Any] | None:
         if now is not None and (now.tzinfo is None or now.utcoffset() is None):
             raise ValueError("check-in clock requires a timezone")
         moment = (now or _now()).astimezone(timezone.utc)
         with self.db.transaction() as c:
-            row = c.execute("""SELECT * FROM meemee_companion_checkins WHERE status='queued' AND due_at<=%s
+            row = c.execute("""SELECT * FROM meemee_companion_checkins WHERE status='queued' AND claim_token IS NULL AND attempts<max_attempts AND due_at<=%s
                                ORDER BY due_at, id LIMIT 1 FOR UPDATE SKIP LOCKED""", (moment,)).fetchone()
             if row is None:
                 return None
@@ -240,13 +242,18 @@ class CompanionStore:
                       (_now(), row["id"]))
         return _row(row)  # the row as it was before the claim, like SQLite
 
-    def finish_local_checkin(self, checkin_id: str, conversation_id: str, message: str) -> bool:
+    def finish_local_checkin(self, checkin_id: str, conversation_id: str, message: str, *, claim: dict | None = None) -> bool:
         """Publish a local message and its check-in completion in one transaction."""
         from meemee.companion.checkins import in_quiet_hours
 
         now, clean = _now(), scrub_text(message)
         with self.db.transaction() as c:
-            row = c.execute("SELECT user_id,address,channel FROM meemee_companion_checkins WHERE id=%s AND status='running' FOR UPDATE",
+            if claim is not None:
+                from meemee.companion.checkin_leases import _Queries
+                owned=self._owned_claim(_Queries(c,True),claim)
+                if owned['delivery_state']!='not_started':raise ValueError('local claim already has send intent')
+                if claim['id']!=checkin_id:raise ValueError('check-in claim mismatch')
+            row = c.execute("SELECT user_id,address,channel FROM meemee_companion_checkins WHERE id=%s AND status='running'" + (" AND claim_token IS NULL" if claim is None else "") + " FOR UPDATE",
                             (checkin_id,)).fetchone()
             conversation = c.execute("SELECT user_id,channel FROM meemee_companion_conversations WHERE id=%s FOR UPDATE",
                                      (conversation_id,)).fetchone()
@@ -257,6 +264,9 @@ class CompanionStore:
             user = c.execute("SELECT * FROM meemee_companion_users WHERE user_id=%s FOR SHARE", (row["user_id"],)).fetchone()
             profile = UserProfile(**{k: self._profile(user)[k] for k in ("user_id", "display_name", "timezone", "persona", "checkins")}) if user else None
             prefs = profile.checkins if profile is not None else None
+            if claim is not None:
+                self._validate_claim_time(owned)
+            now = lease_clock()
             if (prefs is None or not prefs.enabled or prefs.channel != "local" or prefs.address != row["address"]
                     or (prefs.quiet_hours is not None and in_quiet_hours(now.astimezone(profile.tz()), prefs.quiet_hours))):
                 c.execute("UPDATE meemee_companion_checkins SET status='cancelled',updated_at=%s WHERE id=%s", (now, checkin_id))
@@ -264,34 +274,34 @@ class CompanionStore:
             c.execute("INSERT INTO meemee_companion_messages(conversation_id,role,content,created_at) VALUES(%s,'assistant',%s,%s)",
                       (conversation_id, clean, now))
             c.execute("UPDATE meemee_companion_conversations SET last_message_at=%s WHERE id=%s", (now, conversation_id))
-            c.execute("UPDATE meemee_companion_checkins SET status='done',message=%s,last_error=NULL,updated_at=%s WHERE id=%s",
+            c.execute("UPDATE meemee_companion_checkins SET status='done',delivery_state='accepted',message=%s,last_error=NULL,updated_at=%s WHERE id=%s",
                       (clean, now, checkin_id))
         return True
 
     def finish_checkin(self, checkin_id: str, message: str) -> None:
         with self.db.transaction() as c:
             c.execute("""UPDATE meemee_companion_checkins SET status='done', message=%s, last_error=NULL, updated_at=%s
-                         WHERE id=%s AND status='running'""", (scrub_text(message), _now(), checkin_id))
+                         WHERE id=%s AND status='running' AND claim_token IS NULL""", (scrub_text(message), _now(), checkin_id))
 
     def fail_checkin(self, checkin_id: str, error: str) -> str:
         with self.db.transaction() as c:
             c.execute("""UPDATE meemee_companion_checkins
                          SET status=CASE WHEN attempts<max_attempts THEN 'queued' ELSE 'failed' END, last_error=%s, updated_at=%s
-                         WHERE id=%s AND status='running'""", (error[:500], _now(), checkin_id))
+                         WHERE id=%s AND status='running' AND claim_token IS NULL""", (error[:500], _now(), checkin_id))
             return c.execute("SELECT status FROM meemee_companion_checkins WHERE id=%s", (checkin_id,)).fetchone()["status"]
 
     def mark_checkin_unknown(self, checkin_id: str, error: str) -> bool:
         """Stop automatic retries when an interrupted send may have taken effect."""
         with self.db.transaction() as c:
             return bool(c.execute(
-                "UPDATE meemee_companion_checkins SET status='failed',last_error=%s,updated_at=%s WHERE id=%s AND status='running'",
+                "UPDATE meemee_companion_checkins SET status='failed',last_error=%s,updated_at=%s WHERE id=%s AND status='running' AND claim_token IS NULL",
                 (error[:500], _now(), checkin_id),
             ).rowcount)
 
     def cancel_claimed_checkin(self, checkin_id: str) -> bool:
         with self.db.transaction() as c:
             return bool(c.execute(
-                "UPDATE meemee_companion_checkins SET status='cancelled',updated_at=%s WHERE id=%s AND status='running'",
+                "UPDATE meemee_companion_checkins SET status='cancelled',updated_at=%s WHERE id=%s AND status='running' AND claim_token IS NULL",
                 (_now(), checkin_id),
             ).rowcount)
 
@@ -308,7 +318,7 @@ class CompanionStore:
         with self.db.transaction() as c:
             rows = c.execute(f"SELECT * FROM meemee_companion_checkins WHERE {' AND '.join(clauses)} ORDER BY due_at DESC, id DESC LIMIT %s",
                              tuple(parameters)).fetchall()
-        return [_row(row) for row in rows]
+        return [{k:v for k,v in _row(row).items() if k != "claim_token"} for row in rows]
 
     def record_model_trace(self, message_id: int, conversation_id: str, trace: dict[str, Any]) -> None:
         with self.db.transaction() as c:
@@ -346,7 +356,7 @@ class CompanionStore:
                                   ON t.conversation_id=o.cid ORDER BY o.n, t.message_id""", (ids,)).fetchall()
             checkins = c.execute("SELECT * FROM meemee_companion_checkins WHERE user_id=%s ORDER BY created_at, id", (user_id,)).fetchall()
         return {"profile": _row(user), "facts": [_row(x) for x in facts], "conversations": [_row(x) for x in conversations],
-                "messages": [_row(x) for x in messages], "checkins": [_row(x) for x in checkins],
+                "messages": [_row(x) for x in messages], "checkins": [{k:v for k,v in _row(x).items() if k != "claim_token"} for x in checkins],
                 "model_traces": [_row(x) for x in traces]}
 
     def delete_user_data(self, user_id: str) -> dict[str, int]:

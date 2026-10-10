@@ -11,6 +11,7 @@ from typing import Any
 from .._sqlite_guard import close_db_on_init_failure
 from ..schema_registry import register_schema
 from ..sensitive import scrub_text
+from .checkin_leases import CheckinLeaseMixin, lease_clock
 from .models import CheckInPreferences, FactInput, PersonaConfig, UserProfile
 
 SCHEMA = [
@@ -18,6 +19,7 @@ SCHEMA = [
     "companion facts with fts and supersession",
     "companion conversations and messages",
     "companion check-in durable delivery queue",
+    "generation-fenced check-in lease, token and durable send intent",
 ]
 
 
@@ -25,7 +27,7 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-class CompanionStore:
+class CompanionStore(CheckinLeaseMixin):
     """Durable per-user companion state: profiles, facts, conversations and check-ins."""
 
     @close_db_on_init_failure
@@ -118,7 +120,17 @@ class CompanionStore:
             CREATE INDEX IF NOT EXISTS companion_checkins_user
                 ON companion_checkins(user_id, due_at DESC);
         """)
-        register_schema(self.db, "companion", 1, SCHEMA)
+        with self.lock:
+            self.db.execute('BEGIN IMMEDIATE')
+            try:
+                cols={r['name'] for r in self.db.execute('PRAGMA table_info(companion_checkins)')}
+                additions={'claim_token':'TEXT','claim_generation':'INTEGER NOT NULL DEFAULT 0','claimed_at':'TEXT','lease_until':'TEXT','delivery_state':"TEXT NOT NULL DEFAULT 'unknown'"}
+                for name,decl in additions.items():
+                    if name not in cols:self.db.execute(f'ALTER TABLE companion_checkins ADD COLUMN {name} {decl}')
+                self.db.commit()
+            except BaseException:
+                self.db.rollback();raise
+        register_schema(self.db, "companion", 2, SCHEMA)
 
     def ping(self) -> bool:
         with self.lock:
@@ -366,7 +378,7 @@ class CompanionStore:
                     (user_id,),
                 ).fetchone()
                 if pending is not None:
-                    return dict(pending), False
+                    return {k:v for k,v in dict(pending).items() if k != "claim_token"}, False
             created = self.db.execute(
                 """INSERT INTO companion_checkins(id,user_id,slot,due_at,status,max_attempts,channel,address,created_at,updated_at)
                    VALUES(?,?,?,?,'queued',?,?,?,?,?)
@@ -377,7 +389,7 @@ class CompanionStore:
             row = self.db.execute(
                 "SELECT * FROM companion_checkins WHERE user_id=? AND slot=?", (user_id, slot)
             ).fetchone()
-        return dict(row), bool(created)
+        return {k:v for k,v in dict(row).items() if k != "claim_token"}, bool(created)
 
     def claim_checkin(self, now: datetime | None = None) -> dict[str, Any] | None:
         if now is not None and (now.tzinfo is None or now.utcoffset() is None):
@@ -387,7 +399,7 @@ class CompanionStore:
             self.db.execute("BEGIN IMMEDIATE")
             row = self.db.execute(
                 """SELECT * FROM companion_checkins
-                   WHERE status='queued' AND due_at<=? ORDER BY due_at, id LIMIT 1""",
+                   WHERE status='queued' AND claim_token IS NULL AND attempts<max_attempts AND due_at<=? ORDER BY due_at, id LIMIT 1""",
                 (moment,),
             ).fetchone()
             if row is None:
@@ -401,14 +413,19 @@ class CompanionStore:
             self.db.execute("COMMIT")
         return dict(row) if changed else None
 
-    def finish_local_checkin(self, checkin_id: str, conversation_id: str, message: str) -> bool:
+    def finish_local_checkin(self, checkin_id: str, conversation_id: str, message: str, *, claim: dict | None = None) -> bool:
         """Commit local message and completion together; never cover external delivery."""
         now = _now()
         clean = scrub_text(message)
         with self.lock, self.db:
             self.db.execute("BEGIN IMMEDIATE")
+            if claim is not None:
+                from .checkin_leases import _Queries
+                owned=self._owned_claim(_Queries(self.db,False),claim)
+                if owned['delivery_state']!='not_started':raise ValueError('local claim already has send intent')
+                if claim['id']!=checkin_id:raise ValueError('check-in claim mismatch')
             row = self.db.execute(
-                "SELECT user_id,address,channel FROM companion_checkins WHERE id=? AND status='running'",
+                "SELECT user_id,address,channel FROM companion_checkins WHERE id=? AND status='running'" + (" AND claim_token IS NULL" if claim is None else ""),
                 (checkin_id,),
             ).fetchone()
             conversation = self.db.execute(
@@ -423,6 +440,9 @@ class CompanionStore:
             from .checkins import in_quiet_hours
 
             prefs = profile.checkins if profile is not None else None
+            if claim is not None:
+                self._validate_claim_time(owned)
+            now = lease_clock().isoformat()
             if (prefs is None or not prefs.enabled or prefs.channel != "local"
                     or prefs.address != row["address"]
                     or (prefs.quiet_hours is not None and in_quiet_hours(
@@ -441,7 +461,7 @@ class CompanionStore:
                 (now, conversation_id),
             )
             self.db.execute(
-                "UPDATE companion_checkins SET status='done',message=?,last_error=NULL,updated_at=? WHERE id=?",
+                "UPDATE companion_checkins SET status='done',delivery_state='accepted',message=?,last_error=NULL,updated_at=? WHERE id=?",
                 (clean, now, checkin_id),
             )
         return True
@@ -450,7 +470,7 @@ class CompanionStore:
         with self.lock, self.db:
             self.db.execute(
                 """UPDATE companion_checkins SET status='done', message=?, last_error=NULL, updated_at=?
-                   WHERE id=? AND status='running'""",
+                   WHERE id=? AND status='running' AND claim_token IS NULL""",
                 (scrub_text(message), _now(), checkin_id),
             )
 
@@ -460,7 +480,7 @@ class CompanionStore:
                 """UPDATE companion_checkins
                    SET status=CASE WHEN attempts<max_attempts THEN 'queued' ELSE 'failed' END,
                        last_error=?, updated_at=?
-                   WHERE id=? AND status='running'""",
+                   WHERE id=? AND status='running' AND claim_token IS NULL""",
                 (error[:500], _now(), checkin_id),
             )
             row = self.db.execute(
@@ -472,14 +492,14 @@ class CompanionStore:
         """Stop automatic retries when an interrupted send may have taken effect."""
         with self.lock, self.db:
             return bool(self.db.execute(
-                "UPDATE companion_checkins SET status='failed',last_error=?,updated_at=? WHERE id=? AND status='running'",
+                "UPDATE companion_checkins SET status='failed',last_error=?,updated_at=? WHERE id=? AND status='running' AND claim_token IS NULL",
                 (error[:500], _now(), checkin_id),
             ).rowcount)
 
     def cancel_claimed_checkin(self, checkin_id: str) -> bool:
         with self.lock, self.db:
             return bool(self.db.execute(
-                "UPDATE companion_checkins SET status='cancelled',updated_at=? WHERE id=? AND status='running'",
+                "UPDATE companion_checkins SET status='cancelled',updated_at=? WHERE id=? AND status='running' AND claim_token IS NULL",
                 (_now(), checkin_id),
             ).rowcount)
 
@@ -504,7 +524,7 @@ class CompanionStore:
                 f"SELECT * FROM companion_checkins WHERE {' AND '.join(clauses)} ORDER BY due_at DESC, id DESC LIMIT ?",
                 tuple(parameters),
             ).fetchall()
-        return [dict(row) for row in rows]
+        return [{k:v for k,v in dict(row).items() if k != "claim_token"} for row in rows]
 
     def record_model_trace(self, message_id: int, conversation_id: str, trace: dict[str, Any]) -> None:
         """Durably record model provenance bound to its stored message."""
@@ -546,7 +566,7 @@ class CompanionStore:
                 messages.extend(self.db.execute("SELECT * FROM companion_messages WHERE conversation_id=? ORDER BY id", (conversation_id,)).fetchall())
                 traces.extend(self.db.execute("SELECT * FROM companion_message_models WHERE conversation_id=? ORDER BY message_id", (conversation_id,)).fetchall())
             checkins = self.db.execute("SELECT * FROM companion_checkins WHERE user_id=? ORDER BY created_at", (user_id,)).fetchall()
-        return {"profile": dict(user) if user else None, "facts": [dict(x) for x in facts], "conversations": [dict(x) for x in conversations], "messages": [dict(x) for x in messages], "checkins": [dict(x) for x in checkins], "model_traces": [dict(x) for x in traces]}
+        return {"profile": dict(user) if user else None, "facts": [dict(x) for x in facts], "conversations": [dict(x) for x in conversations], "messages": [dict(x) for x in messages], "checkins": [{k:v for k,v in dict(x).items() if k != "claim_token"} for x in checkins], "model_traces": [dict(x) for x in traces]}
 
     def delete_user_data(self, user_id: str) -> dict[str, int]:
         """Delete customer companion content transactionally; audit lives elsewhere."""

@@ -20,7 +20,7 @@ async def test_sent_then_finish_error_terminal_unknown(tmp_path, error):
     def failed_publication(checkin_id, message):
         raise error('completion publication unavailable')
 
-    store.finish_checkin = failed_publication
+    store.finish_checkin_claim = failed_publication
     channels['local'] = Accepted()
     try:
         summary = await deliver_due_once(store, engine, channels)
@@ -48,8 +48,8 @@ async def test_fallback_publication_failure_never_requeues(tmp_path):
     def unavailable(*args):
         raise RuntimeError('all publication unavailable')
 
-    store.finish_checkin = unavailable
-    store.mark_checkin_unknown = unavailable
+    store.finish_checkin_claim = unavailable
+    store.unknown_checkin_claim = unavailable
     channels['local'] = Accepted()
     with pytest.raises(RuntimeError, match='all publication unavailable'):
         await deliver_due_once(store, engine, channels)

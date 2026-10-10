@@ -45,7 +45,7 @@ SPECS={
                TableSpec("companion_conversations","meemee_companion_conversations",("id","user_id","channel","created_at","last_message_at"),("id",)),
                TableSpec("companion_messages","meemee_companion_messages",("id","conversation_id","role","content","created_at"),("id",)),
                TableSpec("companion_message_models","meemee_companion_message_models",("message_id","conversation_id","role","profile","model","attempts","created_at"),("message_id",)),
-               TableSpec("companion_checkins","meemee_companion_checkins",("id","user_id","slot","due_at","status","attempts","max_attempts","channel","address","message","last_error","created_at","updated_at"),("id",))),
+               TableSpec("companion_checkins","meemee_companion_checkins",("id","user_id","slot","due_at","status","attempts","max_attempts","channel","address","message","last_error","created_at","updated_at","claim_token","claim_generation","claimed_at","lease_until","delivery_state"),("id",))),
  "personal":(TableSpec("personal_items","meemee_personal_items",("id","owner_id","kind","title","value","confidence","status","valid_from","valid_until","supersedes_id","created_at","updated_at"),("id",)),
              TableSpec("personal_evidence","meemee_personal_evidence",("id","item_id","owner_id","source_id","source_record_id","observed_value","confidence","observed_at"),("id",))),
  "context":(TableSpec("context_sources","meemee_context_sources",("owner_id","source_id","connector","config","permission","cursor","created_at","updated_at"),("owner_id","source_id")),
@@ -93,6 +93,10 @@ def _json(value):
 
 def source_columns(spec: TableSpec, conn: sqlite3.Connection) -> str:
     """Old offline sources have no ownership column; represent that as tokenless legacy rows."""
+    if spec.source == "companion_checkins":
+        available={row[1] for row in conn.execute('PRAGMA table_info(companion_checkins)')}
+        defaults={'claim_token':'NULL','claim_generation':'0','claimed_at':'NULL','lease_until':'NULL','delivery_state':"'unknown'"}
+        return ','.join(f'{defaults[col]} AS {col}' if col in defaults and col not in available else col for col in spec.columns)
     if spec.source == "idempotency":
         available = {row[1] for row in conn.execute("PRAGMA table_info(idempotency)")}
         return ",".join("NULL AS claim_token" if col == "claim_token" and col not in available else col for col in spec.columns)
