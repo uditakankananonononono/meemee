@@ -33,7 +33,7 @@ from .entitlements import public_catalog
 from .health import ReadinessChecker
 from .idempotency import IdempotencyConflict
 from .model_profiles import ModelCatalog, build_role_model, probe_profile, uses_routing
-from .monitors import MonitorInput, MonitorEventConflict
+from .monitors import MonitorInput, MonitorEventConflict, MonitorEventInvalid, MonitorEventUnavailable
 from .observability import (
     AGENT_RUNS,
     JOBS_CREATED,
@@ -504,8 +504,10 @@ def evaluate_monitors(request: MonitorEventRequest, principal=runs_write_depende
         result = monitors.evaluate_identified(principal.id, request.source_id, request.event, event_id=request.event_id)
     except MonitorEventConflict:
         raise HTTPException(409, 'monitor event identity conflict') from None
-    except (ValueError, TypeError):
+    except MonitorEventInvalid:
         raise HTTPException(422, 'invalid monitor event identity or payload') from None
+    except MonitorEventUnavailable:
+        raise HTTPException(503, 'monitor event identity temporarily unavailable', headers={'Retry-After': '1'}) from None
     fired = result['fired']
     audit.append(principal.id, "monitor.evaluate", request.source_id, "success", {"fired": fired})
     return {"fired": fired, "source_id": request.source_id, "status": result["status"]}

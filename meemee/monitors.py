@@ -14,6 +14,23 @@ from pydantic import BaseModel, Field, field_validator
 from ._sqlite_guard import close_db_on_init_failure
 from .monitor_event_identity import identify_event
 
+class MonitorEventInvalid(ValueError):
+    """Only supplied identity/canonical payload validation failed."""
+
+
+class MonitorEventUnavailable(RuntimeError):
+    """Identity disappeared during arbitration; retry after owner deletion settles."""
+
+
+def prepare_monitor_identity(owner_id, source_id, event_id, event):
+    if event_id is None:
+        return None
+    try:
+        return identify_event(owner_id, source_id, event_id, event)
+    except (ValueError, TypeError):
+        raise MonitorEventInvalid('invalid monitor event identity or payload') from None
+
+
 class MonitorEventConflict(ValueError):
     """Same supplied identity, different payload. No raw payload in message."""
 
@@ -88,7 +105,7 @@ class MonitorStore:
         return self.evaluate_identified(owner_id,source_id,event,at=at)["fired"]
 
     def evaluate_identified(self,owner_id,source_id,event,*,event_id=None,at=None):
-        identity = identify_event(owner_id,source_id,event_id,event) if event_id is not None else None
+        identity = prepare_monitor_identity(owner_id,source_id,event_id,event)
         if identity is not None:
             event = json.loads(identity.canonical_payload)
         json.dumps(event, allow_nan=False)
