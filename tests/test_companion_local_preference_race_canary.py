@@ -14,9 +14,9 @@ async def test_local_preference_change_at_commit_prevents_publication(tmp_path, 
     queue_checkin(store)
     commit = store.finish_local_checkin
 
-    def changed_preferences(checkin_id, conversation_id, message):
+    def changed_preferences(checkin_id, conversation_id, message, *, claim=None):
         store.upsert_user(UserProfile(user_id='udita', display_name='Udita', checkins=prefs))
-        return commit(checkin_id, conversation_id, message)
+        return commit(checkin_id, conversation_id, message, claim=claim)
 
     store.finish_local_checkin = changed_preferences
     summary = await deliver_due_once(store, engine, channels)
