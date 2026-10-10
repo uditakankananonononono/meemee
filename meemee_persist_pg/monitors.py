@@ -15,7 +15,8 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from meemee.monitors import MonitorInput
+from meemee.monitors import MonitorInput, MonitorEventConflict
+from meemee.monitor_event_identity import identify_event
 from meemee.monitors import MonitorStore as _SQLiteMonitors
 from meemee.reflection_schedule import reflection_clock
 
@@ -70,12 +71,27 @@ class MonitorStore:
         return [{**dict(row), "predicate": json.loads(row["predicate"])} for row in rows]
 
     def evaluate(self, owner_id, source_id, event, at=None):
+        return self.evaluate_identified(owner_id,source_id,event,at=at)['fired']
+
+    def evaluate_identified(self, owner_id, source_id, event, *, event_id=None, at=None):
+        identity = identify_event(owner_id,source_id,event_id,event) if event_id is not None else None
+        if identity is not None:
+            event = json.loads(identity.canonical_payload)
         json.dumps(event, allow_nan=False)
         instant = datetime.fromisoformat(at.replace('Z', '+00:00')) if at else _now()
         if instant.tzinfo is None:
             raise ValueError('evaluation time must include a timezone')
         clock, fired = instant.astimezone(timezone.utc).isoformat(), []
         with self.db.transaction() as c:
+            if identity is not None:
+                inserted=c.execute("""INSERT INTO meemee_monitor_source_events(owner_id,source_id,event_id,payload_sha256,created_at)
+                    VALUES(%s,%s,%s,%s,%s) ON CONFLICT(owner_id,source_id,event_id) DO NOTHING RETURNING event_id""",
+                    (owner_id,source_id,event_id,identity.identity.payload_sha256,clock)).fetchone()
+                if inserted is None:
+                    prior=c.execute("SELECT payload_sha256 FROM meemee_monitor_source_events WHERE owner_id=%s AND source_id=%s AND event_id=%s",(owner_id,source_id,event_id)).fetchone()
+                    if prior is None or prior['payload_sha256'] != identity.identity.payload_sha256:
+                        raise MonitorEventConflict('monitor event identity conflict')
+                    return {'fired': [], 'status': 'replay'}
             rows = c.execute("""SELECT * FROM meemee_monitors WHERE owner_id=%s AND source_id=%s AND status='active'
                                 ORDER BY id FOR UPDATE""", (owner_id, source_id)).fetchall()
             for row in rows:
@@ -87,7 +103,7 @@ class MonitorStore:
                     status = "completed" if count >= row["max_fires"] else "active"
                     c.execute("UPDATE meemee_monitors SET fire_count=%s,status=%s,updated_at=%s WHERE id=%s", (count, status, clock, row["id"]))
                     self._event(c, row["id"], owner_id, "triggered", event); fired.append(row["id"])
-        return fired
+        return {'fired': fired, 'status': 'new' if identity is not None else 'legacy'}
 
     def cancel(self, owner_id, ident):
         with self.db.transaction() as c:
@@ -107,6 +123,7 @@ class MonitorStore:
         if not owner_id:
             raise ValueError("owner is required")
         with self.db.transaction() as c:
+            c.execute("DELETE FROM meemee_monitor_source_events WHERE owner_id=%s",(owner_id,))
             events = c.execute("DELETE FROM meemee_monitor_events WHERE owner_id=%s", (owner_id,)).rowcount
             monitors = c.execute("DELETE FROM meemee_monitors WHERE owner_id=%s", (owner_id,)).rowcount
         return {"monitors": monitors, "monitor_events": events}

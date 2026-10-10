@@ -67,6 +67,7 @@ def export_account(db: Database, principal: str, destination: Path) -> dict[str,
                              (principal,)).fetchall()
         plan_rows = c.execute("SELECT principal,plan,updated_at FROM meemee_principal_plans WHERE principal=%s",
                               (principal,)).fetchall()
+        identities=c.execute("SELECT owner_id,source_id,event_id,payload_sha256,created_at FROM meemee_monitor_source_events WHERE owner_id=%s ORDER BY source_id,event_id",(principal,)).fetchall()
     jobs = [{**row, "id": str(row["id"]), "run_at": _iso(row["run_at"]), "created_at": _iso(row["created_at"]),
              "updated_at": _iso(row["updated_at"]), "result": _json_text(row["result"]),
              "purge_pending": int(bool(row["purge_pending"]))} for row in job_rows]
@@ -74,7 +75,7 @@ def export_account(db: Database, principal: str, destination: Path) -> dict[str,
              "approvals_required": json.dumps(row["approvals_required"])} for row in run_rows]
     entitlements = [{**row, "updated_at": _iso(row["updated_at"])} for row in plan_rows]
     payload = {"format": FORMAT, "principal": principal, "exported_at": datetime.now(timezone.utc).isoformat(),
-               "jobs": jobs, "runs": runs, "entitlements": entitlements}
+               "jobs": jobs, "runs": runs, "entitlements": entitlements, "monitor_source_events": identities}
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     envelope = {"payload": payload, "sha256": hashlib.sha256(canonical.encode()).hexdigest()}
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -85,10 +86,14 @@ def export_account(db: Database, principal: str, destination: Path) -> dict[str,
 
 def import_account(db: Database, source: Path, target_principal: str | None = None) -> dict[str, Any]:
     """Import a verified export in one transaction; any collision or failure writes nothing."""
-    from meemee.account_export import inspect_import
+    from meemee.account_export import inspect_import, validated_identity_rows
 
     plan = inspect_import(source, target_principal); payload = plan["payload"]; target = plan["target_principal"]
+    identities=validated_identity_rows(payload)
     with db.transaction() as c:
+        for row in identities:
+            if c.execute("SELECT 1 FROM meemee_monitor_source_events WHERE owner_id=%s AND source_id=%s AND event_id=%s",(target,row['source_id'],row['event_id'])).fetchone():
+                raise ValueError('monitor identity collision')
         job_ids = [row["id"] for row in payload["jobs"]]; run_ids = [row["run_id"] for row in payload["runs"]]
         if job_ids and c.execute("SELECT 1 FROM meemee_jobs WHERE id = ANY(%s::uuid[]) LIMIT 1", (job_ids,)).fetchone():
             raise ValueError("job ID collision")
@@ -112,6 +117,8 @@ def import_account(db: Database, source: Path, target_principal: str | None = No
         for row in payload["entitlements"]:
             c.execute("INSERT INTO meemee_principal_plans(principal,plan,updated_at) VALUES(%s,%s,%s)",
                       (target, row["plan"], _moment(row["updated_at"])))
+        for row in identities:
+            c.execute("INSERT INTO meemee_monitor_source_events VALUES(%s,%s,%s,%s,%s)",(target,row['source_id'],row['event_id'],row['payload_sha256'],row['created_at']))
     return {key: plan[key] for key in ("source_principal", "target_principal", "jobs", "runs", "entitlements", "sha256")}
 
 
