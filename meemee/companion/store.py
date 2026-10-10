@@ -12,9 +12,28 @@ from .._sqlite_guard import close_db_on_init_failure
 from ..schema_registry import register_schema
 from ..sensitive import scrub_text
 from .checkin_leases import CheckinLeaseMixin, lease_clock
+from .destination_control import DestinationControlMixin
 from .models import CheckInPreferences, FactInput, PersonaConfig, UserProfile
 
+DESTINATION_SCHEMA = """
+CREATE TABLE IF NOT EXISTS companion_destination_challenges (
+ id text PRIMARY KEY, owner_id text NOT NULL, destination text NOT NULL,
+ nonce_sha256 text NOT NULL, created_at text NOT NULL,
+ expires_at text NOT NULL, consumed_at text
+);
+CREATE INDEX IF NOT EXISTS companion_destination_challenges_owner
+ ON companion_destination_challenges(owner_id,expires_at);
+CREATE TABLE IF NOT EXISTS companion_destination_grants (
+ id text PRIMARY KEY, owner_id text NOT NULL, channel text NOT NULL CHECK(channel='webhook'),
+ destination text NOT NULL, issued_at text NOT NULL,
+ expires_at text NOT NULL, revoked_at text
+);
+CREATE INDEX IF NOT EXISTS companion_destination_grants_owner
+ ON companion_destination_grants(owner_id,channel,destination);
+"""
+
 SCHEMA = [
+    "server-issued webhook control challenges and expiring owner-bound grants",
     "companion users, persona and check-in preferences",
     "companion facts with fts and supersession",
     "companion conversations and messages",
@@ -27,7 +46,7 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-class CompanionStore(CheckinLeaseMixin):
+class CompanionStore(DestinationControlMixin, CheckinLeaseMixin):
     """Durable per-user companion state: profiles, facts, conversations and check-ins."""
 
     @close_db_on_init_failure
@@ -130,7 +149,8 @@ class CompanionStore(CheckinLeaseMixin):
                 self.db.commit()
             except BaseException:
                 self.db.rollback();raise
-        register_schema(self.db, "companion", 2, SCHEMA)
+        self.db.executescript(DESTINATION_SCHEMA)
+        register_schema(self.db, "companion", 3, SCHEMA)
 
     def ping(self) -> bool:
         with self.lock:
@@ -579,6 +599,8 @@ class CompanionStore(CheckinLeaseMixin):
                 messages += self.db.execute("DELETE FROM companion_messages WHERE conversation_id=?", (conversation_id,)).rowcount
                 traces += self.db.execute("DELETE FROM companion_message_models WHERE conversation_id=?", (conversation_id,)).rowcount
             counts = {
+                'destination_challenges': self.db.execute('DELETE FROM companion_destination_challenges WHERE owner_id=?', (user_id,)).rowcount,
+                'destination_grants': self.db.execute('DELETE FROM companion_destination_grants WHERE owner_id=?', (user_id,)).rowcount,
                 "messages": messages,
                 "model_traces": traces,
                 "conversations": self.db.execute("DELETE FROM companion_conversations WHERE user_id=?", (user_id,)).rowcount,

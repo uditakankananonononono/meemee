@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .channels import ChannelError, validate_delivery_address
 from .checkins import CheckInScheduler
@@ -9,6 +9,11 @@ from .engine import CompanionEngine
 from .models import ChatRequest, CheckInPreferences, FactInput, PersonaConfig, UserProfile
 from .store import CompanionStore
 from .worker import deliver_due_once
+
+
+class WebhookControlRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    destination: str = Field(min_length=1, max_length=500)
 
 
 class ProfileUpsert(BaseModel):
@@ -60,6 +65,38 @@ def build_companion_router(
             return
         if principal_id != user_id:
             raise HTTPException(status_code=404, detail="unknown companion user")
+
+    def destination_owner(principal, user_id):
+        # Admin authority to manage profiles is not endpoint-control proof.
+        if not getattr(principal, 'id', '') or principal.id != user_id:
+            raise HTTPException(status_code=404, detail="unknown companion user")
+        if store.get_user(user_id) is None:
+            raise HTTPException(status_code=404, detail="unknown companion user")
+
+    @router.post("/users/{user_id}/destinations/webhook/verify", status_code=201)
+    async def verify_destination(user_id: str, request: WebhookControlRequest, principal=write):
+        from .destination_control import DestinationVerificationError, verify_webhook_control
+        destination_owner(principal, user_id)
+        try:
+            grant = await verify_webhook_control(store, user_id, request.destination)
+        except DestinationVerificationError:
+            raise HTTPException(status_code=422, detail="destination verification refused") from None
+        audit_event("companion.destination.verified", principal, user_id, {"grant_id": grant['id']})
+        return grant
+
+    @router.get("/users/{user_id}/destinations")
+    def destinations(user_id: str, principal=read):
+        destination_owner(principal, user_id)
+        return {"grants": store.list_destination_grants(user_id),
+                "unverifiable_channels": ["whatsapp", "imessage"]}
+
+    @router.delete("/users/{user_id}/destinations/{grant_id}")
+    def revoke_destination(user_id: str, grant_id: str, principal=write):
+        destination_owner(principal, user_id)
+        if not store.revoke_destination(user_id, grant_id):
+            raise HTTPException(status_code=404, detail="unknown destination grant")
+        audit_event("companion.destination.revoked", principal, user_id, {"grant_id": grant_id})
+        return {"id": grant_id, "revoked": True}
 
     @router.get("/users")
     def list_users(limit: int = 100, principal=read):

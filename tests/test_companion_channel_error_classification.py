@@ -141,6 +141,8 @@ async def test_worker_dns_failure_is_retryable_not_unknown(tmp_path, monkeypatch
     async with client:
         channels["webhook"] = ch
         queue_checkin(store, channel="webhook", address=ADDR)
+        proof, nonce = store.create_destination_challenge("udita", ADDR)
+        store.consume_destination_challenge("udita", proof["id"], nonce)
         summary = await deliver_due_once(store, engine, channels)
     assert summary["status"] == "queued"
     assert "unknown" not in store.list_checkins("udita")[0]["last_error"]
@@ -157,6 +159,8 @@ async def test_PROTECTION_worker_stream_error_is_unknown_and_not_retried(tmp_pat
     async with client:
         channels["webhook"] = ch
         queue_checkin(store, channel="webhook", address=ADDR)
+        proof, nonce = store.create_destination_challenge("udita", ADDR)
+        store.consume_destination_challenge("udita", proof["id"], nonce)
         summary = await deliver_due_once(store, engine, channels)
         assert summary["status"] == "failed"
         assert "unknown" in store.list_checkins("udita")[0]["last_error"]

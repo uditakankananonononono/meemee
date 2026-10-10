@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from meemee.companion.checkin_leases import CheckinLeaseMixin, lease_clock
+from meemee.companion.destination_control import DestinationControlMixin
 from meemee.companion.models import CheckInPreferences, FactInput, PersonaConfig, UserProfile
 from meemee.sensitive import scrub_text
 
@@ -39,7 +40,7 @@ def _row(row: dict[str, Any] | None) -> dict[str, Any] | None:
     return result
 
 
-class CompanionStore(CheckinLeaseMixin):
+class CompanionStore(DestinationControlMixin, CheckinLeaseMixin):
     _checkin_pg = True
     """Durable per-user companion state: profiles, facts, conversations and check-ins (PostgreSQL)."""
 
@@ -362,7 +363,11 @@ class CompanionStore(CheckinLeaseMixin):
     def delete_user_data(self, user_id: str) -> dict[str, int]:
         owned = "SELECT id FROM meemee_companion_conversations WHERE user_id=%s"
         with self.db.transaction() as c:
+            c.execute('SELECT id FROM meemee_companion_checkins WHERE user_id=%s ORDER BY id FOR UPDATE', (user_id,)).fetchall()
+            c.execute('SELECT user_id FROM meemee_companion_users WHERE user_id=%s FOR UPDATE', (user_id,)).fetchone()
             counts = {
+                'destination_challenges': c.execute('DELETE FROM meemee_companion_destination_challenges WHERE owner_id=%s', (user_id,)).rowcount,
+                'destination_grants': c.execute('DELETE FROM meemee_companion_destination_grants WHERE owner_id=%s', (user_id,)).rowcount,
                 "messages": c.execute(f"DELETE FROM meemee_companion_messages WHERE conversation_id IN ({owned})", (user_id,)).rowcount,
                 "model_traces": c.execute(f"DELETE FROM meemee_companion_message_models WHERE conversation_id IN ({owned})", (user_id,)).rowcount,
                 "conversations": c.execute("DELETE FROM meemee_companion_conversations WHERE user_id=%s", (user_id,)).rowcount,

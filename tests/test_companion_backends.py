@@ -135,7 +135,7 @@ def test_export_and_delete_are_user_scoped(store):
     assert exported["profile"]["user_id"] == "u1" and isinstance(exported["profile"]["persona"], str)
     assert [len(exported[k]) for k in ("facts", "conversations", "messages", "checkins", "model_traces")] == [1, 1, 1, 1, 1]
     assert exported["model_traces"][0]["attempts"] == "[]"
-    assert store.delete_user_data("u1") == {"messages": 1, "model_traces": 1, "conversations": 1, "facts": 1, "checkins": 1, "profiles": 1}
+    assert store.delete_user_data("u1") == {"messages": 1, "model_traces": 1, "conversations": 1, "facts": 1, "checkins": 1, "profiles": 1, "destination_challenges": 0, "destination_grants": 0}
     assert store.export_user_data("u1")["profile"] is None and store.history("c2")[0]["content"] == "other"
 
 
