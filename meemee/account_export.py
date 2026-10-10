@@ -107,6 +107,8 @@ def import_account(data_dir: Path, source: Path, target_principal: str | None = 
             db.execute("ATTACH DATABASE ? AS imported_monitors",(str(data_dir/'monitors.sqlite3'),))
         db.execute("BEGIN IMMEDIATE")
         if identities:
+            if not db.execute("SELECT 1 FROM imported_monitors.sqlite_master WHERE type='table' AND name='monitor_source_events'").fetchone():
+                raise ValueError('target monitor identity schema missing; open target with current MonitorStore before import')
             for row in identities:
                 if db.execute("SELECT 1 FROM imported_monitors.monitor_source_events WHERE owner_id=? AND source_id=? AND event_id=?",(target,row['source_id'],row['event_id'])).fetchone():
                     raise ValueError('monitor identity collision')

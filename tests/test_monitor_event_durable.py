@@ -186,3 +186,60 @@ def test_invalid_import_identity_refuses_before_state_change(tmp_path):
         with pytest.raises((ValueError,TypeError)):
             validated_identity_rows({'principal':'a','monitor_source_events':[bad]})
     with pytest.raises(ValueError):validated_identity_rows({'principal':'a','monitor_source_events':[good,good]})
+
+
+def test_import_into_unopened_legacy_monitor_schema_refuses_cleanly(tmp_path):
+    from meemee.account_export import export_account,import_account
+    from meemee.jobs import JobStore
+    src=tmp_path/'src';s=init_portable(src);ev(s)
+    JobStore(src/'jobs.sqlite3').enqueue('must not import',principal='a')
+    export=tmp_path/'src.json';export_account(src,'a',export)
+    dst=tmp_path/'dst';d=init_portable(dst)
+    d.db.execute('DROP TABLE monitor_source_events');d.db.commit();d.db.close()
+    with pytest.raises(ValueError,match='target monitor identity schema missing'):
+        import_account(dst,export,'b')
+    assert JobStore(dst/'jobs.sqlite3').list_for_principal('b')[0]==[]
+    upgraded=MonitorStore(dst/'monitors.sqlite3');import_account(dst,export,'b')
+    assert ev(upgraded,owner='b')['status']=='replay'
+    upgraded.db.close();s.db.close()
+
+
+def test_http_validation_is_narrow_and_replay_outcome_explicit(tmp_path,monkeypatch):
+    from fastapi.testclient import TestClient
+    from meemee import api
+    from meemee.monitors import MonitorEventUnavailable
+    s=MonitorStore(tmp_path/'api.db');monkeypatch.setattr(api,'monitors',s)
+    c=TestClient(api.app,raise_server_exceptions=False);h={'Authorization':'Bearer test-bootstrap-token'}
+    body={'source_id':'s','event_id':'i','event':{'v':'yes'}};m=mon(s,'bootstrap')
+    assert c.post('/v1/monitors/evaluate',headers=h,json=body).json()['fired']==[m['id']]
+    assert c.post('/v1/monitors/evaluate',headers=h,json=body).json()=={'fired':[],'source_id':'s','status':'replay'}
+    deep={'v':'yes','nested':{}};cur=deep['nested']
+    for _ in range(17):cur['next']={};cur=cur['next']
+    body['event']=deep
+    assert c.post('/v1/monitors/evaluate',headers=h,json=body).status_code==422
+    del body['event_id']
+    assert c.post('/v1/monitors/evaluate',headers=h,json=body).json()['status']=='legacy'
+    def storage_fail(*args,**kwargs):raise ValueError('private lower layer')
+    monkeypatch.setattr(s,'evaluate_identified',storage_fail)
+    assert c.post('/v1/monitors/evaluate',headers=h,json=body).status_code==500
+    def unavailable(*args,**kwargs):raise MonitorEventUnavailable('private arbitration')
+    monkeypatch.setattr(s,'evaluate_identified',unavailable)
+    r=c.post('/v1/monitors/evaluate',headers=h,json=body)
+    assert r.status_code==503 and r.headers['Retry-After']=='1'
+    assert r.json()['detail']=='monitor event identity temporarily unavailable'
+    s.db.close()
+
+
+def test_pg_vanished_identity_branch_not_content_conflict():
+    # Deterministic statement-result seam, NOT evidence of a concurrent delete.
+    from contextlib import contextmanager
+    from meemee_persist_pg.monitors import MonitorStore as PG
+    from meemee.monitors import MonitorEventUnavailable
+    class Missing:
+        def execute(self,*args):return self
+        def fetchone(self):return None
+    class DB:
+        @contextmanager
+        def transaction(self):yield Missing()
+    with pytest.raises(MonitorEventUnavailable,match='temporarily unavailable'):
+        ev(PG(DB()))

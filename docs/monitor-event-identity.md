@@ -43,3 +43,50 @@ handles, transaction rollback, store reopen/fresh Python process, supplied HTTP
 auth cases, transfer and cutover. It does not establish managed/HA PostgreSQL,
 authentic connector ingestion, external-source permissions, production rollout,
 OS/power-loss recovery or full product readiness.
+
+## Response compatibility and replay outcome
+
+The response now adds `status` for every successful HTTP caller, including
+legacy calls without `event_id`: `new`, `replay`, or `legacy`. Existing `fired`
+and `source_id` fields remain. Clients requiring exact response keys must
+update; this is an additive response-shape compatibility change, not an
+unchanged API contract.
+
+Replay always returns `fired: []`. It does NOT return the original fired IDs
+or original response. The ledger stores only the identity digest and creation
+time, not a recoverable outcome. This protects fire-once execution but does
+not provide outcome discovery after a lost response. Use authenticated monitor
+state/events to inspect outcomes; do not infer "original event fired nothing"
+from a replay response.
+
+## Validation bounds and arbitration failures
+
+Both HTTP modes already limit input to 32,768 bytes of Python default JSON
+encoding and 100 top-level event keys. Identified mode additionally requires
+exact JSON types, finite numbers, depth at most16 (root at0), at most100 keys
+per nested object, at most4096 list entries and4096 total visited nodes
+(including keys), integer bit length at most256, and canonical UTF-8 encoding
+at most32,768 bytes. Strings have their own32,768 character/byte cap.
+Identifiers are exact nonempty strings, at most240 characters/960 UTF-8 bytes,
+with no edge whitespace, ASCII controls or DEL. No normalization is applied.
+Nested events accepted in legacy mode may therefore receive422 with event_id.
+Canonical JSON is decoded to a detached object before identified evaluation;
+legacy evaluation does not use that round-trip. Direct store calls do not have
+the HTTP preflight limits, but identified calls have the helper limits.
+
+Only identity/helper validation maps to the fixed identity/payload422. Other
+lower-layer ValueError/TypeError failures (time parsing, storage implementation)
+are not masked as identity errors; absent another handler they remain server
+errors. If PostgreSQL arbitration loses the prior identity row to deletion
+between the conflict statement and its read, it rolls back and returns fixed
+503 `monitor event identity temporarily unavailable`, with Retry-After:1.
+It is not a content conflict. Retrying after owner deletion may evaluate anew,
+because deletion intentionally removes replay protection. This is not a
+concurrent account-deletion lifecycle fence.
+
+SQLite import of identities into an existing legacy monitor database with no
+identity table cleanly refuses before account inserts, with an instruction to
+open the target through current MonitorStore first. Import does not silently
+migrate that target. PostgreSQL ordered locks are the `ORDER BY id FOR UPDATE`
+query in `meemee_persist_pg/monitors.py` inside `evaluate_identified`, after
+identity reservation; this query was already present before this integration.

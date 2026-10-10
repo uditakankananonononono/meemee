@@ -15,8 +15,7 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from meemee.monitors import MonitorInput, MonitorEventConflict
-from meemee.monitor_event_identity import identify_event
+from meemee.monitors import MonitorInput, MonitorEventConflict, MonitorEventUnavailable, prepare_monitor_identity
 from meemee.monitors import MonitorStore as _SQLiteMonitors
 from meemee.reflection_schedule import reflection_clock
 
@@ -74,7 +73,7 @@ class MonitorStore:
         return self.evaluate_identified(owner_id,source_id,event,at=at)['fired']
 
     def evaluate_identified(self, owner_id, source_id, event, *, event_id=None, at=None):
-        identity = identify_event(owner_id,source_id,event_id,event) if event_id is not None else None
+        identity = prepare_monitor_identity(owner_id,source_id,event_id,event)
         if identity is not None:
             event = json.loads(identity.canonical_payload)
         json.dumps(event, allow_nan=False)
@@ -89,7 +88,9 @@ class MonitorStore:
                     (owner_id,source_id,event_id,identity.identity.payload_sha256,clock)).fetchone()
                 if inserted is None:
                     prior=c.execute("SELECT payload_sha256 FROM meemee_monitor_source_events WHERE owner_id=%s AND source_id=%s AND event_id=%s",(owner_id,source_id,event_id)).fetchone()
-                    if prior is None or prior['payload_sha256'] != identity.identity.payload_sha256:
+                    if prior is None:
+                        raise MonitorEventUnavailable('monitor event identity temporarily unavailable')
+                    if prior['payload_sha256'] != identity.identity.payload_sha256:
                         raise MonitorEventConflict('monitor event identity conflict')
                     return {'fired': [], 'status': 'replay'}
             rows = c.execute("""SELECT * FROM meemee_monitors WHERE owner_id=%s AND source_id=%s AND status='active'
