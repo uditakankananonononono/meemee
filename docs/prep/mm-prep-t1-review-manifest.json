@@ -1,0 +1,302 @@
+{
+  "unit": "MM-PREP-T1",
+  "status": "PREP-NORUN",
+  "base": "a88f6e051de5842b3af5cf5641e06f8af4df08e9",
+  "base_tree": "00ed0f508cccea7b1a14cc05851ae32447ae40c4",
+  "reference": {
+    "commit": "b28de877e0955f215b8023d94447bf8c8ff09a11",
+    "status": "READ ONLY attached format-patch; not applied, not merged; public fetch not our ref",
+    "attachment_filename": "01-MM-PREP-T1-M3-reference-only-6ba855c2.patch",
+    "attachment_sha256": "f365af6f591ba848adbdf02aa7d06a5b1f560a2488aca442905abd4265ef41e7",
+    "peer_stated_sha256_matches": true,
+    "parent_and_tree": "UNAVAILABLE",
+    "paths": [
+      "meemee/takeover_claim_policy.py",
+      "tests/test_takeover_claim_policy.py"
+    ],
+    "execution_claim": "reference docstring claims executed; not independently verified; this unit runs nothing"
+  },
+  "source": [
+    {
+      "path": "meemee/browser_api.py",
+      "file_sha256": "2433c8ec147443953597c0d6727b3bd04413d0e72865be9662c1507fcb6d24be",
+      "symbols": [
+        {
+          "name": "build_browser_router",
+          "start_line": 129,
+          "end_line": 296,
+          "sha256": "36cc9fe33bf38529df7ee80c1ebb84abecb3d40774665e404c9b2c59a76f94c8",
+          "hash_semantics": "UTF-8 ast.get_source_segment, no trailing newline"
+        },
+        {
+          "name": "build_browser_router.takeover_socket",
+          "start_line": 218,
+          "end_line": 294,
+          "sha256": "e040e467f2affec113ff82f64a789b6ec27015c9f2ae42b8ae7a577729b8fa5d",
+          "hash_semantics": "UTF-8 ast.get_source_segment, no trailing newline"
+        },
+        {
+          "name": "build_browser_router.release",
+          "start_line": 201,
+          "end_line": 207,
+          "sha256": "34e07671420054c28f46c8d9c7f0bce8b79ed9d293c7ffb54534cbd756f35598",
+          "hash_semantics": "UTF-8 ast.get_source_segment, no trailing newline"
+        }
+      ]
+    },
+    {
+      "path": "meemee/browser_sessions.py",
+      "file_sha256": "a07f38c5011a5001118a601a686f14dbda6638e273eb7ee3179cb872fb929b0e",
+      "symbols": [
+        {
+          "name": "BrowserSessionStore.claim_takeover",
+          "start_line": 303,
+          "end_line": 305,
+          "sha256": "4256d898e798434e8fab2be1cb5eb5842d6b747f09767f0a633c7859a64eedc2",
+          "hash_semantics": "UTF-8 ast.get_source_segment, no trailing newline"
+        },
+        {
+          "name": "BrowserSessionManager.authenticate_takeover",
+          "start_line": 667,
+          "end_line": 682,
+          "sha256": "9faa26cc86a6a76a6a22db64850bf965e549431b1242d1ac837e5fdfc50bc016",
+          "hash_semantics": "UTF-8 ast.get_source_segment, no trailing newline"
+        },
+        {
+          "name": "BrowserSessionManager.claim",
+          "start_line": 684,
+          "end_line": 692,
+          "sha256": "d444e9f252b7aad538378a520b57ad87a190408e01d00bd709e97ba453bda1e7",
+          "hash_semantics": "UTF-8 ast.get_source_segment, no trailing newline"
+        },
+        {
+          "name": "BrowserSessionManager.human_input",
+          "start_line": 694,
+          "end_line": 700,
+          "sha256": "d881ba45b1b70cc6c16cf6a655a3d69e55a2cbb7ecf4c8af577bb32926d5cad4",
+          "hash_semantics": "UTF-8 ast.get_source_segment, no trailing newline"
+        },
+        {
+          "name": "BrowserSessionManager.frame",
+          "start_line": 776,
+          "end_line": 781,
+          "sha256": "a8a596aa8a6130ea4a30fb62871684ceb0f57a8cb8c0f9bc199a450fc9d79775",
+          "hash_semantics": "UTF-8 ast.get_source_segment, no trailing newline"
+        },
+        {
+          "name": "BrowserSessionManager.release",
+          "start_line": 760,
+          "end_line": 774,
+          "sha256": "c6c48470857e435b73d5fbc419ea46bf5d1acd6d6297e22d6b9c08ce2affc91e",
+          "hash_semantics": "UTF-8 ast.get_source_segment, no trailing newline"
+        }
+      ]
+    },
+    {
+      "path": "meemee_persist_pg/browser.py",
+      "file_sha256": "ddddfb1ef51d81e775b8971d7dbcc0440b8609107a89044bccc22df9014eda24",
+      "symbols": [
+        {
+          "name": "BrowserSessionStore.claim_takeover",
+          "start_line": 121,
+          "end_line": 123,
+          "sha256": "f22dfd157ac28096e491bf424ecd27da440aea5d95a1042629e707f28c69fada",
+          "hash_semantics": "UTF-8 ast.get_source_segment, no trailing newline"
+        }
+      ]
+    },
+    {
+      "path": "meemee/auth.py",
+      "file_sha256": "94dcc1e1fa08a8db8b6d29c22f429c710ccc62c10a1baf806c99ff025b958ebe",
+      "symbols": [
+        {
+          "name": "Principal",
+          "start_line": 21,
+          "end_line": 24,
+          "sha256": "87e41bc3574f662c7f1328b71e028cf62a565fddd0aff5e61085702d5d5f0a7b",
+          "hash_semantics": "UTF-8 ast.get_source_segment, no trailing newline"
+        },
+        {
+          "name": "TokenStore.authenticate",
+          "start_line": 118,
+          "end_line": 128,
+          "sha256": "18145d963548195294013892e48060b1e054caf4e9410a5d6a7b1cd788109452",
+          "hash_semantics": "UTF-8 ast.get_source_segment, no trailing newline"
+        },
+        {
+          "name": "Authenticator.dependency",
+          "start_line": 267,
+          "end_line": 289,
+          "sha256": "9d1053974ef61524c106525b7dcce41b4052097aac842d4652064948af07df3b",
+          "hash_semantics": "UTF-8 ast.get_source_segment, no trailing newline"
+        }
+      ]
+    },
+    {
+      "path": "docs/browser-takeover.md",
+      "file_sha256": "68d49df005f8c38d22562a6a4f5b67992e8c91547c865fe0bc8741319ebcae42",
+      "symbols": []
+    },
+    {
+      "path": "tests/test_takeover_ws_frames.py",
+      "file_sha256": "c7ac6cba2f6daef7defb39c9fdb5268f626c37283e718f6dbd08dd32f27f0a23",
+      "symbols": [
+        {
+          "name": "FakeManager.claim",
+          "start_line": 21,
+          "end_line": 24,
+          "sha256": "b0b7eeb6b12ca94ab8855859c6c994c3d753c261fcf40bcf03456a99384f4d68",
+          "hash_semantics": "UTF-8 ast.get_source_segment, no trailing newline"
+        },
+        {
+          "name": "_client",
+          "start_line": 42,
+          "end_line": 46,
+          "sha256": "7261875a069e5ac1b5f569d7b4fc95c38c5a2abcf5dbf817a0c60777b9b05cb7",
+          "hash_semantics": "UTF-8 ast.get_source_segment, no trailing newline"
+        }
+      ]
+    },
+    {
+      "path": "tests/test_browser_takeover.py",
+      "file_sha256": "6b95888afdb4d2fcc87cf4586389f20c8729eb2dd84c1eaf21f3ee5f09aa97c4",
+      "symbols": [
+        {
+          "name": "test_api_websocket_takeover_end_to_end",
+          "start_line": 194,
+          "end_line": 254,
+          "sha256": "69bdccd7ab61f7ab187522d33e1db90d720fbe222d2a82d6d96654298ea74414",
+          "hash_semantics": "UTF-8 ast.get_source_segment, no trailing newline"
+        }
+      ]
+    },
+    {
+      "path": "tests/test_browser_records_backends.py",
+      "file_sha256": "6a751f82635c980769e12b8cfd897edb895406140fc39d7633ab72ae4d710e96",
+      "symbols": [
+        {
+          "name": "test_session_records_and_host_scoped_restart",
+          "start_line": 31,
+          "end_line": 56,
+          "sha256": "80272db6689efbf4c9d07bf050c1abb63ab986e72928389f3de16b977b4a74c6",
+          "hash_semantics": "UTF-8 ast.get_source_segment, no trailing newline"
+        }
+      ]
+    },
+    {
+      "path": "tests_pg/test_browser_records_cutover_pg.py",
+      "file_sha256": "3a4512eaa34b81a25dd2eab3d3e36b1f9b3d47b4fd3585980fe272925451aa72",
+      "symbols": [
+        {
+          "name": "test_browser_records_survive_cutover",
+          "start_line": 30,
+          "end_line": 70,
+          "sha256": "b56b36fa24032ccb6781b1d34562258bfacd37f7421f3c5326f9d5ef03b59457",
+          "hash_semantics": "UTF-8 ast.get_source_segment, no trailing newline"
+        }
+      ]
+    },
+    {
+      "path": "tests/test_browser_records_multihost_e2e.py",
+      "file_sha256": "aa7865e8cf6e1aee6739b6fd7aa5846691c7463eda6e27bb1b2447559e6636a6",
+      "symbols": [
+        {
+          "name": "test_session_held_by_a_is_listed_on_b_and_b_names_the_owning_host",
+          "start_line": 28,
+          "end_line": 63,
+          "sha256": "7204459e331b6ceab39fb559b6b2b238ddd52cfac8b479dc1d74a8a56beb93ca",
+          "hash_semantics": "UTF-8 ast.get_source_segment, no trailing newline"
+        }
+      ]
+    }
+  ],
+  "authored_tests": {
+    "functions": 10,
+    "static_cases": 45,
+    "expected_red_cases": 4,
+    "expected_green_cases": 41,
+    "count_method": "AST decorator lists and JSON case count; no pytest collection",
+    "names": [
+      {
+        "function": "test_negative_matrix_blocks_initial_effects",
+        "static_cases": 26,
+        "expected": "GREEN oracle/source observation",
+        "execution": "NOT RUN"
+      },
+      {
+        "function": "test_exactly_one_row_required_before_effects",
+        "static_cases": 6,
+        "expected": "GREEN oracle/source observation",
+        "execution": "NOT RUN"
+      },
+      {
+        "function": "test_unchanged_snapshot_allows_twice_without_reservation",
+        "static_cases": 1,
+        "expected": "GREEN oracle/source observation",
+        "execution": "NOT RUN"
+      },
+      {
+        "function": "test_contract_kills_removed_predicate_mutants",
+        "static_cases": 4,
+        "expected": "GREEN oracle/source observation",
+        "execution": "NOT RUN"
+      },
+      {
+        "function": "test_pin_observation_socket_hello_token_only",
+        "static_cases": 1,
+        "expected": "GREEN oracle/source observation",
+        "execution": "NOT RUN"
+      },
+      {
+        "function": "test_pin_observation_both_stores_coalesce_no_first_claim_result",
+        "static_cases": 2,
+        "expected": "GREEN oracle/source observation",
+        "execution": "NOT RUN"
+      },
+      {
+        "function": "test_pin_observation_manager_has_unconditional_effects",
+        "static_cases": 1,
+        "expected": "GREEN oracle/source observation",
+        "execution": "NOT RUN"
+      },
+      {
+        "function": "test_expected_red_initial_claim_requires_trusted_principal",
+        "static_cases": 1,
+        "expected": "RED at base",
+        "execution": "NOT RUN"
+      },
+      {
+        "function": "test_expected_red_store_has_first_claim_cas_result",
+        "static_cases": 2,
+        "expected": "RED at base",
+        "execution": "NOT RUN"
+      },
+      {
+        "function": "test_expected_red_handshake_does_not_expose_exception_reason",
+        "static_cases": 1,
+        "expected": "RED at base",
+        "execution": "NOT RUN"
+      }
+    ]
+  },
+  "checks": [
+    "source reads",
+    "AST syntax parse only; no imports or test execution",
+    "JSON parse only",
+    "SHA256 hashing"
+  ],
+  "artifacts": [
+    {
+      "path": "docs/prep/mm-prep-t1.md",
+      "sha256": "abeb3099ed78b33d56acc0cb1998455daa8c5584e364acff69bd7078cb529a56"
+    },
+    {
+      "path": "tests/prep/test_mm_prep_t1.py",
+      "sha256": "97ade4a1a26bb02524c426258207bd24f69fda6e0b7b388048317d9805304ddf"
+    },
+    {
+      "path": "tests/prep/mm_prep_t1_cases.json",
+      "sha256": "8f06ce8caedd412841827e12a8c15a6c1d9bbd464b4a89293dfd73d3dc3983f3"
+    }
+  ]
+}
