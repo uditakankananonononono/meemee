@@ -50,7 +50,8 @@ SPECS={
              TableSpec("personal_evidence","meemee_personal_evidence",("id","item_id","owner_id","source_id","source_record_id","observed_value","confidence","observed_at"),("id",))),
  "context":(TableSpec("context_sources","meemee_context_sources",("owner_id","source_id","connector","config","permission","cursor","created_at","updated_at"),("owner_id","source_id")),
             TableSpec("context_records","meemee_context_records",("id","owner_id","source_id","external_id","content_hash","kind","title","content","occurred_at","provenance","visibility","cursor","metadata","ingested_at"),("id",))),
- "monitors":(TableSpec("monitors","meemee_monitors",("id","owner_id","name","source_id","predicate","deadline","max_fires","fire_count","status","created_at","updated_at"),("id",)),
+ "monitors":(TableSpec("monitor_source_events","meemee_monitor_source_events",("owner_id","source_id","event_id","payload_sha256","created_at"),("owner_id","source_id","event_id")),
+             TableSpec("monitors","meemee_monitors",("id","owner_id","name","source_id","predicate","deadline","max_fires","fire_count","status","created_at","updated_at"),("id",)),
              TableSpec("monitor_events","meemee_monitor_events",("sequence","monitor_id","owner_id","kind","payload","created_at"),("sequence",))),
  "reflection":(TableSpec("reflection_runs","meemee_reflection_runs",("owner_id","watermark","last_attempt_at","last_success_at","last_status","last_result"),("owner_id",)),),
  "deletions":(TableSpec("account_deletions","meemee_account_deletions",("id","principal","requested_by","status","started_at","completed_at"),("id",)),
@@ -97,6 +98,12 @@ def source_columns(spec: TableSpec, conn: sqlite3.Connection) -> str:
         return ",".join("NULL AS claim_token" if col == "claim_token" and col not in available else col for col in spec.columns)
     return ",".join(spec.columns)
 
+
+def source_query(spec:TableSpec, conn:sqlite3.Connection)->str:
+    if spec.source == 'monitor_source_events' and not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(spec.source,)).fetchone():
+        # Legacy snapshots predating identity mode have zero identity records.
+        return 'SELECT '+','.join('NULL AS '+col for col in spec.columns)+' WHERE 0'
+    return f"SELECT {source_columns(spec,conn)} FROM {spec.source} ORDER BY {','.join(spec.order)}"
 
 def transform(spec:TableSpec,row:sqlite3.Row)->tuple[Any,...]:
     values=[]
@@ -160,7 +167,7 @@ class Cutover:
                         columns=",".join(spec.columns); placeholders=",".join(["%s"]*len(spec.columns))
                         override=" OVERRIDING SYSTEM VALUE" if spec.target in IDENTITY_TARGETS else ""
                         statement=f"INSERT INTO {spec.target} ({columns}){override} VALUES ({placeholders})"
-                        cursor=src[group].execute(f"SELECT {source_columns(spec, src[group])} FROM {spec.source} ORDER BY {','.join(spec.order)}")
+                        cursor=src[group].execute(source_query(spec,src[group]))
                         count=0
                         while True:
                             rows=cursor.fetchmany(batch_size)
@@ -184,7 +191,7 @@ class Cutover:
                 for group,specs in self.specs.items():
                     for spec in specs:
                         columns=",".join(spec.columns); order=",".join(spec.order)
-                        source_rows=(dict(zip(spec.columns,transform(spec,row))) for row in src[group].execute(f"SELECT {source_columns(spec, src[group])} FROM {spec.source} ORDER BY {order}"))
+                        source_rows=(dict(zip(spec.columns,transform(spec,row))) for row in src[group].execute(source_query(spec,src[group])))
                         source_count,source_hash=digest_rows(source_rows)
                         pg_rows=target.execute(f"SELECT {columns} FROM {spec.target} ORDER BY {order}")
                         target_count,target_hash=digest_rows(pg_rows)
