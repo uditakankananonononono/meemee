@@ -120,6 +120,7 @@ class CheckinLeaseMixin:
             instant=self._validate_claim_time(row,now);clock=instant.isoformat()
             if row['delivery_state']!='not_started':raise LostCheckinClaim('check-in send intent already used')
             allowed=self._permission_current(c,row,instant)
+            allowed=allowed and self._destination_verified_locked(c,row['user_id'],row['channel'],row['address'],now)
             instant=self._validate_claim_time(row,now);clock=instant.isoformat()
             if not allowed:
                 c.execute("UPDATE companion_checkins SET status='cancelled',updated_at=? WHERE id=?",(clock,row['id']))
@@ -163,8 +164,10 @@ class _Queries:
     @property
     def for_update(self):return ' FOR UPDATE' if self.pg else ''
     @property
+    def for_share(self):return ' FOR SHARE' if self.pg else ''
+    @property
     def claim_lock(self):return ' FOR UPDATE SKIP LOCKED' if self.pg else ''
     def execute(self,sql,args=()):
         if self.pg:
-            sql=sql.replace('companion_checkins','meemee_companion_checkins').replace('companion_users','meemee_companion_users').replace('?','%s')
+            sql=sql.replace('companion_destination_challenges','meemee_companion_destination_challenges').replace('companion_destination_grants','meemee_companion_destination_grants').replace('companion_checkins','meemee_companion_checkins').replace('companion_users','meemee_companion_users').replace('?','%s')
         return self.db.execute(sql,args)

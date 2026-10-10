@@ -45,7 +45,9 @@ SPECS={
                TableSpec("companion_conversations","meemee_companion_conversations",("id","user_id","channel","created_at","last_message_at"),("id",)),
                TableSpec("companion_messages","meemee_companion_messages",("id","conversation_id","role","content","created_at"),("id",)),
                TableSpec("companion_message_models","meemee_companion_message_models",("message_id","conversation_id","role","profile","model","attempts","created_at"),("message_id",)),
-               TableSpec("companion_checkins","meemee_companion_checkins",("id","user_id","slot","due_at","status","attempts","max_attempts","channel","address","message","last_error","created_at","updated_at","claim_token","claim_generation","claimed_at","lease_until","delivery_state"),("id",))),
+               TableSpec("companion_checkins","meemee_companion_checkins",("id","user_id","slot","due_at","status","attempts","max_attempts","channel","address","message","last_error","created_at","updated_at","claim_token","claim_generation","claimed_at","lease_until","delivery_state"),("id",)),
+               TableSpec("companion_destination_challenges","meemee_companion_destination_challenges",("id","owner_id","destination","nonce_sha256","created_at","expires_at","consumed_at"),("id",)),
+               TableSpec("companion_destination_grants","meemee_companion_destination_grants",("id","owner_id","channel","destination","issued_at","expires_at","revoked_at"),("id",))),
  "personal":(TableSpec("personal_items","meemee_personal_items",("id","owner_id","kind","title","value","confidence","status","valid_from","valid_until","supersedes_id","created_at","updated_at"),("id",)),
              TableSpec("personal_evidence","meemee_personal_evidence",("id","item_id","owner_id","source_id","source_record_id","observed_value","confidence","observed_at"),("id",))),
  "context":(TableSpec("context_sources","meemee_context_sources",("owner_id","source_id","connector","config","permission","cursor","created_at","updated_at"),("owner_id","source_id")),
@@ -104,7 +106,7 @@ def source_columns(spec: TableSpec, conn: sqlite3.Connection) -> str:
 
 
 def source_query(spec:TableSpec, conn:sqlite3.Connection)->str:
-    if spec.source == 'monitor_source_events' and not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(spec.source,)).fetchone():
+    if spec.source in ('monitor_source_events', 'companion_destination_challenges', 'companion_destination_grants') and not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(spec.source,)).fetchone():
         # Legacy snapshots predating identity mode have zero identity records.
         return 'SELECT '+','.join('NULL AS '+col for col in spec.columns)+' WHERE 0'
     return f"SELECT {source_columns(spec,conn)} FROM {spec.source} ORDER BY {','.join(spec.order)}"

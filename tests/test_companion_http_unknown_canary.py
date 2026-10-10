@@ -21,7 +21,13 @@ async def test_accepted_http_message_with_lost_response_is_not_retried(tmp_path,
         channels[kind] = (WebhookChannel(client=client) if kind == 'webhook'
                           else ProviderChannel(kind, 'https://example.com', 'synthetic-token', client=client))
         queue_checkin(store, channel=kind, address='https://example.com/inbox' if kind == 'webhook' else 'synthetic-recipient')
+        if kind == 'webhook':
+            proof, nonce = store.create_destination_challenge('udita', 'https://example.com/inbox')
+            store.consume_destination_challenge('udita', proof['id'], nonce)
         summary = await deliver_due_once(store, engine, channels)
+        if kind == 'whatsapp':
+            assert summary['status'] == 'cancelled' and calls == []
+            return
         assert summary['status'] == 'failed'
         assert 'unknown' in store.list_checkins('udita')[0]['last_error']
         assert await deliver_due_once(store, engine, channels) == {'claimed': False}
@@ -39,5 +45,8 @@ async def test_before_connection_failure_still_retries(tmp_path, monkeypatch, er
     async with httpx.AsyncClient(transport=httpx.MockTransport(fail)) as client:
         channels['webhook'] = WebhookChannel(client=client)
         queue_checkin(store, channel='webhook', address='https://example.com/inbox')
+        # Synthetic server proof only; this is a transport-error regression.
+        proof, nonce = store.create_destination_challenge('udita', 'https://example.com/inbox')
+        store.consume_destination_challenge('udita', proof['id'], nonce)
         summary = await deliver_due_once(store, engine, channels)
         assert summary['status'] == 'queued'
