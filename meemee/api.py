@@ -33,7 +33,7 @@ from .entitlements import public_catalog
 from .health import ReadinessChecker
 from .idempotency import IdempotencyConflict
 from .model_profiles import ModelCatalog, build_role_model, probe_profile, uses_routing
-from .monitors import MonitorInput
+from .monitors import MonitorInput, MonitorEventConflict, MonitorEventInvalid, MonitorEventUnavailable
 from .observability import (
     AGENT_RUNS,
     JOBS_CREATED,
@@ -268,6 +268,7 @@ class PersonalModelRequest(PersonalItemInput):
 
 
 class MonitorEventRequest(BaseModel):
+    event_id: str | None = Field(default=None, min_length=1, max_length=240)
     source_id: str = Field(min_length=1, max_length=240)
     event: dict[str, Any]
 
@@ -499,9 +500,17 @@ def evaluate_monitors(request: MonitorEventRequest, principal=runs_write_depende
         raise HTTPException(422, "event must contain finite JSON values") from exc
     if len(encoded.encode()) > 32_768 or len(request.event) > 100:
         raise HTTPException(422, "event exceeds monitor input limits")
-    fired = monitors.evaluate(principal.id, request.source_id, request.event)
+    try:
+        result = monitors.evaluate_identified(principal.id, request.source_id, request.event, event_id=request.event_id)
+    except MonitorEventConflict:
+        raise HTTPException(409, 'monitor event identity conflict') from None
+    except MonitorEventInvalid:
+        raise HTTPException(422, 'invalid monitor event identity or payload') from None
+    except MonitorEventUnavailable:
+        raise HTTPException(503, 'monitor event identity temporarily unavailable', headers={'Retry-After': '1'}) from None
+    fired = result['fired']
     audit.append(principal.id, "monitor.evaluate", request.source_id, "success", {"fired": fired})
-    return {"fired": fired, "source_id": request.source_id}
+    return {"fired": fired, "source_id": request.source_id, "status": result["status"]}
 
 
 @app.delete("/v1/monitors/{monitor_id}")
