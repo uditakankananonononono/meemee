@@ -1,0 +1,476 @@
+{
+  "unit": "MM-PREP-R1",
+  "base": "a88f6e051de5842b3af5cf5641e06f8af4df08e9",
+  "base_tree": "00ed0f508cccea7b1a14cc05851ae32447ae40c4",
+  "reference": {
+    "commit": "7cbad75cba98388b63cd02bbbc39f53fb4c8eed4",
+    "status": "PATCH_BYTES_VERIFIED_COMMIT_OBJECT_UNAVAILABLE",
+    "symbol_hashes": [
+      {
+        "path": "meemee/checkin_recovery_policy.py",
+        "name": "RecoveryAction",
+        "start_line": 32,
+        "end_line": 35,
+        "sha256": "5717eda08c057a470d2d82a5ac652dd3bcbbbdcfee2d120a4dcfc144caf69cbb"
+      },
+      {
+        "path": "meemee/checkin_recovery_policy.py",
+        "name": "CheckinClaim",
+        "start_line": 38,
+        "end_line": 49,
+        "sha256": "d0c92b29a3e99df4eeb5e109cc156f28a57d8904efaf6eb9de51dd3948864d74"
+      },
+      {
+        "path": "meemee/checkin_recovery_policy.py",
+        "name": "RecoveryDecision",
+        "start_line": 52,
+        "end_line": 55,
+        "sha256": "ebee85f3c51b56763ee98e5b8eae2d654ac15cdba87d234e7b36dc5a82072a4a"
+      },
+      {
+        "path": "meemee/checkin_recovery_policy.py",
+        "name": "_identifier",
+        "start_line": 58,
+        "end_line": 61,
+        "sha256": "79eee1e73f637e59e558335128fc73cc5b175494f587a86a7d818483c549e047"
+      },
+      {
+        "path": "meemee/checkin_recovery_policy.py",
+        "name": "_clock",
+        "start_line": 64,
+        "end_line": 70,
+        "sha256": "349335b9f974f573960663de56e1fa0ddb25357b15eb44446a02a42fc60dc83a"
+      },
+      {
+        "path": "meemee/checkin_recovery_policy.py",
+        "name": "decide_checkin_recovery",
+        "start_line": 73,
+        "end_line": 122,
+        "sha256": "1780d164131146352f70fc6ebda36707cf2259d076dd8410b87dc0e5db697a5e"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "snapshot",
+        "start_line": 13,
+        "end_line": 18,
+        "sha256": "33398c7e93e110146a18133f7d83e0b4596cf121469e68145b8cf26ac03bfa69"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "decide",
+        "start_line": 21,
+        "end_line": 25,
+        "sha256": "5f58018c472e6ccc19464e583185d84ae4edb21235f54ce93a6ca45137743c75"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "test_expired_before_send_requests_retry",
+        "start_line": 28,
+        "end_line": 29,
+        "sha256": "61a054894a8b32b3a899583638968884c1407c10c3b970799157daa92382e343"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "test_expiry_boundary_is_expired",
+        "start_line": 32,
+        "end_line": 33,
+        "sha256": "74d62479bf8efae394684738fcadba0786495d1862b50755dbb196e12098c73f"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "test_active_claim_is_denied",
+        "start_line": 36,
+        "end_line": 39,
+        "sha256": "9f99842751ae8410b6aeae274009d9419ea597cf320db8cd42cf500a86478116"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "test_delivery_evidence_quarantines_even_expired",
+        "start_line": 42,
+        "end_line": 44,
+        "sha256": "76146f14cbe3c0eea5bb4325fc9236229482a6ef43c7aeb0eefb4a7f53fd3df6"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "test_active_delivery_denies_before_quarantine",
+        "start_line": 47,
+        "end_line": 48,
+        "sha256": "98befaa85375933b9c9fdadd83f483852582a28aed4faf85fbad1128a89055e1"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "test_identity_mismatch_denied",
+        "start_line": 51,
+        "end_line": 56,
+        "sha256": "e0b70209a2ca30d9ff996247fca8aba954291b88e9452839ebfe4b358694e3cb"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "test_replayed_generation_denied",
+        "start_line": 59,
+        "end_line": 62,
+        "sha256": "67abc3c84bd035faee8096b1056d4d1cb833da74fe31092513166171cd96b3d0"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "test_old_snapshot_against_new_lease_denied",
+        "start_line": 65,
+        "end_line": 67,
+        "sha256": "f5d81a02b4217b7cb72149c2ef3d85eb392e9f258fef1b8bb52cabc02ce27aa8"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "test_invalid_snapshot_identity_denied",
+        "start_line": 70,
+        "end_line": 73,
+        "sha256": "1f86d4e2bd35a559ae740077fab99e8e766f69e4dc1068d42464d0f1b3847330"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "test_invalid_expected_identity_denied",
+        "start_line": 76,
+        "end_line": 79,
+        "sha256": "22b7d56caab526c621941fb02054755855e6ab0c47e81f3a5cadecb2edba2f18"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "test_invalid_generation_denied",
+        "start_line": 82,
+        "end_line": 85,
+        "sha256": "b5168b67c81b21686eabfb16e751c1f52922158315a9f321cb3212f503d1e56f"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "test_nonrunning_denied",
+        "start_line": 88,
+        "end_line": 90,
+        "sha256": "780ba8f8723987a5231d2efdee4bc61f07665a3a3a6250a8035a1b94033197f3"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "test_exact_int_budget_required",
+        "start_line": 93,
+        "end_line": 98,
+        "sha256": "2a577ba42a82690a0bb7cb430766cbe7c6cfa3b6b25958350abd2a5323748692"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "test_overdrawn_budget_denied",
+        "start_line": 101,
+        "end_line": 102,
+        "sha256": "c11b9d0d1f7c1aad2b7b8166425794e78143c28b734cc14371737641e56801b1"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "test_exhausted_budget_denied",
+        "start_line": 105,
+        "end_line": 108,
+        "sha256": "e79e17e21b2d85baf9d638cad3f4160a49bda0c3ee9ade6f14fac79d4bf1801d"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "test_one_remaining_generation_allowed",
+        "start_line": 111,
+        "end_line": 112,
+        "sha256": "be8250dfb5f1217f2f3c90e0780f40cca4946fb8bede14a855940ce3d2d90686"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "test_nonfinite_or_invalid_clock_denied",
+        "start_line": 115,
+        "end_line": 121,
+        "sha256": "c6ab75025449111781cab281efe771fa33f525d41822b6c4945a2582c8f87c07"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "test_invalid_lease_order_denied",
+        "start_line": 124,
+        "end_line": 126,
+        "sha256": "264e09423863ba03b047e42c72cb60cb9127bdce783f73361dc35c6830396dc3"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "test_backwards_clock_denied",
+        "start_line": 129,
+        "end_line": 130,
+        "sha256": "af549a328c39eb6179db95b6a520e2a7a3b67d7d73ee7426e7e1d4460c48547c"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "test_finite_integer_clock_allowed",
+        "start_line": 133,
+        "end_line": 135,
+        "sha256": "15236dd0fc4914bb8626ee8fb7e5770b9d5fba59c62afd8e781d46ad8f3b04cc"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "test_wrong_snapshot_type_denied",
+        "start_line": 138,
+        "end_line": 145,
+        "sha256": "c0809539e16eaac2bc8055e4bb0ba82fb2f49f2ae08f9d761f5f23ca15e15d01"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "test_repeated_advice_has_no_replay_protection_or_mutation",
+        "start_line": 148,
+        "end_line": 155,
+        "sha256": "7245b9041a795d1158f14d400fbdd6307e910742404ba4f1b6b2408b3727d2c6"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "test_decision_never_echoes_token",
+        "start_line": 158,
+        "end_line": 160,
+        "sha256": "289ff4185a081615faf4321e42b142114baf8023face9e55429834b688049235"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "test_invalid_clock_and_budget_deny_before_quarantine",
+        "start_line": 163,
+        "end_line": 165,
+        "sha256": "91f5d01016d135558a8e98291608048b5fdf527e2981f075624709982512a34a"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "test_all_active_delivery_states_never_quarantine",
+        "start_line": 167,
+        "end_line": 169,
+        "sha256": "c87c0a64908dab4f2c0a7f3c0953bc384a214deb34d97930943fe207cb16930a"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "name": "test_identity_controls_refused",
+        "start_line": 171,
+        "end_line": 173,
+        "sha256": "e3a64b841128c2f8a35a743745338ad533def2f6f266a55b0dfc6e694e436ebc"
+      }
+    ],
+    "patch_path": "tests/prep/MM-R1-reference-M1.patch",
+    "patch_sha256": "ed91756ef670fdd09f74eb72595e3f1d535bc0da2e95e92a0cec723a714f626d",
+    "peer_reported_patch_sha256": "ed91756ef670fdd09f74eb72595e3f1d535bc0da2e95e92a0cec723a714f626d",
+    "attachment_label_prefix": "e18ad7e2",
+    "label_note": "label is not a content checksum; actual bytes equal peer checksum",
+    "files": [
+      {
+        "path": "meemee/checkin_recovery_policy.py",
+        "sha256": "516128cc17da56ace7618dd703f4bb7bfe29a6cbf78a89f205bc65c851fa63c1"
+      },
+      {
+        "path": "tests/test_checkin_recovery_policy.py",
+        "sha256": "37f4b5d61f1c65c35113fa03e1e1a62395b5a6dc0ed5c1253bfa2c0319951279"
+      }
+    ]
+  },
+  "symbol_hash_definition": "UTF-8 source bytes from first decorator/def line through AST end_lineno inclusive, preserving LF",
+  "absent_fields": [
+    "lease_owner",
+    "token",
+    "generation",
+    "claimed_at",
+    "lease_until",
+    "delivery_state",
+    "send_intent",
+    "receipt"
+  ],
+  "source_files": [
+    {
+      "path": "meemee/companion/store.py",
+      "sha256": "73a7e492f703fb8c67c007d6279b00373fba67ba3bdcc12ad2e334b86b572b5e",
+      "symbols": [
+        {
+          "name": "CompanionStore.__init__",
+          "start_line": 31,
+          "end_line": 121,
+          "sha256": "5efd2fad8060ea76b415715532ff5a8cf529a8c929656a7b0196c98b3f12724d"
+        },
+        {
+          "name": "CompanionStore.schedule_checkin",
+          "start_line": 345,
+          "end_line": 380,
+          "sha256": "ccb18cc2c6105996b007d2aa8285522e462e39e91dc80c84e80729c90a149d2c"
+        },
+        {
+          "name": "CompanionStore.claim_checkin",
+          "start_line": 382,
+          "end_line": 402,
+          "sha256": "fdadbe209d2b669837dfa5ce9ab5299881a64336f2cf4812cf3f25b79fa209b4"
+        },
+        {
+          "name": "CompanionStore.finish_local_checkin",
+          "start_line": 404,
+          "end_line": 447,
+          "sha256": "747b2ddef148cda771c91859e35b8e96809b1270d7f1ca1b62bb0ca5a4a1602c"
+        },
+        {
+          "name": "CompanionStore.finish_checkin",
+          "start_line": 449,
+          "end_line": 455,
+          "sha256": "97ae9434a0eff33f07f84720ce1ffdeadc752ee0c7007feba480c6e1f930ebb7"
+        },
+        {
+          "name": "CompanionStore.fail_checkin",
+          "start_line": 457,
+          "end_line": 469,
+          "sha256": "aa18858e109f6ddb98cc7fb9c47df84e3d9f2040a74fadb4dba2f04ab94ff7d1"
+        },
+        {
+          "name": "CompanionStore.mark_checkin_unknown",
+          "start_line": 471,
+          "end_line": 477,
+          "sha256": "343c21dcf33945f5028bc8fb699080266992786440b68df9e81c079f765613dc"
+        },
+        {
+          "name": "CompanionStore.cancel_claimed_checkin",
+          "start_line": 479,
+          "end_line": 484,
+          "sha256": "51664c51759dbd7800bc417ef01d9ba03b1e579a9684a2e961dc451daf8ab187"
+        }
+      ]
+    },
+    {
+      "path": "meemee_persist_pg/companion.py",
+      "sha256": "a42ff37d3bc9832da751678593ff6e5c08d59cafcc1d633ed78a78d572decf15",
+      "symbols": [
+        {
+          "name": "CompanionStore.schedule_checkin",
+          "start_line": 207,
+          "end_line": 228,
+          "sha256": "e56b4747915f9615ee814e695e163301383936e33b177ed7193caf0ed4e8a508"
+        },
+        {
+          "name": "CompanionStore.claim_checkin",
+          "start_line": 230,
+          "end_line": 241,
+          "sha256": "1a1aa74336aec16b09998e87c3ce5988f50de839471c940caa81d7ae9c3eaab3"
+        },
+        {
+          "name": "CompanionStore.finish_local_checkin",
+          "start_line": 243,
+          "end_line": 269,
+          "sha256": "e7ab6506bfd7c7449874cc6a1ab580d4604b415c50ac8318a9da3f18608a5db9"
+        },
+        {
+          "name": "CompanionStore.finish_checkin",
+          "start_line": 271,
+          "end_line": 274,
+          "sha256": "f8e0cc6b3819a60b23ea6c69d34515a9eb03e317e9ca975113e5ac15bae18638"
+        },
+        {
+          "name": "CompanionStore.fail_checkin",
+          "start_line": 276,
+          "end_line": 281,
+          "sha256": "5b748f7d4a8734732ba22a967eb8bc3083d8254890ab5fe8af653e3dfe0e105d"
+        },
+        {
+          "name": "CompanionStore.mark_checkin_unknown",
+          "start_line": 283,
+          "end_line": 289,
+          "sha256": "38a58aa55541c92f2e7899952093963d32d1dc381901e46db22e5533e84c8d59"
+        },
+        {
+          "name": "CompanionStore.cancel_claimed_checkin",
+          "start_line": 291,
+          "end_line": 296,
+          "sha256": "d5902c14e0e9d82a947a8802dd77a1436c15eeccfdc9eed43be88c0ceb614f4e"
+        }
+      ]
+    },
+    {
+      "path": "meemee/companion/checkins.py",
+      "sha256": "0d3253f5893261d65ec48fd983d1327b1bb5e55b20487ef1ea68b4765bf8c046",
+      "symbols": [
+        {
+          "name": "CheckInScheduler.plan_user",
+          "start_line": 52,
+          "end_line": 72,
+          "sha256": "34c63706449e022e3c17210e3599d33d2b4216e418f8cf12f6ace5cb99a590be"
+        },
+        {
+          "name": "in_quiet_hours",
+          "start_line": 15,
+          "end_line": 23,
+          "sha256": "7f5b537fba61af95a595175026aa96ed0264be4cfcf59e9170056cb2252eb020"
+        }
+      ]
+    },
+    {
+      "path": "meemee/companion/worker.py",
+      "sha256": "60e855525e1be41eacc70b2f4aa80e65268f239296094569ccada85608e70bc1",
+      "symbols": [
+        {
+          "name": "deliver_due_once",
+          "start_line": 17,
+          "end_line": 126,
+          "sha256": "58647b90a2cff4dce99ac4213b6309570a4a9479fc1bd524c49d280b8835617e"
+        },
+        {
+          "name": "checkin_forever",
+          "start_line": 129,
+          "end_line": 149,
+          "sha256": "ed2e39a33082a2a73d7580f66b8a341271a11e85de0c63d0ec394a27322533ae"
+        }
+      ]
+    },
+    {
+      "path": "meemee/worker.py",
+      "sha256": "9f588b6e10ebf21d256475fecc723ca98b5bcdf6e64b2155c568ccf66788c4cf",
+      "symbols": []
+    },
+    {
+      "path": "meemee_persist_pg/sql/010_companion.sql",
+      "sha256": "cf6ebb47eaffc9d734b18a64fdec32f3fc6401b93021dc620cf181a24ddfe7f5",
+      "symbols": []
+    },
+    {
+      "path": "docs/audit/README.md",
+      "sha256": "47299d6f48f6881e3647ce3ede92625d1630eb7c65633a25573eb8e611668ea3",
+      "symbols": []
+    },
+    {
+      "path": "docs/audit/2026-10-07-buildout.md",
+      "sha256": "a655bd4c039c85ae3541c37ccc71021d448f6a9d54f0d8908e189afc253158c2",
+      "symbols": []
+    },
+    {
+      "path": "tests/test_checkin_retry_budget.py",
+      "sha256": "ba275fea6987c2b6a684c13831e1afa7546086954430d13daa5beded27b353f2",
+      "symbols": []
+    },
+    {
+      "path": "tests/test_companion_send_unknown_canary.py",
+      "sha256": "7ce90d72cb3349d6d106abc879b6cb325ef643ce7f499bf3ff0c9a01e964dd0c",
+      "symbols": []
+    },
+    {
+      "path": "tests/test_checkin_pre_effect_canary.py",
+      "sha256": "b28902658208f5032f82de632dea1408f2a63fbb739f6fe343b55e5156367f7a",
+      "symbols": []
+    },
+    {
+      "path": "tests/test_companion_local_atomic_canary.py",
+      "sha256": "74662b65a8e6bf43c86fe78dc94d8becf2d6e5d892e6509164c2b636acb2659e",
+      "symbols": []
+    },
+    {
+      "path": "tests/test_companion_pg_local_atomic.py",
+      "sha256": "c3810d5c33cbae1b26d458a57e9854642657bb72d96fdde4c92500ba7328a730",
+      "symbols": []
+    },
+    {
+      "path": "tests/test_companion_generation_cancel_canary.py",
+      "sha256": "650308623ab90dea7a7527c47df6c83da7e50e14e43d79184d94bc91d150ed61",
+      "symbols": []
+    },
+    {
+      "path": "tests/test_companion_local_preference_race_canary.py",
+      "sha256": "6d5109bf6cde8f4cc733e16b9b57039851c0c292b9bd9a9568947317be497b47",
+      "symbols": []
+    }
+  ],
+  "checks_run": [
+    "source reading",
+    "AST extraction/parsing only",
+    "SHA256 calculation"
+  ],
+  "tests_run": false
+}
