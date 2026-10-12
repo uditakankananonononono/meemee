@@ -1,13 +1,13 @@
 # Meemee status
 
 **Current core version:** 0.122.0  
-**Ledger:** 163 verified, 0 thin  
+**Historical ledger:** 187 numbered implementation entries in README; this is a recorded ledger count, not fresh acceptance of every capability
 **Supported production shape:** SQLite/WAL single-host; PostgreSQL memory and owner-scoped jobs are selectable but require target-environment live verification  
 **Last core verification (main, PostgreSQL-backed tokens, accounts and audit chain + pb7 494dda0 merge):** 525 core + `tests_pg` passed against live PostgreSQL 16.2 (1 skipped: opt-in live HF router check); 266 SDK passed including live PostgreSQL SDK runs; core Ruff clean  
 
 ## What is production-usable now
 
-The authoritative detailed list is the 123-item "Verified" section in [README.md](README.md). The main product surfaces are:
+The detailed historical list is the 187-item "Verified" section in [README.md](README.md). The main product surfaces are:
 
 - Bounded agent loop, typed tools, per-run and persistent exact-tool approvals, deterministic policy, secret scrubbing and safe provenance.
 - Local and scheduled jobs, atomic claims, retries, cooperative cancellation, resumable SSE and idempotent submission.

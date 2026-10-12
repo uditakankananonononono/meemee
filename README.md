@@ -5,7 +5,7 @@ Monitor deadline guard (2026-09-27): explicit timezone and positive fire budgets
 
 Meemee is Udita's private, local-first agent runtime. It turns a goal into an inspectable plan, gives a model a bounded set of real tools, records every result, and stops honestly when it finishes or cannot continue. This is a working commercial-grade single-host runtime, not a claim to be finished general intelligence. Read [STATUS.md](STATUS.md) for the exact verified, thin and missing ledger, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Verified in v0.122.0 (186)
+## Verified in v0.122.0 (187)
 
 Items 164-166, 172 and 174 are unreleased pb7 work, items 167-171 are unreleased pb4 work, items 173 and 175 are unreleased main-lane work item 176 is unreleased model-layer work item 177 is unreleased pg-email-verification work item 178 is unreleased pg-quotas-entitlements work item 179 is unreleased pg-runs work item 180 is unreleased pg-webhooks work item 181 is unreleased pg-companion work item 182 is unreleased pg-personal-context work item 183 is unreleased pg-monitors-reflection work item 184 is unreleased pg-deletion-browser work and item 185 is unreleased pg-vault-rotation work, all verified in this tree; the rest shipped in v0.122.0.
 
